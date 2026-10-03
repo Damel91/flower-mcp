@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 import tempfile
+import tomllib
 import unittest
 
 from markdown_it import MarkdownIt
@@ -208,7 +209,10 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(set(re.findall(r"https?://[^)\s]+", editions[0])), set(re.findall(r"https?://[^)\s]+", editions[1])))
                 self.assertEqual(len(re.findall(r"^#{1,6} ", editions[0], re.MULTILINE)), len(re.findall(r"^#{1,6} ", editions[1], re.MULTILINE)))
 
-    def test_installation_closes_the_story_and_separates_windows_source_from_release(self):
+    def test_installation_closes_the_story_with_version_pinned_release_assets(self):
+        project = tomllib.loads((ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        version = project["version"]
+        distribution = project["name"].replace("-", "_")
         for folder in reader.LANGUAGES:
             with self.subTest(folder=folder):
                 root = ROOT / folder
@@ -217,11 +221,11 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(paths[paths.index("06-operate.md") + 1], "try-flower.md")
                 self.assertIn("try-flower.md", (root / "06-operate.md").read_text(encoding="utf-8"))
                 source = (root / "try-flower.md").read_text(encoding="utf-8")
-                for name in ("install.sh", "install_flower.py", "flow_of_work_mcp-0.1.0-py3-none-any.whl",
-                             "flow_of_work_mcp-0.1.0.tar.gz", "SHA256SUMS", "BOOTSTRAP.md"):
-                    self.assertIn(f"/releases/download/v0.1.0/{name}", source)
-                self.assertIn("https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1", source)
-                self.assertNotIn("/releases/download/v0.1.0/install.ps1", source)
+                for name in ("install.sh", "install.ps1", "install_flower.py",
+                             f"{distribution}-{version}-py3-none-any.whl",
+                             f"{distribution}-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md"):
+                    self.assertIn(f"/releases/download/v{version}/{name}", source)
+                self.assertNotIn("https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1", source)
 
     def test_english_shell_and_errors_are_localized(self):
         output, _ = reader.compile_reader(ROOT / "eng")

@@ -120,7 +120,8 @@ jobs:
           assert Path(flow_of_work_mcp.__file__).is_relative_to(Path(sys.prefix))
           assert version('flow-of-work-mcp') == os.environ['FLOWER_EXPECTED_VERSION']
           command = str(Path(sys.prefix) / 'Scripts' / 'flower-mcp.exe')
-          assert subprocess.check_output([command, 'bootstrap']) == files('flow_of_work_mcp').joinpath('resources/agent-bootstrap.md').read_bytes()
+          output = subprocess.check_output([command, 'bootstrap']).decode('utf-8').replace('\r\n', '\n')
+          assert output == files('flow_of_work_mcp').joinpath('resources/agent-bootstrap.md').read_text(encoding='utf-8')
           assert not Path(os.environ['FLOWER_HOME']).exists()
           '@
           Push-Location $env:RUNNER_TEMP
