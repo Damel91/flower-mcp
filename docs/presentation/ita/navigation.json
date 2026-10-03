@@ -2,7 +2,7 @@
   "title": "Flower MCP",
   "language": "it",
   "subtitle": "Dal requisito al software",
-  "product_revision": "ddc83c6c79638eda63edae5be1bd9789faa44a2e",
+  "product_revision": "d832b5e53ab3f1082f9143ae15abc70543f264b6",
   "pages": [
     {"path": "README.md", "label": "Il percorso", "group": "Percorso"},
     {"path": "01-require.md", "label": "1. Require", "group": "Percorso"},

@@ -11,7 +11,7 @@ receives a plan or TODO, works through its own host and reports outcomes. The
 integrated path adds direct exchanges with compatible services. CodingCastle is
 the technical provider for which the public source contains packet and test
 adapters; it is not a dependency of Flower's core.
-[Provider factory](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/runtime_factory.py).
+[Provider factory](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/runtime_factory.py).
 
 ## Who owns what
 
@@ -24,7 +24,7 @@ adapters; it is not a dependency of Flower's core.
 
 A reachable provider is not automatically the project's provider. A passing
 test is not automatically an accepted milestone. These distinctions are part
-of the [public recipes](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+of the [public recipes](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## Portable associations, not hidden configuration
 
@@ -37,7 +37,7 @@ A receipt does **not** install a server or configure endpoints, credentials or
 commands. The operator must already have authorized the provider route. Moving
 an association does not mean moving the whole runtime or obtaining authority
 to modify a repository.
-[Association contract](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/association_receipts.py).
+[Association contract](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/association_receipts.py).
 
 ## Coordinated lens orientation
 
@@ -49,7 +49,7 @@ discovery is read-only and does not alter its standalone lens.
 A lens changes attention, not the tool catalog, lifecycle or permissions. If
 the provider is unavailable, the frame exposes degraded coordinated mode and
 any blocked technical area rather than pretending it is available.
-[Orientation adapter](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py), [interaction projection](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/interaction_projection.py).
+[Orientation adapter](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py), [interaction projection](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/interaction_projection.py).
 
 ## Source snapshots and intent grounding
 
@@ -58,7 +58,7 @@ behavior and packet targets. They check the contract, binding and required
 revision references: names or descriptions alone are not current evidence.
 Search and the graph remain in the provider; Flower consumes a projection
 for its engineering work.
-[Snapshot adapters](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py).
+[Snapshot adapters](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py).
 
 Grounding relates intent to observed implementation. `fow_ground_intent` is the
 internal path using a model and source provider. `fow_semantic` also offers
@@ -66,7 +66,7 @@ host-executed assignments with inputs and an output contract prepared by Flower;
 host grounding uses a closed evidence receipt and preserves host-declared
 provenance. It does not automatically convert that evidence into provider
 attestation.
-[Semantic recipe](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+[Semantic recipe](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## From semantic packet to technical work
 
@@ -81,7 +81,7 @@ In the configured path, `fow_packet_advance` can delegate operations to the
 the workspace belong to CodingCastle; Flower does not become a second
 compilation engine. An absent or incompatible provider, or stale evidence,
 leaves a gate open rather than authorizing invented execution.
-[Packet adapter](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py), [reconciliation recipes](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+[Packet adapter](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py), [reconciliation recipes](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## Workspace review and semantic correction
 
@@ -93,7 +93,7 @@ approval merely because it contains no error.
 A semantic defect found after review feeds an ordinary corrective packet. It
 is not automatic technical retry of failed compilation. The recipe separates
 continuation, verification, remediation and blockage.
-[Review and remediation recipes](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+[Review and remediation recipes](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## Campaigns, oracles and provider tests
 
@@ -107,7 +107,7 @@ or framework.
 Progression requires materialization authority and current attested results.
 A test that compiles but lacks the required attestation cannot establish
 authoritative product failure. Acceptance remains a separate decision.
-[Test adapter](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py), [campaign recipes](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+[Test adapter](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py), [campaign recipes](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## Two audiences, two projections
 
@@ -115,7 +115,7 @@ The model receives readable Markdown content. Server-to-server exchanges
 instead consume MCP `structuredContent` under versioned contracts: they do
 not reinterpret model-facing text as JSON. Readable output and structured
 receipts serve different audiences.
-[Structured-channel decoding](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py).
+[Structured-channel decoding](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py).
 
 ## What is present and what remains open
 
@@ -132,7 +132,7 @@ receipts serve different audiences.
 The presence of adapters in source **does not certify every running version
 combination**. This page describes capabilities and boundaries of the reference
 source, not a new live campaign for the Flower/CodingCastle pair.
-[Factory](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/runtime_factory.py), [status declared in recipes](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py).
+[Factory](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/runtime_factory.py), [status declared in recipes](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/src/flow_of_work_mcp/application/lifecycle_recipes.py).
 
 ## Spazio Comune with a provider
 

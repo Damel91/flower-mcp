@@ -10,26 +10,26 @@ server, the public name of Flow of Work MCP.
 ## Public repository and downloads
 
 - [GitHub repository](https://github.com/Damel91/flower-mcp): code, README and current documentation.
-- [Flower MCP 0.1.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.1.0): packages and version notes.
-- [Installation guide for the documented revision](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md): full procedures, configuration and removal.
-- [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
+- [Flower MCP 0.1.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.1.1): packages and version notes.
+- [Installation guide for the documented revision](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/docs/INSTALLATION.md): full procedures, configuration and removal.
+- [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
 
 | File | Purpose |
 | --- | --- |
-| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh) | Guided installation on macOS and Linux. |
-| [install.ps1](https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1) | Windows PowerShell launcher, distributed through the current repository. |
-| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install_flower.py) | Release Python installer; requires Python 3.11+. |
-| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/flow_of_work_mcp-0.1.0-py3-none-any.whl) | Manual installation of the Python package. |
-| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/flow_of_work_mcp-0.1.0.tar.gz) | Packaged release source. |
-| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/SHA256SUMS) | Checksums for release-file verification. |
-| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
+| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh) | Guided installation on macOS and Linux. |
+| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.ps1) | Windows PowerShell launcher from the same release. |
+| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install_flower.py) | Release Python installer; requires Python 3.11+. |
+| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/flow_of_work_mcp-0.1.1-py3-none-any.whl) | Manual installation of the Python package. |
+| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/flow_of_work_mcp-0.1.1.tar.gz) | Packaged release source. |
+| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/SHA256SUMS) | Checksums for release-file verification. |
+| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
 
-Release `v0.1.0` contains six assets; `install.ps1` is available from public
-source, not that release. The Windows launcher installs the `0.1.0` wheel.
+Release `v0.1.1` contains seven assets, including `install.ps1`.
+The Windows launcher installs the `0.1.1` wheel.
 The Python distribution remains `flow-of-work-mcp`; the command is `flower-mcp`.
-Downloads and anonymous access were checked on 3 October 2026. The guide is pinned
-to this presentation's documented revision; the README and launcher on `main`
-follow repository updates instead.
+Download links are pinned to this version, not mutable source on `main`. The
+guide is pinned to this presentation's documented revision; the current README
+follows repository updates instead.
 
 ## Before installing
 
@@ -52,11 +52,11 @@ After checking prerequisites, the public command starts the guided installer
 and lets you choose a client or installation only:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh | bash
 ```
 
 The script prepares an isolated Python environment and verifies backend and
-wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh)
+wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh)
 before running it. Options and manual procedures are in the complete guide.
 
 ### Windows
@@ -65,7 +65,7 @@ In a writable directory, download the public launcher and choose a client.
 This example uses Codex:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -74,7 +74,7 @@ script before starting it. `-Platform claude-code` or `-Platform cursor` selects
 another client; `-NoRegister` installs without registering one. The execution
 policy option applies only to that PowerShell process.
 
-For manual installation, follow [the wheel and checksum procedure](https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+For manual installation, follow [the wheel and checksum procedure](https://github.com/Damel91/flower-mcp/blob/d832b5e53ab3f1082f9143ae15abc70543f264b6/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 ## From installation to the first requirement
 
@@ -97,6 +97,6 @@ and retrieve a snapshot.
 
 If you encounter an issue, report it in the [repository issues](https://github.com/Damel91/flower-mcp/issues)
 with your operating system, version, client, operation and error, without
-credentials or personal data. Flower `0.1.0` is a first version under testing.
+credentials or personal data. Flower `0.1.1` is a first version under testing.
 
 [Back to Require](01-require.md) · [GitHub repository](https://github.com/Damel91/flower-mcp) · [Index](README.md)
