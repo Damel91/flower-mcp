@@ -1,224 +1,197 @@
 # Flower MCP
 
 <p align="center">
-  <img src="assets/flower-mcp-logo.png" alt="Flower MCP lifecycle logo" width="380">
+  <img src="assets/flower-mcp-logo.png" alt="Flower MCP: Require, Plan, Build, Verify, Deploy, Operate" width="380">
 </p>
 
-Version: `0.1.1` · License: `Apache-2.0` · Python: `3.11+`
+**Persistent software lifecycle management for coding agents.**
 
-Flower MCP gives coding agents a persistent software lifecycle: requirements,
-goals, milestones, changes, implementation plans, findings, verification,
-acceptance and handover. It keeps project state in a SQLite ledger while your
-coding agent investigates repositories, writes code and reports outcomes.
+Flower connects requirements, milestones and implementation plans to evidence,
+verification, acceptance and handover. It stores project state in a SQLite ledger
+and exposes it through the Model Context Protocol (MCP), while your coding agent
+investigates repositories, writes code and runs checks.
 
-Core works without CodingCastle, LM Studio or an internal model. Integration
-providers and internal inference are optional. The command is `flower-mcp`;
-the Python distribution retains the name `flow-of-work-mcp`, the import package
-`flow_of_work_mcp` and the existing `fow_*` MCP tools.
+Version: `0.1.1` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
-## Installation
+[Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
-Flower MCP is currently in testing. Release `v0.1.1` includes installers, a
-wheel and a source archive. Choose the route for your operating system below.
-Automatic installers use public GitHub release downloads. If access is restricted,
-use an authorized clone or manually downloaded wheel; downloading an installer
-with an authenticated browser does not authenticate its subsequent downloads.
+## Why Flower exists
 
-| Operating system | Implemented installation routes | Verification so far |
-| --- | --- | --- |
-| macOS | Bash release installer, manual source/wheel, Python release installer | Installed package and public MCP workflow verified locally |
-| Linux | Bash release installer, manual source/wheel, Python release installer | Installed wheel and MCP smoke verified in Ubuntu CI on Python 3.11–3.14; anonymous Linux release-installer run remains pending |
-| Windows | PowerShell release launcher, manual source/wheel and Python release installer | PowerShell 5.1 helpers and installed-wheel public MCP behavior checked in CI; target workstation/client test remains separate |
+An agent can finish a patch while the requested behavior remains unverified.
+A later session needs to know which decisions still apply, which results are
+current and what remains open before delivery.
 
-Release `v0.1.1` includes the Windows launcher as `install.ps1`, covered by
-`SHA256SUMS`. All automatic installation commands below select that same version.
+Flower checks declared plan dependencies and verification obligations, applies
+lifecycle gates, and preserves result provenance and revisions. A handover
+recovers current work and the next gate. Exported Markdown plans support
+authorized offline work and reconciliation when Flower returns.
 
-### Prerequisites
+**The model is not the system of record.** Persistence supports the lifecycle;
+the purpose is to keep agreed intent, delegated work and evidence connected.
 
-These prerequisites cover core installation. Choose one route; its requirements differ:
+You can start with a scenario: what should the software do and show? Using
+Flower's bootstrap guidance, the agent investigates technical gaps and asks
+progressive questions about your intent. It records requirements and decisions
+in Flower and proposes a roadmap for your confirmation before implementation.
+You do not need to define the architecture up front.
 
-- **Bash release installer (macOS/Linux):** Bash, `curl`, `awk`,
-  `sha256sum` or `shasum`, standard shell utilities, trusted HTTPS certificates
-  and Internet access. Python is prepared automatically when no suitable
-  interpreter is available.
-- **PowerShell launcher (Windows):** Windows PowerShell 5.1+ and Internet access.
-  It reuses Python 3.11+ when available or prepares managed Python when missing.
-  Git and curl are unnecessary.
-- **Manual source/wheel installation or the Python release installer:** Python
-  **3.11 or newer** with `venv`, `ensurepip` and SSL support. Creating the venv
-  supplies its `pip`. Git is needed only to clone the source; a downloaded wheel
-  and the Python release installer do not require Git or `curl`.
-- **Agent registration:** have the selected Codex, Claude Code or Cursor client
-  installed. Flower does not install the client. You can install Flower first
-  and configure a client later.
+## Who does what?
 
-Use a writable user directory. Flower itself installs into a virtual environment;
-system package-manager commands used to obtain prerequisites may need administrator
-permission. Follow the [prerequisite setup guide](docs/INSTALLATION.md#prerequisites)
-for macOS, Linux and Windows, including installation of `curl`, Python and Git.
+| Participant | Responsibility |
+| --- | --- |
+| **Person / project authority** | Clarifies intent, confirms scope and makes the acceptance and delivery decisions assigned to them. |
+| **Coding agent and its host** | Investigates the repository, chooses the technical implementation, edits code, runs checks and reports outcomes. |
+| **Flower MCP** | Maintains lifecycle records, applies its operation gates, tracks evidence provenance and returns durable state. |
 
-### Automatic installation on macOS/Linux
+The core works without CodingCastle, LM Studio or an internal model. Optional
+providers can connect lifecycle records to technical evidence and execution;
+see [integration boundaries](docs/presentation/eng/advanced.md).
 
-Check your shell and downloader first:
+### Implemented ≠ verified ≠ accepted
 
-```sh
-bash --version
-curl --version
-```
+| State | What it means |
+| --- | --- |
+| **Implemented** | The material work is declared produced. |
+| **Verified** | The required checks have passed for the declared scope and relevant current revision, with supporting evidence. |
+| **Accepted** | The competent authority has made the required decision. |
 
-If `curl` is missing on Ubuntu/Debian, install it before using the download command:
+Local checks, deferred campaigns and acceptance stay distinct. Results from an
+older revision do not automatically satisfy current work.
+[Plans, evidence and gates](docs/presentation/eng/concepts.md).
 
-```sh
-sudo apt update
-sudo apt install curl ca-certificates
-```
+## Example: two people book the same room
 
-Other Linux package managers and macOS alternatives are in the
-[prerequisite setup guide](docs/INSTALLATION.md#prerequisites).
-The Linux package-manager commands follow the
-[curl installation guide](https://everything.curl.dev/install/linux.html).
+*Illustrative scenario from the presentation, not an executed demo or benchmark.*
 
-With release assets publicly accessible:
+The requirement: two concurrent requests for the same room and time slot must
+produce one confirmation and one explicit conflict. The agent records the requirement and
+scenario in Flower, plans bounded work with dependencies and checks, and reports
+results against the relevant revision. The implementation remains its job.
+
+Two confirmations would be a defect; recurring bookings would be a new request.
+Flower preserves that distinction and the work still awaiting verification.
+
+The walkthrough follows **Require → Plan → Build → Verify → Deploy → Operate**.
+These are lifecycle perspectives, not mandatory sequential commands or built-in
+deployment and monitoring. Follow the story in
+[English](docs/presentation/eng/README.md) or [Italiano](docs/presentation/ita/README.md).
+
+## Quick start
+
+Choose one installation route. Use a writable user directory and have a
+**Codex, Claude Code or Cursor** client installed. Downloads require Internet
+access and trusted HTTPS certificates. Check the
+[prerequisites](docs/INSTALLATION.md#prerequisites) first.
+
+### macOS / Linux
+
+Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh) before execution:
 
 ```sh
 curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh | bash
 ```
 
-The installer prepares an isolated Python environment, obtains Python when
-needed, verifies release downloads and lets you choose Codex, Claude Code,
-Cursor or installation without registration. It does not authenticate private
-GitHub downloads.
+The installer prepares an isolated Python environment, obtaining Python if
+needed, checks backend and wheel checksums, and offers optional client registration.
 
-### Manual installation from source
+### Windows
 
-Have Git and Python 3.11+ installed. Run each step separately and stop if it fails.
-While the repository is private, cloning requires authorized GitHub access.
-
-**macOS/Linux:**
-
-```sh
-python3 --version
-git --version
-git clone https://github.com/Damel91/flower-mcp.git
-cd flower-mcp
-python3 -m venv .venv
-.venv/bin/python -m pip install .
-.venv/bin/python -m pip check
-.venv/bin/flower-mcp install --platform codex --dry-run
-.venv/bin/flower-mcp install --platform codex
-.venv/bin/flower-mcp doctor --platform codex
-```
-
-**Windows, in PowerShell (implemented route; native verification pending):**
-
-```powershell
-py -3 --version
-git --version
-git clone https://github.com/Damel91/flower-mcp.git
-cd flower-mcp
-py -3 -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install .
-& .\.venv\Scripts\python.exe -m pip check
-& .\.venv\Scripts\flower-mcp.exe install --platform codex --dry-run
-& .\.venv\Scripts\flower-mcp.exe install --platform codex
-& .\.venv\Scripts\flower-mcp.exe doctor --platform codex
-```
-
-The selected interpreter must report Python 3.11 or newer. Use a version selector
-such as `py -3.12` consistently if your default Python 3 is older.
-These commands use the venv executables directly; no activation or PowerShell
-execution-policy change is needed.
-
-Use `claude-code` or `cursor` instead of `codex` for another client. Then reload
-that client and follow its connection/trust prompt. `doctor` inspects files; it
-does not prove an MCP connection.
-
-### Automatic Windows installation with PowerShell
-
-The script is [tools/install.ps1](tools/install.ps1). If you already have the
-repository, run it from the repository root without downloading another copy:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install.ps1 -Platform codex
-```
-
-Download the version-pinned release launcher and run it in a dedicated PowerShell process:
+Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run the
+second command only after the download succeeds:
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
-Use `-Platform claude-code`, `-Platform cursor`, or `-NoRegister` instead. The
-execution-policy option applies only to this process. The script verifies the
-pinned Python backend before execution, reuses the canonical installer and
-prepares managed Python 3.11 when necessary. It does not install the coding client.
+Use `-Platform claude-code`, `-Platform cursor` or `-NoRegister` as appropriate.
+The launcher reuses or prepares Python and installs the checked release wheel.
+The execution-policy option applies only to that process.
 
-The default installation environment is `%LOCALAPPDATA%\Flower MCP Install\venv`;
-persistent profiles and ledgers live separately in `%LOCALAPPDATA%\Flower MCP`.
-Reload the selected client and follow its connection/trust prompt. The target
-Windows workstation and client experience remain to be tested. The
-[CI workflow](https://github.com/Damel91/flower-mcp/actions/workflows/ci.yml)
-checks the launcher helpers and the current installed wheel, bootstrap and
-public MCP workflow on Windows. Release-download installation, managed Python
-preparation when Python is missing and
-coding-client connections remain unverified on Windows.
+**Manual alternatives:** [source](docs/INSTALLATION.md#manual-installation-from-source)
+or [release wheel with checksum verification](docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+Both require Python 3.11+ with SSL, `venv` and `ensurepip`; cloning also requires
+Git. The [installation guide](docs/INSTALLATION.md) covers downloads, upgrades,
+profiles, removal and recovery.
 
-### Manual wheel installation
+### Connect an agent and start a project
 
-You can instead download the wheel and `SHA256SUMS` from the
-[release](https://github.com/Damel91/flower-mcp/releases/tag/v0.1.1), compare the
-wheel's SHA-256 with its manifest entry, create a venv and install that local wheel.
-See the complete [macOS/Linux and Windows wheel commands](docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+1. **Reload the registered client and approve its MCP connection.** The client
+   starts Flower. If you installed without registration, configure the client
+   first. Do not start another server process against the same ledger.
+2. **Give your agent this request** while working in the project you intend to
+   develop. Replace "the installed Flower MCP command" with the executable path
+   returned by the installer:
 
-The release's `install_flower.py` is also available if Python 3.11+ is already
-installed. See [installation](docs/INSTALLATION.md) for prerequisite setup,
-launcher options, bootstrap commands, profiles, upgrades, removal and recovery.
+> Run the installed Flower MCP command with `bootstrap` and follow its output
+> to update this project's `AGENTS.md`, preserving its existing rules. Verify
+> the MCP connection, discover the lifecycle projects and select the intended
+> project explicitly. If the ledger is empty, I authorize creating a lifecycle
+> project for this repository. Report an ambiguous project choice or a missing
+> connection instead of guessing. Read the durable project snapshot and follow
+> Flower's current recipes. Help me describe the first scenario, clarify its
+> intent progressively and present a roadmap for my confirmation before coding.
 
-## Using Flower
+The bootstrap command prints instructions; the agent merges them into
+`AGENTS.md`. Ensure your host loads those instructions through its supported
+mechanism. Project selection and state recovery use Flower's public tools;
+the agent follows their current recipes.
 
-For a scenario-led introduction, choose [English](docs/presentation/eng/README.md)
-or [Italiano](docs/presentation/ita/README.md). Both editions follow one project
-through the six lifecycle petals, with a public-tool map and a matching offline
-HTML reader. The [presentation index](docs/presentation/README.md) links both.
+For a manual source installation, the bootstrap command is
+`.venv/bin/flower-mcp bootstrap` on macOS/Linux or
+`& .\.venv\Scripts\flower-mcp.exe bootstrap` in PowerShell, **from the Flower
+checkout**. From your application project, use the absolute path to that
+executable. A bare `flower-mcp` command works only when it is on `PATH`.
 
-Ask your coding agent to run `flower-mcp bootstrap` and follow the output to
-update the current project's `AGENTS.md`, preserving its existing rules.
-The instructions are bundled with the installed package and also supplied as
-`BOOTSTRAP.md` in each release. Its persistent agent template includes progressive
-scenario-first dialogue, autonomous technical investigation, complete plan gates,
-semantic correction and honest progress reporting. See [agent bootstrap](docs/BOOTSTRAP.md) for a
-ready-to-use model request and the connection/project-selection steps.
+**First-use check:** the agent can see Flower's tools, select the intended
+project and retrieve its current snapshot and next gate. `doctor` checks
+configuration files; it does not prove the MCP connection. The
+[bootstrap guide](docs/BOOTSTRAP.md) includes a ready-to-use agent request.
 
-Begin with `fow_interaction`, using a fresh host-owned interaction reference,
-and select the intended lifecycle project explicitly. `fow_capabilities`
-describes the available operations and engineering recipes; `fow_handover`
-returns durable project state and the next gate.
+## Documentation
 
-Flower records lifecycle authority and evidence provenance. External plans
-expose ordered instructions, dependencies and checks through `fow_external_work`.
-Exported Markdown plans can be executed by your coding agent while Flower is
-offline, then reconciled against the declared revision when it returns.
-Completion, verification and human acceptance are separate states.
+| Topic | English | Italiano |
+| --- | --- | --- |
+| Scenario-led walkthrough | [Start here](docs/presentation/eng/README.md) | [Inizia qui](docs/presentation/ita/README.md) |
+| Concepts, packet validation and evidence | [Concepts](docs/presentation/eng/concepts.md) | [Concetti](docs/presentation/ita/concepts.md) |
+| Public MCP tools | [Tool map](docs/presentation/eng/tools.md) | [Mappa dei tool](docs/presentation/ita/tools.md) |
+| Optional providers and technical execution | [Integrations](docs/presentation/eng/advanced.md) | [Integrazioni](docs/presentation/ita/advanced.md) |
+| Comparison with related projects | [Comparison](docs/presentation/eng/comparison.md) | [Confronto](docs/presentation/ita/comparison.md) |
+| Sources, provenance and limits | [Sources](docs/presentation/eng/sources.md) | [Fonti](docs/presentation/ita/sources.md) |
 
-`fow_bindings` manages project associations. `fow_semantic` supports preparation,
-validation and adoption of semantic results, including host-produced results
-without an internal model. Inspect each operation's current prerequisites.
+The [presentation index](docs/presentation/README.md) also links the offline readers.
 
-Profiles, client configuration and runtime databases are stored outside the
-package. One process owns each ledger; use separate profiles for independent
-client sessions. You can start the stdio server directly with `flower-mcp serve`.
+## Development method
 
-## Releases
+Flower is a personal project by **Davide Mele**, developed outside his
+professional work. He designed the system, defined requirements and constraints,
+guided verification and made acceptance decisions; coding agents, primarily
+**Codex**, carried out repository investigation, technical planning,
+implementation, tests and document updates. The work first used a documentary
+framework; Flower moves part of that discipline into a persistent server.
+Read the method in [English](docs/presentation/eng/method.md) or
+[Italiano](docs/presentation/ita/method.md).
 
-Release `v0.1.1` contains a wheel, a source archive, `install.sh`, `install.ps1`,
-`install_flower.py`, `BOOTSTRAP.md` and `SHA256SUMS`. The source archive includes
-the bilingual presentation and offline reader. See [version notes](docs/RELEASE-NOTES-0.1.1.md).
-The repository includes the installer source and the build/publish workflow. See [releasing](docs/RELEASING.md) for
-versioning and the explicit publication procedure.
+## Status and operating limits
 
-## License and attribution
+Flower `0.1.1` is in testing. The [release notes](docs/RELEASE-NOTES-0.1.1.md) and
+[installation status](docs/INSTALLATION.md#testing-status-and-release-access)
+distinguish installed-package and CI checks from end-to-end installer and
+target-client qualification.
 
-Flower MCP is licensed under the [Apache License 2.0](LICENSE).
-[NOTICE](NOTICE) credits Flower MCP and copyright holder Davide Mele.
-Both files are included in source and wheel distributions.
+Flower's gates govern its server operations, not every action available to the
+agent's host. Host-declared evidence is not an independent source audit;
+correctness depends on the implementation, checks and oracles behind it.
+Optional CodingCastle adapters need compatible services; their presence alone
+does not establish that a runtime pairing has been qualified.
+
+To report an issue, include the Flower version, operating system, client,
+operation and error in the [issue tracker](https://github.com/Damel91/flower-mcp/issues),
+without credentials or private project data.
+
+## License and compatibility
+
+Licensed under [Apache-2.0](LICENSE), with attribution in [NOTICE](NOTICE).
+The public command is `flower-mcp`; the Python distribution `flow-of-work-mcp`,
+import package `flow_of_work_mcp` and MCP prefix `fow_*` retain their existing names.
