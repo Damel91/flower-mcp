@@ -1,0 +1,26 @@
+"""Persistence port for durable operation jobs."""
+from __future__ import annotations
+
+from typing import Mapping, Protocol
+
+from flow_of_work_mcp.core.domain.jobs import JobRecord
+
+
+class JobRepository(Protocol):
+    def create_job(self, job: JobRecord) -> JobRecord: ...
+
+    def mark_job_running(self, project_id: str, job_id: str) -> JobRecord: ...
+
+    def complete_job(
+        self, project_id: str, job_id: str, *, result: Mapping[str, object]
+    ) -> JobRecord: ...
+
+    def block_job(self, project_id: str, job_id: str, *, terminal_reason: str) -> JobRecord: ...
+
+    def fail_job(self, project_id: str, job_id: str, *, terminal_reason: str) -> JobRecord: ...
+
+    def get_job(self, project_id: str, job_id: str) -> JobRecord: ...
+
+    def jobs(self, project_id: str) -> list[JobRecord]: ...
+
+    def recover_interrupted_jobs(self) -> int: ...

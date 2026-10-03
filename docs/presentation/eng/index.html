@@ -1,0 +1,1730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="color-scheme" content="light dark">
+<title>Flower MCP: From requirements to software</title>
+<link rel="stylesheet" href="../assets/github-markdown.css">
+<link rel="stylesheet" href="../assets/reader.css">
+<script src="../assets/reader.js" defer></script>
+</head>
+<body>
+<!-- Generated from linked Markdown. Source digest: 083a3beef91e37039976575e1ec8d0d144245cc13c536219d1e6c4deffd2c6a9. -->
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header">
+<a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
+<nav aria-label="Quick access"><a href="#page=tools.md" data-page="tools.md">Tools</a><a href="#page=sources.md" data-page="sources.md">Sources</a><a id="language-switch" href="../ita/index.html">Italiano</a></nav>
+</header>
+<div class="layout">
+<aside><details id="navigation" open><summary>Presentation index</summary><nav aria-label="Chapters"><h2>The story</h2><a href="#page=README.md" data-page="README.md" aria-current="page">The presentation</a><a href="#page=01-require.md" data-page="01-require.md">1. Require</a><a href="#page=02-plan.md" data-page="02-plan.md">2. Plan</a><a href="#page=03-build.md" data-page="03-build.md">3. Build</a><a href="#page=04-verify.md" data-page="04-verify.md">4. Verify</a><a href="#page=05-deploy.md" data-page="05-deploy.md">5. Deploy</a><a href="#page=06-operate.md" data-page="06-operate.md">6. Operate</a><a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a><h2>Further reading</h2><a href="#page=scenario.md" data-page="scenario.md">Spazio Comune</a><a href="#page=concepts.md" data-page="concepts.md">Essential concepts</a><a href="#page=tools.md" data-page="tools.md">Public tools</a><a href="#page=comparison.md" data-page="comparison.md">Comparing planes</a><a href="#page=advanced.md" data-page="advanced.md">Advanced integrations</a><a href="#page=method.md" data-page="method.md">How I built it</a><a href="#page=sources.md" data-page="sources.md">Sources and limits</a><a href="#page=talk.md" data-page="talk.md">Talk outline</a><a href="#page=reader.md" data-page="reader.md">Offline reader</a><h2>Flower resource</h2><a href="#page=..%2F..%2FBOOTSTRAP.md" data-page="../../BOOTSTRAP.md">Public bootstrap</a></nav></details></aside>
+<main id="content" tabindex="-1"><p id="route-error" role="status" data-missing-page="The requested page is unavailable. You can start again from the index." data-missing-section="The requested section is unavailable. The chapter is still accessible." hidden></p><article class="markdown-body" data-document="README.md" data-title="Flower MCP: from requirements to software" data-prefix="doc-b33563055168"><h1 id="doc-b33563055168--flower-mcp-from-requirements-to-software">Flower MCP: from requirements to software</h1>
+<p><img src="../assets/flower-mcp-logo.png" alt="Flower MCP: Require, Plan, Build, Verify, Deploy, Operate" /></p>
+<p><a href="../ita/index.html">Italiano</a> · <a href="../index.html">Available languages</a></p>
+<p><strong>Writing code is part of the job. Keeping what we wanted, what we built and
+what we can demonstrate connected is another.</strong></p>
+<p>This presentation follows the development of <strong>Spazio Comune</strong> (&quot;Shared Space&quot;),
+a small room-booking service for an association. One story spans the six petals
+of the logo: Require, Plan, Build, Verify, Deploy and Operate.</p>
+<blockquote>
+<p>Spazio Comune is an educational scenario, not a delivered application or a
+passed benchmark. Conversations, requirements and plans are editorial examples.
+Behaviors attributed to Flower are linked to its public sources.</p>
+</blockquote>
+<h2 id="doc-b33563055168--one-story-six-questions">One story, six questions</h2>
+<table>
+<thead>
+<tr>
+<th>Chapter</th>
+<th>Question</th>
+<th>The problem we will encounter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#page=01-require.md" data-page="01-require.md">1. Require</a></td>
+<td>What does &quot;book a room&quot; actually mean?</td>
+<td>An understandable wish is not yet a defined behavior.</td>
+</tr>
+<tr>
+<td><a href="#page=02-plan.md" data-page="02-plan.md">2. Plan</a></td>
+<td>Can the plan be executed without inventing its missing parts?</td>
+<td>A task list can hide dependencies and decisions.</td>
+</tr>
+<tr>
+<td><a href="#page=03-build.md" data-page="03-build.md">3. Build</a></td>
+<td>Who writes the code, and what does Flower maintain?</td>
+<td>The agent's work must remain connected to recognizable intent and revision.</td>
+</tr>
+<tr>
+<td><a href="#page=04-verify.md" data-page="04-verify.md">4. Verify</a></td>
+<td>What exactly have we verified?</td>
+<td>&quot;The tests pass&quot; does not mean &quot;the behavior has been accepted.&quot;</td>
+</tr>
+<tr>
+<td><a href="#page=05-deploy.md" data-page="05-deploy.md">5. Deploy</a></td>
+<td>What are we authorized to deliver?</td>
+<td>A local result does not prove operation in the target environment.</td>
+</tr>
+<tr>
+<td><a href="#page=06-operate.md" data-page="06-operate.md">6. Operate</a></td>
+<td>Does this issue change the software or change the request?</td>
+<td>Fixing a defect and introducing a feature are different decisions.</td>
+</tr>
+</tbody>
+</table>
+<p>The presentation closes with <a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a>: the repository,
+public downloads, prerequisites and connecting an agent to your first project.</p>
+<h2 id="doc-b33563055168--three-participants-three-responsibilities">Three participants, three responsibilities</h2>
+<ul>
+<li><strong>The person:</strong> clarifies intent, confirms scope and owns the acceptance and
+delivery decisions assigned to them.</li>
+<li><strong>The coding agent:</strong> investigates, chooses the technical implementation,
+writes code, runs checks and reports results through its host's tools.</li>
+<li><strong>Flower MCP:</strong> preserves lifecycle state, applies the gates defined by its
+contracts and returns context, work and evidence provenance.</li>
+</ul>
+<p>Flower is not a new model and does not replace the coding agent. The core does
+not require CodingCastle or an internal model. A capable agent is still needed:
+the server does not decide whether a requirement is right or whether the software
+has value for its user.</p>
+<h2 id="doc-b33563055168--you-can-also-read-by-topic">You can also read by topic</h2>
+<ul>
+<li><a href="#page=scenario.md" data-page="scenario.md">The complete scenario</a>: people, scope and open questions.</li>
+<li><a href="#page=concepts.md" data-page="concepts.md">Essential concepts</a>: lenses, packets, PVP, TODOs and current evidence.</li>
+<li><a href="#page=tools.md" data-page="tools.md">The public-tool map</a>: which tools belong to each area.</li>
+<li><a href="#page=comparison.md" data-page="comparison.md">Comparison with other planes</a>: strengths, tradeoffs and use cases, including the documentary Flow.</li>
+<li><a href="#page=advanced.md" data-page="advanced.md">Advanced integrations</a>: cross-server evidence, packets, workspace and campaigns.</li>
+<li><a href="#page=method.md" data-page="method.md">How I built it</a>: agents, the documentary plane, time and source size.</li>
+<li><a href="#page=sources.md" data-page="sources.md">Sources and limits</a>: the basis of the claims and what we do not promise.</li>
+<li><a href="#page=talk.md" data-page="talk.md">The talk outline</a>: a short path, questions and useful detours.</li>
+<li><a href="#page=reader.md" data-page="reader.md">The local reader</a>: offline access to the same Markdown.</li>
+</ul>
+<p>This is not a one-way chain. A test can take us back to requirements; an issue in
+use can open a change. The petals tell the lifecycle story, not six automatic
+steps or six tools to execute in sequence.</p>
+<p><strong>Start with <a href="#page=01-require.md" data-page="01-require.md">Require</a>.</strong></p>
+</article><article class="markdown-body" data-document="01-require.md" data-title="1. Require: behavior before code" data-prefix="doc-3b641b096e6c" hidden><h1 id="doc-3b641b096e6c--1-require-behavior-before-code">1. Require: behavior before code</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=scenario.md" data-page="scenario.md">Scenario</a> · <a href="#page=02-plan.md" data-page="02-plan.md">Next: Plan</a></p>
+<blockquote>
+<p>&quot;I don't want the same room to be booked twice.&quot;</p>
+</blockquote>
+<h2 id="doc-3b641b096e6c--the-question-hidden-inside-the-request">The question hidden inside the request</h2>
+<p>The agent could start with a calendar, login and database. Marta could approve
+an attractive screen without noticing that the central behavior is still undefined.</p>
+<p>Luca and another person see an available room at the same time. Both press
+&quot;Book.&quot; What should happen? An availability list updated before the click does
+not answer that question.</p>
+<p>The first job is to make intent observable: <strong>one confirmation, an explicit
+conflict for the other request and no invented confirmation when the outcome
+is missing</strong>. The engineer/agent owns the technical solution; Marta clarifies
+the result she needs, without having to choose a database isolation level.</p>
+<h2 id="doc-3b641b096e6c--what-flower-preserves">What Flower preserves</h2>
+<p>The agent registers the requirement, rationale, use case and sequence. Guided
+bootstrap can preserve selected answers with provenance and link them to
+canonical entities. Correspondence is a judgment declared by the host, not
+automatic semantic proof.</p>
+<table>
+<thead>
+<tr>
+<th>Story element</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Requirement SC-R1</td>
+<td>Defines the result to preserve.</td>
+</tr>
+<tr>
+<td>Use case &quot;Book a room&quot;</td>
+<td>Explains actor, goal and observable outcome.</td>
+</tr>
+<tr>
+<td>A sequence with two requests</td>
+<td>Exposes a conflict hidden by the happy path.</td>
+</tr>
+<tr>
+<td>Marta's answer linked to scope</td>
+<td>Makes the decision recoverable instead of leaving it in chat.</td>
+</tr>
+</tbody>
+</table>
+<p>A derived roadmap is presented to the person and confirmed with a real reference.
+<strong>Confirming scope does not accept software that has not been produced.</strong></p>
+<h2 id="doc-3b641b096e6c--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>A conversation can contain proposals, observations and decisions with different
+authority. A new session must not turn the last sentence it read into a new
+requirement. Revisioned requirements, linked answers and confirmed scope make
+the governing intent explicit.</p>
+<p>Flower does not prevent an external agent from using other tools outside that
+workflow: its gates govern server operations. Agent adherence to instructions
+remains something to test on its host.</p>
+<h2 id="doc-3b641b096e6c--on-the-public-surface">On the public surface</h2>
+<p><code>fow_bootstrap</code> guides intake; <code>fow_register_requirement</code> registers a requirement;
+<code>fow_goal</code> holds use cases, sequences and expectations. <code>fow_capabilities</code> exposes
+the <code>engineering-bootstrap</code> recipe and exact operation contracts.</p>
+<p><strong>Question for the audience:</strong> if we change agents tomorrow, will the new agent
+know why we chose this behavior, or find only a screen that has already been built?</p>
+<p><a href="#page=concepts.md&amp;section=lenses" data-page="concepts.md" data-section="lenses">More: intent and lenses</a> · <a href="#page=sources.md&amp;section=require" data-page="sources.md" data-section="require">Chapter sources</a></p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=02-plan.md" data-page="02-plan.md">Next: Plan</a></p>
+</article><article class="markdown-body" data-document="02-plan.md" data-title="2. Plan: a list is not yet a plan" data-prefix="doc-52142ad3dd9b" hidden><h1 id="doc-52142ad3dd9b--2-plan-a-list-is-not-yet-a-plan">2. Plan: a list is not yet a plan</h1>
+<p><a href="#page=01-require.md" data-page="01-require.md">Previous: Require</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=03-build.md" data-page="03-build.md">Next: Build</a></p>
+<blockquote>
+<p>&quot;Let's build the API, calendar and tests. Then deliver.&quot;</p>
+</blockquote>
+<h2 id="doc-52142ad3dd9b--a-hidden-dependency">A hidden dependency</h2>
+<p>The calendar unit wants to use an API that does not exist yet. If the plan
+contains only activity names, the agent can invent its signature, states and
+outcome semantics. Two components compile separately but speak different languages.</p>
+<p>In our example, the agent chooses a technical implementation and records it:
+a <code>reserve_room</code> function returns confirmation, conflict or a temporary error.
+This is a <strong>declaration of what will be produced</strong>, not evidence that the function
+is already available.</p>
+<h2 id="doc-52142ad3dd9b--an-educational-packet-not-an-api-recipe">An educational packet, not an API recipe</h2>
+<table>
+<thead>
+<tr>
+<th>Unit</th>
+<th>Ordered action</th>
+<th>Produces or consumes</th>
+<th>Check at its boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A: service</td>
+<td>Implement the atomic booking decision and agreed outcomes.</td>
+<td>Produces the &quot;booking outcome&quot; contract.</td>
+<td>Service test: concurrent requests do not produce two confirmations.</td>
+</tr>
+<tr>
+<td>B: interface</td>
+<td>Consume A's contract, display outcomes and handle the temporary error.</td>
+<td>Explicitly requires A's contract.</td>
+<td>Checks for the three outcomes and the distinction between error and confirmation.</td>
+</tr>
+<tr>
+<td>C: integration</td>
+<td>Connect the components and prepare the simultaneous-request procedure.</td>
+<td>Depends on the required components already being produced.</td>
+<td>Available local verification; the real-environment check remains separate.</td>
+</tr>
+</tbody>
+</table>
+<p>The units belong to a packet: an increment with intent, scope and completion
+criteria. The table explains its structure; it does not contain complete Flower
+operation payloads and does not authorize execution by itself.</p>
+<h2 id="doc-52142ad3dd9b--what-flower-checks">What Flower checks</h2>
+<p>The <strong>Packet Validation Projection, PVP</strong>, derives closure from plan data:
+which unit implements each criterion, who produces a contract, which predecessors
+make it available to its consumer, and which checks are local or deferred.</p>
+<p>A consumer does not maintain a second copy of its producer's clauses. An absent
+producer, or one unavailable in the declared order, leaves a gap. A structurally
+closed plan cannot ignore a current semantic blocker: <strong>closure, plan acceptance
+and execution admission are distinct</strong>.</p>
+<h2 id="doc-52142ad3dd9b--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>The model needs to know what it can use <strong>now</strong>. A planned future must not become
+present source evidence. Separating declarations, dependencies and outcomes makes
+this distinction inspectable without asking the user to approve every unit.</p>
+<p>PVP does not demonstrate that <code>reserve_room</code> is correct or choose the best
+architecture. Technical design and clause quality remain the agent's work.</p>
+<h2 id="doc-52142ad3dd9b--on-the-public-surface">On the public surface</h2>
+<p><code>fow_promote_milestone</code> defines milestone scope and policies; <code>fow_change</code> governs
+the change; <code>fow_packet_author</code> builds packets and plans; <code>fow_external_work</code>
+exposes standalone validation and handoff.</p>
+<p><strong>Question for the audience:</strong> could another agent execute this increment
+without reopening every decision made by the first?</p>
+<p><a href="#page=concepts.md&amp;section=pvp" data-page="concepts.md" data-section="pvp">More: PVP</a> · <a href="#page=sources.md&amp;section=plan" data-page="sources.md" data-section="plan">Chapter sources</a></p>
+<p><a href="#page=01-require.md" data-page="01-require.md">Previous: Require</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=03-build.md" data-page="03-build.md">Next: Build</a></p>
+</article><article class="markdown-body" data-document="03-build.md" data-title="3. Build: work leaves the server, intent does not" data-prefix="doc-77983e290283" hidden><h1 id="doc-77983e290283--3-build-work-leaves-the-server-intent-does-not">3. Build: work leaves the server, intent does not</h1>
+<p><a href="#page=02-plan.md" data-page="02-plan.md">Previous: Plan</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=04-verify.md" data-page="04-verify.md">Next: Verify</a></p>
+<blockquote>
+<p>The plan is ready. The agent starts. Halfway through, the session is interrupted.</p>
+</blockquote>
+<h2 id="doc-77983e290283--code-has-an-executor">Code has an executor</h2>
+<p>The agent writes <code>reserve_room</code>, runs tests and builds the interface using its
+host's tools. Flower <strong>does not open the repository to write that code</strong> and does
+not launch those tests in standalone external-agent mode.</p>
+<p>From the accepted plan, closed PVP and current admission, Flower can expose a
+dependency-ordered TODO. When the agent declares an outcome, Flower preserves
+the unit, plan authority, artifact references and checks with their provenance.
+It does not turn that declaration into a filesystem audit it never performed.</p>
+<h2 id="doc-77983e290283--if-flower-is-unavailable">If Flower is unavailable</h2>
+<p>A complete Markdown export preserves the necessary context: intent, criteria,
+decisions, contracts, unit order and checks. The host saves the artifact and can
+work offline <strong>within the authority it has already received</strong>.</p>
+<p>A file named &quot;plan&quot; is not enough. A draft export exposes its gaps and is not
+executable authority. A new intent issue or missing authority cannot be resolved
+by inventing offline authorization.</p>
+<h2 id="doc-77983e290283--if-the-plan-changes-during-the-interruption">If the plan changes during the interruption</h2>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>What must remain distinguishable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The agent reconnects and reports the same outcome.</td>
+<td>An identical replay must not create a second independent result.</td>
+</tr>
+<tr>
+<td>Two different reports declare an outcome under the same authority.</td>
+<td>The conflict requires explicit reconciliation.</td>
+</tr>
+<tr>
+<td>The current plan has changed.</td>
+<td>The old revision's result remains history, not automatic closure of new work.</td>
+</tr>
+</tbody>
+</table>
+<p>The TODO is a state projection, not a parallel list the model must manually
+synchronize in chat memory.</p>
+<h2 id="doc-77983e290283--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>A &quot;done&quot; message does not identify which plan was executed, which outputs exist
+or what remains open. Continuity does not come from copying the entire chat:
+facts, authority and the next gate are recovered from their owner.</p>
+<p>Flower does not guarantee every agent will follow an exported plan. It preserves
+and checks its own protocol boundary; the agent loop is qualified separately.</p>
+<h2 id="doc-77983e290283--on-the-public-surface">On the public surface</h2>
+<p><code>fow_external_work</code> offers <code>export_plan</code>, <code>todo</code>, <code>report_outcome</code> and
+<code>reconcile_outcome</code>. <code>fow_handover</code> reconstructs current state and progress.
+The relevant recipe is <code>standalone-external-plan</code>.</p>
+<p><strong>Question for the audience:</strong> after an interruption, do we resume from the
+agent's last sentence or from the work that was actually recorded?</p>
+<p><a href="#page=concepts.md&amp;section=current-evidence" data-page="concepts.md" data-section="current-evidence">More: authority and evidence</a> · <a href="#page=sources.md&amp;section=build" data-page="sources.md" data-section="build">Chapter sources</a></p>
+<p><a href="#page=02-plan.md" data-page="02-plan.md">Previous: Plan</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=04-verify.md" data-page="04-verify.md">Next: Verify</a></p>
+</article><article class="markdown-body" data-document="04-verify.md" data-title="4. Verify: green against which question?" data-prefix="doc-d08678d07d3d" hidden><h1 id="doc-d08678d07d3d--4-verify-green-against-which-question">4. Verify: green against which question?</h1>
+<p><a href="#page=03-build.md" data-page="03-build.md">Previous: Build</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=05-deploy.md" data-page="05-deploy.md">Next: Deploy</a></p>
+<blockquote>
+<p>&quot;All tests pass. Can we say double bookings are solved?&quot;</p>
+</blockquote>
+<h2 id="doc-d08678d07d3d--the-happy-path-is-not-concurrency">The happy path is not concurrency</h2>
+<p>One request succeeds. A second request, arriving later, is rejected. That test
+is useful, but it does not check two simultaneous requests. A service test also
+does not demonstrate that the interface displays the right outcome when the
+connection drops after confirmation.</p>
+<p>The agent must create and run checks that address the agreed behaviors. Flower
+preserves obligations, results and links; it does not make an irrelevant test
+appropriate just because its exit code is zero.</p>
+<h2 id="doc-d08678d07d3d--an-honest-view-of-progress">An honest view of progress</h2>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Example in the story</th>
+<th>What it does not imply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Implementation</td>
+<td>Service and interface are declared produced.</td>
+<td>That they are correct or accepted.</td>
+</tr>
+<tr>
+<td>Local verification</td>
+<td>The unit's available checks have declared outcomes and references.</td>
+<td>That a campaign on the real system was executed.</td>
+</tr>
+<tr>
+<td>Deferred verification</td>
+<td>A complete check in the target environment remains open.</td>
+<td>An implicit failure or automatic promotion to pass.</td>
+</tr>
+<tr>
+<td>Acceptance</td>
+<td>The competent authority makes the required decision with appropriate evidence.</td>
+<td>That a completion percentage was enough.</td>
+</tr>
+</tbody>
+</table>
+<p>Derived progress concerns selected criteria and scope. A missing denominator
+does not become &quot;100%.&quot; Evidence from an older plan is not used as though it
+unconditionally verifies the current one.</p>
+<h2 id="doc-d08678d07d3d--a-campaign-not-just-a-test-command">A campaign, not just a test command</h2>
+<p>The agent can structure cases, obligations, expected responses and oracle
+sources: simultaneous requests, cancellation, permissions and lost responses.
+Flower provides campaign authoring, advancement and inspection; technical
+execution and attestation depend on the available path and prerequisites.</p>
+<p>Optional semantic analysis can help: <code>fow_semantic</code> prepares bounded SRS or
+grounding assignments, including host-executed ones. A structurally valid
+response is not universal proof. Adoption records an audit with provenance,
+not automatic product acceptance.</p>
+<h2 id="doc-d08678d07d3d--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>&quot;Verified,&quot; &quot;completed&quot; and &quot;accepted&quot; are too convenient unless we say by
+whom, with which data and at which revision. Keeping them distinct preserves
+what we know and makes what we do not know visible.</p>
+<h2 id="doc-d08678d07d3d--on-the-public-surface">On the public surface</h2>
+<p><code>fow_campaign_author</code>, <code>fow_campaign_advance</code> and <code>fow_campaign_inspect</code> manage
+campaigns; <code>fow_record_verification</code>, <code>fow_traceability</code> and <code>fow_assurance</code>
+record evidence and decisions. Operations requiring a provider or model are
+not presented as available when those prerequisites are missing.</p>
+<p><strong>Question for the audience:</strong> if we read &quot;100%,&quot; can we also identify which
+questions have not been verified yet?</p>
+<p><a href="#page=concepts.md&amp;section=three-meanings-of-done" data-page="concepts.md" data-section="three-meanings-of-done">More: three meanings of done</a> · <a href="#page=sources.md&amp;section=verify" data-page="sources.md" data-section="verify">Chapter sources</a></p>
+<p><a href="#page=03-build.md" data-page="03-build.md">Previous: Build</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=05-deploy.md" data-page="05-deploy.md">Next: Deploy</a></p>
+</article><article class="markdown-body" data-document="05-deploy.md" data-title="5. Deploy: deliver a bounded promise" data-prefix="doc-a65cca43d692" hidden><h1 id="doc-a65cca43d692--5-deploy-deliver-a-bounded-promise">5. Deploy: deliver a bounded promise</h1>
+<p><a href="#page=04-verify.md" data-page="04-verify.md">Previous: Verify</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=06-operate.md" data-page="06-operate.md">Next: Operate</a></p>
+<blockquote>
+<p>&quot;It works on my computer. Shall we make it available to the association?&quot;</p>
+</blockquote>
+<h2 id="doc-a65cca43d692--the-environment-changes-not-just-the-address">The environment changes, not just the address</h2>
+<p>Spazio Comune must use the target database, manage credentials and permissions,
+and survive a restart. Local checks remain useful evidence, but do not by
+themselves demonstrate these behaviors.</p>
+<p>The agent prepares the technical implementation, uses available tools and reports
+what it actually executed. The person retains the delivery and irreversible-effect
+authority assigned to them.</p>
+<p><strong>Flower is not a deployer, credential manager or CI/CD system.</strong> The Deploy
+petal represents governed delivery: scope, evidence, open obligations,
+acceptance decisions and recoverable state.</p>
+<h2 id="doc-a65cca43d692--delivery-in-our-story">Delivery in our story</h2>
+<table>
+<thead>
+<tr>
+<th>Statement</th>
+<th>The condition that must be explicit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;This is the first version.&quot;</td>
+<td>Which scope and behaviors does it include?</td>
+</tr>
+<tr>
+<td>&quot;These checks passed.&quot;</td>
+<td>Which results, environment and revision?</td>
+</tr>
+<tr>
+<td>&quot;This verification remains open.&quot;</td>
+<td>Who performs it, and why was it not marked completed?</td>
+</tr>
+<tr>
+<td>&quot;The association accepts the result.&quot;</td>
+<td>Is there a real decision by the competent authority, not agent-generated text?</td>
+</tr>
+</tbody>
+</table>
+<p>A planned milestone and an accepted milestone are distinct states. Flower
+provides governed transitions and evidence references; it does not unilaterally
+choose the risk threshold Marta must accept.</p>
+<h2 id="doc-a65cca43d692--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>If delivery is only a chat message, a successor can confuse produced software
+with accepted software. A recoverable handover must say what exists, what
+governs the work and which obligation remains open.</p>
+<p>A record is not production-grade certification. Even an explicitly experimental
+first release can have a precise, honest handover.</p>
+<h2 id="doc-a65cca43d692--on-the-public-surface">On the public surface</h2>
+<p><code>fow_accept_milestone</code> governs the required acceptance; <code>fow_handover</code> returns
+snapshots and handovers; <code>fow_get_artifacts</code> retrieves available artifacts.
+Exporting a plan and accepting software are not the same operation.</p>
+<p><strong>Question for the audience:</strong> can Spazio Comune's recipients distinguish what
+was delivered from what was merely promised?</p>
+<p><a href="#page=concepts.md&amp;section=responsibilities" data-page="concepts.md" data-section="responsibilities">More: responsibilities</a> · <a href="#page=sources.md&amp;section=deploy" data-page="sources.md" data-section="deploy">Chapter sources</a></p>
+<p><a href="#page=04-verify.md" data-page="04-verify.md">Previous: Verify</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=06-operate.md" data-page="06-operate.md">Next: Operate</a></p>
+</article><article class="markdown-body" data-document="06-operate.md" data-title="6. Operate: when the world responds" data-prefix="doc-eba200274d73" hidden><h1 id="doc-eba200274d73--6-operate-when-the-world-responds">6. Operate: when the world responds</h1>
+<p><a href="#page=05-deploy.md" data-page="05-deploy.md">Previous: Deploy</a> · <a href="#page=try-flower.md" data-page="try-flower.md">Next: try Flower</a> · <a href="#page=README.md" data-page="README.md">Index</a></p>
+<blockquote>
+<p>&quot;There was a conflict last night. And we need to book every Tuesday.&quot;</p>
+</blockquote>
+<h2 id="doc-eba200274d73--two-reports-two-paths">Two reports, two paths</h2>
+<p>The first can be a defect against SC-R1: two incompatible confirmations. The
+second introduces recurring bookings, excluded from the first scope. Combining
+them into one &quot;fix&quot; risks changing the product without saying so.</p>
+<table>
+<thead>
+<tr>
+<th>Report</th>
+<th>Question before modifying anything</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Two confirmations for the same interval</td>
+<td>Which evidence demonstrates a divergence from current intent?</td>
+</tr>
+<tr>
+<td>A booking every Tuesday</td>
+<td>How does scope change, and which new rules must be clarified and confirmed?</td>
+</tr>
+</tbody>
+</table>
+<p>The agent investigates the defect with its tools. Flower does not monitor the
+service, autonomously collect incidents or diagnose Spazio Comune's database.</p>
+<h2 id="doc-eba200274d73--correct-without-rewriting-the-past">Correct without rewriting the past</h2>
+<p>For a divergence, the agent records a finding, rereads the current requirement,
+scenario, milestone and packet, and declares an intent reassessment. Only a
+current assessment establishing a correction within agreed intent admits that
+corrective path.</p>
+<p>The new packet stays linked to the finding and carries a regression obligation.
+An assessment does not prove the bug is solved; subsequent results must still
+support its disposition.</p>
+<p>Recurring bookings follow the ordinary intent-change path: new rules, revisions
+and confirmation of affected scope. SC-R1 is not retroactively rewritten to
+justify two incorrect confirmations.</p>
+<h2 id="doc-eba200274d73--if-the-person-or-agent-changes">If the person or agent changes</h2>
+<p>Another session selects the project and recovers a snapshot. It can read current
+state and history without treating the model as the system of record. The next
+gate guides work; it does not guarantee every semantic decision will be correct.</p>
+<h2 id="doc-eba200274d73--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
+<p>The lifecycle does not end at first delivery. We must preserve the reason for
+a change, the authority admitting it and the distinction between old evidence
+and new work. A message log does not replace these relationships.</p>
+<h2 id="doc-eba200274d73--on-the-public-surface">On the public surface</h2>
+<p><code>fow_assurance</code> records findings, reassessments and corrective links;
+<code>fow_revise_requirement</code> preserves revisions; <code>fow_change</code> governs changes;
+<code>fow_handover</code> supports recovery. The story can return to Require or Plan:
+there is no need to declare a new project for every correction.</p>
+<p><strong>Question for the audience:</strong> will the next agent know whether to repair an
+unfulfilled promise or design a new one?</p>
+<p><a href="#page=concepts.md&amp;section=current-evidence" data-page="concepts.md" data-section="current-evidence">More: history and current state</a> · <a href="#page=sources.md&amp;section=operate" data-page="sources.md" data-section="operate">Chapter sources</a></p>
+<p>The presentation now moves from the story to your project: <a href="#page=try-flower.md" data-page="try-flower.md">install and try Flower</a>.</p>
+<p><a href="#page=05-deploy.md" data-page="05-deploy.md">Previous: Deploy</a> · <a href="#page=try-flower.md" data-page="try-flower.md">Next: try Flower</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=01-require.md" data-page="01-require.md">Back to Require</a></p>
+</article><article class="markdown-body" data-document="try-flower.md" data-title="Now try Flower MCP" data-prefix="doc-d92560641e4a" hidden><h1 id="doc-d92560641e4a--now-try-flower-mcp">Now try Flower MCP</h1>
+<p><a href="#page=06-operate.md" data-page="06-operate.md">Previous: Operate</a> · <a href="#page=README.md" data-page="README.md">Index</a></p>
+<p>We followed Spazio Comune from requirements to change. The last step brings
+that method into your project: <strong>install Flower and connect your coding agent</strong>.
+Spazio Comune remains an educational scenario; the download is the Flower MCP
+server, the public name of Flow of Work MCP.</p>
+<h2 id="doc-d92560641e4a--public-repository-and-downloads">Public repository and downloads</h2>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">GitHub repository</a>: code, README and current documentation.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.1.0" rel="noopener noreferrer">Flower MCP 0.1.0 release</a>: packages and version notes.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md" rel="noopener noreferrer">Installation guide for the documented revision</a>: full procedures, configuration and removal.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md#prerequisites" rel="noopener noreferrer">Operating-system prerequisites</a>: what to prepare before downloading.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh" rel="noopener noreferrer">install.sh</a></td>
+<td>Guided installation on macOS and Linux.</td>
+</tr>
+<tr>
+<td><a href="https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1" rel="noopener noreferrer">install.ps1</a></td>
+<td>Windows PowerShell launcher, distributed through the current repository.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install_flower.py" rel="noopener noreferrer">install_flower.py</a></td>
+<td>Release Python installer; requires Python 3.11+.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/flow_of_work_mcp-0.1.0-py3-none-any.whl" rel="noopener noreferrer">Python wheel</a></td>
+<td>Manual installation of the Python package.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/flow_of_work_mcp-0.1.0.tar.gz" rel="noopener noreferrer">Source archive</a></td>
+<td>Packaged release source.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/SHA256SUMS" rel="noopener noreferrer">SHA256SUMS</a></td>
+<td>Checksums for release-file verification.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/BOOTSTRAP.md" rel="noopener noreferrer">BOOTSTRAP.md</a></td>
+<td>Public instructions for starting agent work with Flower.</td>
+</tr>
+</tbody>
+</table>
+<p>Release <code>v0.1.0</code> contains six assets; <code>install.ps1</code> is available from public
+source, not that release. The Windows launcher installs the <code>0.1.0</code> wheel.
+The Python distribution remains <code>flow-of-work-mcp</code>; the command is <code>flower-mcp</code>.
+Downloads and anonymous access were checked on 3 October 2026. The guide is pinned
+to this presentation's documented revision; the README and launcher on <code>main</code>
+follow repository updates instead.</p>
+<h2 id="doc-d92560641e4a--before-installing">Before installing</h2>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Essential prerequisites</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>macOS / Linux, Bash installer</td>
+<td>Bash, curl, awk, sha256sum or shasum, shell utilities, HTTPS access and Internet. Suitable Python is reused or prepared by the installer.</td>
+</tr>
+<tr>
+<td>Windows, PowerShell launcher</td>
+<td>Windows PowerShell 5.1+, HTTPS access and Internet. Suitable Python is reused or prepared by the launcher.</td>
+</tr>
+<tr>
+<td>Manual installation or Python installer</td>
+<td>Python 3.11+ with ssl, venv and ensurepip; dependency access. Git is needed only to clone source.</td>
+</tr>
+<tr>
+<td>Agent connection</td>
+<td>Codex, Claude Code or Cursor already installed; a writable user directory.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The core requires no LM Studio, internal model, CodingCastle or VPN.</strong> Inference
+remains with your chosen coding agent. The reader works offline, while a fresh
+installation downloads packages and dependencies.</p>
+<h2 id="doc-d92560641e4a--choose-a-route">Choose a route</h2>
+<h3 id="doc-d92560641e4a--macos-and-linux">macOS and Linux</h3>
+<p>After checking prerequisites, the public command starts the guided installer
+and lets you choose a client or installation only:</p>
+<pre><code class="language-sh">curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh | bash
+</code></pre>
+<p>The script prepares an isolated Python environment and verifies backend and
+wheel checksums. You can download and inspect <a href="https://github.com/Damel91/flower-mcp/releases/download/v0.1.0/install.sh" rel="noopener noreferrer">the script</a>
+before running it. Options and manual procedures are in the complete guide.</p>
+<h3 id="doc-d92560641e4a--windows">Windows</h3>
+<p>In a writable directory, download the public launcher and choose a client.
+This example uses Codex:</p>
+<pre><code class="language-powershell">Invoke-WebRequest -UseBasicParsing -Uri &quot;https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1&quot; -OutFile &quot;.\install.ps1&quot;
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
+</code></pre>
+<p>Run the commands separately and stop if the download fails. You can inspect the
+script before starting it. <code>-Platform claude-code</code> or <code>-Platform cursor</code> selects
+another client; <code>-NoRegister</code> installs without registering one. The execution
+policy option applies only to that PowerShell process.</p>
+<p>For manual installation, follow <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md#manual-installation-from-a-release-wheel" rel="noopener noreferrer">the wheel and checksum procedure</a>.</p>
+<h2 id="doc-d92560641e4a--from-installation-to-the-first-requirement">From installation to the first requirement</h2>
+<ol>
+<li>Keep the executable path and bootstrap command returned by the installer.
+After registration, reload the client and approve its MCP connection as
+requested. The client starts the registered server.</li>
+<li>Ask the agent to run <code>flower-mcp bootstrap</code> using that path. The command prints
+instructions; the agent integrates them into the selected project, preserving
+existing rules. <a href="#page=..%2F..%2FBOOTSTRAP.md" data-page="../../BOOTSTRAP.md">The public bootstrap</a> explains this step.</li>
+<li>The agent reads <code>fow_capabilities</code>, discovers and explicitly selects the project
+through <code>fow_interaction</code>; for a fresh ledger, it first creates the agreed
+project with <code>fow_create_project</code>.</li>
+<li>Retrieve the snapshot through <code>fow_handover</code> and start with Require's question:
+<strong>what behavior do we want, in which scenario and within which limits?</strong></li>
+</ol>
+<p>Use a separate project for a first trial: revisit Spazio Comune, clarify a use
+case and work toward an exportable plan. Successful installation and <code>doctor</code>
+alone do not prove client connection: check that the agent can see the tools
+and retrieve a snapshot.</p>
+<p>If you encounter an issue, report it in the <a href="https://github.com/Damel91/flower-mcp/issues" rel="noopener noreferrer">repository issues</a>
+with your operating system, version, client, operation and error, without
+credentials or personal data. Flower <code>0.1.0</code> is a first version under testing.</p>
+<p><a href="#page=01-require.md" data-page="01-require.md">Back to Require</a> · <a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">GitHub repository</a> · <a href="#page=README.md" data-page="README.md">Index</a></p>
+</article><article class="markdown-body" data-document="scenario.md" data-title="Spazio Comune: a story to follow" data-prefix="doc-7919894c00b1" hidden><h1 id="doc-7919894c00b1--spazio-comune-a-story-to-follow">Spazio Comune: a story to follow</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=01-require.md" data-page="01-require.md">Require</a></p>
+<h2 id="doc-7919894c00b1--we-need-a-website-to-book-our-rooms">&quot;We need a website to book our rooms&quot;</h2>
+<p>An association manages two rooms. Bookings happen through messages and a shared
+spreadsheet. Two people can believe they have secured the same space. The
+coordinator must reconstruct who requested what and which request is confirmed.</p>
+<p><strong>Marta</strong> coordinates the association. <strong>Luca</strong> organizes meetings. A <strong>coding
+agent</strong> helps build the service. Flower maintains the service's engineering
+project, not the members' bookings: the application database and the engineering
+ledger are different things.</p>
+<h2 id="doc-7919894c00b1--the-storys-initial-scope">The story's initial scope</h2>
+<p>The first version offers an availability view, a booking request, an explicit
+outcome and cancellation by authorized people. Payments, recurring bookings and
+external notifications are outside this first scope.</p>
+<p>The rules do not become true because we write them here. In the story, we assume
+Marta has clarified them and the agent has registered them in the Flower project:</p>
+<table>
+<thead>
+<tr>
+<th>Educational label</th>
+<th>Agreed behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SC-R1</td>
+<td>Two confirmed bookings cannot occupy the same room during the same interval.</td>
+</tr>
+<tr>
+<td>SC-R2</td>
+<td>The interface distinguishes confirmation, conflict and temporary unavailability: an error never implies confirmation.</td>
+</tr>
+<tr>
+<td>SC-R3</td>
+<td>A member cancels their own booking; the coordinator can also manage other members' bookings.</td>
+</tr>
+<tr>
+<td>SC-R4</td>
+<td>The cancellation outcome makes the new availability observable.</td>
+</tr>
+</tbody>
+</table>
+<p><code>SC-R1</code> and the other labels only help us follow the story. <strong>They are not IDs
+issued by Flower.</strong> Real IDs, revisions and fingerprints come from the server;
+we do not invent them to make a demonstration look credible.</p>
+<h2 id="doc-7919894c00b1--the-two-recurring-questions">The two recurring questions</h2>
+<ol>
+<li><strong>Simultaneous requests:</strong> both people can see the room as available. Which
+component must prevent two confirmations?</li>
+<li><strong>A missing confirmation:</strong> the connection drops. Luca tries again. How do
+we distinguish a new request from observing an existing result?</li>
+</ol>
+<p>These are product problems the agent must investigate and implement. Flower
+helps record their meaning and verification obligations; it does not automatically
+implement concurrency or idempotency in the booking service.</p>
+<h2 id="doc-7919894c00b1--what-this-story-is-not">What this story is not</h2>
+<p>It is not proof that a local model can build Spazio Comune. It is not a performance
+comparison with other agents. It is not a declaration of security, compliance or
+production-grade quality. It is a concrete way to understand what Flower governs
+before, during and after coding.</p>
+<p><a href="#page=README.md" data-page="README.md">Back to the index</a> · <a href="#page=01-require.md" data-page="01-require.md">Enter the first scenario</a></p>
+</article><article class="markdown-body" data-document="concepts.md" data-title="Essential concepts, without memorizing a schema" data-prefix="doc-bfb8d422b155" hidden><h1 id="doc-bfb8d422b155--essential-concepts-without-memorizing-a-schema">Essential concepts, without memorizing a schema</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=tools.md" data-page="tools.md">Public tools</a> · <a href="#page=sources.md" data-page="sources.md">Sources</a></p>
+<h2 id="doc-bfb8d422b155--responsibilities">Responsibilities</h2>
+<p>Flower owns requirements, the Goal Graph, milestones, changes, plans, findings,
+declared evidence, acceptance and handover. The agent and its technical tools
+own repository investigation, code, builds, tests and Git. The person owns
+intent and the final decisions assigned to them.</p>
+<p>Flower's SQLite ledger is not the developed application's database. It does not
+automatically contain its source code or proof that the agent read it.</p>
+<h2 id="doc-bfb8d422b155--lenses">Lenses</h2>
+<p>A lens is an operational perspective on a project. The nine areas are bootstrap,
+requirements, Goal Graph, milestones, changes, packet lifecycle, assurance,
+handover and campaigns. They do not map one-to-one to the six narrative petals.</p>
+<p>Selecting a lens changes attention, <strong>not authorization, completion or truth</strong>.
+The client's MCP catalog is not magically hidden and recreated on every area
+change. The current snapshot and gates retain their authority.</p>
+<h2 id="doc-bfb8d422b155--packets">Packets</h2>
+<p>A work increment with intent, scope and criteria. Its plan contains ordered
+units, dependencies, instructions and checks. Readable numbers are stable
+identities, not rankings to compact after a removal.</p>
+<h2 id="doc-bfb8d422b155--pvp">PVP</h2>
+<p>The Packet Validation Projection is derived from canonical data, not a second
+plan to maintain. It exposes criterion coverage, producers, consumers,
+dependencies and verification obligations. A promise of future output does not
+become existing source evidence.</p>
+<p>Structural closure does not demonstrate semantic correctness or code quality.
+The external workflow requires an accepted plan, closed PVP and current admission.
+A relevant semantic finding can still block it.</p>
+<h2 id="doc-bfb8d422b155--todos-and-exports">TODOs and exports</h2>
+<p>The TODO derives from the plan and current reports. It does not execute code.
+A Markdown export transfers bounded authority; the host-saved file is useful
+offline, but editing it does not change Flower's state.</p>
+<h2 id="doc-bfb8d422b155--current-evidence">Current evidence</h2>
+<p>A report declares outcome, revision, artifacts and provenance. Flower checks
+consistency with issued authority and preserves history. Host-declared evidence
+does not mean source code audited by the server.</p>
+<p>If the relevant authority changes, an earlier result can remain true as a
+historical fact without completing the new work. A blind retry after a lost
+response is not the right way to recover state.</p>
+<h2 id="doc-bfb8d422b155--three-meanings-of-done">Three meanings of done</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Implemented</td>
+<td>The material work is declared produced.</td>
+</tr>
+<tr>
+<td>Verified</td>
+<td>The required outcomes and evidence exist for that scope.</td>
+</tr>
+<tr>
+<td>Accepted</td>
+<td>The competent authority has made the required decision.</td>
+</tr>
+</tbody>
+</table>
+<p>They are not synonyms. Deferred checks remain open even when implementation
+and local checks are complete. Progress without scope or a denominator is
+unknown, not perfect.</p>
+<h2 id="doc-bfb8d422b155--mcp-in-this-story">MCP in this story</h2>
+<p>The protocol lets a client call server tools. Markdown content guides the
+model; structured content preserves machine-readable data. Flower does not
+replace the system prompt, model, host permissions or agent adherence to recipes.
+No internal model is required for core standalone workflows; some advanced
+operations have their own prerequisites.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=scenario.md" data-page="scenario.md">Revisit the story</a></p>
+</article><article class="markdown-body" data-document="tools.md" data-title="The public-tool map" data-prefix="doc-c00bac3c298d" hidden><h1 id="doc-c00bac3c298d--the-public-tool-map">The public-tool map</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=concepts.md" data-page="concepts.md">Concepts</a> · <a href="#page=sources.md&amp;section=catalog" data-page="sources.md" data-section="catalog">Sources</a></p>
+<p>Names retain the technical <code>fow_</code> prefix. A client may add its own prefix. This
+map describes the <strong>36 tools in the reference source</strong>; it is not a list of
+payloads to copy. A multiplexed tool offers several operations with different
+prerequisites. The current server catalog remains the operational authority.</p>
+<h2 id="doc-c00bac3c298d--orientation-and-bootstrap">Orientation and bootstrap</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_capabilities</code></td>
+<td>Read a summary, one recipe, an operation contract or detailed documentation.</td>
+</tr>
+<tr>
+<td><code>fow_create_project</code></td>
+<td>Create an isolated lifecycle project. Creation does not select it.</td>
+</tr>
+<tr>
+<td><code>fow_interaction</code></td>
+<td>Select a project and lens, obtain an operational frame and resolve a choice. Resolution suggests a call; it does not execute it.</td>
+</tr>
+<tr>
+<td><code>fow_bootstrap</code></td>
+<td>Manage intake, answers, correspondences, roadmap and confirmations. Binding operations have their own prerequisites.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--requirements-and-behavior">Requirements and behavior</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_register_requirement</code></td>
+<td>Register a canonical requirement.</td>
+</tr>
+<tr>
+<td><code>fow_get_requirement</code></td>
+<td>Retrieve a requirement and immutable history.</td>
+</tr>
+<tr>
+<td><code>fow_revise_requirement</code></td>
+<td>Append a revision instead of overwriting its predecessor.</td>
+</tr>
+<tr>
+<td><code>fow_set_requirement_lifecycle</code></td>
+<td>Execute a policy-permitted transition.</td>
+</tr>
+<tr>
+<td><code>fow_goal</code></td>
+<td>Define and read use cases, sequences and behavioral expectations.</td>
+</tr>
+<tr>
+<td><code>fow_validate_srs</code></td>
+<td>Start structural SRS validation with durable job state. Semantics use a distinct path.</td>
+</tr>
+<tr>
+<td><code>fow_import_srs</code></td>
+<td>Validate and atomically import an accepted initial baseline.</td>
+</tr>
+<tr>
+<td><code>fow_revise_srs_baseline</code></td>
+<td>Classify and register a baseline revision with source provenance.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--milestones">Milestones</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_promote_milestone</code></td>
+<td>Define the scope and policies of a planned milestone.</td>
+</tr>
+<tr>
+<td><code>fow_accept_milestone</code></td>
+<td>Record governed acceptance with required evidence. It is not a synonym for planning.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--changes-and-work">Changes and work</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_change</code></td>
+<td>Govern changes, dependencies, state and evidence; packets have dedicated surfaces.</td>
+</tr>
+<tr>
+<td><code>fow_packet_author</code></td>
+<td>Build canonical packets, units, declarations and plans.</td>
+</tr>
+<tr>
+<td><code>fow_packet_advance</code></td>
+<td>Advance deterministic gates to a decision or asynchronous boundary. The selected technical path may require a provider.</td>
+</tr>
+<tr>
+<td><code>fow_packet_inspect</code></td>
+<td>Read scope, units, gates or history through bounded projections.</td>
+</tr>
+<tr>
+<td><code>fow_external_work</code></td>
+<td>Validate a standalone plan, select external mode, export Markdown, read TODOs and record/reconcile outcomes. It does not execute code.</td>
+</tr>
+<tr>
+<td><code>fow_run</code></td>
+<td>Manage implementation-run records, steps, dependencies and work views. It is not a new coding agent.</td>
+</tr>
+<tr>
+<td><code>fow_what_next</code></td>
+<td>Derive next work from durable state, with pagination.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--evidence-and-campaigns">Evidence and campaigns</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_record_verification</code></td>
+<td>Record declared deterministic or live evidence. It does not generate test results by itself.</td>
+</tr>
+<tr>
+<td><code>fow_traceability</code></td>
+<td>Read a paginated project traceability projection.</td>
+</tr>
+<tr>
+<td><code>fow_audit_phase</code></td>
+<td>Start a phase audit on declared scope; prerequisites depend on the audit.</td>
+</tr>
+<tr>
+<td><code>fow_assurance</code></td>
+<td>Record findings, reassess intent, link corrections and govern assurance decisions.</td>
+</tr>
+<tr>
+<td><code>fow_campaign_author</code></td>
+<td>Build campaigns, cases, obligations, oracles and materialization authority.</td>
+</tr>
+<tr>
+<td><code>fow_campaign_advance</code></td>
+<td>Advance deterministic work to a semantic, technical or evidence boundary. Technical execution requires an available path.</td>
+</tr>
+<tr>
+<td><code>fow_campaign_inspect</code></td>
+<td>Read a campaign, working sheet, components or history.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--continuity-and-artifacts">Continuity and artifacts</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_handover</code></td>
+<td>Read a coherent snapshot, progress and bounded history; create or recover a handover.</td>
+</tr>
+<tr>
+<td><code>fow_generate_artifacts</code></td>
+<td>Start artifact generation under supported profiles with a durable job.</td>
+</tr>
+<tr>
+<td><code>fow_get_artifacts</code></td>
+<td>Retrieve stored artifact metadata and content.</td>
+</tr>
+<tr>
+<td><code>fow_get_job</code></td>
+<td>Observe job state. Observation does not restart it.</td>
+</tr>
+<tr>
+<td><code>fow_list_jobs</code></td>
+<td>List a project's jobs.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--associations-and-optional-semantics">Associations and optional semantics</h2>
+<p>For ownership and prerequisites of the integrated path, see
+<a href="#page=advanced.md" data-page="advanced.md">cross-server features</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+<th>Limit to remember</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fow_bindings</code></td>
+<td>Inspect, export or import host/provider association receipts.</td>
+<td>Receipts do not install endpoints, credentials or commands.</td>
+</tr>
+<tr>
+<td><code>fow_semantic</code></td>
+<td>Inventory roles; prepare, inspect, submit and adopt SRS/grounding results; or explicitly invoke internal mode.</td>
+<td>Host execution requires no internal model; internal mode does. Unsupported roles remain visible as a limit.</td>
+</tr>
+<tr>
+<td><code>fow_ground_intent</code></td>
+<td>Start internal intent grounding.</td>
+<td>Requires a model and source provider; it is not a core standalone prerequisite.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-c00bac3c298d--discover-details-without-memorizing-everything">Discover details without memorizing everything</h2>
+<p>Read-only call examples, without invented project locators:</p>
+<pre><code class="language-json">{&quot;view&quot;: &quot;recipe&quot;, &quot;recipe_name&quot;: &quot;standalone-external-plan&quot;}
+</code></pre>
+<pre><code class="language-json">{&quot;view&quot;: &quot;operation&quot;, &quot;operation_tool&quot;: &quot;fow_external_work&quot;, &quot;operation_name&quot;: &quot;export_plan&quot;}
+</code></pre>
+<p>These are <code>fow_capabilities</code> arguments, not plan-execution commands. The recipe
+explains the workflow; the operation contract exposes fields and constraints;
+the current frame provides choices permitted by the project state.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=03-build.md" data-page="03-build.md">Follow Build in the story</a></p>
+</article><article class="markdown-body" data-document="comparison.md" data-title="Which plane for which job?" data-prefix="doc-846b2b3894aa" hidden><h1 id="doc-846b2b3894aa--which-plane-for-which-job">Which plane for which job?</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=concepts.md" data-page="concepts.md">Concepts</a> · <a href="#page=advanced.md" data-page="advanced.md">Advanced integrations</a></p>
+<p><strong>The useful comparison is not &quot;who has more tools&quot;, but &quot;which state must
+survive the conversation, and who governs changes to it&quot;.</strong></p>
+<p>Flower is not the only project that organizes an agent's work. Some tools focus
+on specifications, others on backlogs or task gates. The documentary Flow of
+Work instead starts with readable, versionable contracts without requiring an
+MCP server.</p>
+<h2 id="doc-846b2b3894aa--how-to-read-this-comparison">How to read this comparison</h2>
+<p>A survey of official sources consulted on <strong>2 October 2026</strong>. The table lists
+documented capabilities; strengths, tradeoffs and recommended cases are an
+editorial assessment, not results from a comparative benchmark.</p>
+<p>We have not installed and qualified every project. A feature not mentioned here
+<strong>must not be treated as absent</strong>. Stars, contributor counts and tool counts do
+not measure the correctness of the software produced.</p>
+<h2 id="doc-846b2b3894aa--five-alternatives-five-centers-of-gravity">Five alternatives, five centers of gravity</h2>
+<table>
+<thead>
+<tr>
+<th>Plane</th>
+<th>Center of gravity</th>
+<th>Strengths</th>
+<th>Tradeoff to consider</th>
+<th>Recommended use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/README.md" rel="noopener noreferrer">Flower MCP</a></td>
+<td>Requirements, goals, milestones, changes, work, evidence, acceptance and handover in a persistent ledger.</td>
+<td>Connects intent and current work; separates completion, verification and acceptance; offers Markdown plans and TODOs for external agents.</td>
+<td>More concepts to learn than a backlog. Host declarations are not an automatic source-code audit.</td>
+<td>A product spanning multiple iterations, where the reasons for work, verified outcomes and open obligations must remain visible.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Damel91/LLMs-flow-of-work" rel="noopener noreferrer">Documentary LLM Flow of Work</a></td>
+<td>Markdown contracts, authorities and implementation chains; <strong>not an MCP server</strong>.</td>
+<td>Git-inspectable documents; usable in chat; <code>flowctl</code> helpers for checks and orientation.</td>
+<td>Human routing and documentary discipline remain central; consistency is not entirely governed by a server ledger.</td>
+<td>A team or engineer making method and decisions explicit without introducing a persistent service.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/Pimzino/spec-workflow-mcp" rel="noopener noreferrer">Spec Workflow MCP</a></td>
+<td>Requirements → Design → Tasks specifications, approvals and tracking.</td>
+<td>Dashboard, VS Code integration, revisions and implementation logs.</td>
+<td>The approval path requires human coordination through its interface; document approval does not prove implemented behavior.</td>
+<td>A feature to clarify and approve before implementation.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/eyaltoledano/claude-task-master" rel="noopener noreferrer">Task Master AI</a></td>
+<td>PRD to backlog: tasks, dependencies, expansion and next work.</td>
+<td>MCP and CLI access; assistance with decomposition and research.</td>
+<td>AI commands need inference access; the generated plan needs judgment, not just execution.</td>
+<td>Turning a product brief into operational tasks for a coding agent.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/jpicklyk/task-orchestrator" rel="noopener noreferrer">MCP Task Orchestrator</a></td>
+<td>Persistent work items, dependencies, note schemas and server-governed transitions.</td>
+<td>Server-side structural gates and actor attribution.</td>
+<td>Work schemas need design; required notes and valid transitions do not themselves demonstrate semantic correctness.</td>
+<td>Coordinating agents or sessions with required deliverables before progression.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="doc-846b2b3894aa--where-flower-fits">Where Flower fits</h2>
+<p>Flower's design choice is to preserve a <strong>lifecycle chain of authority</strong>, not
+just a task list: requirement and scenario, milestone scope, change, plan,
+finding, verification, acceptance and handover. Revisions and evidence
+provenance help prevent yesterday's result from becoming completion of today's
+work. The core can do this without CodingCastle or an internal model.
+<a href="#page=sources.md&amp;section=plan" data-page="sources.md" data-section="plan">Flower sources</a>, <a href="#page=sources.md&amp;section=build" data-page="sources.md" data-section="build">external work</a>.</p>
+<p><strong>Server-side gates are not exclusive to Flower.</strong> The comparison with Task
+Orchestrator primarily concerns the governed domain, not the presence or
+absence of structural control. Choosing Flower should reflect a need for its
+lifecycle connections; for a simple task queue they may be unnecessary cost.</p>
+<p>Portable plans do not eliminate the ledger: an exported document permits
+offline work, but outcomes, current revision and decisions must be reconciled
+on return. <a href="#page=advanced.md" data-page="advanced.md">Advanced integrations</a> add evidence and technical
+execution through providers; they are not required for the standalone path.</p>
+<h2 id="doc-846b2b3894aa--one-story-different-choices">One story, different choices</h2>
+<p>For <strong>Spazio Comune</strong>, the practical question might be:</p>
+<ul>
+<li>&quot;I want Git-readable contracts and decisions, with a person at the helm&quot;:
+start with the documentary Flow.</li>
+<li>&quot;I want to approve the booking specification before implementing it&quot;:
+consider Spec Workflow MCP.</li>
+<li>&quot;I have a PRD and need an actionable backlog&quot;: consider Task Master AI.</li>
+<li>&quot;Several agents must provide required notes and respect dependencies&quot;:
+consider Task Orchestrator.</li>
+<li>&quot;I must distinguish the initial request, concurrency defect, correction,
+verified regression and milestone acceptance&quot;: consider Flower.</li>
+</ul>
+<p>These are selection guidelines, not a ranking. An evening prototype and a
+service maintained for months may need different governance levels. More
+structure helps only when it addresses a real problem.</p>
+<h2 id="doc-846b2b3894aa--before-choosing">Before choosing</h2>
+<p>Ask each solution the same questions: where state lives, how it recovers after
+interruption, which decisions block progression, what counts as evidence and
+how much work it asks of the user. Then try the same small scenario on your
+own host and agent.</p>
+<p>This comparison does not certify performance, security, model autonomy or
+Flower's superiority. Such claims require comparable campaigns, not just
+reading READMEs.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=sources.md&amp;section=comparing-planes" data-page="sources.md" data-section="comparing-planes">Comparison sources</a> · <a href="#page=advanced.md" data-page="advanced.md">Cross-server features</a></p>
+</article><article class="markdown-body" data-document="advanced.md" data-title="Flower beyond the standalone path" data-prefix="doc-f5ec36cbd880" hidden><h1 id="doc-f5ec36cbd880--flower-beyond-the-standalone-path">Flower beyond the standalone path</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=comparison.md" data-page="comparison.md">Comparison</a> · <a href="#page=tools.md" data-page="tools.md">Tool map</a></p>
+<p><strong>Flower can govern the lifecycle without executing code. Cross-server
+integrations connect that lifecycle to an evidence and execution provider
+without merging their responsibilities.</strong></p>
+<p>The base path remains the one described in <a href="#page=03-build.md" data-page="03-build.md">Build</a>: a coding agent
+receives a plan or TODO, works through its own host and reports outcomes. The
+integrated path adds direct exchanges with compatible services. CodingCastle is
+the technical provider for which the public source contains packet and test
+adapters; it is not a dependency of Flower's core.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>.</p>
+<h2 id="doc-f5ec36cbd880--who-owns-what">Who owns what</h2>
+<table>
+<thead>
+<tr>
+<th>Party</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Flower</td>
+<td>Intent, requirements and scenarios, milestones, changes, semantic packets, findings, campaigns, acceptance and handover.</td>
+</tr>
+<tr>
+<td>Technical provider</td>
+<td>Technical context, target identities, source evidence and, where supported, executable packets, workspace, compilation and tests.</td>
+</tr>
+<tr>
+<td>Orchestrator</td>
+<td>Evidence selection, semantic interpretation, decisions permitted by the current gate and handling gaps.</td>
+</tr>
+<tr>
+<td>Person</td>
+<td>Intent confirmation and the human acceptance and delivery decisions required by the path.</td>
+</tr>
+</tbody>
+</table>
+<p>A reachable provider is not automatically the project's provider. A passing
+test is not automatically an accepted milestone. These distinctions are part
+of the <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">public recipes</a>.</p>
+<h2 id="doc-f5ec36cbd880--portable-associations-not-hidden-configuration">Portable associations, not hidden configuration</h2>
+<p><code>fow_bindings</code> can inspect, export and import host/project or project/provider
+associations through versioned JSON receipts. The logical association can
+change without restarting the plane: the ledger preserves the choice and
+revision, and a conflicting replacement requires an explicit reason.</p>
+<p>A receipt does <strong>not</strong> install a server or configure endpoints, credentials or
+commands. The operator must already have authorized the provider route. Moving
+an association does not mean moving the whole runtime or obtaining authority
+to modify a repository.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Association contract</a>.</p>
+<h2 id="doc-f5ec36cbd880--coordinated-lens-orientation">Coordinated lens orientation</h2>
+<p>When the technical context is associated, <code>fow_interaction</code> can combine
+Flower's areas with those discovered through <code>codingcastle_interaction</code>, showing
+availability and prerequisites. Flower retains the coordinated lens; provider
+discovery is read-only and does not alter its standalone lens.</p>
+<p>A lens changes attention, not the tool catalog, lifecycle or permissions. If
+the provider is unavailable, the frame exposes degraded coordinated mode and
+any blocked technical area rather than pretending it is available.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Orientation adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">interaction projection</a>.</p>
+<h2 id="doc-f5ec36cbd880--source-snapshots-and-intent-grounding">Source snapshots and intent grounding</h2>
+<p>Evidence adapters receive bounded snapshots of implementation, bootstrap
+behavior and packet targets. They check the contract, binding and required
+revision references: names or descriptions alone are not current evidence.
+Search and the graph remain in the provider; Flower consumes a projection
+for its engineering work.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Snapshot adapters</a>.</p>
+<p>Grounding relates intent to observed implementation. <code>fow_ground_intent</code> is the
+internal path using a model and source provider. <code>fow_semantic</code> also offers
+host-executed assignments with inputs and an output contract prepared by Flower;
+host grounding uses a closed evidence receipt and preserves host-declared
+provenance. It does not automatically convert that evidence into provider
+attestation.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic recipe</a>.</p>
+<h2 id="doc-f5ec36cbd880--from-semantic-packet-to-technical-work">From semantic packet to technical work</h2>
+<p>Flower maintains ordered instructions, checks, dependencies and unit intent.
+The orchestrator chooses readable candidates; the provider resolves exact
+technical targets. Graph identities, execution handles and transport
+correlations remain behind that boundary rather than becoming content to
+paste into a plan.</p>
+<p>In the configured path, <code>fow_packet_advance</code> can delegate operations to the
+<code>codingcastle_packet</code> adapter and reconcile receipts. Internal execution and
+the workspace belong to CodingCastle; Flower does not become a second
+compilation engine. An absent or incompatible provider, or stale evidence,
+leaves a gate open rather than authorizing invented execution.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">reconciliation recipes</a>.</p>
+<h2 id="doc-f5ec36cbd880--workspace-review-and-semantic-correction">Workspace review and semantic correction</h2>
+<p>A review must address the current candidate and make targets, coverage and
+evidence explicit. Flower records the disposition and finding history; the
+provider identifies the workspace. A partial review does not become complete
+approval merely because it contains no error.</p>
+<p>A semantic defect found after review feeds an ordinary corrective packet. It
+is not automatic technical retry of failed compilation. The recipe separates
+continuation, verification, remediation and blockage.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Review and remediation recipes</a>.</p>
+<h2 id="doc-f5ec36cbd880--campaigns-oracles-and-provider-tests">Campaigns, oracles and provider tests</h2>
+<p>Flower defines expected behavior, cases, obligations and oracle meaning. The
+provider materializes and runs tests in the supported path. The
+<code>codingcastle_tests</code> adapter distinguishes orchestrator-supplied source from
+deterministic oracle IR; the latter requires a compatible profile declared by
+the provider. This is not a promise of universal generation for any language
+or framework.</p>
+<p>Progression requires materialization authority and current attested results.
+A test that compiles but lacks the required attestation cannot establish
+authoritative product failure. Acceptance remains a separate decision.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">Test adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">campaign recipes</a>.</p>
+<h2 id="doc-f5ec36cbd880--two-audiences-two-projections">Two audiences, two projections</h2>
+<p>The model receives readable Markdown content. Server-to-server exchanges
+instead consume MCP <code>structuredContent</code> under versioned contracts: they do
+not reinterpret model-facing text as JSON. Readable output and structured
+receipts serve different audiences.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Structured-channel decoding</a>.</p>
+<h2 id="doc-f5ec36cbd880--what-is-present-and-what-remains-open">What is present and what remains open</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Status and prerequisites</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core and external coding-agent plan</td>
+<td>Standalone path; no mandatory technical provider or internal model.</td>
+</tr>
+<tr>
+<td>Association receipts</td>
+<td>Contract and services present; a provider route needs operator authorization.</td>
+</tr>
+<tr>
+<td>Coordinated lens</td>
+<td>Optional technical discovery; associated context and available provider, or declared degradation in the frame.</td>
+</tr>
+<tr>
+<td>Evidence snapshots</td>
+<td>Adapters present; a service must honor the specific contract, binding and revision. Merely &quot;speaking MCP&quot; is insufficient.</td>
+</tr>
+<tr>
+<td>Technical packets and tests</td>
+<td>Optional CodingCastle adapters present; they require compatible service, context and capabilities. They do not automatically make every coding agent interchangeable.</td>
+</tr>
+<tr>
+<td>Internal semantics</td>
+<td>Requires an inference runtime; the host alternative exists for supported roles, not every operation.</td>
+</tr>
+<tr>
+<td>Full cross-server PVP</td>
+<td>Explicitly deferred, together with CodingCastle compilation in the IMPL-67 family and paired qualification. Standalone PVP does not certify this path.</td>
+</tr>
+</tbody>
+</table>
+<p>The presence of adapters in source <strong>does not certify every running version
+combination</strong>. This page describes capabilities and boundaries of the reference
+source, not a new live campaign for the Flower/CodingCastle pair.
+<a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Factory</a>, <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">status declared in recipes</a>.</p>
+<h2 id="doc-f5ec36cbd880--spazio-comune-with-a-provider">Spazio Comune with a provider</h2>
+<p>In our example, Flower preserves the rule &quot;two concurrent bookings must not
+occupy the same room&quot; and governs its corrective packet. A compatible provider
+supplies targets and workspace; the campaign connects the test to the rule and
+its oracle. The technical result returns as evidence, not an automatic delivery
+decision.</p>
+<p>This is an illustrative path, not an executed run. The architectural benefit
+is connecting intent and technical work without giving them one owner. The
+standalone path remains sufficient to start using Flower.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=04-verify.md" data-page="04-verify.md">Verify</a> · <a href="#page=sources.md&amp;section=cross-server-integrations" data-page="sources.md" data-section="cross-server-integrations">Integration sources</a></p>
+</article><article class="markdown-body" data-document="method.md" data-title="How I built Flower MCP" data-prefix="doc-f3963dc3adf4" hidden><h1 id="doc-f3963dc3adf4--how-i-built-flower-mcp">How I built Flower MCP</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=comparison.md" data-page="comparison.md">Comparing planes</a> · <a href="#page=sources.md" data-page="sources.md">Sources and limits</a></p>
+<blockquote>
+<p>&quot;I have a job, and I did not personally write a single line of this project's
+code. I designed the system, discussed requirements, guided the agents and
+decided what to verify, correct and accept.&quot;</p>
+</blockquote>
+<p>This is the author's account of the method, not an autonomy benchmark.
+Delegating code writing did not remove the engineering work: it shifted my
+contribution toward intent, architecture, constraints and verification.</p>
+<h2 id="doc-f3963dc3adf4--tools-and-time">Tools and time</h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>How I worked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main coding agent</td>
+<td><strong>Codex</strong>, with different models over the course of the project.</td>
+</tr>
+<tr>
+<td>My role</td>
+<td>Design, discussion of choices, review of outcomes and acceptance decisions.</td>
+</tr>
+<tr>
+<td>The agents' role</td>
+<td>Reading code, technical planning, implementation, tests and document updates.</td>
+</tr>
+<tr>
+<td>Time spent on the server</td>
+<td><strong>Around two months of concentrated development</strong>, carried out after working hours.</td>
+</tr>
+<tr>
+<td>Wider context</td>
+<td>Earlier and ongoing research into coding agents and local models.</td>
+</tr>
+</tbody>
+</table>
+<p>I developed the projects in my personal time, after working hours. I kept my
+professional work and this research separate, including their application domains.</p>
+<p>The duration is the author's estimate: not a work-hour log or the total research
+period. The public copy was prepared toward the end of that process; its Git
+creation date is not the start of development. I do not attribute the outcome
+to a single model version.</p>
+<h2 id="doc-f3963dc3adf4--before-the-server-the-documentary-plane">Before the server: the documentary plane</h2>
+<p>Flower did not start with a single conversation asking an agent to &quot;build an MCP
+server.&quot; Work was governed by a <strong>documentary plane</strong>: linked documents separating
+requirements, decisions, changes, implementation packets, reviews, findings and
+test campaigns.</p>
+<p><a href="../assets/method-authorities.png"><img src="../assets/method-authorities.png" alt="Project authority structure: baseline, campaigns, contracts, diffs, implementation and reviews" /></a></p>
+<p><em>A crop of the adopted document structure. It shows categories, not document contents.</em></p>
+<p>The loop was practical:</p>
+<ol>
+<li>clarify expected behavior and its limits;</li>
+<li>record the requirements change and design an implementation chain;</li>
+<li>give the agent packets with actions, dependencies and checks;</li>
+<li>inspect the outcome with deterministic tests and live campaigns where relevant;</li>
+<li>record issues, correct them and decide what to accept;</li>
+<li>keep documentary and implementation commits separate.</li>
+</ol>
+<p><a href="../assets/method-plan.png"><img src="../assets/method-plan.png" alt="Example list of implementation chains and packets" /></a></p>
+<p><em>Plans were persistent artifacts, not just messages to remember in a chat.</em></p>
+<p><a href="../assets/method-campaigns.png"><img src="../assets/method-campaigns.png" alt="Campaign list covering Flower bootstrap, handoff, installation and release" /></a></p>
+<p><em>A campaign document does not prove that every test passed: outcomes require
+their evidence and decisions, which are not published here.</em></p>
+<h2 id="doc-f3963dc3adf4--why-this-method">Why this method</h2>
+<p>With interrupted work sessions, I did not want to start over each time by
+explaining earlier decisions. Nor did I want a convincing agent response to
+automatically become an accepted change.</p>
+<p>The plane let me resume from a specific obligation, distinguish a bug from a
+new requirement and compare the outcome with the original intent. Documentary
+discipline adds work, but makes decisions open to challenge and state recoverable
+even when the chat or model changes.</p>
+<p><strong>Flower moves part of that discipline from documents into a server:</strong> state,
+revisions, plans, evidence and handovers can be queried through tools. This does
+not mean a completed Flower was used to build itself, or that it replaces
+engineering judgment.</p>
+<h2 id="doc-f3963dc3adf4--how-much-code-exists-today">How much code exists today</h2>
+<table>
+<thead>
+<tr>
+<th>Public-copy measurement</th>
+<th>Value on 3 October 2026</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Production Python files in <code>src/flow_of_work_mcp</code></td>
+<td><strong>171</strong></td>
+</tr>
+<tr>
+<td>Physical lines in those files</td>
+<td><strong>74,586</strong></td>
+</tr>
+<tr>
+<td>Included</td>
+<td>Code, comments, docstrings and blank lines.</td>
+</tr>
+<tr>
+<td>Excluded</td>
+<td>Tests, development tools, documentation, generated reader and private repositories.</td>
+</tr>
+</tbody>
+</table>
+<p>This counts current source, not every line produced and rewritten during
+development. It does not measure quality, useful complexity or hours saved.
+The product revision is the one identified in <a href="#page=sources.md" data-page="sources.md">Sources and limits</a>.</p>
+<p>From a checkout of that revision, reproduce the count with:</p>
+<pre><code class="language-sh">git ls-files -- 'src/flow_of_work_mcp/*.py' | wc -l
+git ls-files -z -- 'src/flow_of_work_mcp/*.py' | xargs -0 wc -l | tail -n 1
+</code></pre>
+<h2 id="doc-f3963dc3adf4--wider-research-separate-products">Wider research, separate products</h2>
+<p>I am also building an <strong>experimental coding agent for local models</strong>. The
+research goal is to understand how much work smaller models can handle when
+context, tasks and verification are better bounded. This is not a guaranteed
+capability of this Flower release, or a claim of autonomy already achieved.</p>
+<p>Flower is the public software-lifecycle component, usable with different coding
+agents. Other experimental components, their internal details and model campaigns
+are outside this publication.</p>
+<h2 id="doc-f3963dc3adf4--what-i-am-not-publishing-yet">What I am not publishing yet</h2>
+<p>The <a href="https://github.com/Damel91/LLMs-flow-of-work" rel="noopener noreferrer">general documentary framework</a>
+is separate from the instance actually adopted for this project. <strong>The complete
+project plane remains private</strong>: it contains personal data and internal material,
+and its sanitization has not yet been planned.</p>
+<p>This page publishes only three local crops of file lists, without the desktop,
+sidebars, personal paths or file contents. Original screenshots are not part of
+the presentation or distributed package. The crops illustrate the method;
+they do not replace an audit of the private history.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=02-plan.md" data-page="02-plan.md">How this method becomes Plan</a></p>
+</article><article class="markdown-body" data-document="sources.md" data-title="Sources, provenance and limits" data-prefix="doc-9f8babe31a3f" hidden><h1 id="doc-9f8babe31a3f--sources-provenance-and-limits">Sources, provenance and limits</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=tools.md" data-page="tools.md">Tools</a> · <a href="#page=talk.md" data-page="talk.md">Talk outline</a></p>
+<h2 id="doc-9f8babe31a3f--what-you-are-reading">What you are reading</h2>
+<p>This is an editorial presentation, not a new server specification. Spazio Comune,
+its rules and conversations are educational examples. They are not runtime
+records, live receipts or a benchmark. Flower's current operational documentation
+takes precedence over an introductory explanation.</p>
+<p>The research also used internal development authorities and CodingCastle's
+temporal-authority research as study material. <strong>Their text was not exported into
+this site</strong>: no private documents, runtimes, hosts, credentials or logs. The
+<a href="#page=method.md" data-page="method.md">method page</a> shows only cropped document lists selected by the author.
+A CodingCastle engine capability is not attributed to Flower.</p>
+<p>The public Flower sources below are pinned to
+<code>ddc83c6c79638eda63edae5be1bd9789faa44a2e</code>, declared version <code>0.1.0</code>.
+This is an editorial source snapshot, not new qualification of release binaries.
+The reader is rebuilt from Markdown; product references must be reassessed when
+server behavior changes.</p>
+<h2 id="doc-9f8babe31a3f--require">Require</h2>
+<p>Original problem: do not confuse conversation, proposals and current intent.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Public agent template</a>: engineering role, scenarios and real roadmap confirmation.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: <code>engineering-bootstrap</code> and authority boundaries.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/guided_bootstrap.py" rel="noopener noreferrer">Guided bootstrap</a>: answers, correspondences and confirmations.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--plan">Plan</h2>
+<p>Original problem: a future output is not a materialized dependency; structural
+coverage and semantic judgment are not interchangeable.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/core/domain/packet_validation_projection.py" rel="noopener noreferrer">Standalone PVP</a>: derived plan validation.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: unit declarations and external routes.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Standalone recipes</a>: producers, consumers, verification and admission.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--build">Build</h2>
+<p>Original problem: an interruption or revision must not promote an old report
+to completion of current work.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/external_work.py" rel="noopener noreferrer">External work</a>: TODOs, exports and declared outcomes.</li>
+<li><a href="#page=..%2F..%2FBOOTSTRAP.md" data-page="../../BOOTSTRAP.md">Public bootstrap</a>: persistent instructions, offline work and reconciliation.</li>
+<li><a href="#page=tools.md" data-page="tools.md">Tool map</a>: observation, declaration and execution are distinct.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--verify">Verify</h2>
+<p>Original problem: compilation, tests, declared evidence and acceptance answer
+different questions.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Public catalog</a>: campaigns, verification and semantic prerequisites.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic and campaign recipes</a>: audit adoption and oracle authority.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/tools/smoke_mcp.py" rel="noopener noreferrer">Public smoke check</a>: mechanical verification of the installed package, not a cognitive benchmark.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--deploy">Deploy</h2>
+<p>Original problem: delivery must state scope, evidence and open obligations,
+without treating an agent message as acceptance.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/README.md" rel="noopener noreferrer">Public README</a>: core ownership and separation from agent actions.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: milestones and handover.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--operate">Operate</h2>
+<p>Original problem: do not change intent to justify an incorrect implementation;
+preserve history without accidentally making it current authority.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Public recipes</a>: current reassessment and correction within intent.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Agent template</a>: progress, semantic gaps and responsibilities.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--catalog">Catalog</h2>
+<p>The nine lenses and 36 names in the <a href="#page=tools.md" data-page="tools.md">map</a> match <code>_WORK_AREAS</code> and
+<code>_PUBLIC_TOOLS</code> in the <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">public registry</a>.
+The editorial check verifies that no tool names are omitted or invented.</p>
+<h2 id="doc-9f8babe31a3f--comparing-planes">Comparing planes</h2>
+<p>The <a href="#page=comparison.md" data-page="comparison.md">comparison page</a> uses the projects' official sources,
+consulted on 2 October 2026. These are current, changeable references, not
+qualified external releases or an exhaustive code audit. Use-case suggestions
+are editorial assessments; we have not measured a winner.</p>
+<ul>
+<li><a href="https://github.com/Damel91/LLMs-flow-of-work" rel="noopener noreferrer">Documentary LLM Flow of Work</a>.</li>
+<li><a href="https://github.com/Pimzino/spec-workflow-mcp" rel="noopener noreferrer">Spec Workflow MCP</a>.</li>
+<li><a href="https://github.com/eyaltoledano/claude-task-master" rel="noopener noreferrer">Task Master AI</a>.</li>
+<li><a href="https://github.com/jpicklyk/task-orchestrator" rel="noopener noreferrer">MCP Task Orchestrator</a>.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--cross-server-integrations">Cross-server integrations</h2>
+<p>The <a href="#page=advanced.md" data-page="advanced.md">advanced page</a> separates the standalone core from optional
+adapters. It neither exports private configuration nor certifies a new runtime
+pair. References remain pinned to the Flower source identified above.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>: optional paths and selected adapters.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Portable associations</a>: receipts and route authorization.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Technical orientation</a> and <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">lens projection</a>: read-only discovery and coordinated availability.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">MCP snapshots</a>: evidence and structured channel.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a> and <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">test adapter</a>: CodingCastle integration present in source.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: ownership, review, campaigns and deferred cross-server PVP.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--installation-and-downloads">Installation and downloads</h2>
+<p>The closing <a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a> page uses the <a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">public repository</a>,
+the <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.1.0" rel="noopener noreferrer">v0.1.0 release</a> and
+the <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md" rel="noopener noreferrer">installation guide for the documented revision</a>.
+On 3 October 2026, the six-asset release inventory and download links were checked
+without authentication, including the PowerShell launcher on <code>main</code>. That
+launcher is not an asset of release <code>v0.1.0</code>.</p>
+<p>This check confirms link availability on that date, not a new installation or
+native Windows/Linux qualification. The README and launcher on <code>main</code> are current;
+the guide stays pinned like the sources above.</p>
+<h2 id="doc-9f8babe31a3f--explicit-limits">Explicit limits</h2>
+<ul>
+<li>Flower does not guarantee agent correctness or adherence to recipes.</li>
+<li>Schema or PVP validation does not demonstrate semantic truth.</li>
+<li>Standalone Flower does not automatically audit external source code and symbols.</li>
+<li>The core is not a coding harness, deployer or monitoring service.</li>
+<li>A host report does not become provider attestation or a human decision.</li>
+<li>This site promises no token reduction, superior quality or autonomy for any
+particular model: those require separate benchmarks.</li>
+</ul>
+<h2 id="doc-9f8babe31a3f--reader-and-attribution">Reader and attribution</h2>
+<p>The reader is a conceptual adaptation of the documentary Flow's offline viewer:
+index/content layout, but prerendered documents, path-based links and no parser
+downloaded by the browser. The corpus uses ordinary Markdown with tables; it
+does not reproduce every GitHub extension or its interface.</p>
+<ul>
+<li><a href="https://github.com/sindresorhus/github-markdown-css" rel="noopener noreferrer">github-markdown-css</a>, MIT,
+locally pinned to <code>7f38dcb9054bc5d860fac65291f5c98fef47932c</code>.</li>
+<li><a href="https://markdown-it-py.readthedocs.io/en/latest/using.html" rel="noopener noreferrer">markdown-it-py</a>,
+used only to build the reader, with raw HTML disabled.</li>
+<li>The logo comes from the Flower repository; fonts come from the system.</li>
+</ul>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=reader.md" data-page="reader.md">Open and rebuild the reader</a></p>
+</article><article class="markdown-body" data-document="talk.md" data-title="A talk outline" data-prefix="doc-ccff7643a5d6" hidden><h1 id="doc-ccff7643a5d6--a-talk-outline">A talk outline</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=scenario.md" data-page="scenario.md">Scenario</a> · <a href="#page=sources.md" data-page="sources.md">Sources and limits</a></p>
+<h2 id="doc-ccff7643a5d6--opening">Opening</h2>
+<p>&quot;Two people book the same room. The code compiled, the tests were green and the
+screen looked good. What had we actually asked the software to do?&quot;</p>
+<p>This question introduces Spazio Comune without requiring knowledge of MCP.
+Show the logo after the question: the petals name the perspectives, not the answer.</p>
+<h2 id="doc-ccff7643a5d6--main-path">Main path</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What to show</th>
+<th>Message to leave</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#page=01-require.md" data-page="01-require.md">Require</a></td>
+<td>Two simultaneous requests.</td>
+<td>An observable result comes before technology.</td>
+</tr>
+<tr>
+<td><a href="#page=02-plan.md" data-page="02-plan.md">Plan</a></td>
+<td>The contract between service and interface.</td>
+<td>Dependencies need meaning, not just names.</td>
+</tr>
+<tr>
+<td><a href="#page=03-build.md" data-page="03-build.md">Build</a></td>
+<td>A plan that survives an interruption.</td>
+<td>The agent executes; Flower preserves work authority.</td>
+</tr>
+<tr>
+<td><a href="#page=04-verify.md" data-page="04-verify.md">Verify</a></td>
+<td>Four state dimensions.</td>
+<td>A local check does not promote itself to campaign or acceptance.</td>
+</tr>
+<tr>
+<td><a href="#page=05-deploy.md" data-page="05-deploy.md">Deploy</a></td>
+<td>Delivery with open obligations.</td>
+<td>Explicit limits make a promise inspectable.</td>
+</tr>
+<tr>
+<td><a href="#page=06-operate.md" data-page="06-operate.md">Operate</a></td>
+<td>A bug or a recurring booking?</td>
+<td>Correction and new intent require different paths.</td>
+</tr>
+</tbody>
+</table>
+<p>A short talk can use just the six pages. Concepts, tools and sources remain
+detours for questions: there is no need to read a catalog on stage. Actual duration
+must be rehearsed aloud; this is not a timed script.</p>
+<p>To discuss the project's origins, open <a href="#page=method.md" data-page="method.md">How I built it</a>: distinguish
+agent-written code from the author's design and decisions. The crops show the
+method, not certification of test outcomes.</p>
+<h2 id="doc-ccff7643a5d6--if-we-want-a-real-demonstration">If we want a real demonstration</h2>
+<p>The written story is not a transcript. A later demo should select an isolated
+project, use current contracts and preserve real receipts:</p>
+<ol>
+<li>show a criterion without verification or a consumer without a producer;</li>
+<li>read the gap returned by Flower;</li>
+<li>complete the declaration and show the updated projection;</li>
+<li>export the plan and distinguish executable work from deferred obligations.</li>
+</ol>
+<p>Do not put invented IDs into calls. Do not use the private runtime project as
+though it were a demo environment. Do not show &quot;accepted&quot; without a real
+decision. If the network is unavailable, the editorial presentation is already
+offline; it must not pretend to be a successful live demo.</p>
+<h2 id="doc-ccff7643a5d6--questions-that-deserve-explicit-answers">Questions that deserve explicit answers</h2>
+<ul>
+<li><strong>&quot;Why isn't a document enough?&quot;</strong> The exported document is useful. Flower
+adds canonical state, revisions, gates and reconciliation through the server.</li>
+<li><strong>&quot;Can the model ignore it?&quot;</strong> Yes, an agent can use other tools: Flower is
+not a sandbox for its host. Adherence is tested, not presumed.</li>
+<li><strong>&quot;Do I need a local model?&quot;</strong> Not for the standalone core. An internal model
+and providers are optional for specific capabilities.</li>
+<li><strong>&quot;Does it guarantee correct software?&quot;</strong> No. It bounds work, evidence and
+decisions; agent quality, plan quality and oracles remain decisive.</li>
+<li><strong>&quot;Are Deploy and Operate automated?&quot;</strong> No. The story concerns governed
+delivery and changes, not built-in CI/CD or monitoring.</li>
+</ul>
+<h2 id="doc-ccff7643a5d6--closing">Closing</h2>
+<p>&quot;I am not asking the model to remember better. I am making what we decided,
+which work we assigned and what remains before calling it done recoverable.&quot;</p>
+<p>Close by opening <a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a>: show the repository, release and
+installation route for the audience's operating system. Connect bootstrap to
+Require's first question, without presenting it as a seventh petal or a demo
+already executed.</p>
+<p><a href="#page=try-flower.md" data-page="try-flower.md">Install and try Flower</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=tools.md" data-page="tools.md">Tool catalog</a></p>
+</article><article class="markdown-body" data-document="reader.md" data-title="The same presentation, offline too" data-prefix="doc-71625a889437" hidden><h1 id="doc-71625a889437--the-same-presentation-offline-too">The same presentation, offline too</h1>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=sources.md&amp;section=reader-and-attribution" data-page="sources.md" data-section="reader-and-attribution">Sources</a></p>
+<h2 id="doc-71625a889437--read-on-github">Read on GitHub</h2>
+<p>The entry point is <a href="#page=README.md" data-page="README.md">README.md</a>. All chapters use relative links,
+headings, tables, quotations and code blocks readable on GitHub. The reader
+does not contain a second version of the story.</p>
+<h2 id="doc-71625a889437--read-locally">Read locally</h2>
+<p>Open <a href="index.html">index.html</a> in a browser. Reading the presentation needs no
+HTTP server, Python, Node, Flower, model, login or Internet connection.</p>
+<p>The <code>presentation</code> folder contains both editions, <code>ita</code> and <code>eng</code>, their generated
+HTML, and shared scripts, stylesheets and logo. Copy the whole <code>presentation</code>
+folder, not just one language, to read it without the rest of the repository.
+The language selector opens the same chapter in the other edition. The reader
+also includes the public English bootstrap as further reading. GitHub source
+links and the product README are external references: they need a network when
+clicked, but are never loaded automatically.</p>
+<p>The index, chapter links, anchors and browser back/forward work in the reader.
+Content styling follows GitHub Markdown; it is not an identical copy of GitHub's
+UI. Navigation adapts to the viewport and the theme follows the system.
+Fonts are not downloaded.</p>
+<p>Editorial verification covered Chrome on macOS, offline, at widths of 1440,
+390 and 320 pixels, and a copy containing only HTML and assets. It is not native
+Windows/Linux certification or a Flower server campaign.</p>
+<h2 id="doc-71625a889437--update-the-presentation">Update the presentation</h2>
+<p>Edit Markdown in the appropriate language, not the content of <code>index.html</code>.
+One builder regenerates both editions and the bilingual index. Rebuilding needs
+Python 3.11+ and the editorial dependency in <code>requirements-reader.txt</code>.
+Use an editorial virtual environment separate from Flower's runtime. From the
+repository root, with that environment active:</p>
+<pre><code class="language-sh">python -m pip install -r docs/presentation/requirements-reader.txt
+python docs/presentation/build_reader.py
+python docs/presentation/build_reader.py --check
+python -m unittest discover -s docs/presentation/tests
+</code></pre>
+<p>On macOS/Linux use <code>python3</code> if needed; on Windows you can use <code>py -3.11</code>.
+The commands use Python and relative paths, not Bash scripts. No editorial
+dependency is added to the server installation.</p>
+<p><code>--check</code> validates local links, anchors and generated-HTML consistency without
+updating files. Tool names are compared with repository source when available.
+The <a href="#page=sources.md" data-page="sources.md">sources page</a> records the product snapshot behind this edition.</p>
+<h2 id="doc-71625a889437--the-readers-boundary">The reader's boundary</h2>
+<p>This is a publication to read, not an MCP client: it does not call Flower,
+execute code, write the ledger or generate acceptance evidence. Markdown
+remains the source; HTML is its local projection.</p>
+<p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=talk.md" data-page="talk.md">Talk outline</a></p>
+</article><article class="markdown-body" data-document="../../BOOTSTRAP.md" data-title="Configure a project&#x27;s agent instructions" data-prefix="doc-609e0ef9e8b2" hidden><h1 id="doc-609e0ef9e8b2--configure-a-projects-agent-instructions">Configure a project's agent instructions</h1>
+<p>After installing Flower MCP and reloading the selected coding agent, use the
+installed command to obtain the model bootstrap:</p>
+<pre><code class="language-sh">flower-mcp bootstrap
+</code></pre>
+<p>Use the absolute command path printed by the curl installer if it is not on PATH.
+For a source checkout, run <code>.venv/bin/flower-mcp bootstrap</code>. The command prints
+instructions bundled in the package; it does not change files or start a server.
+Each GitHub Release also provides the same instructions as <code>BOOTSTRAP.md</code>.</p>
+<p>Give your model this request while working in the intended project:</p>
+<blockquote>
+<p>Run the installed Flower MCP command with <code>bootstrap</code> and follow its output to
+update this project's AGENTS.md. Preserve the existing rules, merge one Flower
+section, and verify the connection and explicit lifecycle-project selection.
+Use the current server recipes to begin the work I have authorized. If a project
+choice or connection prerequisite is missing, report it instead of guessing.</p>
+</blockquote>
+<p>Replace &quot;the installed Flower MCP command&quot; with its actual executable path when
+needed. If you installed with <code>--no-register</code>, first configure the intended agent
+using the <a href="https://github.com/Damel91/flower-mcp/blob/ddc83c6c79638eda63edae5be1bd9789faa44a2e/docs/INSTALLATION.md" rel="noopener noreferrer">installation instructions</a>.</p>
+<p>The model reads existing project instructions, discovers projects through
+<code>fow_interaction</code>, explicitly selects the intended one and reads the durable
+snapshot through <code>fow_handover</code>. An empty profile requires a new project only
+when your request authorizes creating it. Current <code>fow_capabilities</code> recipes
+guide the next action. The model adds or updates a bounded Flower section and
+keeps your existing build, testing and repository rules.</p>
+<h2 id="doc-609e0ef9e8b2--the-persistent-engineering-agent-template">The persistent engineering agent template</h2>
+<p>The printed bootstrap contains one complete, marked template for the project's
+<code>AGENTS.md</code>. Merge the entire section, including the engineering mindset:</p>
+<ul>
+<li>Help the stakeholder describe scenarios of what the software should do and
+show; ask progressive intent questions needed for the current step.</li>
+<li>Investigate technical architecture, implementation and reusable patterns or
+libraries, then register governing decisions through Flower. Stakeholder
+participation in architecture is explicit.</li>
+<li>Present and record actual roadmap confirmation; complete the milestones in
+that scope without introducing approval after each bounded unit.</li>
+<li>Require a complete accepted plan, closed Packet Validation Projection (PVP)
+and current admission before coding. Keep producer/consumer contracts and
+local versus deferred verification explicit.</li>
+<li>Stop affected work on semantic gaps, reread canonical intent and record its
+reassessment. A finding-linked corrective packet and regression can proceed
+only when the assessment establishes a correction within agreed intent.</li>
+<li>Report Flower's current criterion-based progress and evidence honestly,
+keeping implementation, verification and human acceptance separate. Execute
+authorized offline work from its export and reconcile explicitly later.</li>
+</ul>
+<p>The template is embedded in the single canonical resource
+<code>src/flow_of_work_mcp/resources/agent-bootstrap.md</code>. The installed command and
+release's <code>BOOTSTRAP.md</code> provide the same complete bytes. Project agents use
+Flower's public recipes and durable snapshots; they do not need the development
+repository's overlay, implementation indexes or campaign administration.</p>
+<p>Printing the template and preserving its package bytes qualify distribution
+mechanics. Actual model adherence, cognitive fit and novice usability require
+their own trials.</p>
+<p><code>AGENTS.md</code> stores stable project locators and operating rules. Requests, cursors,
+plan revisions, fingerprints, runtime history and credentials belong outside it.
+For public repositories, omit private host/profile paths. A client that does not
+load <code>AGENTS.md</code> automatically needs its own supported instruction mechanism to
+include it; creating the file alone does not activate it in every host.</p>
+<p>Reading the bootstrap and updating instructions do not perform engineering
+work or grant human acceptance. The model continues only the current authorized
+task, using the connected server's current authority and next gate.</p>
+<h2 id="doc-609e0ef9e8b2--guided-input-contracts-and-recovery">Guided input contracts and recovery</h2>
+<p>Before recording a selected answer or its canonical correspondence, request
+<code>fow_capabilities(view=&quot;operation&quot;, operation_tool=&quot;fow_bootstrap&quot;, operation_name=&quot;record_answer&quot;)</code> or <code>operation_name=&quot;record_correspondence&quot;</code>.
+The operation help includes the exact nested schema, required fields, accepted
+values and an example. Replace example locators with current returned identities.
+Correspondence uses the recorded answer revision and at least one existing
+requirement, goal or milestone; it does not certify semantic truth.</p>
+<p>Starting against an existing project requires its registered name. A rejected
+start exposes a typed cause, current project/bootstrap context and one explicit
+<code>next_tool_call</code>. Inspect an active bootstrap instead of starting another. A
+changed replay payload requires inspection of its original owner, not a blind
+retry. Suggested recovery is never performed automatically.</p>
+</article>
+<noscript><p>The full presentation is also available as Markdown files; enable JavaScript to navigate this reader.</p></noscript>
+</main>
+</div>
+<footer>Flower MCP · Editorial presentation · Illustrative scenario, not live receipts</footer>
+</body>
+</html>

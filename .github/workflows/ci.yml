@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    name: Build and installed wheel / Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Check the shell installer syntax
+        run: bash -n tools/install.sh
+      - name: Check the release inventory regressions
+        run: python -m unittest discover -s tests -p test_release_assets.py -v
+      - name: Build packages and release assets
+        run: |
+          python -m pip install build
+          python tools/build_release.py --output dist
+      - name: Exercise the installed wheel outside the checkout
+        shell: bash
+        run: |
+          FLOWER_EXPECTED_VERSION="$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          export FLOWER_EXPECTED_VERSION
+          python -m venv "$RUNNER_TEMP/flower-wheel"
+          "$RUNNER_TEMP/flower-wheel/bin/python" -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --help
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.metadata import version; from importlib.resources import files; import flow_of_work_mcp; import os; from pathlib import Path; assert Path(flow_of_work_mcp.__file__).is_relative_to(Path("flower-wheel").resolve()); assert files("flow_of_work_mcp").joinpath("resources/standalone.yaml").is_file(); installed = version("flow-of-work-mcp"); assert installed == os.environ["FLOWER_EXPECTED_VERSION"], f"Installed version differs: {installed}"; print(installed)'
+          export FLOWER_HOME="$RUNNER_TEMP/bootstrap-no-profile"
+          test ! -e "$FLOWER_HOME"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" bootstrap > "$RUNNER_TEMP/flower-bootstrap.md"
+          test ! -e "$FLOWER_HOME"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from pathlib import Path; from importlib.resources import files; import os; output = Path(os.environ["RUNNER_TEMP"]).joinpath("flower-bootstrap.md").read_bytes(); canonical = files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_bytes(); assert output == canonical, "Bootstrap command differs from its bundled instructions"; assert all(marker in output for marker in (b"fow_interaction", b"fow_capabilities", b"fow_handover", b"<!-- flower-mcp:begin -->", b"<!-- flower-mcp:end -->")), "Bootstrap command omits essential instructions"'
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_mcp.py" --command "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --output "$RUNNER_TEMP/flower-mcp-smoke.json"
+      - name: Retain the release artifacts built on the minimum Python version
+        if: matrix.python == '3.11'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flower-packages
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+  windows-installer:
+    name: Windows PowerShell launcher checks and installed wheel
+    needs: packages
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Parse and exercise the launcher helpers on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5) {
+            throw 'This checkpoint requires Windows PowerShell 5.1.'
+          }
+          & .\tools\check_windows_installer.ps1
+      - name: Fetch the current packages built on the minimum Python version
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flower-packages
+          path: dist
+      - name: Exercise the current installed wheel without coding-client registration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $environment = Join-Path $env:RUNNER_TEMP 'flower-installer-venv'
+          $profile = Join-Path $env:RUNNER_TEMP 'flower-installer-profile'
+          $env:FLOWER_HOME = Join-Path $env:RUNNER_TEMP 'flower-installer-home'
+          if ((Test-Path $environment) -or (Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
+            throw 'The installer checkpoint requires fresh isolated paths.'
+          }
+          $wheel = @(Get-ChildItem -LiteralPath .\dist -Filter '*.whl')
+          if ($wheel.Count -ne 1) { throw 'Expected exactly one current release wheel.' }
+          python -m venv $environment
+          if ($LASTEXITCODE -ne 0) { throw 'Isolated environment preparation failed.' }
+          $python = Join-Path $environment 'Scripts\python.exe'
+          & $python -m pip install $wheel[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Current wheel installation failed.' }
+          & $python -m pip check
+          if ($LASTEXITCODE -ne 0) { throw 'Installed dependencies are inconsistent.' }
+          if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
+            throw 'No-register installation created a lifecycle profile.'
+          }
+          $command = Join-Path $environment 'Scripts\flower-mcp.exe'
+          $env:FLOWER_EXPECTED_VERSION = python -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])"
+          if ($LASTEXITCODE -ne 0) { throw 'Release version lookup failed.' }
+          $smoke = Join-Path $env:GITHUB_WORKSPACE 'tools\smoke_mcp.py'
+          $probe = @'
+          import os, subprocess, sys
+          from importlib.metadata import version
+          from importlib.resources import files
+          from pathlib import Path
+          import flow_of_work_mcp
+          assert Path(flow_of_work_mcp.__file__).is_relative_to(Path(sys.prefix))
+          assert version('flow-of-work-mcp') == os.environ['FLOWER_EXPECTED_VERSION']
+          command = str(Path(sys.prefix) / 'Scripts' / 'flower-mcp.exe')
+          assert subprocess.check_output([command, 'bootstrap']) == files('flow_of_work_mcp').joinpath('resources/agent-bootstrap.md').read_bytes()
+          assert not Path(os.environ['FLOWER_HOME']).exists()
+          '@
+          Push-Location $env:RUNNER_TEMP
+          try {
+            & $command --help
+            if ($LASTEXITCODE -ne 0) { throw 'Installed Flower command failed.' }
+            & $python -c $probe
+            if ($LASTEXITCODE -ne 0) { throw 'Installed metadata or bootstrap failed.' }
+            & $python $smoke --command $command --output (Join-Path $env:RUNNER_TEMP 'flower-windows-mcp-smoke.json')
+            if ($LASTEXITCODE -ne 0) { throw 'Installed public MCP lifecycle smoke failed.' }
+          }
+          finally { Pop-Location }
+          if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
+            throw 'Bootstrap created a lifecycle profile.'
+          }

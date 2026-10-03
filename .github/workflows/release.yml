@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Public MAJOR.MINOR.PATCH version matching pyproject.toml (without v)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flower-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the public repository and main branch
+        env:
+          EXPECTED_REPOSITORY: Damel91/flower-mcp
+        run: |
+          test "$GITHUB_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Validate the requested version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python tools/build_release.py --version "$RELEASE_VERSION" --check-version
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: [validate, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Fetch the packages validated in this run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flower-packages
+          path: dist
+      - name: Verify exact assets and prepare factual release notes
+        run: python tools/build_release.py --version "$RELEASE_VERSION" --output dist --verify-only --notes "$RUNNER_TEMP/flower-release-notes.md"
+      - name: Refuse an existing tag
+        shell: bash
+        run: |
+          tag="v$RELEASE_VERSION"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY.git" \
+            "refs/tags/$tag" "refs/tags/$tag^{}" && status=0 || status=$?
+          if [ "$status" != 2 ]; then
+            echo 'Release tag already exists, or its absence could not be verified.' >&2
+            exit 1
+          fi
+      - name: Publish the checked commit, packages, installer and checksums
+        shell: bash
+        run: |
+          gh release create "v$RELEASE_VERSION" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Flower MCP $RELEASE_VERSION" \
+            --notes-file "$RUNNER_TEMP/flower-release-notes.md"

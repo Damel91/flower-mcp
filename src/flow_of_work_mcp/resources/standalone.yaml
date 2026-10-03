@@ -1,0 +1,17 @@
+# Canonical Flower core profile template. The installer materializes absolute paths.
+schema_version: 1
+runtime:
+  database_path: ledger.sqlite3
+  import_root: imports
+  job_workers: 1
+logging:
+  level: INFO
+  enable_console: false
+  logs_path: logs
+model:
+  enabled: false
+providers: {}
+packet_provider:
+  mode: agnostic
+test_provider:
+  mode: agnostic

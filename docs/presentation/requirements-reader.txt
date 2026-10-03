@@ -1,0 +1,2 @@
+# Build-time only; the generated reader has no Python/Node dependency.
+markdown-it-py==4.0.0

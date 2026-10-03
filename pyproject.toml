@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flow-of-work-mcp"
+version = "0.1.1"
+description = "Flower MCP: auditable software-engineering lifecycle plane"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{name = "Davide Mele"}]
+requires-python = ">=3.11"
+dependencies = [
+    "mdengine==0.13.4",
+    "mcp>=1.23,<2",
+    "PyYAML>=6.0",
+    "tree-sitter>=0.25,<0.26",
+    "tree-sitter-markdown==0.5.1",
+    "tomlkit>=0.13,<1",
+]
+
+[project.optional-dependencies]
+inference = ["lmstudio-agent-runtime @ git+https://github.com/Damel91/lmstudio-agent-runtime.git@743552c4291bb9801dcca3d17bd997f5d6e2d57e"]
+
+[project.urls]
+Homepage = "https://github.com/Damel91/flower-mcp"
+Documentation = "https://github.com/Damel91/flower-mcp/blob/main/docs/INSTALLATION.md"
+Issues = "https://github.com/Damel91/flower-mcp/issues"
+
+[project.scripts]
+flow-of-work-mcp = "flow_of_work_mcp.cli:main"
+flower-mcp = "flow_of_work_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flow_of_work_mcp = ["resources/*.yaml", "resources/*.md"]

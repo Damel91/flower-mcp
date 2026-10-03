@@ -1,0 +1,26 @@
+{
+  "title": "Flower MCP",
+  "language": "en",
+  "subtitle": "From requirements to software",
+  "product_revision": "ddc83c6c79638eda63edae5be1bd9789faa44a2e",
+  "pages": [
+    {"path": "README.md", "label": "The presentation", "group": "The story"},
+    {"path": "01-require.md", "label": "1. Require", "group": "The story"},
+    {"path": "02-plan.md", "label": "2. Plan", "group": "The story"},
+    {"path": "03-build.md", "label": "3. Build", "group": "The story"},
+    {"path": "04-verify.md", "label": "4. Verify", "group": "The story"},
+    {"path": "05-deploy.md", "label": "5. Deploy", "group": "The story"},
+    {"path": "06-operate.md", "label": "6. Operate", "group": "The story"},
+    {"path": "try-flower.md", "label": "Now try Flower", "group": "The story"},
+    {"path": "scenario.md", "label": "Spazio Comune", "group": "Further reading"},
+    {"path": "concepts.md", "label": "Essential concepts", "group": "Further reading"},
+    {"path": "tools.md", "label": "Public tools", "group": "Further reading"},
+    {"path": "comparison.md", "label": "Comparing planes", "group": "Further reading"},
+    {"path": "advanced.md", "label": "Advanced integrations", "group": "Further reading"},
+    {"path": "method.md", "label": "How I built it", "group": "Further reading"},
+    {"path": "sources.md", "label": "Sources and limits", "group": "Further reading"},
+    {"path": "talk.md", "label": "Talk outline", "group": "Further reading"},
+    {"path": "reader.md", "label": "Offline reader", "group": "Further reading"},
+    {"path": "../../BOOTSTRAP.md", "label": "Public bootstrap", "group": "Flower resource"}
+  ]
+}

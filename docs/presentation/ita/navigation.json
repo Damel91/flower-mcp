@@ -1,0 +1,26 @@
+{
+  "title": "Flower MCP",
+  "language": "it",
+  "subtitle": "Dal requisito al software",
+  "product_revision": "ddc83c6c79638eda63edae5be1bd9789faa44a2e",
+  "pages": [
+    {"path": "README.md", "label": "Il percorso", "group": "Percorso"},
+    {"path": "01-require.md", "label": "1. Require", "group": "Percorso"},
+    {"path": "02-plan.md", "label": "2. Plan", "group": "Percorso"},
+    {"path": "03-build.md", "label": "3. Build", "group": "Percorso"},
+    {"path": "04-verify.md", "label": "4. Verify", "group": "Percorso"},
+    {"path": "05-deploy.md", "label": "5. Deploy", "group": "Percorso"},
+    {"path": "06-operate.md", "label": "6. Operate", "group": "Percorso"},
+    {"path": "try-flower.md", "label": "Ora prova Flower", "group": "Percorso"},
+    {"path": "scenario.md", "label": "Spazio Comune", "group": "Approfondimenti"},
+    {"path": "concepts.md", "label": "Concetti essenziali", "group": "Approfondimenti"},
+    {"path": "tools.md", "label": "Tool pubblici", "group": "Approfondimenti"},
+    {"path": "comparison.md", "label": "Confronto tra plane", "group": "Approfondimenti"},
+    {"path": "advanced.md", "label": "Integrazioni avanzate", "group": "Approfondimenti"},
+    {"path": "method.md", "label": "Come l'ho costruito", "group": "Approfondimenti"},
+    {"path": "sources.md", "label": "Fonti e limiti", "group": "Approfondimenti"},
+    {"path": "talk.md", "label": "Traccia del talk", "group": "Approfondimenti"},
+    {"path": "reader.md", "label": "Reader offline", "group": "Approfondimenti"},
+    {"path": "../../BOOTSTRAP.md", "label": "Bootstrap pubblico (EN)", "group": "Risorsa Flower"}
+  ]
+}
