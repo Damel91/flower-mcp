@@ -115,6 +115,14 @@ Both require Python 3.11+ with SSL, `venv` and `ensurepip`; cloning also require
 Git. The [installation guide](docs/INSTALLATION.md) covers downloads, upgrades,
 profiles, removal and recovery.
 
+### Glama and containers
+
+The repository includes maintainer metadata and a core-only Dockerfile for
+Glama's build workflow. See the [Glama and container guide](docs/GLAMA.md) for
+startup arguments, persistent SQLite storage and client setup. Glama account
+claim, hosted deployment and platform release are separate steps; the existing
+GitHub `v0.1.1` tag predates these container files.
+
 ### Connect an agent and start a project
 
 1. **Reload the registered client and approve its MCP connection.** The client
