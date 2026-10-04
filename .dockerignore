@@ -1,0 +1,13 @@
+# Only the inputs needed to install the core package enter the build context.
+**
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!README.md
+!LICENSE
+!NOTICE
+!src/
+!src/**
+**/__pycache__
+**/*.py[cod]
+**/.DS_Store

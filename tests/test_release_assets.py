@@ -31,7 +31,8 @@ class ReleaseAssetsTests(unittest.TestCase):
             for path in (SOURCE / "docs/presentation").rglob("*")
             if path.is_file() and path.suffix in release.PRESENTATION_SUFFIXES
         }
-        sources = {"pyproject.toml", "LICENSE", "NOTICE", *release.ASSET_SOURCES.values(), *self.presentation}
+        sources = {"pyproject.toml", "LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
+                   *release.CONTAINER_SOURCES, *self.presentation}
         for relative in sources:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -58,7 +59,8 @@ class ReleaseAssetsTests(unittest.TestCase):
             archive.writestr(release.BOOTSTRAP_RESOURCE.removeprefix("src/"),
                              (self.root / release.BOOTSTRAP_RESOURCE).read_bytes())
         payloads = {relative: (self.root / relative).read_bytes()
-                    for relative in ("LICENSE", "NOTICE", *release.ASSET_SOURCES.values(), *sorted(self.presentation))}
+                    for relative in ("LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
+                                     *sorted(release.CONTAINER_SOURCES), *sorted(self.presentation))}
         payloads["PKG-INFO"] = metadata
         if replace:
             payloads.update(replace)
@@ -126,6 +128,21 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_sdist_must_include_the_offline_reader(self):
         self.packages(omit="docs/presentation/index.html")
         with self.assertRaisesRegex(ValueError, "source distribution omits required source docs/presentation/index.html"):
+            release.prepare(self.root, self.dist)
+
+    def test_sdist_must_include_each_container_build_source(self):
+        for source in sorted(release.CONTAINER_SOURCES):
+            with self.subTest(source=source):
+                self.packages(omit=source)
+                with self.assertRaisesRegex(ValueError, "source distribution omits required source"):
+                    release.prepare(self.root, self.dist)
+
+    def test_sdist_container_inputs_must_match_and_be_regular_files(self):
+        self.packages(replace={"Dockerfile": b"FROM unexpected:latest\n"})
+        with self.assertRaisesRegex(ValueError, "source distribution Dockerfile differs"):
+            release.prepare(self.root, self.dist)
+        self.packages(nonregular=".dockerignore")
+        with self.assertRaisesRegex(ValueError, "sources must be regular files"):
             release.prepare(self.root, self.dist)
 
     def test_sdist_must_include_shared_reader_assets(self):

@@ -1,4 +1,5 @@
 include LICENSE NOTICE README.md
+include Dockerfile .dockerignore glama.json
 recursive-include docs *.md
 recursive-include docs/presentation *.html *.json *.css *.js *.png *.txt *.py
 recursive-include tools *.py *.sh *.ps1

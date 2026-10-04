@@ -137,3 +137,64 @@ jobs:
           if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
             throw 'Bootstrap created a lifecycle profile.'
           }
+  container:
+    name: Core container and durable public MCP / Linux amd64
+    needs: packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flower-packages
+          path: dist
+      - name: Prepare the public client and check qualifier failures
+        run: |
+          python -m pip install dist/*.whl
+          python -m unittest discover -s tests -p test_container_smoke.py -v
+      - name: Validate maintainer metadata against Glama's published schema
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          from pathlib import Path
+          from jsonschema import Draft7Validator
+          manifest = json.loads(Path('glama.json').read_text())
+          with urllib.request.urlopen(manifest['$schema'], timeout=30) as response:
+              schema = json.load(response)
+          Draft7Validator.check_schema(schema)
+          Draft7Validator(schema).validate(manifest)
+          Path('glama-schema-checked.json').write_text(json.dumps(schema, indent=2) + '\n')
+          PY
+      - name: Build the actual image from the current source archive
+        run: |
+          python - <<'PY'
+          import os, tarfile
+          from pathlib import Path
+          archives = list(Path('dist').glob('*.tar.gz'))
+          assert len(archives) == 1
+          destination = Path(os.environ['RUNNER_TEMP']) / 'flower-container-source'
+          destination.mkdir()
+          with tarfile.open(archives[0]) as archive:
+              archive.extractall(destination, filter='data')
+          sources = list(destination.iterdir())
+          assert len(sources) == 1 and (sources[0] / 'Dockerfile').is_file()
+          Path('container-build-source.txt').write_text(str(sources[0]))
+          PY
+          docker build --tag flower-mcp:qualification "$(cat container-build-source.txt)"
+      - name: Exercise the network-disabled image through public MCP and recreate it
+        run: python tools/smoke_container.py --engine docker --image flower-mcp:qualification --output flower-container-smoke.json
+      - name: Retain the container and schema receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flower-container-qualification
+          path: |
+            flower-container-smoke.json
+            glama-schema-checked.json
+          if-no-files-found: warn
+          retention-days: 14

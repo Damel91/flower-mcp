@@ -23,6 +23,7 @@ STABLE_VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0
 INSTALLERS = {"install.sh", "install.ps1", "install_flower.py"}
 BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
+CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
                  "install_flower.py": "tools/install_flower.py",
                  "BOOTSTRAP.md": BOOTSTRAP_RESOURCE}
@@ -123,7 +124,8 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
             for path in (root / "docs/presentation").rglob("*")
             if path.is_file() and path.suffix in PRESENTATION_SUFFIXES
         )
-        for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(), *presentation):
+        for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                     *sorted(CONTAINER_SOURCES), *presentation):
             try:
                 member = archive.getmember(prefix + name)
             except KeyError as exc:
