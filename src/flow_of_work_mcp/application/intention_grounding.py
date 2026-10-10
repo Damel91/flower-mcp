@@ -380,9 +380,13 @@ class IntentionGroundingService:
         request = preparation['request']
         try:
             result = self._gateway.invoke(ModelRequest(**{**request, 'messages': tuple(request['messages'])}))
-        except ModelGatewayError:
-            result = ModelResult(text='', structured_output=None, model='', terminal_reason='model_error')
+        except ModelGatewayError as exc:
+            result = ModelResult(text='', structured_output=None, model='', terminal_reason=exc.terminal_reason,
+                                 transport=exc.transport)
         audit = self.validate_result(preparation, result, provenance={'execution_mode': 'internal', 'model': result.model,
+                                     'terminal_reason': result.terminal_reason, 'usage': dict(result.usage),
+                                     'usage_derived_fields': list(result.usage_derived_fields),
+                                     'transport': dict(result.transport),
                                      'source_currentness': 'provider_snapshot_as_of_preparation'})
         reason = self.currentness_reason(preparation)
         if reason:

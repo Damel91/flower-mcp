@@ -6,6 +6,7 @@ import an HTTP SDK, a local runtime or a provider-specific package.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any, Mapping, Protocol
 
 
@@ -26,8 +27,16 @@ class ModelResult:
     terminal_reason: str
     reasoning_text: str = ""
     usage: Mapping[str, int | None] = field(default_factory=dict)
+    tool_calls: tuple[Mapping[str, Any], ...] = ()
+    usage_derived_fields: tuple[str, ...] = ()
+    transport: Mapping[str, object] = field(default_factory=dict)
 
 
 class ModelGateway(Protocol):
-    def invoke(self, request: ModelRequest) -> ModelResult:
+    def invoke(
+        self, request: ModelRequest, *,
+        cancellation_probe: Callable[[], bool] | None = None,
+        thinking_diagnostics: Mapping[str, object] | None = None,
+        thinking_sink: Callable[[object], None] | None = None,
+    ) -> ModelResult:
         """Run one bounded role invocation or raise a typed adapter error."""

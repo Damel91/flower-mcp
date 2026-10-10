@@ -16,7 +16,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 param(
     [ValidateSet('codex', 'claude-code', 'cursor')][string]$Platform,
     [switch]$NoRegister,
-    [string]$Version = '0.1.1',
+    [string]$Version = '0.2.0',
     [string]$Venv,
     [switch]$Upgrade,
     [string]$ClientConfig,

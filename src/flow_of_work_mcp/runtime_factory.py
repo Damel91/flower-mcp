@@ -31,35 +31,41 @@ from flow_of_work_mcp.config import (
 )
 from flow_of_work_mcp.core.domain import ImplementationProviderKind
 from flow_of_work_mcp.core.ports import ModelGateway
-from flow_of_work_mcp.mcp_runtime import McpRuntime, build_runtime
+from flow_of_work_mcp.mcp_runtime import McpRuntime, RuntimeCompositionCleanupError, build_runtime
 from flow_of_work_mcp.runtime_ownership import RuntimeOwnership, acquire_runtime_ownership
 
 
 def build_model_gateway(config: ModelConfig) -> ModelGateway | None:
     if not config.enabled:
         return None
+    if config.backend != "llamacpp":
+        raise FlowConfigError("model.backend must be llamacpp; migrate the legacy inference configuration")
     try:
         from flow_of_work_mcp.adapters.model_runtime import (
-            LMStudioRuntimeGatewayConfig,
-            LMStudioRuntimeModelGateway,
+            RuntimeLlamaGatewayConfig,
+            RuntimeLlamaModelGateway,
         )
     except ModuleNotFoundError as exc:
-        if exc.name != "lmstudio_agent_runtime":
+        if exc.name != "runtime_llama":
             raise
         raise FlowConfigError(
             "internal inference requires the optional inference dependency; "
-            "install flow-of-work-mcp[inference], configure an authorized model "
+            "install the verified runtime-llama wheel supplied in the Flower release, "
+            "then flow-of-work-mcp[inference] using that wheel's directory with --find-links; "
+            "configure an authorized model "
             "endpoint, or set model.enabled=false to use Flower core"
         ) from exc
 
-    return LMStudioRuntimeModelGateway(
-        LMStudioRuntimeGatewayConfig(
+    return RuntimeLlamaModelGateway(
+        RuntimeLlamaGatewayConfig(
             model=config.model,
             base_url=config.base_url,
             context_length=config.context_length,
-            auto_load=config.auto_load,
             stream_idle_timeout_sec=config.idle_timeout_sec,
             api_key_env=config.api_key_env,
+            temperature=config.temperature,
+            verify_ssl=config.verify_ssl,
+            reasoning=config.reasoning,
         )
     )
 
@@ -209,6 +215,8 @@ def build_runtime_from_config(
         raise
     try:
         return _compose_runtime_from_config(config, ownership=lease)
+    except RuntimeCompositionCleanupError:
+        raise
     except BaseException:
         lease.close()
         raise
@@ -220,6 +228,28 @@ def _compose_runtime_from_config(
     """Compose the existing runtime from one validated configuration."""
 
     model_gateway = build_model_gateway(config.model)
+    try:
+        return _compose_owned_components(config, ownership=ownership, model_gateway=model_gateway)
+    except RuntimeCompositionCleanupError:
+        # Worker teardown failed: do not close a gateway that may still be in
+        # use and do not release the resource lease.
+        raise
+    except BaseException:
+        close = getattr(model_gateway, "close", None)
+        if callable(close):
+            try:
+                close()
+            except BaseException as cleanup_error:
+                raise RuntimeCompositionCleanupError(
+                    "runtime composition failed and model gateway cleanup is incomplete; "
+                    "runtime ownership remains held"
+                ) from cleanup_error
+        raise
+
+
+def _compose_owned_components(
+    config: FlowConfig, *, ownership: RuntimeOwnership, model_gateway: ModelGateway | None,
+) -> McpRuntime:
     ledger = SQLiteRequirementLedger(config.runtime.database_path)
     authorizations = tuple(
         ProviderBindingAuthorization(
@@ -314,6 +344,7 @@ def _compose_runtime_from_config(
         database_path=config.runtime.database_path,
         import_root=config.runtime.import_root,
         model_gateway=model_gateway,
+        owned_model_gateway=model_gateway,
         implementation_provider=implementation_provider,
         bootstrap_behavior_provider=bootstrap_provider,
         packet_evidence_provider=packet_evidence_provider,

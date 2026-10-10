@@ -1,0 +1,14 @@
+{
+  "distribution": "runtime-llama",
+  "version": "0.3.0.dev0",
+  "source_commit": "9538540e4e9fc285068fa18bc011650642636e97",
+  "artifact": "runtime_llama-0.3.0.dev0-py3-none-any.whl",
+  "sha256": "6a24fc89318fc27f4bcf6e007d6e81e749a2ebef353a1c55ddcdf45a2c160b2e",
+  "license": "MIT",
+  "license_files": [
+    "LICENSE",
+    "NOTICE",
+    "llamatelemetry.LICENSE"
+  ],
+  "distribution_note": "Unmodified upstream-delivered wheel. The upstream project has no public repository or package release; install from this artifact rather than an inferred URL. Flower core does not install this optional distribution."
+}

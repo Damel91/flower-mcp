@@ -69,12 +69,13 @@ class SrsSemanticValidationService:
             raise ModelGatewayError("semantic_internal_runtime_unconfigured")
         try:
             result = self._gateway.invoke(request)
-        except ModelGatewayError:
+        except ModelGatewayError as exc:
             result = ModelResult(
                 text="",
                 structured_output=None,
                 model="",
-                terminal_reason="model_error",
+                terminal_reason=exc.terminal_reason,
+                transport=exc.transport,
             )
         return self.validate_result(structural_audit, result)
 
@@ -145,22 +146,25 @@ class SrsSemanticValidationService:
                     anchor=self._document_anchor(structural_audit),
                 )
             )
-        if result.terminal_reason == "model_error":
+        if result.terminal_reason != "completed":
             local_findings.append(
                 ValidationFinding(
                     code="SRS-SEMANTIC-MODEL-UNAVAILABLE",
                     severity=FindingSeverity.WARNING,
-                    message="semantic validation did not return a usable bounded model result",
+                    message=("semantic validation did not return a usable bounded model result "
+                             f"({result.terminal_reason})"),
                     anchor=self._document_anchor(structural_audit),
                 )
             )
             return self._audit(
                 structural_audit,
                 local_findings,
-                model="",
-                terminal_reason="model_error",
+                model=result.model,
+                terminal_reason=result.terminal_reason,
                 input_truncated=input_truncated,
-                usage={},
+                usage=result.usage,
+                usage_derived_fields=result.usage_derived_fields,
+                transport=result.transport,
             )
 
         parsed_findings = self._validate_model_findings(
@@ -179,18 +183,6 @@ class SrsSemanticValidationService:
             )
         else:
             local_findings.extend(parsed_findings)
-        if result.terminal_reason != "completed":
-            local_findings.append(
-                ValidationFinding(
-                    code="SRS-SEMANTIC-INCOMPLETE",
-                    severity=FindingSeverity.WARNING,
-                    message=(
-                        "semantic validation ended without normal completion "
-                        f"({result.terminal_reason})"
-                    ),
-                    anchor=self._document_anchor(structural_audit),
-                )
-            )
         return self._audit(
             structural_audit,
             local_findings,
@@ -201,6 +193,8 @@ class SrsSemanticValidationService:
             ),
             input_truncated=input_truncated,
             usage=result.usage,
+            usage_derived_fields=result.usage_derived_fields,
+            transport=result.transport,
         )
 
     def _build_scope(self, structural_audit, profile):
@@ -316,6 +310,8 @@ class SrsSemanticValidationService:
         terminal_reason: str,
         input_truncated: bool,
         usage: Mapping[str, int | None],
+        usage_derived_fields: tuple[str, ...] = (),
+        transport: Mapping[str, object] | None = None,
     ) -> SemanticValidationAudit:
         if any(item.severity == FindingSeverity.ERROR for item in findings):
             disposition = ValidationDisposition.REJECTED
@@ -332,6 +328,8 @@ class SrsSemanticValidationService:
             prompt_version=self._policy.prompt_version,
             input_truncated=input_truncated,
             usage=dict(usage),
+            usage_derived_fields=usage_derived_fields,
+            transport=dict(transport or {}),
         )
 
     @staticmethod

@@ -99,6 +99,12 @@ class RunControlBlockedError(LifecycleError):
 class ModelGatewayError(LifecycleError):
     """Base error for a provider-neutral bounded model invocation."""
 
+    terminal_reason = "model_error"
+
+    def __init__(self, message: str = "", *, transport: Mapping[str, object] | None = None) -> None:
+        super().__init__(message)
+        self.transport = dict(transport or {})
+
 
 class ImplementationProviderError(LifecycleError):
     """Base error for a bounded external implementation-intelligence provider."""
@@ -129,6 +135,14 @@ class PacketProviderRejectedError(ImplementationProviderError):
 
 class ModelBackendError(ModelGatewayError):
     """Raised when a configured model endpoint rejects or corrupts a response."""
+
+    terminal_reason = "backend_error"
+
+
+class ModelCancelledError(ModelGatewayError):
+    """A consumer cancellation was acknowledged by the model transport."""
+
+    terminal_reason = "cancelled"
 
 
 class ModelIdleTimeoutError(ModelGatewayError, TimeoutError):

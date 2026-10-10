@@ -93,9 +93,9 @@ class BootstrapBehaviorDraftService:
         try:
             result = self._gateway.invoke(request)
         except ModelGatewayError as exc:
-            raise BootstrapBlockedError("bootstrap_behavior_model_unavailable") from exc
+            raise BootstrapBlockedError(f"bootstrap_behavior_model_{exc.terminal_reason}") from exc
         if result.terminal_reason != "completed":
-            raise BootstrapBlockedError("bootstrap_behavior_model_incomplete")
+            raise BootstrapBlockedError(f"bootstrap_behavior_model_{result.terminal_reason}")
         parsed = self._parse(result.structured_output, snapshot)
         return {
             "draft_version": "bootstrap-behavior-draft-v1",
@@ -105,6 +105,9 @@ class BootstrapBehaviorDraftService:
             "surfaces": list(snapshot.surfaces),
             "input_truncated": input_truncated or snapshot.truncated,
             "model": result.model,
+            "usage": dict(result.usage),
+            "usage_derived_fields": list(result.usage_derived_fields),
+            "transport": dict(result.transport),
             "prompt_version": self._policy.prompt_version,
             **parsed,
         }

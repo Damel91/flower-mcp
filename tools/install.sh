@@ -3,7 +3,7 @@
 set -euo pipefail
 
 FLOWER_REPOSITORY="https://github.com/Damel91/flower-mcp"
-FLOWER_VERSION="0.1.1"
+FLOWER_VERSION="0.2.0"
 UV_VERSION="0.12.21"
 selection=""
 has_client_config=0
@@ -19,7 +19,7 @@ With no agent flag, choose Codex, Claude Code, Cursor or installation only.
 Options:
   --platform codex|claude-code|cursor   Register this agent without a menu
   --no-register                       Install without registering an agent
-  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.1.1)
+  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.2.0)
   --venv PATH                          Dedicated installation environment
   --upgrade                            Upgrade an existing owned installation
   --client-config PATH                 Explicit agent configuration file

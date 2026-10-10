@@ -43,12 +43,13 @@ bootstrap = resources.joinpath("agent-bootstrap.md").read_text(encoding="utf-8")
 require(config["model"]["enabled"] is False and config["providers"] == {}, "core profile must disable inference/providers")
 require(config["logging"]["enable_console"] is False, "core profile must keep diagnostics off stdout")
 require("Flower" in bootstrap and "fow_" in bootstrap, "installed bootstrap resource must be reachable")
-try:
-    metadata.distribution("lmstudio-agent-runtime")
-except metadata.PackageNotFoundError:
-    pass
-else:
-    raise RuntimeError("optional inference dependency must not be installed")
+for optional_distribution in ("lmstudio-agent-runtime", "runtime-llama"):
+    try:
+        metadata.distribution(optional_distribution)
+    except metadata.PackageNotFoundError:
+        pass
+    else:
+        raise RuntimeError("optional inference dependency must not be installed: " + optional_distribution)
 private_paths = ["/build", "/src", "/app", "/authorities", "/qualification", "/work", "/config"]
 require(not any(Path(path).exists() for path in private_paths), "image contains source or private development inputs")
 require(not any(part in {"tests", "authorities", "qualification"} for item in distribution.files or [] for part in item.parts), "installed package contains private inputs")

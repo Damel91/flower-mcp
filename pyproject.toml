@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flow-of-work-mcp"
-version = "0.1.1"
+version = "0.2.0"
 description = "Flower MCP: auditable software-engineering lifecycle plane"
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-inference = ["lmstudio-agent-runtime @ git+https://github.com/Damel91/lmstudio-agent-runtime.git@743552c4291bb9801dcca3d17bd997f5d6e2d57e"]
+inference = ["runtime-llama==0.3.0.dev0"]
 
 [project.urls]
 Homepage = "https://github.com/Damel91/flower-mcp"

@@ -1,0 +1,22 @@
+runtime-llama
+
+Copyright (c) 2026 Davide Mele. The complete project is distributed under the
+MIT license in LICENSE, as explicitly authorized by the project owner.
+The following upstream attribution and license remain applicable to their
+respective derived components.
+
+The HTTP client in src/runtime_llama/client.py is adapted from LlamaCppClient
+in llamatelemetry/llamatelemetry at a0a1df88e3b143d1e38e241b2599e82c56092a0b.
+Copyright (c) 2024 Waqas Muhammad. The original MIT license is reproduced at
+src/runtime_llama/_vendor/llamatelemetry.LICENSE and included in distributions.
+Request dispatch, headers, and endpoint/payload mappings derive from upstream;
+stream parsing, cancellation, closure and raw response handling were adapted.
+
+Functional contracts, error/runaway handling, MCP data contracts, usage types,
+and selected regression cases derive from the stakeholder's adjacent
+lmstudio-agent-runtime repository at 9300f295a5383aa341f350fa6d7ccb854ee5d0bc.
+Generation and embedding adapters preserve and adapt those behaviors.
+No LICENSE or NOTICE file was present in the inspected baseline snapshot;
+the upstream Waqas Muhammad notice applies to the llamatelemetry-derived client.
+The historical absence of a license in that baseline is recorded for provenance;
+the current project license is assigned by its owner in LICENSE.

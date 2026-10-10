@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -35,13 +36,15 @@ class LoggingConfig:
 @dataclass(frozen=True)
 class ModelConfig:
     enabled: bool = False
-    backend: str = "lmstudio"
+    backend: str = "llamacpp"
     model: str = ""
-    base_url: str = "http://127.0.0.1:1234"
+    base_url: str = "http://127.0.0.1:8080"
     context_length: int | None = None
-    auto_load: bool = True
     api_key_env: str | None = None
     idle_timeout_sec: float = 30.0
+    verify_ssl: bool = True
+    temperature: float = 0.1
+    reasoning: str = "auto"
 
 
 @dataclass(frozen=True)
@@ -161,9 +164,12 @@ _MODEL_KEYS = {
     "model",
     "base_url",
     "context_length",
-    "auto_load",
+    "auto_load",  # Recognized only to produce an explicit migration error.
     "api_key_env",
     "idle_timeout_sec",
+    "verify_ssl",
+    "temperature",
+    "reasoning",
 }
 _PROVIDERS_KEYS = {"implementation_graph", "bootstrap_behavior", "packet_evidence"}
 _PROVIDER_KEYS = {
@@ -293,30 +299,46 @@ def load_config(path: str | Path) -> FlowConfig:
 
 
 def _model_config(raw: Mapping[str, Any]) -> ModelConfig:
+    if "auto_load" in raw:
+        raise FlowConfigError(
+            "model.auto_load is no longer supported; remove it. "
+            "runtime-llama uses server-owned model loading and never launches models"
+        )
     enabled = _boolean(raw.get("enabled", False), "model.enabled")
-    backend = _string(raw.get("backend", "lmstudio"), "model.backend").lower()
-    if backend != "lmstudio":
-        raise FlowConfigError("model.backend must be lmstudio")
+    backend = _string(raw.get("backend", "llamacpp"), "model.backend").lower()
+    if backend != "llamacpp":
+        raise FlowConfigError(
+            "model.backend must be llamacpp; migrate legacy lmstudio configuration "
+            "to a llama.cpp HTTP endpoint and remove auto_load"
+        )
     model = _string(raw.get("model", ""), "model.model", allow_empty=True)
     base_url = _string(
-        raw.get("base_url", "http://127.0.0.1:1234"),
+        raw.get("base_url", "http://127.0.0.1:8080"),
         "model.base_url",
     )
     if enabled and not model:
         raise FlowConfigError("model.model must be non-empty when model.enabled is true")
     context_value = raw.get("context_length", 0)
     context_length = _integer(context_value, "model.context_length", minimum=0)
+    reasoning = _string(raw.get("reasoning", "auto"), "model.reasoning").lower()
+    if reasoning not in {"auto", "off", "on", "low", "medium", "high"}:
+        raise FlowConfigError("model.reasoning must be auto, off, on, low, medium or high")
+    temperature = _number(raw.get("temperature", 0.1), "model.temperature", exclusive_minimum=-1)
+    if temperature < 0:
+        raise FlowConfigError("model.temperature must be non-negative")
     return ModelConfig(
         enabled=enabled,
         backend=backend,
         model=model,
         base_url=base_url,
         context_length=context_length or None,
-        auto_load=_boolean(raw.get("auto_load", True), "model.auto_load"),
         api_key_env=_optional_string(raw.get("api_key_env"), "model.api_key_env"),
         idle_timeout_sec=_number(
             raw.get("idle_timeout_sec", 30.0), "model.idle_timeout_sec", exclusive_minimum=0
         ),
+        verify_ssl=_boolean(raw.get("verify_ssl", True), "model.verify_ssl"),
+        temperature=temperature,
+        reasoning=reasoning,
     )
 
 
@@ -617,7 +639,7 @@ def _number(value: Any, field: str, *, exclusive_minimum: float) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise FlowConfigError(f"{field} must be numeric")
     parsed = float(value)
-    if parsed <= exclusive_minimum:
+    if not math.isfinite(parsed) or parsed <= exclusive_minimum:
         raise FlowConfigError(f"{field} must be > {exclusive_minimum}")
     return parsed
 

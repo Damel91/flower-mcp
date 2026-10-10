@@ -238,10 +238,14 @@ class SemanticAssignmentService:
         )
         try:
             result = self._gateway.invoke(request)
-        except ModelGatewayError:
-            result = ModelResult(text="", structured_output=None, model="", terminal_reason="model_error")
+        except ModelGatewayError as exc:
+            result = ModelResult(text="", structured_output=None, model="", terminal_reason=exc.terminal_reason,
+                                 transport=exc.transport)
         provenance = {"execution_mode": "internal", "model": result.model,
-                      "terminal_reason": result.terminal_reason, "evidence_authority": "internal_model_proposal"}
+                      "terminal_reason": result.terminal_reason, "usage": dict(result.usage),
+                      "usage_derived_fields": list(result.usage_derived_fields),
+                      "transport": dict(result.transport),
+                      "evidence_authority": "internal_model_proposal"}
         if view["role"] == "intention_grounding":
             provenance.update({"assignment_id": view["assignment_id"], "evidence_authority": "provider_snapshot",
                                "source_currentness": "provider_snapshot_as_of_preparation"})

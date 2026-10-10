@@ -169,6 +169,8 @@ class SemanticValidationAudit:
     prompt_version: str = ""
     input_truncated: bool = False
     usage: Mapping[str, int | None] = field(default_factory=dict)
+    usage_derived_fields: tuple[str, ...] = ()
+    transport: Mapping[str, object] = field(default_factory=dict)
 
     @property
     def error_count(self) -> int:
@@ -194,5 +196,7 @@ class SemanticValidationAudit:
             "prompt_version": self.prompt_version,
             "input_truncated": self.input_truncated,
             "usage": dict(self.usage),
+            "usage_derived_fields": list(self.usage_derived_fields),
+            "transport": dict(self.transport),
             "findings": [finding_to_dict(finding) for finding in self.findings],
         }

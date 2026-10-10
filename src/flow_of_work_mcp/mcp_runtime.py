@@ -63,6 +63,14 @@ from flow_of_work_mcp.application.semantic_assignments import SemanticAssignment
 from flow_of_work_mcp.runtime_ownership import RuntimeOwnership
 
 
+class RuntimeCompositionCleanupError(RuntimeError):
+    """Construction failed and owned resources could not finish cleanup.
+
+    The chained errors retain both failures. Runtime ownership must remain held
+    until explicit cleanup or process exit, rather than admit unsafe recovery.
+    """
+
+
 @dataclass
 class McpRuntime:
     ledger: SQLiteRequirementLedger
@@ -115,12 +123,17 @@ class McpRuntime:
     semantic_validation: SrsSemanticValidationService | None = None
     grounding: IntentionGroundingService | None = None
     runtime_ownership: RuntimeOwnership | None = None
+    owned_model_gateway: ModelGateway | None = None
 
     def close(self) -> None:
         # A failed shutdown does not prove workers have stopped. Keep ownership
         # until cleanup succeeds or the process exits rather than admit recovery
         # over work that may still be alive.
         self.jobs.shutdown()
+        close = getattr(self.owned_model_gateway, "close", None)
+        if callable(close):
+            close()
+        self.owned_model_gateway = None
         if self.runtime_ownership is not None:
             self.runtime_ownership.close()
 
@@ -142,6 +155,7 @@ def build_runtime(
     provider_bindings: ProviderBindingService | None = None,
     job_workers: int = 1,
     runtime_ownership: RuntimeOwnership | None = None,
+    owned_model_gateway: ModelGateway | None = None,
 ) -> McpRuntime:
     """Compose the standalone runtime without an external-provider runtime import."""
 
@@ -425,7 +439,13 @@ def build_runtime(
             test_provider=test_provider,
             test_provider_mode=str(test_provider_mode or "agnostic"),
             runtime_ownership=runtime_ownership,
+            owned_model_gateway=owned_model_gateway,
         )
     except BaseException:
-        jobs.shutdown()
+        try:
+            jobs.shutdown()
+        except BaseException as cleanup_error:
+            raise RuntimeCompositionCleanupError(
+                "runtime construction failed and worker cleanup is incomplete; runtime ownership remains held"
+            ) from cleanup_error
         raise

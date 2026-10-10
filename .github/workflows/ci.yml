@@ -42,16 +42,30 @@ jobs:
           FLOWER_EXPECTED_VERSION="$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
           export FLOWER_EXPECTED_VERSION
           python -m venv "$RUNNER_TEMP/flower-wheel"
-          "$RUNNER_TEMP/flower-wheel/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/flower-wheel/bin/python" -m pip install dist/flow_of_work_mcp-*.whl
           cd "$RUNNER_TEMP"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --help
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.metadata import version; from importlib.resources import files; import flow_of_work_mcp; import os; from pathlib import Path; assert Path(flow_of_work_mcp.__file__).is_relative_to(Path("flower-wheel").resolve()); assert files("flow_of_work_mcp").joinpath("resources/standalone.yaml").is_file(); installed = version("flow-of-work-mcp"); assert installed == os.environ["FLOWER_EXPECTED_VERSION"], f"Installed version differs: {installed}"; print(installed)'
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.util import find_spec; assert find_spec("runtime_llama") is None; assert find_spec("lmstudio_agent_runtime") is None'
           export FLOWER_HOME="$RUNNER_TEMP/bootstrap-no-profile"
           test ! -e "$FLOWER_HOME"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" bootstrap > "$RUNNER_TEMP/flower-bootstrap.md"
           test ! -e "$FLOWER_HOME"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from pathlib import Path; from importlib.resources import files; import os; output = Path(os.environ["RUNNER_TEMP"]).joinpath("flower-bootstrap.md").read_bytes(); canonical = files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_bytes(); assert output == canonical, "Bootstrap command differs from its bundled instructions"; assert all(marker in output for marker in (b"fow_interaction", b"fow_capabilities", b"fow_handover", b"<!-- flower-mcp:begin -->", b"<!-- flower-mcp:end -->")), "Bootstrap command omits essential instructions"'
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_mcp.py" --command "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --output "$RUNNER_TEMP/flower-mcp-smoke.json"
+      - name: Install the exact optional runtime from the current release assets
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/flower-inference"
+          flower_wheels=("$GITHUB_WORKSPACE"/dist/flow_of_work_mcp-*.whl)
+          test "${#flower_wheels[@]}" -eq 1
+          "$RUNNER_TEMP/flower-inference/bin/python" -m pip install "${flower_wheels[0]}[inference]" "$GITHUB_WORKSPACE/dist/runtime_llama-0.3.0.dev0-py3-none-any.whl"
+          "$RUNNER_TEMP/flower-inference/bin/python" -m pip check
+          cd "$RUNNER_TEMP"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-inference/bin/python" -c 'from importlib.metadata import version; from pathlib import Path; import runtime_llama, sys; assert version("runtime-llama") == "0.3.0.dev0"; assert Path(runtime_llama.__file__).is_relative_to(Path(sys.prefix)); assert "lmstudio" not in sys.modules and "openai" not in sys.modules; print(version("runtime-llama"))'
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-inference/bin/flower-mcp" --help
+          "$RUNNER_TEMP/flower-inference/bin/python" -m pip install 'pytest>=8,<10'
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-inference/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_model_runtime_gateway.py"
       - name: Retain the release artifacts built on the minimum Python version
         if: matrix.python == '3.11'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -95,8 +109,8 @@ jobs:
           if ((Test-Path $environment) -or (Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
             throw 'The installer checkpoint requires fresh isolated paths.'
           }
-          $wheel = @(Get-ChildItem -LiteralPath .\dist -Filter '*.whl')
-          if ($wheel.Count -ne 1) { throw 'Expected exactly one current release wheel.' }
+          $wheel = @(Get-ChildItem -LiteralPath .\dist -Filter 'flow_of_work_mcp-*.whl')
+          if ($wheel.Count -ne 1) { throw 'Expected exactly one current Flower release wheel.' }
           python -m venv $environment
           if ($LASTEXITCODE -ne 0) { throw 'Isolated environment preparation failed.' }
           $python = Join-Path $environment 'Scripts\python.exe'
@@ -115,10 +129,12 @@ jobs:
           import os, subprocess, sys
           from importlib.metadata import version
           from importlib.resources import files
+          from importlib.util import find_spec
           from pathlib import Path
           import flow_of_work_mcp
           assert Path(flow_of_work_mcp.__file__).is_relative_to(Path(sys.prefix))
           assert version('flow-of-work-mcp') == os.environ['FLOWER_EXPECTED_VERSION']
+          assert find_spec('runtime_llama') is None and find_spec('lmstudio_agent_runtime') is None
           command = str(Path(sys.prefix) / 'Scripts' / 'flower-mcp.exe')
           output = subprocess.check_output([command, 'bootstrap']).decode('utf-8').replace('\r\n', '\n')
           assert output == files('flow_of_work_mcp').joinpath('resources/agent-bootstrap.md').read_text(encoding='utf-8')
@@ -155,7 +171,7 @@ jobs:
           path: dist
       - name: Prepare the public client and check qualifier failures
         run: |
-          python -m pip install dist/*.whl
+          python -m pip install dist/flow_of_work_mcp-*.whl
           python -m unittest discover -s tests -p test_container_smoke.py -v
       - name: Validate maintainer metadata against Glama's published schema
         run: |

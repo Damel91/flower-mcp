@@ -24,9 +24,43 @@ INSTALLERS = {"install.sh", "install.ps1", "install_flower.py"}
 BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
 CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
+RUNTIME_VERSION = "0.3.0.dev0"
+RUNTIME_WHEEL = f"runtime_llama-{RUNTIME_VERSION}-py3-none-any.whl"
+RUNTIME_SHA256 = "6a24fc89318fc27f4bcf6e007d6e81e749a2ebef353a1c55ddcdf45a2c160b2e"
+RUNTIME_COMMIT = "9538540e4e9fc285068fa18bc011650642636e97"
+THIRD_PARTY_ROOT = "third_party/runtime-llama"
+THIRD_PARTY_SOURCES = {f"{THIRD_PARTY_ROOT}/{name}" for name in
+                       (RUNTIME_WHEEL, "LICENSE", "NOTICE", "llamatelemetry.LICENSE", "provenance.json")}
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
                  "install_flower.py": "tools/install_flower.py",
-                 "BOOTSTRAP.md": BOOTSTRAP_RESOURCE}
+                 "BOOTSTRAP.md": BOOTSTRAP_RESOURCE,
+                 RUNTIME_WHEEL: f"{THIRD_PARTY_ROOT}/{RUNTIME_WHEEL}"}
+
+
+def validate_runtime(root: Path) -> None:
+    for relative in THIRD_PARTY_SOURCES:
+        source = root / relative
+        if source.is_symlink() or not source.is_file():
+            raise ValueError("optional runtime artifact and provenance sources must be regular files")
+    provenance = json.loads((root / THIRD_PARTY_ROOT / "provenance.json").read_text(encoding="utf-8"))
+    expected = {"distribution": "runtime-llama", "version": RUNTIME_VERSION,
+                "source_commit": RUNTIME_COMMIT, "artifact": RUNTIME_WHEEL,
+                "sha256": RUNTIME_SHA256, "license": "MIT",
+                "license_files": ["LICENSE", "NOTICE", "llamatelemetry.LICENSE"]}
+    if not isinstance(provenance, dict) or any(provenance.get(key) != value for key, value in expected.items()):
+        raise ValueError("optional runtime provenance differs from the delivered artifact contract")
+    wheel = root / THIRD_PARTY_ROOT / RUNTIME_WHEEL
+    if hashlib.sha256(wheel.read_bytes()).hexdigest() != RUNTIME_SHA256:
+        raise ValueError("optional runtime wheel differs from the delivered SHA-256")
+    with zipfile.ZipFile(wheel) as archive:
+        prefix = f"runtime_llama-{RUNTIME_VERSION}.dist-info/"
+        metadata = BytesParser().parsebytes(archive.read(prefix + "METADATA"))
+        if metadata["Name"] != "runtime-llama" or metadata["Version"] != RUNTIME_VERSION:
+            raise ValueError("optional runtime metadata differs from its locked identity")
+        for name, relative in (("LICENSE", "LICENSE"), ("NOTICE", "NOTICE"),
+                               ("llamatelemetry.LICENSE", "src/runtime_llama/_vendor/llamatelemetry.LICENSE")):
+            if archive.read(prefix + "licenses/" + relative) != (root / THIRD_PARTY_ROOT / name).read_bytes():
+                raise ValueError("optional runtime attribution differs from the delivered wheel")
 
 
 def validate_project(root: Path, requested_version: str | None = None) -> dict:
@@ -58,6 +92,9 @@ def validate_project(root: Path, requested_version: str | None = None) -> dict:
                 and any(isinstance(target, ast.Name) and target.id == "DEFAULT_VERSION" for target in node.targets)]
     if len(defaults) != 1 or not isinstance(defaults[0], ast.Constant) or defaults[0].value != version:
         raise ValueError("Python installer default release version differs from pyproject.toml")
+    if project.get("optional-dependencies", {}).get("inference") != [f"runtime-llama=={RUNTIME_VERSION}"]:
+        raise ValueError("inference extra must name only the exact delivered runtime version")
+    validate_runtime(root)
     return project
 
 
@@ -73,7 +110,7 @@ def check_inventory(dist: Path, project: dict, *, require_copied_assets: bool = 
     actual = {path.name for path in dist.iterdir()}
     required = expected if require_copied_assets else expected - set(ASSET_SOURCES)
     if actual - expected - {"SHA256SUMS"} or required - actual:
-        raise ValueError("dist must contain exactly the current wheel, sdist, installers, BOOTSTRAP.md and optional SHA256SUMS")
+        raise ValueError("dist must contain exactly the Flower wheel, sdist, optional runtime wheel, installers, BOOTSTRAP.md and optional SHA256SUMS")
     if any(path.is_symlink() or not path.is_file() for path in dist.iterdir()):
         raise ValueError("release assets must be regular files")
 
@@ -96,16 +133,25 @@ def check_metadata(payload: bytes, project: dict) -> None:
         raise ValueError("built package license metadata differs from the public license")
     if metadata["Requires-Python"] != project["requires-python"]:
         raise ValueError("built Python requirement differs from pyproject.toml")
+    requirements = metadata.get_all("Requires-Dist") or []
+    runtime_requirements = [item for item in requirements if re.match(r"runtime[-_]llama(?:\s|[<=>!])", item)]
+    if runtime_requirements != [f'runtime-llama=={RUNTIME_VERSION}; extra == "inference"']:
+        raise ValueError("built package must keep the exact runtime dependency confined to the inference extra")
 
 
 def check_packages(root: Path, files: list[Path], project: dict) -> None:
-    wheel = next(path for path in files if path.suffix == ".whl")
+    normalized_name = re.sub(r"[-_.]+", "_", project["name"])
+    wheel_name = f"{normalized_name}-{project['version']}-py3-none-any.whl"
+    wheel = next(path for path in files if path.name == wheel_name)
     with zipfile.ZipFile(wheel) as archive:
         metadata_names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(metadata_names) != 1:
             raise ValueError("wheel must contain one package metadata file")
         metadata_name = metadata_names[0]
         check_metadata(archive.read(metadata_name), project)
+        if any(name.startswith(("third_party/", "runtime_llama/")) or name.endswith(".whl")
+               for name in archive.namelist()):
+            raise ValueError("Flower core wheel must not contain the optional runtime artifact or package")
         distinfo = metadata_name.rsplit("/", 1)[0]
         for name in ("LICENSE", "NOTICE"):
             if archive.read(f"{distinfo}/licenses/{name}") != (root / name).read_bytes():
@@ -125,7 +171,7 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
             if path.is_file() and path.suffix in PRESENTATION_SUFFIXES
         )
         for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
-                     *sorted(CONTAINER_SOURCES), *presentation):
+                     *sorted(CONTAINER_SOURCES), *sorted(THIRD_PARTY_SOURCES), *presentation):
             try:
                 member = archive.getmember(prefix + name)
             except KeyError as exc:
@@ -165,13 +211,19 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
         notes.write_text(
             f"Flower MCP {project['version']}\n\n"
             "Python 3.11 or newer. Apache-2.0; LICENSE and NOTICE are included inside both packages.\n\n"
-            "Assets: Python wheel, source distribution, install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
+            "Assets: Flower Python wheel, source distribution, optional runtime_llama-0.3.0.dev0 wheel, "
+            "install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
             "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
-            "This release includes the version-pinned Windows PowerShell launcher and the bilingual offline presentation. "
-            "It remains in testing; this installation/documentation update does not change the public MCP interface.\n\n"
+            "This release replaces optional LM Studio inference with runtime-llama for an operator-managed llama.cpp endpoint, "
+            "preserving an inference-free core. The upstream runtime is a pinned prerelease distributed here as an unmodified wheel; "
+            "no upstream PyPI or Git URL is required. Existing LM Studio model configuration requires explicit migration. "
+            "Glama/container build inputs, the version-pinned Windows PowerShell launcher and the bilingual offline presentation are included. "
+            "Flower remains in testing.\n\n"
             "Install this release and choose your coding client in the terminal:\n\n"
             f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash\n```\n\n"
             "The installer prepares the Python environment and checks downloaded backend and wheel hashes.\n"
+            "The ordinary installer installs only Flower core. For internal inference, verify the optional runtime wheel against SHA256SUMS "
+            f"and follow [optional inference setup](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/INFERENCE.md). Core/host execution needs no model endpoint.\n\n"
             "Windows: obtain the included install.ps1 from this release's assets. "
             "Run the download and execution commands separately, inspecting the script before execution:\n\n"
             f"```powershell\nInvoke-WebRequest -UseBasicParsing -Uri \"https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.ps1\" -OutFile \".\\install.ps1\"\n```\n\n"

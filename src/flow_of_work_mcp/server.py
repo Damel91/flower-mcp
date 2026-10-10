@@ -97,7 +97,7 @@ from flow_of_work_mcp.model_facing import (
     assert_projector_registry,
     model_facing_tool,
 )
-from flow_of_work_mcp.runtime_factory import build_runtime_from_config
+from flow_of_work_mcp.runtime_factory import RuntimeCompositionCleanupError, build_runtime_from_config
 
 
 _CHANGE_OPERATION_OWNERSHIP = change_operation_ownership()
@@ -5503,6 +5503,7 @@ def main(argv: list[str] | None = None) -> None:
     manager = LoggerManager()
     logger = None
     runtime: McpRuntime | None = None
+    composition_cleanup_incomplete = False
     try:
         manager.setup(config.logging)
         logger = get_logger("server", session_id="server")
@@ -5524,6 +5525,11 @@ def main(argv: list[str] | None = None) -> None:
             args.transport, args.host, args.port,
         )
         app.run(transport=args.transport)
+    except RuntimeCompositionCleanupError:
+        composition_cleanup_incomplete = True
+        if logger is not None:
+            logger.error("server composition cleanup incomplete; runtime ownership retained")
+        raise
     except Exception as exc:
         if logger is not None:
             logger.error("server startup/runtime failure type=%s", type(exc).__name__)
@@ -5537,10 +5543,10 @@ def main(argv: list[str] | None = None) -> None:
         finally:
             # Failed shutdown may leave live workers. Keep the OS lease until
             # successful close or process exit rather than admitting a rival.
-            if runtime is None or runtime_stopped:
+            if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
                 ownership.close()
             if logger is not None:
-                if runtime is None or runtime_stopped:
+                if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
                     logger.info("MCP server stopped")
                 else:
                     logger.error("MCP server shutdown incomplete; runtime ownership retained")
