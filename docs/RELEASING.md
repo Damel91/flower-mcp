@@ -8,8 +8,8 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; the current version is `0.1.1`. Tags use the `v` prefix,
-for example `v0.1.1`. Version `0.x` means the public interface is still evolving;
+`MAJOR.MINOR.PATCH`; the current version is `0.2.0`. Tags use the `v` prefix,
+for example `v0.2.0`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
 increments for fixes that preserve the advertised interface. A future `1.0.0`
 requires a deliberately declared stable public interface.
@@ -32,21 +32,21 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify the current `0.1.1` checkout locally, use Python 3.11 or newer in an
+To qualify the current `0.2.0` checkout locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.1.1 --output dist
+python tools/build_release.py --version 0.2.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
-`BOOTSTRAP.md`, and writes `SHA256SUMS`. Stale or unexpected files in the output directory fail the
+`BOOTSTRAP.md` and the exact optional runtime wheel, and writes `SHA256SUMS`. Stale or unexpected files in the output directory fail the
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.1.1 --output dist --verify-only
+python tools/build_release.py --version 0.2.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -80,9 +80,15 @@ the requested new version tag at the full tested SHA and publishes:
 - `install.ps1`
 - `install_flower.py`
 - `BOOTSTRAP.md`
+- `runtime_llama-0.3.0.dev0-py3-none-any.whl` (optional inference)
 - `SHA256SUMS`
 
 `VERSION` is the requested version declared in `pyproject.toml`.
+The optional wheel must match `third_party/runtime-llama/provenance.json` and
+its declared SHA256. The source archive includes its licenses, notices and
+provenance; the core Flower wheel and core container exclude it. Select the
+Flower wheel explicitly when installing core; do not install `dist/*.whl`.
+See [INFERENCE.md](INFERENCE.md) for the explicit optional installation route.
 
 Release notes include version, license and installation commands. No packages
 are published to PyPI. The install script downloads the explicit wheel asset;
@@ -110,7 +116,7 @@ supplied target and uploads assets before publication; see [the release command]
 The primary installer uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.1.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
