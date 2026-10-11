@@ -5,7 +5,8 @@ Install a pinned Flower MCP release on Windows.
 .DESCRIPTION
 Reuses the canonical Python installer. Existing Python 3.11+ is preferred;
 otherwise managed Python is prepared without persistent PATH or registry changes.
-Choose -Platform codex|claude-code|cursor or -NoRegister. The Python backend owns
+Choose -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.
+The Python backend owns
 installation receipts, explicit upgrades and client registration.
 .EXAMPLE
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
@@ -14,9 +15,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('codex', 'claude-code', 'cursor')][string]$Platform,
+    [ValidateSet('codex', 'claude-code', 'cursor', 'antigravity', 'gemini-cli')][string]$Platform,
     [switch]$NoRegister,
-    [string]$Version = '0.2.0',
+    [string]$Version = '0.3.0',
     [string]$Venv,
     [switch]$Upgrade,
     [string]$ClientConfig,
@@ -31,7 +32,7 @@ function Assert-Selection {
     param([string]$SelectedPlatform, [bool]$WithoutRegistration, [string]$SelectedClientConfig,
           [string]$SelectedVersion)
     if ([bool]$SelectedPlatform -eq $WithoutRegistration) {
-        throw 'Choose exactly one of -Platform codex|claude-code|cursor or -NoRegister.'
+        throw 'Choose exactly one of -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.'
     }
     if ($WithoutRegistration -and $SelectedClientConfig) {
         throw '-ClientConfig requires -Platform.'

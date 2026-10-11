@@ -24,10 +24,10 @@ INSTALLERS = {"install.sh", "install.ps1", "install_flower.py"}
 BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
 CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
-RUNTIME_VERSION = "0.3.0.dev0"
+RUNTIME_VERSION = "0.4.0"
 RUNTIME_WHEEL = f"runtime_llama-{RUNTIME_VERSION}-py3-none-any.whl"
-RUNTIME_SHA256 = "6a24fc89318fc27f4bcf6e007d6e81e749a2ebef353a1c55ddcdf45a2c160b2e"
-RUNTIME_COMMIT = "9538540e4e9fc285068fa18bc011650642636e97"
+RUNTIME_SHA256 = "129c461771256d8107d7aeba6f6e7818975052952ad291b068662fe337061fc8"
+RUNTIME_COMMIT = "420acd46a1cc761c6c07cee2fa7ffb9814621597"
 THIRD_PARTY_ROOT = "third_party/runtime-llama"
 THIRD_PARTY_SOURCES = {f"{THIRD_PARTY_ROOT}/{name}" for name in
                        (RUNTIME_WHEEL, "LICENSE", "NOTICE", "llamatelemetry.LICENSE", "provenance.json")}
@@ -211,11 +211,11 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
         notes.write_text(
             f"Flower MCP {project['version']}\n\n"
             "Python 3.11 or newer. Apache-2.0; LICENSE and NOTICE are included inside both packages.\n\n"
-            "Assets: Flower Python wheel, source distribution, optional runtime_llama-0.3.0.dev0 wheel, "
+            "Assets: Flower Python wheel, source distribution, optional runtime_llama-0.4.0 wheel, "
             "install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
             "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
-            "This release replaces optional LM Studio inference with runtime-llama for an operator-managed llama.cpp endpoint, "
-            "preserving an inference-free core. The upstream runtime is a pinned prerelease distributed here as an unmodified wheel; "
+            "This release adds Antigravity and Gemini CLI installation and updates optional runtime-llama to 0.4.0 for operator-managed llama.cpp inference. "
+            "Google client setup and core execution need no inference endpoint. The upstream runtime is pinned and distributed here as an unmodified wheel; "
             "no upstream PyPI or Git URL is required. Existing LM Studio model configuration requires explicit migration. "
             "Glama/container build inputs, the version-pinned Windows PowerShell launcher and the bilingual offline presentation are included. "
             "Flower remains in testing.\n\n"
@@ -228,7 +228,7 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             "Run the download and execution commands separately, inspecting the script before execution:\n\n"
             f"```powershell\nInvoke-WebRequest -UseBasicParsing -Uri \"https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.ps1\" -OutFile \".\\install.ps1\"\n```\n\n"
             f"```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\install.ps1 -Version '{project['version']}' -Platform codex\n```\n\n"
-            "Use -Platform claude-code, -Platform cursor or -NoRegister instead. The execution-policy setting applies only to this process.\n"
+            "Use -Platform claude-code, -Platform cursor, -Platform antigravity, -Platform gemini-cli or -NoRegister instead. The execution-policy setting applies only to this process.\n"
             "Windows requires PowerShell 5.1 or newer; see the installation guide for prerequisites. "
             "Windows installation and coding-client usability require separate platform verification.\n"
             f"Full version notes: https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/RELEASE-NOTES-{project['version']}.md\n\n"

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 FLOWER_REPOSITORY="https://github.com/Damel91/flower-mcp"
-FLOWER_VERSION="0.2.0"
+FLOWER_VERSION="0.3.0"
 UV_VERSION="0.12.21"
 selection=""
 has_client_config=0
@@ -14,12 +14,14 @@ fail() { printf 'Flower installation failed: %s\n' "$*" >&2; exit 1; }
 usage() {
     cat <<'HELP'
 Flower MCP release installer for macOS and Linux.
-With no agent flag, choose Codex, Claude Code, Cursor or installation only.
+With no agent flag, choose Codex, Claude Code, Cursor, Antigravity, Gemini CLI
+or installation only.
 
 Options:
-  --platform codex|claude-code|cursor   Register this agent without a menu
+  --platform codex|claude-code|cursor|antigravity|gemini-cli
+                                       Register this agent without a menu
   --no-register                       Install without registering an agent
-  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.2.0)
+  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.3.0)
   --venv PATH                          Dedicated installation environment
   --upgrade                            Upgrade an existing owned installation
   --client-config PATH                 Explicit agent configuration file
@@ -34,7 +36,7 @@ while [[ $# -gt 0 ]]; do
         --platform)
             [[ $# -ge 2 ]] || fail "--platform requires an agent name"
             [[ -z "$selection" ]] || fail "choose only one agent or --no-register"
-            case "$2" in codex|claude-code|cursor) selection="$2" ;; *) fail "unsupported agent: $2" ;; esac
+            case "$2" in codex|claude-code|cursor|antigravity|gemini-cli) selection="$2" ;; *) fail "unsupported agent: $2" ;; esac
             shift 2 ;;
         --no-register)
             [[ -z "$selection" ]] || fail "choose only one agent or --no-register"
@@ -64,18 +66,20 @@ case "$(uname -s)" in
 esac
 
 if [[ -z "$selection" ]]; then
-    printf 'Install Flower MCP %s\n1) Codex\n2) Claude Code\n3) Cursor\n4) Install only\n' "$FLOWER_VERSION" >&2
+    printf 'Install Flower MCP %s\n1) Codex\n2) Claude Code\n3) Cursor\n4) Install only\n5) Antigravity\n6) Gemini CLI\n' "$FLOWER_VERSION" >&2
     while [[ -z "$selection" ]]; do
-        printf 'Select an agent [1-4]: ' >&2
+        printf 'Select an agent [1-6]: ' >&2
         if ! IFS= read -r answer 2>/dev/null </dev/tty; then
-            fail "no terminal is available; pass --platform codex|claude-code|cursor or --no-register"
+            fail "no terminal is available; pass --platform codex|claude-code|cursor|antigravity|gemini-cli or --no-register"
         fi
         case "$answer" in
             1) selection="codex" ;;
             2) selection="claude-code" ;;
             3) selection="cursor" ;;
             4) selection="none" ;;
-            *) printf 'Enter 1, 2, 3 or 4.\n' >&2 ;;
+            5) selection="antigravity" ;;
+            6) selection="gemini-cli" ;;
+            *) printf 'Enter 1, 2, 3, 4, 5 or 6.\n' >&2 ;;
         esac
     done
 fi

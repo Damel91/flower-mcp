@@ -23,7 +23,7 @@ import tomlkit
 from flow_of_work_mcp.runtime_ownership import acquire_file_ownership
 
 
-PLATFORMS = ("codex", "claude-code", "cursor")
+PLATFORMS = ("codex", "claude-code", "cursor", "antigravity", "gemini-cli")
 _RECEIPT_CONTRACT = "flower.client-registration.v1"
 _RESULT_CONTRACT = "flower.client-registration-result.v1"
 _MAX_CONFIG_BYTES = 4 * 1024 * 1024
@@ -49,7 +49,7 @@ class ClientRegistrationError(ValueError):
 
 def _validate_platform(platform: str) -> None:
     if platform not in PLATFORMS:
-        raise ClientRegistrationError("client_platform_invalid", "Select codex, claude-code or cursor.")
+        raise ClientRegistrationError("client_platform_invalid", "Select " + ", ".join(PLATFORMS) + ".")
 
 
 def _validate_name(server_name: str) -> None:
@@ -81,6 +81,11 @@ def default_client_config(platform: str, home: Path | None = None) -> Path:
     if platform == "codex":
         codex_home = os.environ.get("CODEX_HOME") if home is None else None
         return (Path(codex_home).expanduser() if codex_home else user_home / ".codex") / "config.toml"
+    if platform == "antigravity":
+        return user_home / ".gemini/config/mcp_config.json"
+    if platform == "gemini-cli":
+        gemini_home = os.environ.get("GEMINI_CLI_HOME") if home is None else None
+        return (Path(gemini_home).expanduser() if gemini_home else user_home) / ".gemini/settings.json"
     return user_home / (".claude.json" if platform == "claude-code" else ".cursor/mcp.json")
 
 
@@ -108,7 +113,7 @@ def _entry(platform: str, python_executable: Path, profile_config: Path) -> dict
     entry: dict[str, Any] = {"command": str(python_executable), "args": [
         "-m", "flow_of_work_mcp.cli", "serve", "--config", str(profile_config), "--transport", "stdio",
     ]}
-    if platform != "codex":
+    if platform in {"claude-code", "cursor"}:
         entry = {"type": "stdio", **entry}
     return entry
 
@@ -155,7 +160,7 @@ def _strict_json(payload: bytes) -> Any:
     try:
         return json.loads(payload.decode("utf-8"), object_pairs_hook=unique, parse_constant=reject_constant)
     except (UnicodeError, ValueError, RecursionError) as exc:
-        raise ClientRegistrationError("client_json_invalid", "Selected file must be strict UTF-8 JSON with unique keys; comments are unsupported.") from exc
+        raise ClientRegistrationError("client_json_invalid", "Selected file must be strict UTF-8 JSON with unique keys; comments are unsupported. Use the client's native configuration tools or edit the file manually; Flower has not changed it.") from exc
 
 
 @dataclass

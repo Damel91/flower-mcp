@@ -19,7 +19,7 @@ import venv
 
 
 REPOSITORY = "https://github.com/Damel91/flower-mcp"
-DEFAULT_VERSION = "0.2.0"
+DEFAULT_VERSION = "0.3.0"
 OWNER_FILE = ".flower-release-install.json"
 OWNER_CONTRACT = "flower.release-installation.v1"
 DOWNLOAD_TIMEOUT = 30
@@ -235,7 +235,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--venv", type=Path, help="dedicated installation environment; defaults to the host user data directory")
     parser.add_argument("--upgrade", action="store_true", help="upgrade an existing environment created by this installer")
     choice = parser.add_mutually_exclusive_group(required=True)
-    choice.add_argument("--platform", choices=("codex", "claude-code", "cursor"), help="install and register this coding client")
+    choice.add_argument("--platform", choices=("codex", "claude-code", "cursor", "antigravity", "gemini-cli"), help="install and register this coding client")
     choice.add_argument("--no-register", action="store_true", help="install and diagnose without changing client registration or profiles")
     parser.add_argument("--client-config", type=Path, help="explicit client configuration file")
     parser.add_argument("--profile", default="default")

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 
+from flow_of_work_mcp.client_registration import PLATFORMS
 from flow_of_work_mcp.config import load_config
 from flow_of_work_mcp.profiles import ProfileError, prepare_profile, profile_config_path, profile_root
 from flow_of_work_mcp.runtime_ownership import RuntimeOwnershipError
@@ -34,7 +35,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     for operation in ("install", "doctor", "uninstall"):
         command = commands.add_parser(operation)
         _location_options(command)
-        command.add_argument("--platform", choices=("codex", "claude-code", "cursor"), required=operation != "doctor")
+        command.add_argument("--platform", choices=PLATFORMS, required=operation != "doctor")
         command.add_argument("--client-config", type=Path)
         if operation != "doctor":
             command.add_argument("--dry-run", action="store_true")

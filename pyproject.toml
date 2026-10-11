@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flow-of-work-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Flower MCP: auditable software-engineering lifecycle plane"
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-inference = ["runtime-llama==0.3.0.dev0"]
+inference = ["runtime-llama==0.4.0"]
 
 [project.urls]
 Homepage = "https://github.com/Damel91/flower-mcp"
