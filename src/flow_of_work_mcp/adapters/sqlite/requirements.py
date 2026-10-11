@@ -491,6 +491,21 @@ class RequirementStoreMixin:
                 rows.append(row)
             return rows
 
+    def verification_evidence(self, project_id: str, evidence_id: int) -> Mapping[str, Any]:
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            row = connection.execute(
+                """SELECT evidence_id, project_id, requirement_id, verification_kind,
+                          outcome, reference, actor, metadata_json, recorded_at
+                   FROM verification_evidence WHERE project_id = ? AND evidence_id = ?""",
+                (project_id, evidence_id),
+            ).fetchone()
+            if row is None:
+                raise ValueError("verification evidence not found in the selected project")
+            value = dict(row)
+            value["metadata"] = json.loads(value.pop("metadata_json"))
+            return value
+
     def requirement_history(self, project_id: str, requirement_id: str) -> Mapping[str, Any]:
         requirement_id = validate_requirement_id(requirement_id)
         with self._read_connection() as connection:

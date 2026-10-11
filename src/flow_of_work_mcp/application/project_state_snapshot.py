@@ -177,8 +177,10 @@ class ProjectStateSnapshotService:
                 _next_gate(project_id, item, traceability)
                 for item in focused_actions[1 : limit + 1]
             ]
-            blockers = context.blockers(active, next_gate=next_gate, limit=limit)
-            open_decisions = _open_decisions(primary_action)
+            blockers = context.blockers(
+                active, next_gate=next_gate, packet_lifecycle=packet_lifecycle, limit=limit
+            )
+            decisions = _open_decisions(project_id, focused_actions, limit=limit)
             detail_references = context.detail_references(
                 focus,
                 active,
@@ -224,6 +226,7 @@ class ProjectStateSnapshotService:
                 ("goal_reach.items", bool(goal_projection["truncated"])),
                 ("secondary_actions", len(focused_actions) > limit + 1),
                 ("blockers", bool(blockers["truncated"])),
+                ("open_decisions", bool(decisions["omitted_count"])),
             )
             if truncated
         ]
@@ -240,7 +243,8 @@ class ProjectStateSnapshotService:
             "next_gate": next_gate,
             "secondary_actions": secondary_actions,
             "blockers": blockers["items"],
-            "open_decisions": open_decisions,
+            "open_decisions": decisions["items"],
+            "open_decisions_scope": "bounded_current_focus_semantic_actions",
             "accepted_evidence_boundary": accepted_evidence_boundary,
             "detail_references": detail_references,
             "completeness": {
@@ -257,6 +261,7 @@ class ProjectStateSnapshotService:
                     "goal_reach_items": int(goal_projection["omitted_count"]),
                     "secondary_actions": max(0, len(focused_actions) - 1 - limit),
                     "blockers": int(blockers["omitted_count"]),
+                    "open_decisions": int(decisions["omitted_count"]),
                 },
             },
         }
@@ -410,6 +415,19 @@ class _SnapshotContext:
         if kind == "gate":
             return [item for item in actions if _action_matches_gate(item, ref)]
         scope = self._focus_scope(focus)
+        if kind == "packet":
+            focused = []
+            for action in actions:
+                action_scope = _action_scope(action)
+                packet_ids = {str(item) for item in action_scope.get("packet_ids", [])}
+                if action_scope.get("packet_id"):
+                    packet_ids.add(str(action_scope["packet_id"]))
+                if packet_ids:
+                    if ref in packet_ids:
+                        focused.append(action)
+                elif not action_scope or _action_overlaps(action, scope):
+                    focused.append(action)
+            return focused
         return [item for item in actions if _action_overlaps(item, scope)]
 
     def active_work(
@@ -513,7 +531,7 @@ class _SnapshotContext:
         return {
             "milestone": _milestone_summary(milestone),
             "change": _change_summary(change),
-            "packet": _packet_summary(packet),
+            "packet": _packet_summary(packet, packet_lifecycle=packet_lifecycle),
             "provider_execution": provider_state,
             "review": _review_state(review, provider_state),
             "remediation": remediation,
@@ -605,6 +623,7 @@ class _SnapshotContext:
         active: Mapping[str, str],
         *,
         next_gate: Mapping[str, object],
+        packet_lifecycle: Mapping[str, object],
         limit: int,
     ) -> Mapping[str, object]:
         values: list[Mapping[str, object]] = []
@@ -621,9 +640,14 @@ class _SnapshotContext:
         packet_owner = self.packet_owner.get(active["packet_id"])
         if packet_owner:
             packet = packet_owner[1]
-            for code in list(packet.get("readiness_blockers", [])) + list(
-                packet.get("blocking_reasons", [])
-            ):
+            readiness = packet_lifecycle["packet"]["readiness"]
+            if readiness["consumption_mode"] == "external_agent":
+                codes = [str(item["code"]) for item in readiness["blockers"]]
+            else:
+                codes = list(packet.get("readiness_blockers", [])) + list(
+                    packet.get("blocking_reasons", [])
+                )
+            for code in codes:
                 values.append({"code": str(code), "scope_ref": active["packet_id"]})
         for gap in self.traceability.get("gaps", []):
             if isinstance(gap, Mapping):
@@ -673,6 +697,15 @@ class _SnapshotContext:
                     "view": "nodes",
                 },
             },
+            {
+                "kind": "guided_questions",
+                "tool": "fow_bootstrap",
+                "arguments": {
+                    "project_id": self.project_id,
+                    "operation": "guidance",
+                    "actor": "recovery-reader",
+                },
+            },
         ]
         if active["milestone_id"]:
             refs.append(
@@ -697,6 +730,20 @@ class _SnapshotContext:
                     },
                 }
             )
+            for kind, view in (
+                ("packet_gate", "gates"), ("packet_questions", "working_sheet")
+            ):
+                refs.append(
+                    {
+                        "kind": kind,
+                        "tool": "fow_packet_inspect",
+                        "arguments": {
+                            "project_id": self.project_id,
+                            "packet_id": active["packet_id"],
+                            "view": view,
+                        },
+                    }
+                )
         if focus["kind"] in {"use_case", "sequence", "packet", "milestone"}:
             refs.append(
                 {
@@ -1398,15 +1445,20 @@ def _change_summary(value: Mapping[str, object] | None) -> Mapping[str, object]:
     }
 
 
-def _packet_summary(value: Mapping[str, object] | None) -> Mapping[str, object]:
+def _packet_summary(
+    value: Mapping[str, object] | None, *, packet_lifecycle: Mapping[str, object]
+) -> Mapping[str, object]:
     if value is None:
         return {"state": "not_active"}
+    projected = packet_lifecycle["packet"]
     return {
         "state": "active",
         "packet_id": str(value.get("packet_id") or ""),
         "title": str(value.get("title") or ""),
         "status": str(value.get("status") or ""),
-        "readiness_state": str(value.get("readiness_state") or ""),
+        "readiness_state": str(projected["readiness_state"]),
+        "readiness": dict(projected["readiness"]),
+        "provider_readiness": dict(projected["provider_readiness"]),
         "spec_revision": int(value.get("spec_revision") or 0),
         "state_revision": int(value.get("state_revision") or 0),
     }
@@ -1455,25 +1507,39 @@ def _snapshot_detail_ref(
 
 
 def _open_decisions(
-    action: Mapping[str, object] | None,
-) -> list[Mapping[str, object]]:
-    if action is None:
-        return []
-    decision_class = str(
-        action.get("decision_class") or action.get("execution_class") or ""
-    )
-    if decision_class not in {"semantic", "governed_decision"}:
-        return []
-    return [
-        {
-            "action_id": _action_identity(action),
-            "decision_class": decision_class,
-            "required_inputs": [
-                str(item) for item in action.get("required_inputs", [])
-            ],
-            "reason": str(action.get("reason") or action.get("rationale") or ""),
-        }
-    ]
+    project_id: str, actions: list[Mapping[str, object]], *, limit: int
+) -> Mapping[str, object]:
+    decisions = []
+    for action in actions:
+        decision_class = str(
+            action.get("decision_class") or action.get("execution_class") or ""
+        )
+        if decision_class not in {"semantic", "governed_decision"}:
+            continue
+        route = (
+            {
+                "tool": str(action["tool"]),
+                "operation": str(action.get("operation") or ""),
+                "arguments": dict(action.get("arguments") or {}),
+                "required_inputs": list(action.get("required_inputs", [])),
+            }
+            if action.get("tool")
+            else {
+                "tool": "fow_what_next",
+                "arguments": {"project_id": project_id, "detail_level": "audit"},
+                "required_inputs": [],
+            }
+        )
+        decisions.append(
+            {
+                "action_id": _action_identity(action),
+                "decision_class": decision_class,
+                "required_inputs": [str(item) for item in action.get("required_inputs", [])],
+                "reason": str(action.get("reason") or action.get("rationale") or ""),
+                "route": route,
+            }
+        )
+    return {"items": decisions[:limit], "omitted_count": max(0, len(decisions) - limit)}
 
 
 def _dedupe_mappings(values: list[Mapping[str, object]]) -> list[Mapping[str, object]]:

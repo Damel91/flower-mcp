@@ -89,6 +89,33 @@ def _exact(value, fields, name):
         raise ValueError(f"{name} requires exactly: {', '.join(sorted(fields))}")
 
 
+def _continuation_routes(project, active_state):
+    """Describe existing paths without deciding that the host has new scope."""
+    project_id = project['project_id']
+    active = active_state is not None
+    guided = bool(active_state and active_state['path'] == 'guided_engineering')
+    bootstrap_id = str((active_state or {}).get('bootstrap_id') or '')
+    return [
+        {'route_id': 'current_work', 'label': 'Recover the current authorized work', 'available': True,
+         'effect': 'read_only', 'next_tool_call': {'tool': 'fow_handover',
+             'arguments': {'project_id': project_id, 'operation': 'project_state_snapshot'}},
+         'requires': 'Follow current admission; recovery itself does not authorize coding or acceptance.'},
+        {'route_id': 'extend_active_roadmap', 'label': 'Prepare an extension of the active roadmap',
+         'available': active and guided, 'effect': 'read_only',
+         'next_tool_call': {'tool': 'fow_bootstrap', 'arguments': {
+             'project_id': project_id, 'operation': 'roadmap', 'bootstrap_id': bootstrap_id}},
+         'required_inputs': ['actor', 'milestone_ids'],
+         'requires': 'Use ordinary canonical authoring for the intended scope, then roadmap and confirm_roadmap with actual confirmation. Do not amend a terminal cycle.'},
+        {'route_id': 'new_guided_cycle', 'label': 'Start a new guided cycle for authorized scope',
+         'available': not active, 'effect': 'canonical_mutation',
+         'next_tool_call': {'tool': 'fow_bootstrap', 'arguments': {
+             'project_id': project_id, 'project_name': project['name'],
+             'operation': 'start', 'path': 'guided_engineering'}},
+         'required_inputs': ['actor', 'request_id'],
+         'requires': 'Use existing scope authorization or obtain missing intent confirmation; normal roadmap confirmation remains required. Preserve prior cycles.'},
+    ]
+
+
 class GuidedBootstrapService:
     def __init__(self, ledger, *, external_work, traceability) -> None:
         self._ledger = ledger
@@ -439,9 +466,31 @@ class GuidedBootstrapService:
                 operation='record_continuation', mutation=mutation, guided=guided,
                 actor=actor, request_id=request_id, stage=state['stage'])
 
-    def guidance(self, project_id, bootstrap_id):
+    def guidance(self, project_id, bootstrap_id=''):
         with self._ledger.consistent_read():
-            state = self._state(project_id, bootstrap_id)
+            context = self._ledger.bootstrap_guidance_context(project_id)
+            if bootstrap_id:
+                state = self._state(project_id, bootstrap_id)
+                selection = 'explicit'
+            else:
+                state = context['active_bootstrap'] or context['latest_guided_bootstrap']
+                selection = 'active' if context['active_bootstrap'] else 'latest_guided' if state else 'none'
+            routes = _continuation_routes(context['project'], context['active_bootstrap'])
+            if state is None or state['path'] != 'guided_engineering':
+                selected = state or {}
+                next_gate = ({'tool': 'fow_bootstrap', 'operation': 'state', 'project_id': project_id,
+                              'bootstrap_id': selected['bootstrap_id'], 'required_inputs': ['actor'],
+                              'requires': 'An existing non-guided bootstrap owns the active cycle; inspect its current authority.'}
+                             if state else {'tool': 'fow_bootstrap', 'operation': 'start', 'project_id': project_id,
+                                            'project_name': context['project']['name'], 'path': 'guided_engineering',
+                                            'required_inputs': ['actor', 'request_id'],
+                                            'requires': routes[-1]['requires']})
+                return {'contract_version': 'flow.guided_bootstrap.v1', 'bootstrap_id': selected.get('bootstrap_id', ''),
+                        'status': selected.get('status', 'not_started'), 'path': selected.get('path', ''),
+                        'selection': selection, 'markdown': ROLE_GUIDANCE, 'selected_facts': {}, 'correspondence': {},
+                        'blockers': [], 'next_gate': next_gate, 'continuation_routes': routes,
+                        'semantic_truth_verified': False, 'human_acceptance': False}
+            bootstrap_id = state['bootstrap_id']
             guided = self._guided(state)
             entities, _ = self._entities(project_id)
             gaps = self._correspondence_gaps(guided, entities)
@@ -455,11 +504,19 @@ class GuidedBootstrapService:
             if state['open_contradiction_count'] and not any(g['reason'] == 'bootstrap_contradiction_unresolved' for g in gaps):
                 gaps.append({'reason':'bootstrap_contradiction_unresolved'})
             common = {'project_id':project_id, 'bootstrap_id':bootstrap_id}
-            if state['status'] == 'cancelled':
-                next_gate = {'tool':'fow_bootstrap', 'operation':'start', 'project_id':project_id, 'path':'guided_engineering'}
+            active = context['active_bootstrap']
+            if state['status'] in {'completed', 'cancelled'} and active is not None and active['bootstrap_id'] != bootstrap_id:
+                next_gate = {'tool':'fow_bootstrap', 'operation':'state', 'project_id':project_id,
+                             'bootstrap_id':active['bootstrap_id'], 'required_inputs':['actor'],
+                             'requires':'This selected cycle is historical; inspect the active cycle before continuing.'}
+            elif state['status'] == 'cancelled':
+                next_gate = {'tool':'fow_bootstrap', 'operation':'start', 'project_id':project_id, 'path':'guided_engineering',
+                             'project_name':context['project']['name'], 'required_inputs':['actor', 'request_id'],
+                             'requires':routes[-1]['requires']}
             elif state['status'] == 'completed' and gaps:
                 next_gate = {'tool':'fow_bootstrap', 'operation':'start', 'project_id':project_id,
-                             'path':'guided_engineering', 'requires':'new cycle for canonical correction/current scope confirmation'}
+                             'project_name':context['project']['name'], 'path':'guided_engineering',
+                             'required_inputs':['actor', 'request_id'], 'requires':routes[-1]['requires']}
             elif state['open_contradiction_count']:
                 contradiction = next(c for c in state['contradictions'] if c.get('status') == 'open')
                 next_gate = {'tool':'fow_bootstrap', 'operation':'record_contradiction', **common,
@@ -506,5 +563,6 @@ class GuidedBootstrapService:
                         'current_references':{k:[v[ref] for ref in sorted({ref for m in guided.get('correspondence', {}).values() for ref in m['canonical_references'][k]}) if ref in v] for k,v in entities.items()},
                         'detail_reference':{'tool':'fow_bootstrap', 'operation':'state', 'project_id':project_id, 'bootstrap_id':bootstrap_id}},
                     'roadmap':roadmap, 'blockers':gaps, 'next_gate':next_gate,
+                    'selection':selection, 'path':state['path'], 'continuation_routes':routes,
                     'draft_context':roadmap['draft_context'] if roadmap else self._draft_context(guided, ()),
                     'semantic_truth_verified':False, 'human_acceptance':False}

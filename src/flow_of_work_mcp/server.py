@@ -314,6 +314,7 @@ def _guard(
         }
         if exc.accepted_values:
             diagnostic["accepted_values"] = list(exc.accepted_values)
+        diagnostic.update(exc.details)
         return envelope(
             tool=tool,
             status="rejected",
@@ -487,6 +488,8 @@ def handle_capabilities(
     operation_tool: str = "",
     operation_name: str = "",
 ) -> dict[str, object]:
+    from flow_of_work_mcp.installation_identity import installed_distribution_identity
+    distribution = installed_distribution_identity()
     selected_view = str(view or "summary").strip().lower()
     allowed_views = {"summary", "recipe", "operation", "docs", "full"}
     if selected_view not in allowed_views:
@@ -531,6 +534,7 @@ def handle_capabilities(
             result={
                 "view": "operation",
                 "registry_version": version,
+                "distribution": distribution,
                 "operation_contract": dict(
                     operation_contract(operation_tool, operation_name)
                 ),
@@ -550,6 +554,7 @@ def handle_capabilities(
             result={
                 "view": "recipe",
                 "registry_version": version,
+                "distribution": distribution,
                 "recipe": selected_recipe,
                 "available_recipe_names": list(recipe_names()),
                 "result_channels": result_channels,
@@ -562,6 +567,7 @@ def handle_capabilities(
             result={
                 "view": "docs",
                 "registry_version": version,
+                "distribution": distribution,
                 "areas": list(work_area_catalog()),
                 "tool_reference": render_tool_reference(),
                 "operation_detail": {
@@ -578,6 +584,7 @@ def handle_capabilities(
             result={
                 "view": "full",
                 "registry_version": version,
+                "distribution": distribution,
                 "tools": list(public_tool_catalog()),
                 "areas": list(work_area_catalog()),
                 "recipes": all_recipes(),
@@ -608,6 +615,7 @@ def handle_capabilities(
         result={
             "view": "summary",
             "registry_version": version,
+            "distribution": distribution,
             "preferred_entrypoint": "fow_interaction",
             "interaction_contract": "flow.interaction-frame.v1",
             "orientation": (
@@ -1513,13 +1521,6 @@ def handle_packet_inspect(
         project_id=project_id,
         change_id=change_id,
         packet_id=packet_id,
-    )
-    runtime.packet_factory.ensure_packet_lifecycle(
-        project_id,
-        change_id,
-        packet_id,
-        actor="system:packet-inspect",
-        request_id=f"inspect-repair:{packet_id}",
     )
     detail = str(detail_level or "standard").strip().lower()
     if detail not in {"standard", "audit"}:
@@ -3178,7 +3179,8 @@ def handle_handover(
             result = runtime.handover.get_handover(project_id, handover_id)
         elif selected == "resume_context":
             result = runtime.handover.resume_context(
-                project_id, change_id=change_id, packet_id=packet_id, run_id=run_id
+                project_id, change_id=change_id, packet_id=packet_id, run_id=run_id,
+                handover_id=handover_id,
             )
         elif selected == "ledger_projection":
             result = runtime.handover.ledger_projection(
@@ -3264,7 +3266,12 @@ def handle_get_requirement(
         lambda: envelope(
             tool="fow_get_requirement",
             status="success",
-            result=dict(runtime.requirements.history(project_id, requirement_id)),
+            result={**dict(runtime.requirements.history(project_id, requirement_id)),
+                    "evidence_recovery": {
+                        "description": "Verification events are locators. Read original metadata through traceability audit; use evidence_id for one complete body.",
+                        "next_tool_call": {"tool": "fow_traceability", "arguments": {
+                            "project_id": project_id, "detail_level": "audit", "offset": 0, "limit": 10}},
+                    }},
         ),
     )
 
@@ -3387,8 +3394,18 @@ def handle_traceability(
     detail_level: str = "standard",
     offset: int = 0,
     limit: int = _RECOVERY_DEFAULT_LIMIT,
+    evidence_id: int = 0,
 ) -> dict[str, object]:
     def operation() -> dict[str, object]:
+        if isinstance(evidence_id, bool) or not isinstance(evidence_id, int) or evidence_id < 0:
+            raise ValueError("evidence_id must be a nonnegative integer")
+        if evidence_id:
+            if detail_level != "audit" or milestone_id or offset != 0 or limit != _RECOVERY_DEFAULT_LIMIT:
+                raise ValueError("evidence_id requires detail_level=audit without milestone or pagination overrides")
+            return envelope(tool="fow_traceability", status="success", result={
+                "detail_level": "audit", "evidence": dict(runtime.requirements.evidence(project_id, evidence_id)),
+                "provenance_boundary": "Original recorded evidence; Flower does not independently execute or attest host verification.",
+            })
         detail, page_offset, page_limit = _recovery_page_args(
             detail_level,
             offset,
@@ -4944,6 +4961,7 @@ def create_app(
         detail_level: str = "standard",
         offset: int = 0,
         limit: int = _RECOVERY_DEFAULT_LIMIT,
+        evidence_id: int = 0,
     ) -> dict[str, object]:
         return handle_traceability(
             runtime,
@@ -4952,6 +4970,7 @@ def create_app(
             detail_level=detail_level,
             offset=offset,
             limit=limit,
+            evidence_id=evidence_id,
         )
 
     def fow_goal(

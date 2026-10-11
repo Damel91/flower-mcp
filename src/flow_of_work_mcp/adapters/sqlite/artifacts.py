@@ -113,6 +113,22 @@ class ArtifactStoreMixin:
             )
         return replace(generation, generation_id=generation_id)
 
+    def packet_artifact_references(self, project_id: str, packet_id: str, *, limit: int = 10) -> list[Mapping[str, object]]:
+        """Read bounded immutable references without loading artifact bodies."""
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            rows = connection.execute(
+                """SELECT a.artifact_id, a.generation_id, a.artifact_kind, a.content_sha256,
+                          g.source_ledger_version, g.generated_at
+                   FROM generated_artifacts a JOIN artifact_generations g USING(generation_id)
+                   WHERE g.project_id = ? AND a.artifact_kind = 'implementation_plan'
+                     AND EXISTS (SELECT 1 FROM artifact_mappings m WHERE m.artifact_id = a.artifact_id
+                                 AND m.canonical_kind = 'packet' AND m.canonical_id = ?)
+                   ORDER BY a.artifact_id DESC LIMIT ?""",
+                (project_id, packet_id, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def artifact_generations(self, project_id: str) -> list[Mapping[str, object]]:
         with self._read_connection() as connection:
             self._ensure_project(connection, project_id)

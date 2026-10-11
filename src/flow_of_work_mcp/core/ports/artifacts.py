@@ -7,6 +7,7 @@ from flow_of_work_mcp.core.domain.artifacts import ArtifactGeneration
 
 
 class ArtifactRepository(Protocol):
+    def packet_artifact_references(self, project_id: str, packet_id: str, *, limit: int = 10) -> list[Mapping[str, object]]: ...
     def record_artifact_generation(
         self,
         generation: ArtifactGeneration,

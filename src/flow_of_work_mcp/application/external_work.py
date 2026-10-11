@@ -10,10 +10,31 @@ from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGenera
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES
 from flow_of_work_mcp.core.domain.external_work import (canonical_json, fields, fingerprint, number, objects, strings, text)
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
 
 READ_OPERATIONS = frozenset({'criteria', 'validation', 'todo'})
 MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
+
+
+def _verification_error(snapshot, unit, *, field, received, expected, message, criterion=None):
+    """Return a bounded diagnostic while preserving the exact declaration gate."""
+    expected = list(expected)
+    details = {
+        'unit_key': unit['client_unit_key'],
+        'expected': expected[:10],
+        'expected_count': len(expected),
+        'expected_truncated': len(expected) > 10,
+        'received': received,
+        'next_tool_call': {
+            'tool': 'fow_external_work',
+            'arguments': {'project_id': snapshot['project_id'], 'change_id': snapshot['change_id'],
+                          'packet_id': snapshot['packet_id'], 'operation': 'todo',
+                          'payload': {'unit_key': unit['client_unit_key']}},
+        },
+    }
+    if criterion is not None:
+        details['criterion'] = criterion
+    return InputValidationError(message, field=field, received_value=received, details=details)
 
 
 class ExternalWorkService:
@@ -615,13 +636,30 @@ class ExternalWorkService:
             raise ValueError('produced contracts must not duplicate declarations')
         intents = {(v['criterion'], v['kind'], v['statement']) for v in unit['verifies']}
         value['verification'] = []
-        for evidence in objects(payload.get('verification', []), 'verification'):
+        for index, evidence in enumerate(objects(payload.get('verification', []), 'verification')):
             fields(evidence, {'criterion', 'kind', 'statement', 'status', 'evidence_ref', 'provenance'}, 'verification')
             item = {'criterion': number(evidence.get('criterion')),
                     **{k: text(evidence.get(k), k) for k in ('kind', 'statement', 'status', 'provenance')},
                     'evidence_ref': text(evidence.get('evidence_ref', ''), 'evidence_ref', required=False)}
-            if (item['criterion'], item['kind'], item['statement']) not in intents or item['status'] not in {'pass', 'fail', 'not_run'}:
-                raise ValueError('verification must identify a declared intent and supported result')
+            field = f'payload.verification[{index}]'
+            declared = list(unit['verifies'])
+            if item['criterion'] not in {v['criterion'] for v in declared}:
+                raise _verification_error(snapshot, unit, field=field + '.criterion', received=item['criterion'],
+                    expected=sorted({v['criterion'] for v in declared}), criterion=item['criterion'],
+                    message='verification criterion must be declared by this unit')
+            same_criterion = [v for v in declared if v['criterion'] == item['criterion']]
+            if item['kind'] not in {v['kind'] for v in same_criterion}:
+                raise _verification_error(snapshot, unit, field=field + '.kind', received=item['kind'],
+                    expected=sorted({v['kind'] for v in same_criterion}), criterion=item['criterion'],
+                    message='verification kind must be declared for this unit and criterion')
+            if (item['criterion'], item['kind'], item['statement']) not in intents:
+                raise _verification_error(snapshot, unit, field=field + '.statement', received=item['statement'],
+                    expected=[v['statement'] for v in same_criterion if v['kind'] == item['kind']],
+                    criterion=item['criterion'], message='verification statement must exactly match the declared intent')
+            if item['status'] not in {'pass', 'fail', 'not_run'}:
+                raise _verification_error(snapshot, unit, field=field + '.status', received=item['status'],
+                    expected=['pass', 'fail', 'not_run'], criterion=item['criterion'],
+                    message='verification status must be pass, fail or not_run')
             if item['status'] in {'pass', 'fail'} and not item['evidence_ref']:
                 raise ValueError('verification result requires evidence_ref')
             value['verification'].append(item)
@@ -634,7 +672,10 @@ class ExternalWorkService:
             passed = {(v['criterion'], v['kind'], v['statement']) for v in value['verification'] if v['status'] == 'pass'}
             required = {(v['criterion'], v['kind'], v['statement']) for v in unit['verifies'] if v['kind'] == 'unit_check'}
             if not required.issubset(passed):
-                raise ValueError('complete outcome requires every declared unit-local verification to pass')
+                missing = [{'criterion': criterion, 'kind': kind, 'statement': statement, 'status': 'pass'}
+                           for criterion, kind, statement in sorted(required - passed)]
+                raise _verification_error(snapshot, unit, field='payload.verification', received=value['verification'],
+                    expected=missing, message='complete outcome requires every declared unit-local verification to pass')
             if {c['name'] for c in unit['provides']} != {c['name'] for c in value['produced_contracts']}:
                 raise ValueError('complete outcome requires artifact references for every produced contract')
         projection = self._projection(snapshot)

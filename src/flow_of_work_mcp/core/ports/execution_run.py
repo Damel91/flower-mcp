@@ -1,7 +1,7 @@
 """Ports for implementation-run continuity and handover projections."""
 from __future__ import annotations
 
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from flow_of_work_mcp.core.domain import (
     HandoverDraft,
@@ -70,7 +70,8 @@ class ExecutionRunRepository(Protocol):
     def task_view(self, project_id: str, run_id: str) -> Mapping[str, object]: ...
 
     def create_handover(
-        self, project_id: str, draft: HandoverDraft, *, actor: str, request_id: str = ""
+        self, project_id: str, draft: HandoverDraft, *, actor: str, request_id: str = "",
+        recovery_builder: Callable[[Mapping[str, object]], Mapping[str, object]] | None = None,
     ) -> Mapping[str, object]: ...
 
     def handover_state(self, project_id: str, handover_id: str) -> Mapping[str, object]: ...

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from flow_of_work_mcp.core.domain import (
     PACKET_INACTIVE_STATUS_VALUES,
@@ -413,6 +413,7 @@ class RunStoreMixin:
         *,
         actor: str,
         request_id: str = "",
+        recovery_builder: Callable[[Mapping[str, object]], Mapping[str, object]] | None = None,
     ) -> Mapping[str, Any]:
         project_id = validate_project_id(project_id)
         actor = required_text(actor, "actor")
@@ -438,6 +439,10 @@ class RunStoreMixin:
                 packet_id=draft.packet_id,
                 run_id=draft.run_id,
             )
+            # Compose against this same transaction, after replay selection and
+            # before persistence. The application owns the projection semantics.
+            if recovery_builder is not None:
+                payload = recovery_builder(payload)
             ordinal = self._next_execution_ordinal(connection, project_id, "handover")
             handover_id = f"HAND-{ordinal:06d}"
             connection.execute(

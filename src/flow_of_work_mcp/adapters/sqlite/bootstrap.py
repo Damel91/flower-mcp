@@ -197,6 +197,29 @@ class BootstrapStoreMixin:
             )
             return self._bootstrap_value(connection, project_id, bootstrap_id)
 
+    def bootstrap_guidance_context(self, project_id: str) -> Mapping[str, Any]:
+        """Discover existing authority without starting or changing a cycle."""
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            project = connection.execute(
+                "SELECT project_id, name FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
+            active = connection.execute(
+                "SELECT bootstrap_id FROM bootstraps WHERE project_id = ? "
+                "AND status IN ('in_progress', 'blocked') ORDER BY ordinal DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            guided = connection.execute(
+                "SELECT bootstrap_id FROM bootstraps WHERE project_id = ? "
+                "AND path = 'guided_engineering' ORDER BY ordinal DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            return {
+                'project': dict(project),
+                'active_bootstrap': self._bootstrap_value(connection, project_id, active['bootstrap_id']) if active else None,
+                'latest_guided_bootstrap': self._bootstrap_value(connection, project_id, guided['bootstrap_id']) if guided else None,
+            }
+
     def latest_guided_bootstrap(self, project_id: str) -> Mapping[str, Any] | None:
         with self._read_connection() as connection:
             self._ensure_project(connection, project_id)

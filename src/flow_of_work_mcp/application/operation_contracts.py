@@ -226,6 +226,9 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "resume_context",
         "ledger_projection",
         "project_state_snapshot",
+        "project_progress",
+        "guidance",
+        "roadmap",
         "get_packet_construction_audit",
         "get_packet_reconciliation",
         "get_packet_pressure",
@@ -609,14 +612,18 @@ _BOOTSTRAP = {
 }
 
 _BOOTSTRAP.update({
-    "guidance": _c("fow_bootstrap", "guidance", _P + ("bootstrap_id",)),
+    "guidance": _c("fow_bootstrap", "guidance", _P, ("bootstrap_id",),
+        guidance={"discovery": "Omit bootstrap_id to read the active cycle of any mode, otherwise the latest guided cycle or an explicit start route. An explicit ID reads that owned guided cycle. This never creates, resumes or confirms work.",
+                  "continuation": "continuation_routes distinguish current-work recovery, active-roadmap extension and a new guided cycle. Use existing scope authorization or obtain missing intent confirmation; never invent approval or amend a terminal cycle.",
+                  "questions": "Guidance exposes governing intent/correspondence gaps. Technical investigation and packet engineering questions remain engineer-owned; they do not automatically require a stakeholder question."}),
     "record_answer": _c("fow_bootstrap", "record_answer", _P + ("bootstrap_id", "request_id") + tuple("answer." + key for key in bootstrap_input_schema("answer")["required"]),
         enums={"answer.kind": tuple(bootstrap_input_schema("answer")["properties"]["kind"]["enum"])},
         guidance={"input_schema": {"answer": bootstrap_input_schema("answer")}, "provenance": "Record selected governing answers, not the whole dialogue. Whitespace-only text is invalid. Use the returned answer revision for correspondence."}),
     "record_correspondence": _c("fow_bootstrap", "record_correspondence", _P + ("bootstrap_id", "request_id", "correspondence.answer_key", "correspondence.answer_revision", "correspondence.disposition", "correspondence.rationale") + tuple("correspondence.canonical_references." + key for key in bootstrap_input_schema("correspondence")["properties"]["canonical_references"]["required"]),
         enums={"correspondence.disposition": tuple(bootstrap_input_schema("correspondence")["properties"]["disposition"]["enum"])},
         guidance={"input_schema": {"correspondence": bootstrap_input_schema("correspondence")}, "currentness": "Use the current recorded answer revision and existing canonical IDs. Supply all three reference lists; at least one list must contain a current canonical reference. Replace example IDs with IDs returned by canonical authoring. This records correspondence, not semantic truth or acceptance."}),
-    "roadmap": _c("fow_bootstrap", "roadmap", _P + ("bootstrap_id", "milestone_ids")),
+    "roadmap": _c("fow_bootstrap", "roadmap", _P + ("bootstrap_id", "milestone_ids"),
+        guidance={"continuation": "Extend only an active guided cycle through ordinary canonical authoring and explicit milestone_ids, then confirm_roadmap against its current fingerprint and actual confirmation. Completed preparation is historical; use a new guided cycle for newly authorized scope."}),
     "confirm_roadmap": _c("fow_bootstrap", "confirm_roadmap", _P + ("bootstrap_id", "milestone_ids", "roadmap_fingerprint", "confirmation_reference", "request_id")),
     "record_continuation": _c("fow_bootstrap", "record_continuation", _P + ("bootstrap_id", "continuation_choice", "continuation_reference", "roadmap_fingerprint", "progress_revision", "reason", "request_id"), enums={"continuation_choice": ("continue", "review")}),
 })
@@ -933,13 +940,15 @@ _HANDOVER = {
         ("profile_version", "request_id"),
     ),
     "get_handover": _c(
-        "fow_handover", "get_handover", ("project_id", "operation", "handover_id")
+        "fow_handover", "get_handover", ("project_id", "operation", "handover_id"),
+        guidance={"recovery": "Returns the originally persisted snapshot unchanged. New captures include bounded external recovery references; historical snapshots are never silently hydrated with current state."},
     ),
     "resume_context": _c(
         "fow_handover",
         "resume_context",
         ("project_id", "operation"),
-        ("change_id", "packet_id", "run_id"),
+        ("change_id", "packet_id", "run_id", "handover_id"),
+        guidance={"recovery": "handover_id explicitly compares frozen recovery authority against current state and derives the original change/packet/run focus. Supplied focus IDs must match; a mismatch is rejected. Without handover_id, recover current authority for the supplied focus. Reads never create exports, outcomes or acceptance."},
     ),
     "ledger_projection": _c(
         "fow_handover",
@@ -1812,7 +1821,7 @@ _SIMPLE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "fow_traceability": (
         ("project_id",),
-        ("milestone_id", "detail_level", "offset", "limit"),
+        ("milestone_id", "detail_level", "offset", "limit", "evidence_id"),
     ),
     "fow_validate_srs": (
         ("project_id", "source_path", "standard_profile", "actor"),
@@ -1898,6 +1907,10 @@ _SIMPLE = {
     )
     for tool, (required, optional) in _SIMPLE_FIELDS.items()
 }
+_SIMPLE["fow_traceability"] = _c(
+    "fow_traceability", "call", *_SIMPLE_FIELDS["fow_traceability"],
+    guidance={"evidence_read": "evidence_id defaults to 0 for ordinary traceability. A positive evidence_id requires detail_level=audit, offset=0, limit=10 and no milestone_id. It returns one original project-scoped verification evidence body with full metadata/provenance. Unknown and foreign IDs return the same rejection; no artifact or evidence is created."},
+)
 
 _INTERACTION_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "status": (("interaction_session_ref", "operation"), ()),
@@ -2024,6 +2037,7 @@ _EXTERNAL_WORK = {
                 "verification": [{"criterion": 1, "kind": "unit_check|deterministic_campaign|live_campaign|oracle|explicit_authority", "statement": "exact declared verification intent", "status": "pass|fail|not_run", "evidence_ref": "declared evidence", "provenance": "host-reported"}],
                 "unresolved": ["remaining obligations"],
             } if op == "report_outcome" else {},
+            **({"verification_identity": "Copy the exact criterion/kind/statement from this unit's current TODO declarations. No approximate matching is accepted. Rejections identify the input field, unit, expected and received declaration and a bounded public recovery call; invalid reports persist no outcome."} if op == "report_outcome" else {}),
         },
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
 }

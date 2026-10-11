@@ -228,6 +228,24 @@ class PacketLifecycleProjectionService:
             "view": view,
             "detail_level": detail,
         }
+        readiness = {
+            "consumption_mode": "external_agent" if external_mode else "provider",
+            **guard.as_payload(),
+        }
+        provider_readiness = {
+            "state": str(packet.get("readiness_state") or ""),
+            "readiness_blockers": list(packet.get("readiness_blockers", [])),
+            "blocking_reasons": list(packet.get("blocking_reasons", [])),
+            "applicability": "not_applicable" if external_mode else "current",
+        }
+        result["packet"]["readiness"] = readiness
+        result["packet"]["provider_readiness"] = provider_readiness
+        if external_mode:
+            result["packet"]["readiness_state"] = guard.state
+            result["packet"]["readiness_blockers"] = [
+                blocker.code for blocker in guard.blockers
+            ]
+            result["packet"]["blocking_reasons"] = []
         result["packet_provider"] = provider_projection
         if external_mode:
             result["consumption_mode"] = "external_agent"

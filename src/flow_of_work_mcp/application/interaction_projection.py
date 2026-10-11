@@ -696,10 +696,10 @@ class InteractionProjectionService:
         campaign = dict(active.get("campaign") or {})
         specs: Mapping[str, tuple[str, str, Mapping[str, object], str]] = {
             "project_bootstrap": (
-                "Inspect provider bindings",
+                "Recover the current engineering cycle",
                 "fow_bootstrap",
-                {"operation": "list_provider_bindings"},
-                "list_provider_bindings",
+                {"operation": "guidance"},
+                "guidance",
             ),
             "requirements": (
                 "Inspect requirement traceability",

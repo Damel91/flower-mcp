@@ -296,12 +296,12 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
             if value:
                 _section(lines, title)
                 if isinstance(value, Mapping) and key == 'packet':
-                    diagnostic_fields = {'readiness_state', 'readiness_blockers', 'blocking_reasons', 'target_policy'}
+                    diagnostic_fields = {'provider_readiness'}
                     _record(lines, {k: v for k, v in value.items() if k not in diagnostic_fields})
                     diagnostics = {k: v for k, v in value.items() if k in diagnostic_fields}
                     if diagnostics:
                         _section(lines, 'Inherited provider diagnostics', 3)
-                        lines.append('These recorded provider/navigation/target/evidence readiness fields belong to the inherited provider substrate. They are not external execution gates or current CodingCastle tasks. The current external frontier and engineer admission gate govern standalone readiness.')
+                        lines.append('These provider readiness fields are historical context in external-agent mode. Effective readiness and the current external frontier above govern admission; their semantic, validation and verification obligations remain binding.')
                         _record(lines, diagnostics, level=4)
                 elif isinstance(value, Mapping) and key == 'working_sheet':
                     _record(lines, {k: v for k, v in value.items() if k not in {'units', 'current_gate'}})

@@ -17,10 +17,12 @@ class InputValidationError(ValueError):
         field: str,
         received_value: object,
         accepted_values: tuple[str, ...] = (),
+        details: Mapping[str, object] | None = None,
     ) -> None:
         self.field = str(field or "").strip()
         self.received_value = received_value
         self.accepted_values = tuple(str(item) for item in accepted_values)
+        self.details = dict(details or {})
         super().__init__(message)
 
 

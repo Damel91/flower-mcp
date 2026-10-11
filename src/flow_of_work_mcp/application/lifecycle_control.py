@@ -446,8 +446,13 @@ class LifecycleControlService:
                         kind=NextActionKind.IMPLEMENT_REQUIREMENT,
                         execution_class=ActionExecutionClass.ORCHESTRATION,
                         priority=50,
-                        rationale="requirement is planned and has no implemented lifecycle state",
+                        rationale="Prepare the implementation plan for this planned requirement; coding requires the current accepted plan, closed validation and execution admission.",
                         requirement_ids=(requirement_id,),
+                        tool="fow_capabilities",
+                        operation="recipe",
+                        arguments={"view": "recipe", "recipe_name": "standalone-external-plan"},
+                        state="preparation_required",
+                        decision_class="orchestration",
                     )
                 )
             if (

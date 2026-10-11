@@ -89,9 +89,12 @@ def derive_packet_validation(snapshot: Mapping[str, object]) -> dict[str, object
             if intent.get('authority_ref') and intent['authority_ref'] not in snapshot.get('resolved_authorities', {}):
                 gap('external_authority_missing', unit_key=key, authority_ref=intent['authority_ref'])
         local = {intent['statement'] for intent in unit['verifies'] if intent['kind'] == 'unit_check'}
-        for check in unit.get('unit_checks', []):
+        for index, check in enumerate(unit.get('unit_checks', [])):
             if check not in local:
-                gap('unit_check_verification_missing', unit_key=key, statement=check)
+                expected = sorted(local)
+                gap('unit_check_verification_missing', unit_key=key, statement=check,
+                    field=f'units.{key}.unit_checks[{index}]', received=check,
+                    expected=expected[:10], expected_count=len(expected), expected_truncated=len(expected) > 10)
         for contract in unit['provides']:
             contracts[(key, contract['name'])] = contract
     for criterion in criteria:

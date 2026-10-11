@@ -33,6 +33,7 @@ _DEFAULT_EXACT_CALL_KEYS = frozenset(
         "next_gate_call",
         "continuation",
         "continuations",
+        "recovery_calls",
     }
 )
 
@@ -243,13 +244,19 @@ def project_markdown(
     if spec is None:
         raise ModelFacingProjectionError(f"missing_model_facing_projector:{tool_name}")
     operation = str(arguments.get("operation") or "").strip()
+    complete_evidence = tool_name == "fow_traceability" and bool(arguments.get("evidence_id")) and payload.get("status") == "success"
     title = spec.title + (f": {operation}" if operation else "")
     document, artifacts, exact_calls = _presentation_parts(
         payload,
         result_heading=spec.result_heading,
         artifact_keys=spec.artifact_keys,
         exact_call_keys=spec.exact_call_keys,
+        preserve_multiline=complete_evidence,
     )
+    if complete_evidence:
+        # A single explicitly requested evidence body is a complete reference,
+        # like an exported artifact. Never silently flatten or budget-cut it.
+        output_budget = None
     status = str(payload.get("status") or "unknown")
     # Exported artifacts are the offline handoff. Return their complete bytes in
     # both channels; ordinary discovery projections keep the bounded budget.
@@ -332,6 +339,7 @@ def _presentation_parts(
     result_heading: str,
     artifact_keys: frozenset[str],
     exact_call_keys: frozenset[str],
+    preserve_multiline: bool = False,
 ) -> tuple[dict[str, Any], list[tuple[str, str, str]], list[tuple[str, Any]]]:
     current: dict[str, Any] = {
         "status": str(payload.get("status") or "unknown"),
@@ -345,6 +353,7 @@ def _presentation_parts(
         artifact_keys=artifact_keys,
         exact_call_keys=exact_call_keys,
         path=(),
+        preserve_multiline=preserve_multiline,
     )
     for key in exact_call_keys:
         value = payload.get(key)
@@ -361,6 +370,7 @@ def _extract_special_values(
     artifact_keys: frozenset[str],
     exact_call_keys: frozenset[str],
     path: tuple[str, ...],
+    preserve_multiline: bool = False,
 ) -> tuple[Any, list[tuple[str, str, str]], list[tuple[str, Any]]]:
     artifacts: list[tuple[str, str, str]] = []
     exact_calls: list[tuple[str, Any]] = []
@@ -370,7 +380,7 @@ def _extract_special_values(
             key = str(raw_key)
             item_path = (*path, key)
             if (
-                key in artifact_keys
+                (key in artifact_keys or (preserve_multiline and isinstance(item, str) and ("\n" in item or "\r" in item)))
                 and isinstance(item, str)
                 and item
                 and _is_artifact_value(key, item)
@@ -385,6 +395,7 @@ def _extract_special_values(
                 artifact_keys=artifact_keys,
                 exact_call_keys=exact_call_keys,
                 path=item_path,
+                preserve_multiline=preserve_multiline,
             )
             output[key] = cleaned
             artifacts.extend(child_artifacts)
@@ -398,11 +409,14 @@ def _extract_special_values(
                 artifact_keys=artifact_keys,
                 exact_call_keys=exact_call_keys,
                 path=(*path, str(index)),
+                preserve_multiline=preserve_multiline,
             )
             output_list.append(cleaned)
             artifacts.extend(child_artifacts)
             exact_calls.extend(child_calls)
         return output_list, artifacts, exact_calls
+    if preserve_multiline and isinstance(value, str) and ("\n" in value or "\r" in value):
+        return "Complete multiline content below.", [(_label(path), value, "text")], []
     return value, artifacts, exact_calls
 
 

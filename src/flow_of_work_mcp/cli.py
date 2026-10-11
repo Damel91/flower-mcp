@@ -32,6 +32,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     serve.add_argument("--transport", choices=("stdio", "streamable-http"), default="stdio")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8010)
+    commands.add_parser("probe", add_help=False, help="inspect an explicit HTTP MCP endpoint; use probe --help")
     for operation in ("install", "doctor", "uninstall"):
         command = commands.add_parser(operation)
         _location_options(command)
@@ -47,6 +48,10 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     values = list(sys.argv[1:] if argv is None else argv)
+    if values and values[0] == "probe":
+        from flow_of_work_mcp.mcp_probe import main as probe_main
+        probe_main(values[1:])
+        return
     if not values or values[0].startswith("-") and values[0] not in {"--help", "-h"}:
         values.insert(0, "serve")
     parser = build_cli_parser()
@@ -92,8 +97,10 @@ def main(argv: list[str] | None = None) -> None:
             result = unregister_client(platform=args.platform, client_config=client_path, receipt_path=receipt, dry_run=args.dry_run)
             result["message"] = "Only owned client registration is removed; profiles, ledgers and evidence are retained."
         else:
+            from flow_of_work_mcp.installation_identity import installed_distribution_identity
             result = {"contract": "flower.installation-diagnosis.v1", "profile_config": str(config_path),
                 "profile_present": config_path.is_file(), "runtime_probed": False,
+                "distribution": installed_distribution_identity(),
                 "message": "Diagnosis inspects selected files only; client trust, precedence and connection require separate verification."}
             if config_path.exists() or config_path.is_symlink():
                 prepare_profile(root, args.profile, dry_run=True)

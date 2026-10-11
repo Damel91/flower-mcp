@@ -195,7 +195,6 @@ def build_runtime(
         coverage_propagation=coverage_propagation,
     )
     execution_runs = ExecutionRunService(ledger)
-    handover = HandoverService(ledger)
     goals = GoalGraphService(ledger)
     def external_milestone_progress(project_id: str, milestone_id: str):
         packets = [packet for change in ledger.list_changes(project_id)
@@ -333,6 +332,9 @@ def build_runtime(
         packet_lifecycle=packet_lifecycle,
         provider_enabled=packet_provider is not None,
     )
+    from flow_of_work_mcp.application.handover import ExternalRecoveryProjection
+    handover = HandoverService(ledger, recovery=ExternalRecoveryProjection(
+        ledger, snapshot=project_state_snapshot, external_work=external_work))
     interaction_projection = InteractionProjectionService(
         repository=ledger,
         project_context=project_context,

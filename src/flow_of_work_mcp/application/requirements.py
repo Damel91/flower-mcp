@@ -185,6 +185,11 @@ class RequirementService:
     def traceability(self, project_id: str) -> list[Mapping[str, Any]]:
         return self._ledger.traceability_matrix(project_id)
 
+    def evidence(self, project_id: str, evidence_id: int) -> Mapping[str, Any]:
+        if isinstance(evidence_id, bool) or not isinstance(evidence_id, int) or evidence_id < 1:
+            raise ValueError("evidence_id must be a positive integer")
+        return self._ledger.verification_evidence(project_id, evidence_id)
+
     def history(self, project_id: str, requirement_id: str) -> Mapping[str, Any]:
         return self._ledger.requirement_history(
             project_id,
