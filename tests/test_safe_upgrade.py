@@ -5,6 +5,8 @@ by tools/smoke_upgrade.py. No fixture adopts an operator's actual environment.
 """
 from __future__ import annotations
 
+from contextlib import closing
+import errno
 import hashlib
 import importlib.util
 import json
@@ -58,7 +60,7 @@ def installation(tmp_path):
     profile = profile_root / "profiles/default/flower.yaml"
     profile.parent.mkdir(parents=True)
     database = profile.parent / "ledger.sqlite3"
-    with sqlite3.connect(database) as connection:
+    with closing(sqlite3.connect(database)) as connection, connection:
         connection.execute("CREATE TABLE retained (identity TEXT, evidence TEXT)")
         connection.execute("INSERT INTO retained VALUES (?, ?)", ("project-one", "Original evidence\nSecond line: è"))
     payload = yaml.safe_load((SOURCE / "src/flow_of_work_mcp/resources/standalone.yaml").read_text())
@@ -206,7 +208,7 @@ def test_real_old_interpreter_lease_refuses_busy_ledger_and_releases_after_failu
     try:
         with pytest.raises(ownership.RuntimeOwnershipError, match="already owns"):
             ownership.acquire_runtime_ownership(database)
-        with sqlite3.connect(lease.receipt["database_backup"]) as connection:
+        with closing(sqlite3.connect(lease.receipt["database_backup"])) as connection:
             assert connection.execute("SELECT * FROM retained").fetchall() == [("project-one", "Original evidence\nSecond line: è")]
     finally:
         lease.close()
@@ -233,6 +235,57 @@ def test_ownership_child_exit_and_timeout_are_bounded_and_reaped(tmp_path, monke
     with pytest.raises(installer.InstallationError, match=reason):
         installer.UpgradeLease(Path(sys.executable), {}, cwd=tmp_path)
     assert len(processes) == 1 and processes[0].poll() is not None
+    assert all(stream.closed for stream in (processes[0].stdin, processes[0].stdout, processes[0].stderr))
+
+
+@pytest.mark.parametrize("close_error", [OSError(errno.EINVAL, "closed child pipe"), BrokenPipeError(errno.EPIPE, "closed child pipe")])
+def test_reaped_child_stdin_close_preserves_the_original_installation_error(tmp_path, monkeypatch, close_error):
+    processes = []
+    original_popen = installer.subprocess.Popen
+    class BrokenStdinClose:
+        def __init__(self, original):
+            self.original = original
+        def __getattr__(self, name):
+            return getattr(self.original, name)
+        def close(self):
+            try:
+                self.original.close()
+            finally:
+                raise close_error
+    def popen(*args, **kwargs):
+        process = original_popen(*args, **kwargs)
+        process.stdin = BrokenStdinClose(process.stdin)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(installer.subprocess, "Popen", popen)
+    monkeypatch.setattr(installer, "BACKUP_PROGRAM", "raise SystemExit(7)")
+    with pytest.raises(installer.InstallationError, match="without a valid backup result"):
+        installer.UpgradeLease(Path(sys.executable), {}, cwd=tmp_path)
+    assert len(processes) == 1 and processes[0].poll() is not None
+    assert all(stream.closed for stream in (processes[0].stdin, processes[0].stdout, processes[0].stderr))
+
+
+def test_reaped_child_does_not_hide_unrelated_stream_close_error(tmp_path, monkeypatch):
+    original_popen = installer.subprocess.Popen
+    class FailedOutputClose:
+        def __init__(self, original):
+            self.original = original
+        def __getattr__(self, name):
+            return getattr(self.original, name)
+        def close(self):
+            self.original.close()
+            raise OSError(errno.EIO, "unrelated output error")
+    processes = []
+    def popen(*args, **kwargs):
+        process = original_popen(*args, **kwargs)
+        process.stdout = FailedOutputClose(process.stdout)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(installer.subprocess, "Popen", popen)
+    monkeypatch.setattr(installer, "BACKUP_PROGRAM", "raise SystemExit(7)")
+    with pytest.raises(OSError, match="unrelated output error"):
+        installer.UpgradeLease(Path(sys.executable), {}, cwd=tmp_path)
+    assert processes[0].poll() is not None
     assert all(stream.closed for stream in (processes[0].stdin, processes[0].stdout, processes[0].stderr))
 
 

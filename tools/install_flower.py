@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import hmac
 import json
@@ -377,23 +378,39 @@ class UpgradeLease:
 
     def close(self):
         process = self.process
+        cleanup_error = None
         if process.poll() is None:
             try:
                 process.stdin.write("release\n")
                 process.stdin.flush()
                 process.stdin.close()
                 process.wait(timeout=UPGRADE_RELEASE_TIMEOUT)
-            except (OSError, subprocess.TimeoutExpired):
+            except (OSError, subprocess.TimeoutExpired) as exc:
                 process.terminate()
                 try:
                     process.wait(timeout=UPGRADE_STOP_TIMEOUT)
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=UPGRADE_STOP_TIMEOUT)
+                if isinstance(exc, OSError) and not (
+                        isinstance(exc, BrokenPipeError) or exc.errno in {errno.EPIPE, errno.EINVAL}):
+                    cleanup_error = exc
         self.reader.join(timeout=UPGRADE_STOP_TIMEOUT)
         for stream in (process.stdin, process.stdout, process.stderr):
             if stream is not None:
-                stream.close()
+                try:
+                    stream.close()
+                except OSError as exc:
+                    # Text stdin may retry a buffered flush during close after
+                    # an exited child's pipe is gone. Windows reports EINVAL
+                    # for that case. Only this reaped child's stdin qualifies;
+                    # unrelated descriptor failures remain visible.
+                    broken_stdin = stream is process.stdin and process.poll() is not None and (
+                        isinstance(exc, BrokenPipeError) or exc.errno in {errno.EPIPE, errno.EINVAL})
+                    if not broken_stdin and cleanup_error is None:
+                        cleanup_error = exc
+        if cleanup_error is not None:
+            raise cleanup_error
 
 
 def write_receipt(target: Path, record: dict) -> None:
