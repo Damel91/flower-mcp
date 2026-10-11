@@ -180,6 +180,10 @@ configuration files; it does not prove the MCP connection. The
 
 The [presentation index](docs/presentation/README.md) also links the offline readers.
 
+For current development after 0.3.0, see [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
+frozen handovers, current authority, original evidence, offline outcomes and the
+installed HTTP probe. Published 0.3.0 assets do not include these later corrections.
+
 ## Development method
 
 Flower is a personal project by **Davide Mele**, developed outside his
