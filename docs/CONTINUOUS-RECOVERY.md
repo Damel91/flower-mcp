@@ -45,6 +45,16 @@ Tool calls return both readable Markdown and structured data by default. For
 specific inspection, place `--content-only`, `--structured-only` or
 `--channel-summary` before the `call` subcommand. Read both channels when
 qualifying a workflow; the readable channel is part of the agent interface.
+Inspect the application status and MCP `isError` as well as the command exit
+code. A received MCP rejection can still have a successful transport exit code.
+
+Read `source_ledger_version_namespace` beside a version counter. Snapshot and
+traceability use `requirement_events.max_event_id.v1`; external resume/recovery
+use `lifecycle_events.sum_max_event_ids.v1`. These pre-existing clocks measure
+different event streams. Their numeric values cannot be compared across
+namespaces. Plan/specification revisions and authority fingerprints determine
+the issued work's authority; a difference between these counters alone does
+not mean that a plan is stale. Frozen historical payloads remain unchanged.
 
 ## Recover the current scope
 
@@ -77,6 +87,13 @@ a claim that every project question fits in one response. Packet inspection does
 not repair or rebase stale plans; ordinary accepted packet mutations own that
 boundary. A semantic question can legitimately change the specification revision
 even when it does not require new human roadmap confirmation.
+
+Snapshot `blockers` include the current gate and broader lifecycle obligations.
+Each entry carries its source and scope; a traceability obligation can concern a
+dependent packet while the selected packet is actionable. Read
+`active_work.packet.readiness` for its current execution admission. Preserve
+broader verification and acceptance obligations even when that admission allows
+the next unit.
 
 The engineer investigates architecture, implementation choices and reuse. An
 unresolved requirement, scenario or intended behavior requires clarification.
