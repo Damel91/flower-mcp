@@ -3,7 +3,8 @@
 [Indice](README.md) · [Concetti](concepts.md) · [Fonti](sources.md#catalogo)
 
 I nomi conservano il prefisso tecnico `fow_`. Un client può aggiungere un proprio
-prefisso. Questa mappa descrive i **36 tool del sorgente di riferimento**; non è
+prefisso. Questa mappa descrive i **37 tool del sorgente di sviluppo attuale**
+(36 nella release 0.3.1); non è
 un elenco di payload da copiare. Un tool multiplexato offre più operazioni con
 prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operativa.
 
@@ -41,10 +42,11 @@ prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operati
 | Tool | A che cosa serve |
 | --- | --- |
 | `fow_change` | Governare cambiamenti, dipendenze, stato ed evidenze; i packet hanno superfici dedicate. |
+| `fow_architecture` | Ispezionare, proporre e adottare componenti, interfacce e decisioni tecniche immutabili. L’adozione registra autorità ingegneristica, distinta dall’accettazione umana. |
 | `fow_packet_author` | Costruire packet, unità, dichiarazioni e piani canonici. |
 | `fow_packet_advance` | Avanzare i gate deterministici fino a una decisione o a un confine asincrono. Il percorso tecnico scelto può richiedere provider. |
 | `fow_packet_inspect` | Leggere scope, unità, gate o storia con proiezioni bounded. |
-| `fow_external_work` | Validare il piano standalone, selezionare la modalità esterna, esportare Markdown, leggere TODO e registrare/riconciliare esiti. Non esegue codice. |
+| `fow_external_work` | Validare/esportare piani, leggere TODO e registrare/riconciliare esiti. Il sorgente di sviluppo aggiunge scelta esplicita dell’esecutore, validazione provider senza chiamate esterne e negoziazione delle capacità. Non esegue codice nel repository. |
 | `fow_run` | Gestire record di run, step, dipendenze e viste del lavoro di implementazione. Non è un nuovo agente di coding. |
 | `fow_what_next` | Derivare il lavoro successivo dallo stato durevole, con paginazione. |
 

@@ -189,6 +189,11 @@ Release 0.3.1 includes [continuous work and recovery](docs/CONTINUOUS-RECOVERY.m
 frozen handovers, current authority, original evidence, offline outcomes and the
 installed HTTP probe. Historical 0.3.0 assets remain unchanged.
 
+The development branch also includes [project architecture and negotiated PVP
+handoff](docs/NOXI-INTEGRATION.md), unreleased after 0.3.1. Standalone external
+plans remain independent; real provider pairing requires compatible consumer
+support and separate qualification.
+
 ## Development method
 
 Flower is a personal project by **Davide Mele**, developed outside his

@@ -3,7 +3,8 @@
 [Index](README.md) · [Concepts](concepts.md) · [Sources](sources.md#catalog)
 
 Names retain the technical `fow_` prefix. A client may add its own prefix. This
-map describes the **36 tools in the reference source**; it is not a list of
+map describes the **37 tools in the current development source** (36 in release
+0.3.1); it is not a list of
 payloads to copy. A multiplexed tool offers several operations with different
 prerequisites. The current server catalog remains the operational authority.
 
@@ -41,10 +42,11 @@ prerequisites. The current server catalog remains the operational authority.
 | Tool | Purpose |
 | --- | --- |
 | `fow_change` | Govern changes, dependencies, state and evidence; packets have dedicated surfaces. |
+| `fow_architecture` | Inspect, propose and adopt immutable project components, interfaces and technical decisions. Adoption is engineering authority, distinct from human acceptance. |
 | `fow_packet_author` | Build canonical packets, units, declarations and plans. |
 | `fow_packet_advance` | Advance deterministic gates to a decision or asynchronous boundary. The selected technical path may require a provider. |
 | `fow_packet_inspect` | Read scope, units, gates or history through bounded projections. |
-| `fow_external_work` | Validate a standalone plan, select external mode, export Markdown, read TODOs and record/reconcile outcomes. It does not execute code. |
+| `fow_external_work` | Validate/export standalone plans, read TODOs and record/reconcile outcomes. Development also adds explicit new-work executor selection, pure provider validation and intentional capability negotiation. It does not execute repository code. |
 | `fow_run` | Manage implementation-run records, steps, dependencies and work views. It is not a new coding agent. |
 | `fow_what_next` | Derive next work from durable state, with pagination. |
 
