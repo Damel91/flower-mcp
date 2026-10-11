@@ -8,7 +8,9 @@ from flow_of_work_mcp.core.domain.external_work import fingerprint, normalize_de
 CONTRACT_VERSION = 'flow.external_packet_validation_projection.v1'
 
 
-def derive_packet_validation(snapshot: Mapping[str, object]) -> dict[str, object]:
+def derive_packet_validation(snapshot: Mapping[str, object], *, consumer_scope: str = 'external_agent') -> dict[str, object]:
+    if consumer_scope not in {'external_agent', 'provider'}:
+        raise ValueError('unsupported packet validation consumer scope')
     packet = snapshot['packet']
     plan = snapshot.get('plan') or {}
     state = snapshot['external']
@@ -55,9 +57,9 @@ def derive_packet_validation(snapshot: Mapping[str, object]) -> dict[str, object
     contracts = {}
     closure = {}
     for key, unit in by_key.items():
-        if unit.get('mutation_target_binding_id') and not unit.get('target_description') and not unit.get('file_path'):
+        if consumer_scope == 'external_agent' and unit.get('mutation_target_binding_id') and not unit.get('target_description') and not unit.get('file_path'):
             gap('portable_target_context_missing', unit_key=key)
-        if unit.get('context_target_binding_ids'):
+        if consumer_scope == 'external_agent' and unit.get('context_target_binding_ids'):
             gap('portable_context_content_missing', unit_key=key)
         declarations = normalize_declarations(unit)
         unit.update(declarations)
@@ -121,7 +123,8 @@ def derive_packet_validation(snapshot: Mapping[str, object]) -> dict[str, object
         projected_units.append({**unit, 'resolved_requires': uses})
     stale = any(g['code'] in {'criterion_authority_stale', 'work_plan_stale', 'engineering_answers_stale'} for g in gaps)
     status = 'historical_unprojected' if not version else 'stale' if stale else 'open' if gaps else 'closed'
-    return {'contract_version': CONTRACT_VERSION, 'consumer_scope': 'external_agent', 'status': status,
+    return {'contract_version': CONTRACT_VERSION if consumer_scope == 'external_agent' else 'flow.packet_validation_projection.v1',
+            'consumer_scope': consumer_scope, 'status': status,
             'authority_fingerprint': fingerprint(snapshot['authority_basis']),
             'spec_revision': int(packet['spec_revision']), 'plan_revision': int(plan.get('plan_revision') or 0),
             'criteria': criteria, 'units': projected_units, 'gaps': gaps,

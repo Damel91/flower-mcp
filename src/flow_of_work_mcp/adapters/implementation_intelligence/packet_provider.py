@@ -20,6 +20,9 @@ from flow_of_work_mcp.core.errors import (
     PacketProviderRejectedError,
 )
 from flow_of_work_mcp.core.domain.provider_binding import ImplementationProviderKind
+from flow_of_work_mcp.core.domain.provider_validation import (
+    COMMAND_VERSION, CONTEXT_VERSION, CONSUMER_RECEIPT_VERSION, RECEIPT_VERSION, validate_ack,
+)
 
 
 _CODINGCASTLE_RECEIPT_VERSION = "codingcastle.packet.receipt.v2"
@@ -121,7 +124,25 @@ class McpCodingCastlePacketProvider:
         return binding.provider_session_id
 
     def execute(self, command: PacketProviderCommand) -> PacketProviderReceipt:
+        if command.contract_version == COMMAND_VERSION:
+            raise ImplementationProviderContractError('provider_validation_bound_transport_required')
         session_id = self.session_for_project(command.flow_session_ref)
+        return self._execute(command, session_id=session_id)
+
+    def execute_bound(self, command: PacketProviderCommand, *, binding_identity: Mapping[str, object]) -> PacketProviderReceipt:
+        if (command.contract_version != COMMAND_VERSION or not isinstance(binding_identity, Mapping)
+                or set(binding_identity) != {'provider_kind', 'provider_id', 'provider_context_id', 'binding_revision'}
+                or binding_identity['provider_kind'] != 'packet_execution'
+                or not isinstance(binding_identity['binding_revision'], int) or isinstance(binding_identity['binding_revision'], bool)
+                or binding_identity['binding_revision'] <= 0
+                or any(not isinstance(binding_identity[f], str) or not binding_identity[f].strip() or len(binding_identity[f]) > 256
+                       for f in ('provider_id', 'provider_context_id'))):
+            raise ImplementationProviderContractError('provider_validation_bound_transport_invalid')
+        # The socket validated this immutable canonical identity inside its short
+        # admission transaction. Never re-resolve to a newly rebound session.
+        return self._execute(command, session_id=binding_identity['provider_context_id'])
+
+    def _execute(self, command: PacketProviderCommand, *, session_id: str) -> PacketProviderReceipt:
         arguments: dict[str, object] = {
             "session_id": session_id,
             "operation": command.operation.value,
@@ -175,30 +196,39 @@ class McpCodingCastlePacketProvider:
             metadata_payload["dependencies"] = [
                 item.as_payload() for item in dependency_correlations
             ]
-        metadata = (
-            {_PROVIDER_CORRELATION_VERSION: metadata_payload}
-            if metadata_payload
-            else None
-        )
+        metadata = {_PROVIDER_CORRELATION_VERSION: metadata_payload} if metadata_payload else {}
+        if command.contract_version == COMMAND_VERSION:
+            metadata[CONTEXT_VERSION] = dict(command.validation_context)
 
+        receipt_arguments = dict(
+            flow_unit_ref=command.flow_unit_ref, operation=command.operation,
+            fallback_provider_unit_ref=selected_correlation.provider_unit_ref if selected_correlation is not None else '',
+            fallback_unit_number=selected_correlation.unit_number if selected_correlation is not None else None,
+            validation_context=command.validation_context if command.contract_version == COMMAND_VERSION else None,
+        )
+        def validate_no_effect(payload):
+            receipt = _receipt_from_public_payload(payload, **receipt_arguments)
+            if receipt.changed:
+                raise ImplementationProviderContractError('packet_provider_rejection_effect_unknown')
         payload = _unwrap_public_result(
-            self._client.call_tool(self._tool_name, arguments, meta=metadata)
+            self._client.call_tool(self._tool_name, arguments, meta=metadata or None),
+            rejection_validator=validate_no_effect if command.contract_version == COMMAND_VERSION else None,
         )
-        return _receipt_from_public_payload(
-            payload,
-            flow_unit_ref=command.flow_unit_ref,
-            operation=command.operation,
-            fallback_provider_unit_ref=(
-                selected_correlation.provider_unit_ref
-                if selected_correlation is not None
-                else ""
-            ),
-            fallback_unit_number=(
-                selected_correlation.unit_number
-                if selected_correlation is not None
-                else None
-            ),
-        )
+        return _receipt_from_public_payload(payload, **receipt_arguments)
+
+    def binding_identity(self, project_id: str) -> Mapping[str, object]:
+        binding = (self._binding_resolver.resolve_provider_binding(project_id, ImplementationProviderKind.PACKET_EXECUTION)
+                   if self._binding_resolver is not None else None)
+        if binding is None:
+            raise ImplementationProviderUnavailableError('provider_validation_durable_binding_required')
+        return {'provider_kind': 'packet_execution', 'provider_id': binding.provider_id,
+                'provider_context_id': binding.provider_context_id, 'binding_revision': binding.revision}
+
+    def validation_capabilities(self, project_id: str) -> Mapping[str, object]:
+        self.binding_identity(project_id)
+        payload = _unwrap_public_result(self._client.call_tool('codingcastle_capabilities', {}))
+        capability = payload.get('packet_validation')
+        return dict(capability) if isinstance(capability, Mapping) else {}
 
     def _provider_unit_correlation(
         self,
@@ -251,7 +281,7 @@ class McpCodingCastlePacketProvider:
         return translated, tuple(correlations)
 
 
-def _unwrap_public_result(payload: Mapping[str, object]) -> Mapping[str, object]:
+def _unwrap_public_result(payload: Mapping[str, object], *, rejection_validator=None) -> Mapping[str, object]:
     current: object = payload
     for _ in range(4):
         if not isinstance(current, Mapping):
@@ -260,6 +290,8 @@ def _unwrap_public_result(payload: Mapping[str, object]) -> Mapping[str, object]
         result = current.get("result")
         if status and status not in {"ok", "success", "accepted"}:
             detail = result if isinstance(result, Mapping) else current
+            if rejection_validator is not None:
+                rejection_validator(detail)
             reason = str(
                 detail.get("reason")
                 or current.get("reason")
@@ -280,16 +312,19 @@ def _receipt_from_public_payload(
     operation: PacketProviderOperation,
     fallback_provider_unit_ref: str,
     fallback_unit_number: int | None,
+    validation_context: Mapping[str, object] | None = None,
 ) -> PacketProviderReceipt:
     try:
         provider_contract = str(payload["contract_version"])
-        if provider_contract != _CODINGCASTLE_RECEIPT_VERSION:
+        expected_version = CONSUMER_RECEIPT_VERSION if validation_context is not None else _CODINGCASTLE_RECEIPT_VERSION
+        if provider_contract != expected_version:
             raise ImplementationProviderContractError(
                 "packet_provider_receipt_version_mismatch"
             )
         audit = payload.get("audit")
         if not isinstance(audit, Mapping):
             raise TypeError("audit")
+        validation_ack = validate_ack(audit.get('validation_ack'), validation_context) if validation_context is not None else {}
         changed = _boolean(payload.get("changed"), "changed")
         current_step = str(payload.get("current_step") or "")
         if (
@@ -347,6 +382,7 @@ def _receipt_from_public_payload(
         ):
             raise TypeError("scaffolding")
         return PacketProviderReceipt(
+            **({'contract_version': RECEIPT_VERSION, 'validation_ack': validation_ack} if validation_context is not None else {}),
             provider_kind="codingcastle",
             provider_contract_version=provider_contract,
             provider_packet_ref=str(audit["packet_ref"]),

@@ -79,11 +79,13 @@ class PacketProviderOverlayService:
         socket: PacketProviderSocketService,
         projection: PacketProviderProjectionService,
         external_work=None,
+        executor=None,
     ) -> None:
         self._repository = repository
         self._socket = socket
         self._projection = projection
         self._external_work = external_work
+        self._executor = executor
 
     @property
     def provider_managed_targets(self) -> bool:
@@ -97,6 +99,41 @@ class PacketProviderOverlayService:
         context_reader = getattr(self._repository, "remediation_context", None)
         context = context_reader(project_id, change_id, packet_id) if callable(context_reader) else None
         return isinstance(context, Mapping) and context.get("predecessor_dependency_policy") == "context_only"
+
+    def _requires_validation(self, project_id, change_id, packet_id, *, packet=None, plan=None):
+        if self._executor is not None:
+            return self._executor.requires_validation(project_id, change_id, packet_id)
+        return bool((packet or {}).get('architecture_refs') or _has_standalone_declarations(plan))
+
+    def _provider_admission(self, project_id, change_id, packet_id):
+        if self._executor is None:
+            return {'allowed': False, 'reason': 'provider_executor_not_selected', 'next_operation': 'executor_select'}
+        return self._executor.admission(project_id, change_id, packet_id)
+
+    def _unit_content_hash(self, project_id, change_id, packet_id, unit):
+        identity = (self._executor.content_identity(project_id, change_id, packet_id, str(unit['client_unit_key']))
+                    if self._executor is not None else '')
+        return _content_hash(unit, validation_identity=identity)
+
+    def _recovery_generation(self, project_id, change_id, packet_id, binding):
+        # The first admitted v3 draft has generation zero until its receipt
+        # establishes generation one. Its UNKNOWN remains recoverable then.
+        if self._executor is not None and self._executor.requires_validation(project_id, change_id, packet_id):
+            return None
+        return _binding_generation(binding)
+
+    def _ordered_units(self, project_id, change_id, packet_id, plan):
+        units = _units_by_key(plan)
+        if self._executor is None or not self._executor.requires_validation(project_id, change_id, packet_id):
+            return units
+        ordered = {}
+        remaining = dict(units)
+        while remaining:
+            ready = next((key for key, unit in remaining.items() if set(unit.get('depends_on', [])).issubset(ordered)), None)
+            if ready is None:
+                return units  # Pure projections may expose a gap; admission blocks execution.
+            ordered[ready] = remaining.pop(ready)
+        return ordered
 
     def queue_plan_delta(
         self,
@@ -116,8 +153,11 @@ class PacketProviderOverlayService:
             return {"state": "not_applicable", "consumption_mode": "external_agent", "queued": False}
         if self._context_only_remediation(project_id, change_id, packet_id):
             return {"state": "blocked", "reason": "context_only_requires_external_mode", "queued": False}
-        if _has_standalone_declarations(after):
-            return {"state": "blocked", "reason": "standalone_validation_requires_external_mode", "queued": False}
+        if self._requires_validation(project_id, change_id, packet_id, plan=after):
+            admission = self._provider_admission(project_id, change_id, packet_id)
+            if not admission['allowed']:
+                return {'state': 'blocked', 'reason': admission['reason'], 'queued': False,
+                        'next_operation': admission['next_operation']}
 
         capability = self._projection.capability(project_id)
         if not self.active:
@@ -132,7 +172,7 @@ class PacketProviderOverlayService:
                 project_id,
                 change_id=change_id,
                 packet_id=packet_id,
-                flow_binding_generation=_binding_generation(binding),
+                flow_binding_generation=self._recovery_generation(project_id, change_id, packet_id, binding),
                 limit=1,
             )
             if recoverable:
@@ -161,7 +201,7 @@ class PacketProviderOverlayService:
                     "queued": False,
                 }
             before_units = _units_by_key(before)
-            after_units = _units_by_key(after)
+            after_units = self._ordered_units(project_id, change_id, packet_id, after)
             correlations = _correlations(binding)
             for key in before_units:
                 if key in after_units or key not in correlations:
@@ -238,6 +278,14 @@ class PacketProviderOverlayService:
             packet=packet,
             work_plan=work_plan,
         )
+        validation = None
+        admission = None
+        if self._requires_validation(project_id, change_id, packet_id, packet=packet, plan=work_plan):
+            admission = self._provider_admission(project_id, change_id, packet_id)
+            if self._executor is not None:
+                validation = self._executor.validation_projection(project_id, change_id, packet_id)
+                portable = {**portable, 'contract_version': 'flow.portable_packet.v2',
+                            'packet_validation': validation}
         provider_kind = self._socket.provider_kind
         binding = (
             self._repository.packet_provider_binding(
@@ -251,13 +299,13 @@ class PacketProviderOverlayService:
                 project_id,
                 change_id=change_id,
                 packet_id=packet_id,
-                flow_binding_generation=_binding_generation(binding),
+                flow_binding_generation=self._recovery_generation(project_id, change_id, packet_id, binding),
                 limit=16,
             )
             if provider_kind
             else []
         )
-        units = _units_by_key(work_plan)
+        units = self._ordered_units(project_id, change_id, packet_id, work_plan)
         correlations = _correlations(binding)
         unit_states = [
             self._unit_state(
@@ -290,11 +338,29 @@ class PacketProviderOverlayService:
             unit_states=unit_states,
             latest_delivery=latest_outbox[-1] if latest_outbox else None,
         )
+        if admission and not admission['allowed'] and _running_binding(binding) and self._executor is not None:
+            try:
+                self._executor.frozen_context(project_id, change_id, packet_id)
+            except ChangeControlBlockedError:
+                pass
+            else:
+                # Current authority hashes may require unit resynchronization,
+                # but the already admitted run still needs frozen observation.
+                technical_state, next_operation = 'provider_running', 'observe_provider_packet'
         if str(packet.get("status") or "") in PACKET_INACTIVE_STATUS_VALUES:
             next_operation = "packet_inactive"
+        elif admission and not admission['allowed'] and not (
+                recoverable and recoverable[0]['state'] in {'unknown', 'delivering'}
+                or next_operation == 'observe_provider_packet'):
+            next_operation = admission['next_operation']
         latest_receipt = self._latest_receipt(project_id, change_id, packet_id)
+        upstream_action = (self._executor.upstream_action(admission,
+            project_id=project_id, change_id=change_id, packet_id=packet_id,
+            spec_revision=_spec_revision(packet), plan_revision=int((work_plan or {}).get('plan_revision') or 0))
+            if admission and self._executor is not None and next_operation == admission['next_operation'] else None)
         return {
             "capability": capability,
+            **({'validation_admission': admission} if admission is not None else {}),
             "portable_packet": portable,
             "technical": {
                 "state": technical_state,
@@ -312,7 +378,7 @@ class PacketProviderOverlayService:
                 "technical_execution_claimed": bool(binding),
             },
             "next_operation": next_operation,
-            "next_action": _next_action(next_operation, unit_states),
+            "next_action": upstream_action or _next_action(next_operation, unit_states),
         }
 
     def advance(
@@ -331,8 +397,6 @@ class PacketProviderOverlayService:
 
         if self._context_only_remediation(project_id, change_id, packet_id):
             raise ChangeControlBlockedError("context_only_provider_execution_prohibited")
-        if _has_standalone_declarations(work_plan):
-            raise ChangeControlBlockedError("standalone_validation_requires_external_mode")
         if self._external_work is not None and self._external_work.mode_for_packet(project_id, packet_id) == "external_agent":
             raise ChangeControlBlockedError("external_agent_mode_provider_execution_prohibited")
 
@@ -348,6 +412,15 @@ class PacketProviderOverlayService:
         elif str(decision.get("operation") or "") == "retry_provider_rejection":
             forced_operation = "retry_provider_rejection"
             retry_authorized = True
+        if self._requires_validation(project_id, change_id, packet_id, packet=packet, plan=work_plan) and forced_operation != 'stop_provider_packet':
+            recoverable = self._repository.packet_provider_recoverable_commands(
+                project_id, change_id=change_id, packet_id=packet_id)
+            recovery = bool(recoverable and recoverable[0]['state'] in {'unknown', 'delivering'})
+            admission = self._provider_admission(project_id, change_id, packet_id)
+            safe_observation = not forced_operation and self.projection(
+                project_id, change_id, packet_id, packet=packet, work_plan=work_plan).get('next_operation') == 'observe_provider_packet'
+            if not recovery and not safe_observation and not admission['allowed']:
+                raise ChangeControlBlockedError(admission['reason'], details=admission.get('details', {}))
         if self.active and self._socket.provider_kind:
             self._repository.recover_packet_provider_correlations(
                 project_id,
@@ -368,6 +441,9 @@ class PacketProviderOverlayService:
             )
             operation = forced_operation or str(current["next_operation"])
             forced_operation = ""
+            upstream = (current.get('validation_admission') or {}).get('upstream_gate')
+            if upstream and operation == upstream['next_operation']:
+                return _advancement_result(current, history)
             if operation == "provider_failed" and not terminal_status_observed:
                 binding = self._binding(project_id, change_id, packet_id)
                 if binding is not None:
@@ -399,6 +475,10 @@ class PacketProviderOverlayService:
                 "provider_complete",
                 "provider_failed",
                 "provider_stopped",
+                "executor_select",
+                "provider_negotiate",
+                "provider_validation",
+                "packet_inactive",
             }:
                 return _advancement_result(current, history)
 
@@ -490,7 +570,7 @@ class PacketProviderOverlayService:
                     project_id,
                     change_id=change_id,
                     packet_id=packet_id,
-                    flow_binding_generation=_binding_generation(binding),
+                    flow_binding_generation=self._recovery_generation(project_id, change_id, packet_id, binding),
                     limit=1,
                 )
                 if not pending:
@@ -657,16 +737,19 @@ class PacketProviderOverlayService:
                 command_operation = (
                     "start" if operation == "start_provider_packet" else "stop"
                 )
+                validation_fields = self._socket.validation_fields(project_id, change_id, packet_id, operation=command_operation)
                 command = PacketProviderCommand(
                     flow_session_ref=project_id,
                     flow_packet_ref=packet_id,
                     flow_spec_revision=_spec_revision(packet),
                     operation=command_operation,
+                    **validation_fields,
                     delivery_fingerprint=_control_fingerprint(
                         packet_id,
                         command_operation,
                         _spec_revision(packet),
                         binding,
+                        validation_identity=str(validation_fields.get('validation_context', {}).get('context_sha256') or ''),
                     ),
                 )
                 outcome = self._socket.submit(
@@ -770,11 +853,7 @@ class PacketProviderOverlayService:
             "blocked",
         }:
             return "provider_failed", "provider_failed"
-        if (
-            run_phase in _ACTIVE_PROVIDER_RUN_PHASES
-            or provider_state in {"running", "stopping"}
-            or (run_phase == "authoring" and bool(provider_job_ref))
-        ):
+        if _running_binding(binding):
             return "provider_running", "observe_provider_packet"
         if _retryable_rejection(latest_delivery, unit_states):
             return "provider_failed", "retry_provider_rejection"
@@ -793,7 +872,7 @@ class PacketProviderOverlayService:
     ) -> Mapping[str, object]:
         key = str(unit["client_unit_key"])
         identity_hash = _identity_hash(unit)
-        content_hash = _content_hash(unit)
+        content_hash = self._unit_content_hash(project_id, change_id, packet_id, unit)
         correlated = (
             bool(correlation)
             and str((correlation or {}).get("unit_state") or "")
@@ -908,10 +987,11 @@ class PacketProviderOverlayService:
             project_id, change_id, packet_id, str(unit["client_unit_key"])
         ) != _identity_hash(unit)
 
-    @staticmethod
     def _recoverable_command_is_current(
-        entry: Mapping[str, object], work_plan: Mapping[str, object]
+        self, entry: Mapping[str, object], work_plan: Mapping[str, object]
     ) -> bool:
+        if entry.get('state') in {'unknown', 'delivering'} and (entry.get('command') or {}).get('contract_version') == 'flow.packet_provider.semantic.v3':
+            return True  # Retry exactly the admitted command, even after authority drift.
         unit_key = str(entry.get("flow_unit_ref") or "")
         if not unit_key:
             return True
@@ -925,7 +1005,7 @@ class PacketProviderOverlayService:
             str(entry.get("delivery_fingerprint") or ""),
             unit_key=unit_key,
             identity_hash=_identity_hash(unit),
-            content_hash=_content_hash(unit),
+            content_hash=self._unit_content_hash(str(entry['project_id']), str(entry['change_id']), str(entry['packet_id']), unit),
         )
 
     def _enqueue_semantic_unit(
@@ -944,7 +1024,7 @@ class PacketProviderOverlayService:
     ) -> Mapping[str, object]:
         key = str(unit["client_unit_key"])
         identity_hash = _identity_hash(unit)
-        content_hash = _content_hash(unit)
+        content_hash = self._unit_content_hash(project_id, change_id, packet_id, unit)
         current_correlation = (
             correlation
             if correlation
@@ -1011,6 +1091,7 @@ class PacketProviderOverlayService:
             flow_unit_ref=key,
             semantic_input=semantic_input,
             delivery_fingerprint=delivery_fingerprint,
+            **self._socket.validation_fields(project_id, change_id, packet_id, operation=operation, unit_key=key),
         )
         return self._socket.submit(
             project_id,
@@ -1084,7 +1165,7 @@ class PacketProviderOverlayService:
             )[:16]
         )
         content_hash = (
-            _content_hash(unit) if unit is not None else _fingerprint("removed")[:16]
+            self._unit_content_hash(project_id, change_id, packet_id, unit) if unit is not None else _fingerprint("removed")[:16]
         )
         command = PacketProviderCommand(
             flow_session_ref=project_id,
@@ -1093,6 +1174,7 @@ class PacketProviderOverlayService:
             operation="remove",
             flow_unit_ref=key,
             semantic_input={},
+            **self._socket.validation_fields(project_id, change_id, packet_id, operation='remove', unit_key=key),
             delivery_fingerprint=_unit_delivery_fingerprint(
                 "remove",
                 key,
@@ -1280,6 +1362,17 @@ def _binding_generation(binding: Mapping[str, object] | None) -> int | None:
     return generation
 
 
+def _running_binding(binding: Mapping[str, object] | None) -> bool:
+    if not binding:
+        return False
+    state, phase = str(binding.get('provider_state') or ''), str(binding.get('run_phase') or '')
+    if (phase in _COMPLETE_PROVIDER_RUN_PHASES | _FAILED_PROVIDER_RUN_PHASES
+            or state in {'completed', 'partial', 'failed', 'blocked'}):
+        return False
+    return bool(phase in _ACTIVE_PROVIDER_RUN_PHASES or state in {'running', 'stopping'}
+                or phase == 'authoring' and binding.get('provider_job_ref'))
+
+
 def _provider_unit(
     unit: Mapping[str, object], *, future: bool = False
 ) -> dict[str, object]:
@@ -1342,10 +1435,11 @@ def _identity_hash(unit: Mapping[str, object]) -> str:
     )[:16]
 
 
-def _content_hash(unit: Mapping[str, object]) -> str:
+def _content_hash(unit: Mapping[str, object], *, validation_identity: str = '') -> str:
     return _fingerprint(
         {field: list(unit.get(field) or ()) for field in _TECHNICAL_FIELDS}
         | {"kind": _provider_kind(str(unit.get("operation_kind") or ""))}
+        | ({'validation_context_sha256': validation_identity} if validation_identity else {})
     )[:16]
 
 
@@ -1411,6 +1505,7 @@ def _control_fingerprint(
     operation: str,
     spec_revision: int,
     binding: Mapping[str, object],
+    *, validation_identity: str = '',
 ) -> str:
     boundary = {
         key: binding.get(key)
@@ -1426,6 +1521,8 @@ def _control_fingerprint(
             "last_receipt_id",
         )
     }
+    if validation_identity:
+        boundary['validation_context_sha256'] = validation_identity
     digest = _fingerprint(boundary)[:32]
     return f"flow-semantic-control:{operation}:{packet_id}:s{spec_revision}:b{digest}"
 
@@ -1529,6 +1626,17 @@ def _public_delivery(entry: Mapping[str, object] | None) -> Mapping[str, object]
 def _next_action(
     operation: str, unit_states: Sequence[Mapping[str, object]]
 ) -> Mapping[str, object]:
+    if operation in {'executor_select', 'provider_negotiate', 'provider_validation'}:
+        public_operation = {'executor_select': 'select_executor',
+                            'provider_negotiate': 'negotiate_provider',
+                            'provider_validation': 'provider_validation'}[operation]
+        required = ([] if operation == 'provider_validation' else
+                    ['actor', 'request_id', 'payload.expected_spec_revision', 'payload.expected_plan_revision'])
+        if operation == 'executor_select':
+            required.append('payload.executor')
+        return {'tool': 'fow_external_work', 'operation': public_operation,
+                'decision_class': 'semantic' if operation == 'executor_select' else 'mechanical',
+                'required_inputs': required}
     current = next((item for item in unit_states if not item["synchronized"]), None)
     exposed_operation = (
         "start_provider_packet" if operation == "provider_failed" else operation

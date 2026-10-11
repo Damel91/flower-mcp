@@ -57,6 +57,8 @@ from flow_of_work_mcp.core.ports import (
 from flow_of_work_mcp.core.standards import StandardProfileRegistry
 from flow_of_work_mcp.application.association_receipts import AssociationReceiptService
 from flow_of_work_mcp.application.external_work import ExternalWorkService
+from flow_of_work_mcp.application.architecture import ArchitectureService
+from flow_of_work_mcp.application.packet_executor import PacketExecutorService
 from flow_of_work_mcp.application.engineer_gate import EngineerGateService
 from flow_of_work_mcp.application.guided_bootstrap import GuidedBootstrapService
 from flow_of_work_mcp.application.semantic_assignments import SemanticAssignmentService
@@ -103,6 +105,8 @@ class McpRuntime:
     association_receipts: AssociationReceiptService
     semantic_assignments: SemanticAssignmentService
     external_work: ExternalWorkService
+    architecture: ArchitectureService
+    packet_executor: PacketExecutorService
     engineer_gate: EngineerGateService
     project_context: object
     interaction_projection: InteractionProjectionService
@@ -165,8 +169,13 @@ def build_runtime(
     def external_execution_guard(project_id, packet_id):
         engineer_gate.execution_guard(project_id, packet_id)
         guided_bootstrap.execution_guard(project_id, packet_id)
+    packet_executor = PacketExecutorService(ledger, provider=packet_provider,
+        semantic_projection=lambda project_id, change_id, packet_id:
+            external_work.provider_validation(project_id, change_id, packet_id))
     external_work = ExternalWorkService(ledger, execution_guard=external_execution_guard,
-                                       engineer_projection=engineer_gate.projection)
+                                       engineer_projection=engineer_gate.projection,
+                                       packet_executor=packet_executor)
+    architecture = ArchitectureService(ledger)
     provider_bindings = provider_bindings or ProviderBindingService(ledger)
     association_receipts = AssociationReceiptService(ledger, provider_bindings)
     from flow_of_work_mcp.application.project_context import ProjectContextService
@@ -230,12 +239,14 @@ def build_runtime(
         ledger,
         mode=packet_provider_mode,
         provider=packet_provider,
+        executor=packet_executor,
     )
     packet_provider_overlay = PacketProviderOverlayService(
         ledger,
         socket=packet_provider_socket,
         projection=packet_provider_projection,
         external_work=external_work,
+        executor=packet_executor,
     )
     packet_next_action = PacketNextActionProjectionService()
     packet_work_plan = PacketWorkPlanService(
@@ -392,6 +403,8 @@ def build_runtime(
     try:
         return McpRuntime(
             ledger=ledger,
+            architecture=architecture,
+            packet_executor=packet_executor,
             requirements=requirements,
             assurance=assurance,
             campaign_authority=campaign_authority,

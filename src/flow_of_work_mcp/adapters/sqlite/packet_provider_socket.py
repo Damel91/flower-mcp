@@ -59,6 +59,11 @@ _MAX_CORRELATION_RECOVERY_DELIVERIES = 4096
 
 
 class PacketProviderSocketStoreMixin:
+    def packet_provider_receipt(self, project_id: str, receipt_id: str) -> Mapping[str, Any]:
+        """Resolve exact durable evidence independently of paged recent history."""
+        with self._read_connection() as connection:
+            return self._packet_provider_receipt_value(connection, validate_project_id(project_id), required_text(receipt_id, 'receipt_id'))
+
     def enqueue_packet_provider_command(
         self,
         project_id: str,
@@ -693,14 +698,24 @@ class PacketProviderSocketStoreMixin:
             )
             if existing is not None:
                 existing_receipt_id = str(existing["receipt_id"])
-                if current_receipt_id and existing_receipt_id != current_receipt_id:
+                if receipt.contract_version == 'flow.packet_provider.receipt.v3':
+                    # An outbox must retain its own exact acknowledgement even
+                    # when a newer observation owns the current projection.
+                    receipt_id = existing_receipt_id
+                    observation_disposition = 'stale' if current_receipt_id and existing_receipt_id != current_receipt_id else 'duplicate'
+                elif current_receipt_id and existing_receipt_id != current_receipt_id:
                     receipt_id = current_receipt_id
                     observation_disposition = "stale"
                 else:
                     receipt_id = existing_receipt_id
                     observation_disposition = "duplicate"
             elif stale:
-                receipt_id = current_receipt_id
+                receipt_id = (self._insert_packet_provider_receipt(
+                    connection, project_id=project_id, change_id=change_id, packet_id=packet_id,
+                    outbox_id=outbox_id, flow_spec_revision=flow_spec_revision, receipt=receipt,
+                    observation_kind=observation_kind, fingerprint=fingerprint, encoded=encoded,
+                    occurred_at=occurred_at, actor=actor, request_id=request_id,
+                ) if receipt.contract_version == 'flow.packet_provider.receipt.v3' else current_receipt_id)
                 observation_disposition = "stale"
             else:
                 receipt_id = self._insert_packet_provider_receipt(

@@ -15,6 +15,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 
+from public_inventory import require_tool_inventory
+
+
 @asynccontextmanager
 async def public_session(parameters: StdioServerParameters, *, strict: bool = False):
     """Initialize a real public MCP session over the supplied foreground process."""
@@ -48,7 +51,7 @@ async def qualify_sessions(session_factory: Callable[[], AsyncContextManager[Cli
 
     async with session_factory() as session:
         catalog = await session.list_tools()
-        assert {"fow_bootstrap", "fow_capabilities", "fow_external_work"} <= {tool.name for tool in catalog.tools}
+        require_tool_inventory(catalog.tools)
         bootstrap_schema = next(tool.inputSchema for tool in catalog.tools if tool.name == "fow_bootstrap")
         summary = await call(session, "fow_capabilities", {"view": "summary"})
         standalone = summary["result"]["standalone"]

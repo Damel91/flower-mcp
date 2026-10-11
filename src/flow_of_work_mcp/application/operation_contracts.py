@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from functools import lru_cache
@@ -258,6 +259,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "inventory",
         "criteria",
         "validation",
+        "provider_validation",
         "todo",
     }
     provider_operation = operation in {
@@ -267,6 +269,8 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "attest_source",
     }
     if tool == "fow_semantic" and operation == "execute_internal":
+        provider_operation = True
+    if tool == "fow_external_work" and operation == "negotiate_provider":
         provider_operation = True
     asynchronous = tool in {
         "fow_validate_srs",
@@ -348,8 +352,12 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
 
 _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
+        "fow_architecture", "project_bootstrap",
+        "Inspect immutable project components, interfaces and technical decisions, propose a complete revision or explicitly adopt it. Adoption records engineering authority; it does not prove implementation or human acceptance. Reads never invoke a model or provider.",
+    ),
+    ToolDescriptor(
         "fow_external_work", "packet_lifecycle",
-        "Select external-agent mode, close standalone plan validation, export complete Markdown, read TODOs and reconcile host-reported outcomes. Reads never execute code; completion, verification and human acceptance remain distinct.",
+        "Inspect standalone or provider-scoped validation, explicitly select one executor for new work, negotiate optional provider support, export complete Markdown, read TODOs and reconcile host outcomes. Reads never execute code or probe providers; selection does not transfer an admitted run.",
     ),
     ToolDescriptor(
         "fow_bindings", "project_bootstrap",
@@ -564,6 +572,10 @@ _TOOL_OWNERS: Mapping[str, str] = MappingProxyType(
 _P = ("project_id", "operation", "actor")
 _R = ("request_id",)
 _PACKET = ("change_id", "packet_id")
+_ARCHITECTURE_REFS_GUIDANCE = {
+    "shape": [{"revision": 1, "kind": "decision", "entity_id": "loop-owner"}],
+    "authority": "Select at most128 unique component/interface/decision references from one adopted project architecture revision. Omission preserves existing references; explicit [] clears them through an ordinary spec revision. Proposals/mixed revisions are rejected; selected closure joins export/currentness and relevant drift requires ordinary re-pin/review.",
+}
 
 
 _BOOTSTRAP = {
@@ -785,6 +797,7 @@ _CHANGE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "out_of_scope",
             "invariants",
             "unresolved_questions",
+            "architecture_refs",
             "completion_criteria",
             "target_policy",
             "target_state",
@@ -841,6 +854,7 @@ _CHANGE = {
         optional,
         enums=_CHANGE_ENUMS.get(operation),
         owner=_CHANGE_OWNER[operation],
+        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE} if operation == "revise_packet" else {},
     )
     for operation, (required, optional) in _CHANGE_FIELDS.items()
 }
@@ -1242,12 +1256,14 @@ _PACKET_AUTHOR = {
             "predecessor_dependency_policy",
             "required_regression_evidence",
             "required_campaign_ids",
+            "architecture_refs",
         ),
         enums={
             "purpose": ("implementation", "remediation"),
             "predecessor_dependency_policy": ("materialized", "context_only"),
             "target_policy": tuple(item.value for item in PacketTargetPolicy),
         },
+        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE},
     ),
     "revise_packet": _c(
         "fow_packet_author",
@@ -1270,9 +1286,11 @@ _PACKET_AUTHOR = {
             "out_of_scope",
             "invariants",
             "unresolved_questions",
+            "architecture_refs",
             "expected_spec_revision",
             "expected_plan_revision",
         ),
+        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE},
     ),
     "replace_plan": _c(
         "fow_packet_author",
@@ -2009,8 +2027,78 @@ _INTERACTION = {
     for operation, (required, optional) in _INTERACTION_FIELDS.items()
 }
 
+_ARCHITECTURE_GUIDANCE = {
+    "definition": {
+        "components": [
+            {
+                "id": "lifecycle", "name": "Lifecycle authority",
+                "responsibility": "Own canonical project intent and handoff.",
+                "boundaries": ["The host owns code execution."],
+                "invariants": ["Keep one canonical project ledger."], "links": [],
+            },
+            {
+                "id": "host", "name": "Coding agent",
+                "responsibility": "Investigate, implement and report declared evidence.",
+                "boundaries": ["Use Flower authority without copying a semantic store."],
+                "invariants": ["Retain issued authority while offline."], "links": [],
+            },
+        ],
+        "interfaces": [{
+            "id": "plan-handoff", "name": "Self-contained implementation plan",
+            "provider_component_id": "lifecycle", "consumer_component_ids": ["host"],
+            "kind": "protocol", "clauses": ["Carry complete producer/consumer contracts and verification obligations."],
+            "failure_contract": ["Incomplete or stale authority blocks admission."],
+            "compatibility": ["Host evidence retains its declared provenance."], "links": [],
+        }],
+        "decisions": [{
+            "id": "execution-owner", "statement": "The coding agent owns code execution.",
+            "rationale": "Keep lifecycle authority and execution responsibility explicit.",
+            "component_ids": ["lifecycle", "host"], "interface_ids": ["plan-handoff"],
+            "supersedes_decision_id": "", "links": [],
+        }],
+    },
+    "entity_fields": {
+        "component": ["id", "name", "responsibility", "boundaries", "invariants", "links"],
+        "interface": ["id", "name", "provider_component_id", "consumer_component_ids", "kind", "clauses", "failure_contract", "compatibility", "links"],
+        "decision": ["id", "statement", "rationale", "component_ids", "interface_ids", "supersedes_decision_id", "links"],
+    },
+    "links": [
+        {"kind": "requirement", "requirement_id": "current-requirement-id"},
+        {"kind": "goal", "goal_node_id": "current-goal-node-id"},
+        {"kind": "packet", "change_id": "current-change-id", "packet_id": "current-packet-id"},
+        {"kind": "evidence", "evidence_id": 1},
+    ],
+    "interface_kinds": ["symbol", "api", "data_shape", "protocol", "behavioral_boundary"],
+    "field_types": "Collections, boundaries, invariants, clauses, failure_contract, compatibility and subject/consumer IDs are lists; links contain the exact typed objects below. Other entity fields are strings. supersedes_decision_id is an empty string when no predecessor exists. evidence_id is a positive integer. The complete definition example shows every required entity field.",
+    "bounds": "At most128 entities,512 total links,256KiB canonical UTF-8,128 items per list and4096 characters per string. IDs match [A-Za-z][A-Za-z0-9_.-]{0,79}, unique within kind. Unknown fields/duplicate identities/dangling endpoints/foreign links fail atomically.",
+    "authority": "Proposals are immutable complete definitions and never executable authority. Adoption is an ordinary engineer decision, not product acceptance or verification. Adopted decision bodies are immutable; a changed choice gets a new ID, explicitly supersedes the retained predecessor and cannot form a cycle.",
+    "replay": "Mutations require actor/request_id and expected current adopted revision (0 initially). Exact requests replay the historical receipt; changed actor/operation/payload under the same request ID conflicts. A proposal's base must still match the adopted head at adoption.",
+    "paging": "inspect revision=0 selects current adopted authority; missing adopted authority stays explicitly absent. kind=history selects revision history. offset defaults0; limit defaults20, maximum100. Read completeness and next_offset before assuming an entire result was returned.",
+}
+_ARCHITECTURE = {
+    "inspect": _c(
+        "fow_architecture", "inspect", ("project_id", "operation"),
+        ("payload.revision", "payload.kind", "payload.offset", "payload.limit", "request_id"),
+        enums={"payload.kind": ("all", "component", "interface", "decision", "history")},
+        paging_owner="ledger", guidance=_ARCHITECTURE_GUIDANCE,
+    ),
+    "propose": _c(
+        "fow_architecture", "propose",
+        ("project_id", "operation", "actor", "request_id", "payload.expected_revision", "payload.definition"),
+        guidance=_ARCHITECTURE_GUIDANCE,
+    ),
+    "adopt": _c(
+        "fow_architecture", "adopt",
+        ("project_id", "operation", "actor", "request_id", "payload.expected_revision", "payload.revision", "payload.rationale"),
+        guidance=_ARCHITECTURE_GUIDANCE,
+    ),
+}
+
+_EXTERNAL_WORK_READS = frozenset({"criteria", "validation", "provider_validation", "todo"})
 _EXTERNAL_WORK_FIELDS = {
     "set_mode": (("payload.mode", "payload.expected_spec_revision", "payload.expected_plan_revision"), ()),
+    "select_executor": (("payload.executor", "payload.expected_spec_revision", "payload.expected_plan_revision"), ("payload.provider_kind",)),
+    "negotiate_provider": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ()),
     "upgrade_validation": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ()),
     "criteria": ((), ()),
     "reconcile_criteria": (("payload.expected_spec_revision", "payload.rationale", "payload.criteria"), ("payload.new_statements",)),
@@ -2018,6 +2106,7 @@ _EXTERNAL_WORK_FIELDS = {
     "edit_criterion": (("payload.number", "payload.statement", "payload.expected_spec_revision"), ()),
     "remove_criterion": (("payload.number", "payload.expected_spec_revision"), ()),
     "validation": ((), ("payload.detail",)),
+    "provider_validation": ((), ("payload.detail",)),
     "export_plan": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ("payload.allow_draft",)),
     "todo": ((), ("payload.unit_key",)),
     "report_outcome": (("payload.report_key", "payload.expected_spec_revision", "payload.expected_plan_revision", "payload.authority_fingerprint", "payload.unit_key", "payload.outcome", "payload.summary", "payload.source_revision", "payload.artifacts", "payload.produced_contracts", "payload.verification", "payload.unresolved"), ()),
@@ -2026,11 +2115,20 @@ _EXTERNAL_WORK_FIELDS = {
 _EXTERNAL_WORK = {
     op: _c(
         "fow_external_work", op,
-        ("project_id", "change_id", "packet_id", "operation", *required, *(() if op in {"criteria", "validation", "todo"} else ("actor", "request_id"))),
-        (*optional, *(("request_id",) if op in {"criteria", "validation", "todo"} else ())),
-        enums={"operation": (op,)},
+        ("project_id", "change_id", "packet_id", "operation", *required, *(() if op in _EXTERNAL_WORK_READS else ("actor", "request_id"))),
+        (*optional, *(("request_id",) if op in _EXTERNAL_WORK_READS else ())),
+        enums={
+            "operation": (op,),
+            **({"payload.detail": ("standard", "full")} if op in {"validation", "provider_validation"} else {}),
+            **({"payload.executor": ("external_agent", "provider")} if op == "select_executor" else {}),
+            **({"payload.mode": ("external_agent",)} if op == "set_mode" else {}),
+        },
+        effect_class="provider_probe_and_ledger_mutation" if op == "negotiate_provider" else "",
         guidance={
-            "scope": "Flower-to-external-agent handoff only; full cross-server PVP is deferred.",
+            "scope": "Standalone external-agent PVP remains independent. A bounded Flow-owned negotiated provider bridge requires exact consumer support; original full cross-server PVP/CC IMPL-67 and actual paired qualification remain deferred.",
+            "execution_ownership": "Select one executor for new work before an enriched plan can trigger delivery. executor=provider requires the actual configured adapter provider_kind (codingcastle), distinct from route category packet_execution; external_agent forbids provider_kind. Opposite explicit/legacy external selection, provider history, outcomes, started or completed work reject transfer. An unselected legacy provider default is not explicit selection; no timeout fallback or second writer.",
+            "provider_negotiation": "negotiate_provider explicitly probes the selected configured provider and stores exact capability support bound to selection, canonical packet_execution binding, spec/plan revisions and authority fingerprint. No ordinary read probes a provider. Missing/malformed/unavailable support blocks enriched dispatch; route or authority change requires explicit re-negotiation. URLs/credentials/commands are not accepted.",
+            "provider_validation": "provider_validation is a pure read of provider-scoped semantic closure, selected authority and current executor/capability admission; it never probes or compiles. Local unit checks and deferred campaign/Oracle/explicit-authority obligations remain separate. Consumer compilation acknowledgements do not prove acceptance or satisfy deferred verification.",
             "authority": (
                 "Retain the issued expected_spec_revision, expected_plan_revision and authority_fingerprint from the plan/TODO used for the work, including offline execution. Read current validation/TODO to compare authorities; never replace issued authority with current values to make old evidence appear current. Stale reports remain historical and cannot complete current work."
                 if op == "report_outcome" else
@@ -2096,6 +2194,7 @@ _BY_TOOL: Mapping[str, Mapping[str, OperationContract]] = MappingProxyType(
         "fow_campaign_advance": MappingProxyType(_CAMPAIGN_ADVANCE),
         "fow_campaign_inspect": MappingProxyType(_CAMPAIGN_INSPECT),
         "fow_external_work": MappingProxyType(_EXTERNAL_WORK),
+        "fow_architecture": MappingProxyType(_ARCHITECTURE),
         "fow_bindings": MappingProxyType(_BINDINGS),
         "fow_semantic": MappingProxyType(_SEMANTIC),
     }
@@ -2278,6 +2377,19 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
             ],
             "unit_checks": ["The required public contract is exported."],
         }
+    if contract.tool == "fow_architecture":
+        if contract.operation == "inspect":
+            result["payload"] = {"revision": 0, "kind": "all", "offset": 0, "limit": 20}
+        elif contract.operation == "propose":
+            result["payload"].update(
+                expected_revision=0,
+                definition=deepcopy(_ARCHITECTURE_GUIDANCE["definition"]),
+            )
+        elif contract.operation == "adopt":
+            result["payload"].update(
+                expected_revision=0, revision=1,
+                rationale="Adopt the investigated lifecycle boundary as engineering authority.",
+            )
     if contract.tool == "fow_bootstrap":
         if contract.operation == "record_answer":
             result["answer"] = {"answer_key": "successor-scenario", "question": "What should the software do?", "answer": "Return the integer successor through the declared API.", "kind": "intent", "source_reference": "stakeholder:scenario-1"}
@@ -2303,6 +2415,10 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
     if contract.tool == "fow_external_work":
         if contract.operation == "set_mode":
             result["payload"]["mode"] = "external_agent"
+        elif contract.operation == "select_executor":
+            result["payload"]["executor"] = "external_agent"
+        elif contract.operation == "provider_validation":
+            result["payload"] = {"detail": "full"}
         elif contract.operation == "reconcile_criteria":
             result["payload"]["criteria"] = [{"number": 1, "statement": "Accepted completion criterion", "active": True}]
         elif contract.operation == "report_outcome":
@@ -2370,6 +2486,8 @@ def _sample_value(
     if leaf in {
         "expected_spec_revision",
         "expected_plan_revision",
+        "expected_revision",
+        "revision",
         "offset",
         "limit",
         "transition_budget",

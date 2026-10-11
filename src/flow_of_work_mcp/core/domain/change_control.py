@@ -7,6 +7,7 @@ import re
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_requirement_id
+from flow_of_work_mcp.core.domain.architecture import normalize_architecture_refs
 
 
 _CHANGE_ID_RE = re.compile(r"^CHANGE-[0-9]{6}$")
@@ -111,9 +112,12 @@ class ImplementationPacketDraft:
     target_policy: PacketTargetPolicy = PacketTargetPolicy.DOCUMENTAL_ONLY
     readiness_state: PacketReadinessState | str = ""
     readiness_blockers: tuple[str, ...] = ()
+    architecture_refs: tuple[Mapping[str, object], ...] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "title", required_text(self.title, "title"))
+        if self.architecture_refs is not None:
+            object.__setattr__(self, "architecture_refs", normalize_architecture_refs(self.architecture_refs))
         criteria = _unique_texts(self.completion_criteria, "completion_criteria")
         if not criteria:
             raise ValueError("packet requires at least one completion criterion")

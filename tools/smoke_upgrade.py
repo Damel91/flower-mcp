@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import closing
 import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -22,13 +24,73 @@ import sys
 import urllib.parse
 import urllib.request
 
-
 BASELINE_VERSION = "0.3.0"
 BASELINE_WHEEL_SHA256 = "b8c2146eb7b1ef252293df84fdc6b900ca24d68ecc975151ca8c196ee77c0924"
 BASELINE_INSTALLER_SHA256 = "b27d23fcf2491b28e2948bfd58d93d7b26404d6dddca5746d47030130f42b539"
 REPOSITORY = "https://github.com/Damel91/flower-mcp"
 PROJECT = "flower-upgrade-smoke"
 PROFILE = "upgrade-smoke"
+
+# Independent qualification oracle for the additive IMPL-63 persistence contract.
+# Do not obtain this from the implementation being tested or accept arbitrary DDL.
+ADDITIVE_SCHEMA_SQL = '''
+CREATE TABLE architecture_revisions (
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE RESTRICT,
+    revision INTEGER NOT NULL CHECK(revision > 0),
+    base_revision INTEGER NOT NULL CHECK(base_revision >= 0),
+    definition_json TEXT NOT NULL, definition_fingerprint TEXT NOT NULL,
+    actor TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(project_id, revision));
+CREATE TABLE architecture_adoptions (
+    adoption_id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
+    revision INTEGER NOT NULL, previous_revision INTEGER NOT NULL CHECK(previous_revision >= 0),
+    rationale TEXT NOT NULL, actor TEXT NOT NULL, adopted_at TEXT NOT NULL,
+    UNIQUE(project_id, revision), FOREIGN KEY(project_id, revision)
+        REFERENCES architecture_revisions(project_id, revision) ON DELETE RESTRICT);
+CREATE TABLE architecture_requests (
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE RESTRICT,
+    request_id TEXT NOT NULL, operation TEXT NOT NULL, request_fingerprint TEXT NOT NULL,
+    result_json TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, request_id));
+CREATE TABLE packet_executor_selections (
+    project_id TEXT NOT NULL, change_id TEXT NOT NULL, packet_id TEXT NOT NULL,
+    selection_revision INTEGER NOT NULL CHECK(selection_revision=1),
+    executor TEXT NOT NULL CHECK(executor IN ('external_agent','provider')),
+    provider_kind TEXT NOT NULL, spec_revision INTEGER NOT NULL, plan_revision INTEGER NOT NULL,
+    authority_fingerprint TEXT NOT NULL, actor TEXT NOT NULL, selected_at TEXT NOT NULL,
+    PRIMARY KEY(project_id,change_id,packet_id), FOREIGN KEY(project_id,change_id,packet_id)
+        REFERENCES implementation_packets(project_id,change_id,packet_id));
+CREATE TABLE packet_provider_capabilities (
+    capability_identity INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL, change_id TEXT NOT NULL, packet_id TEXT NOT NULL,
+    provider_kind TEXT NOT NULL, binding_identity_json TEXT NOT NULL,
+    flow_binding_generation INTEGER NOT NULL CHECK(flow_binding_generation>=0),
+    selection_revision INTEGER NOT NULL CHECK(selection_revision=1),
+    selection_fingerprint TEXT NOT NULL, spec_revision INTEGER NOT NULL,
+    plan_revision INTEGER NOT NULL, authority_fingerprint TEXT NOT NULL,
+    supported INTEGER NOT NULL CHECK(supported IN (0,1)), reason TEXT NOT NULL,
+    capability_json TEXT NOT NULL, actor TEXT NOT NULL, observed_at TEXT NOT NULL,
+    FOREIGN KEY(project_id,change_id,packet_id)
+        REFERENCES implementation_packets(project_id,change_id,packet_id));
+CREATE TABLE packet_executor_requests (
+    project_id TEXT NOT NULL, request_id TEXT NOT NULL, request_fingerprint TEXT NOT NULL,
+    result_json TEXT NOT NULL, actor TEXT NOT NULL, operation TEXT NOT NULL,
+    occurred_at TEXT NOT NULL, PRIMARY KEY(project_id,request_id));
+CREATE TABLE packet_provider_admissions (
+    project_id TEXT NOT NULL, outbox_id TEXT NOT NULL, change_id TEXT NOT NULL, packet_id TEXT NOT NULL,
+    capability_identity INTEGER NOT NULL, binding_identity_json TEXT NOT NULL,
+    context_sha256 TEXT NOT NULL, unit_key TEXT NOT NULL, actor TEXT NOT NULL, admitted_at TEXT NOT NULL,
+    PRIMARY KEY(project_id,outbox_id),
+    FOREIGN KEY(project_id,outbox_id) REFERENCES packet_provider_outbox(project_id,outbox_id),
+    FOREIGN KEY(capability_identity) REFERENCES packet_provider_capabilities(capability_identity),
+    FOREIGN KEY(project_id,change_id,packet_id) REFERENCES implementation_packets(project_id,change_id,packet_id));
+CREATE INDEX packet_provider_admissions_context
+    ON packet_provider_admissions(project_id,change_id,packet_id,unit_key,context_sha256);
+'''
+NEW_TABLES = frozenset({"architecture_revisions", "architecture_adoptions", "architecture_requests",
+    "packet_executor_selections", "packet_provider_capabilities", "packet_executor_requests",
+    "packet_provider_admissions"})
+ARCHITECTURE_TABLES = ("implementation_packets", "implementation_packet_revisions")
+ARCHITECTURE_COLUMN = "architecture_refs_json TEXT NOT NULL DEFAULT '[]'"
 
 
 def require(condition: bool, message: str) -> None:
@@ -152,9 +214,89 @@ def state_snapshot(root: Path) -> dict:
 
 def database_state(path: Path) -> str:
     require(path.is_file() and not path.is_symlink(), "Expected regular existing SQLite database")
-    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        connection.execute("BEGIN")
         require(connection.execute("PRAGMA integrity_check").fetchone() == ("ok",), "SQLite integrity check failed")
         return hashlib.sha256("\n".join(connection.iterdump()).encode("utf-8")).hexdigest()
+
+
+def _sql_tokens(sql: str | None):
+    if sql is None:
+        return None
+    # Ignore SQL formatting, preserving quoted values and identifiers exactly.
+    tokens = re.findall(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`|\[[^\]]*\]|[A-Za-z_][A-Za-z0-9_]*|[0-9]+|\S", sql)
+    return tuple(token if token[0] in "'\"`[" else token.lower() for token in tokens if token != ';')
+
+
+def _identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def database_authority(path: Path) -> dict:
+    """Read every old field, row and schema object without opening a runtime."""
+    require(path.is_file() and not path.is_symlink(), "Expected regular existing SQLite database")
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+        connection.execute("BEGIN")
+        require(connection.execute("PRAGMA integrity_check").fetchone() == ("ok",), "SQLite integrity check failed")
+        require(connection.execute("PRAGMA foreign_key_check").fetchall() == [], "SQLite foreign key check failed")
+        objects = {name: (kind, table, sql) for kind, name, table, sql in connection.execute(
+            "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name")}
+        columns, rows = {}, {}
+        for name, (kind, unused, sql) in objects.items():
+            if kind != "table":
+                continue
+            columns[name] = connection.execute("PRAGMA table_info(" + _identifier(name) + ")").fetchall()
+            rows[name] = sorted(connection.execute("SELECT * FROM " + _identifier(name)).fetchall(), key=repr)
+    return {"objects": objects, "columns": columns, "rows": rows}
+
+
+def require_additive_migration(path: Path, before: dict) -> dict:
+    """Qualify exactly52→55, keeping every historical field and clock intact."""
+    require(max(row[0] for row in before["rows"]["schema_migrations"]) == 52,
+            "Upgrade fixture must begin with the exact schema52 predecessor")
+    require(not NEW_TABLES.intersection(before["columns"]), "Predecessor already contains new authority tables")
+    after = database_authority(path)
+    expected = dict(before["objects"])
+    with closing(sqlite3.connect(":memory:")) as oracle:
+        # SQLite inserts new column SQL before existing table constraints. Let
+        # the same SQLite engine apply only the independently permitted ALTER.
+        for table in ARCHITECTURE_TABLES:
+            require(table in before["columns"] and all(column[1] != "architecture_refs_json" for column in before["columns"][table]),
+                    "Predecessor packet schema differs from schema52")
+            kind, owner, sql = expected[table]
+            oracle.execute(sql)
+            oracle.execute("ALTER TABLE " + _identifier(table) + " ADD COLUMN " + ARCHITECTURE_COLUMN)
+            altered = oracle.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()[0]
+            expected[table] = (kind, owner, altered)
+        oracle.executescript(ADDITIVE_SCHEMA_SQL)
+        expected.update({name: (kind, owner, sql) for kind, name, owner, sql in oracle.execute(
+            "SELECT type,name,tbl_name,sql FROM sqlite_master") if owner in NEW_TABLES})
+    require(set(after["objects"]) == set(expected), "Migration added or removed an unexpected schema object")
+    for name, (kind, owner, sql) in expected.items():
+        actual_kind, actual_owner, actual_sql = after["objects"][name]
+        require((actual_kind, actual_owner, _sql_tokens(actual_sql)) == (kind, owner, _sql_tokens(sql)),
+                "Migration changed an unexpected schema definition: " + name)
+    for table, original_columns in before["columns"].items():
+        actual_columns = after["columns"][table]
+        if table in ARCHITECTURE_TABLES:
+            addition = (len(original_columns), "architecture_refs_json", "TEXT", 1, "'[]'", 0)
+            require(actual_columns == [*original_columns, addition], "Migration changed original packet fields: " + table)
+            require(all(row[-1] == "[]" for row in after["rows"][table]), "Migration invented historical architecture references")
+            actual_rows = sorted((row[:-1] for row in after["rows"][table]), key=repr)
+        else:
+            require(actual_columns == original_columns, "Migration changed original columns: " + table)
+            actual_rows = after["rows"][table]
+        if table != "schema_migrations":
+            require(actual_rows == before["rows"][table], "Migration changed original rows or clocks: " + table)
+    old_migrations = dict(before["rows"]["schema_migrations"])
+    new_migrations = dict(after["rows"]["schema_migrations"])
+    require(set(new_migrations) == set(old_migrations) | {53, 54, 55}, "Migration versions differ from exact53..55 contract")
+    require(all(new_migrations[key] == value for key, value in old_migrations.items()), "Historical migration timestamps changed")
+    require(all(isinstance(new_migrations[key], str) and new_migrations[key] for key in (53, 54, 55)), "New migration timestamp is absent")
+    require(all(after["rows"][table] == [] for table in NEW_TABLES), "Migration invented architecture or executor authority")
+    return {"status": "passed", "previous_schema": 52, "current_schema": 55,
+            "historical_tables_preserved": len(before["columns"]), "new_tables": sorted(NEW_TABLES),
+            "added_packet_columns": list(ARCHITECTURE_TABLES), "invented_authority": False}
 
 
 def historical_requirement(current: dict, project: str) -> dict:
@@ -174,7 +316,10 @@ def historical_requirement(current: dict, project: str) -> dict:
 
 async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> dict:
     # Import MCP only in the installed interpreter, never a source checkout.
+    # The worker uses -I, which omits the script directory from sys.path.
+    # Reach sibling qualification helpers explicitly at this boundary.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from public_inventory import require_tool_inventory
     from smoke_mcp import StdioServerParameters, public_session
 
     command = Path(sys.prefix) / ("Scripts/flower-mcp.exe" if os.name == "nt" else "bin/flower-mcp")
@@ -196,7 +341,7 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
 
     async with public_session(parameters, strict=True) as session:
         catalog = await session.list_tools()
-        require(len(catalog.tools) == 36, "Public tool inventory changed unexpectedly")
+        require_tool_inventory(catalog.tools, baseline=phase == "before")
         catalog_values = [tool.model_dump(mode="json") for tool in catalog.tools]
         await call(session, "fow_capabilities", {"view": "summary"})
         if phase == "before":
@@ -290,6 +435,7 @@ def qualify(args) -> dict:
         config = profile / "flower.yaml"
         database = profile / "ledger.sqlite3"
         original_database = database_state(database)
+        original_authority = database_authority(database)
         original_profile = state_snapshot(profiles)
         original_config = config.read_bytes()
         original_client = client.read_bytes()
@@ -327,8 +473,11 @@ def qualify(args) -> dict:
         result["preservation"] = {"sqlite_logical_sha256": original_database, "database": str(database),
                                   "backup": str(backup_databases[0]), "client_sha256": digest(client), "profile_sha256": digest(config)}
         result["after"] = run_worker(python, root, "after")
+        result["migration"] = require_additive_migration(database, original_authority)
+        migrated_database = database_state(database)
         result["restart"] = run_worker(python, root, "restart")
-        require(database_state(database) == original_database, "Read-only recovery changed existing ledger authority")
+        require(database_state(database) == migrated_database, "Read-only restart changed migrated ledger authority")
+        require_additive_migration(database, original_authority)
         result["status"] = "passed"
     except BaseException as exc:
         result.update(status="failed", error=f"{type(exc).__name__}: {exc}")

@@ -20,6 +20,9 @@ _WORKSPACE_REVIEW_REQUIRED_INPUTS = tuple(
 
 
 _ROUTES: Mapping[str, tuple[str, str, str, tuple[str, ...]]] = {
+    "executor_select": ("fow_external_work", "select_executor", "semantic", ("payload.executor", "actor", "request_id")),
+    "provider_negotiate": ("fow_external_work", "negotiate_provider", "semantic", ("actor", "request_id")),
+    "provider_validation": ("fow_external_work", "provider_validation", "semantic", ()),
     "external_select_mode": ("fow_external_work", "set_mode", "semantic", ("actor", "request_id")),
     "external_validation": ("fow_external_work", "validation", "semantic", ()),
     "external_todo": ("fow_external_work", "todo", "semantic", ()),
@@ -358,7 +361,7 @@ def _fixed_arguments(
     if tool == "fow_external_work":
         arguments = {"project_id": project_id, "change_id": change_id,
                      "packet_id": packet_id, "operation": operation}
-        if operation == "reconcile_outcome":
+        if operation in {"reconcile_outcome", "select_executor", "negotiate_provider"}:
             arguments["payload"] = {"expected_spec_revision": spec_revision,
                                     "expected_plan_revision": plan_revision}
         elif operation == "set_mode":

@@ -14,6 +14,8 @@ from typing import Iterator
 
 from flow_of_work_mcp.adapters.sqlite.artifacts import ArtifactStoreMixin
 from flow_of_work_mcp.adapters.sqlite.associations import AssociationStoreMixin
+from flow_of_work_mcp.adapters.sqlite.architecture import ArchitectureStoreMixin
+from flow_of_work_mcp.adapters.sqlite.packet_executor import PacketExecutorStoreMixin
 from flow_of_work_mcp.adapters.sqlite.external_work import ExternalWorkStoreMixin
 from flow_of_work_mcp.adapters.sqlite.semantic_assignments import SemanticAssignmentStoreMixin
 from flow_of_work_mcp.adapters.sqlite.assurance_store import AssuranceStoreMixin
@@ -70,6 +72,8 @@ class SQLiteRequirementLedger(
     ProviderBindingStoreMixin,
     ArtifactStoreMixin,
     AssociationStoreMixin,
+    ArchitectureStoreMixin,
+    PacketExecutorStoreMixin,
     ExternalWorkStoreMixin,
     SemanticAssignmentStoreMixin,
     JobStoreMixin,
@@ -87,6 +91,9 @@ class SQLiteRequirementLedger(
         self.migrate_external_work()
         self.migrate_semantic_assignments()
         self.migrate_grounding_provenance()
+        self.migrate_architecture()
+        self.migrate_packet_executor()
+        self.migrate_packet_provider_admissions()
         self.recover_interrupted_runs()
         self.recover_interrupted_packet_provider_commands()
         self.recover_interrupted_test_provider_commands()

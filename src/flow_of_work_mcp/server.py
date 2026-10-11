@@ -115,6 +115,8 @@ SERVER_INSTRUCTIONS = (
     "Use fow_get_job only after "
     "an asynchronous operation has returned a durable job_id. "
     "Use fow_external_work for explicit external-agent mode, standalone plan validation, complete offline Markdown export and outcome reconciliation. "
+    "Use fow_architecture for adopted project components, interfaces and decisions pinned by ordinary packet references. "
+    "Use fow_external_work select_executor and negotiate_provider for new explicitly selected provider work; compatible v3 acknowledgements are required for enriched delivery. "
     "Use fow_bindings for portable associations and fow_semantic for explicit bounded assignments; internal models and implementation providers are optional. "
     "Core operations never invoke inference automatically. Agent completion, verification and human acceptance are separate."
 )
@@ -631,7 +633,9 @@ def handle_capabilities(
                 "semantic_assignment_tool": "fow_semantic",
                 "host_semantic_roles": ["srs_semantic_validation", "intention_grounding"],
                 "unsupported_host_roles": ["observed_behavior_drafting"],
-                "cross_server_pvp": "deferred; standalone handoff only",
+                "cross_server_pvp": "full contract deferred; provider handoff requires explicit negotiation; real paired qualification pending",
+                "architecture_tool": "fow_architecture",
+                "provider_validation_contract": "flow.packet_validation_projection.v1",
                 "guided_bootstrap_policy": "approved progressive scenarios; engineering-bootstrap recipe",
             },
             "recipes": [{k:v for k,v in recipe.items() if k != "intent"} for recipe in list_recipes()],
@@ -672,6 +676,7 @@ def handle_packet_author(
     out_of_scope: list[str] | None = None,
     invariants: list[str] | None = None,
     unresolved_questions: list[str] | None = None,
+    architecture_refs: list[dict[str, object]] | None = None,
     target_policy: str = "code_targets_required",
     active_provider: str = "",
     source_revision: str = "",
@@ -725,6 +730,7 @@ def handle_packet_author(
                     unresolved_questions=_require_string_list(
                         unresolved_questions or [], "unresolved_questions"
                     ),
+                    architecture_refs=architecture_refs,
                     target_policy=target_policy,
                 ),
                 purpose=PacketPurpose(purpose),
@@ -894,6 +900,7 @@ def handle_packet_author(
                 out_of_scope is not None,
                 invariants is not None,
                 unresolved_questions is not None,
+                architecture_refs is not None,
             )
         )
         if not semantic_fields_present:
@@ -976,6 +983,7 @@ def handle_packet_author(
                     if unresolved_questions is not None
                     else None
                 ),
+                architecture_refs=architecture_refs,
                 completion_criteria=(
                     tuple(
                         _require_string_list(completion_criteria, "completion_criteria")
@@ -1785,6 +1793,7 @@ def handle_change(
     out_of_scope: list[str] | None = None,
     invariants: list[str] | None = None,
     unresolved_questions: list[str] | None = None,
+    architecture_refs: list[dict[str, object]] | None = None,
     source_refs: list[str] | None = None,
     baseline_refs: list[str] | None = None,
     completion_criteria: list[str] | None = None,
@@ -2304,6 +2313,7 @@ def handle_change(
                     if unresolved_questions is not None
                     else None
                 ),
+                architecture_refs=architecture_refs,
                 completion_criteria=(
                     _require_string_list(completion_criteria, "completion_criteria")
                     if completion_criteria is not None
@@ -4357,6 +4367,16 @@ def _standalone_receipt(tool: str, value: Mapping[str, object]) -> dict[str, obj
     return envelope(tool=tool, status=status, reason=reason, result=dict(value))
 
 
+def handle_architecture(
+    runtime: McpRuntime, *, project_id: str, operation: str,
+    payload: Mapping[str, object] | None = None, actor: str = "", request_id: str = "",
+) -> dict[str, object]:
+    return _guard("fow_architecture", lambda: _standalone_receipt(
+        "fow_architecture", runtime.architecture.call(project_id, operation,
+            payload=payload, actor=actor, request_id=request_id),
+    ))
+
+
 def handle_external_work(
     runtime: McpRuntime, *, project_id: str, change_id: str, packet_id: str,
     operation: str, payload: Mapping[str, object] | None = None,
@@ -4577,6 +4597,7 @@ def create_app(
         out_of_scope: list[str] | None = None,
         invariants: list[str] | None = None,
         unresolved_questions: list[str] | None = None,
+        architecture_refs: list[dict[str, object]] | None = None,
         source_refs: list[str] | None = None,
         baseline_refs: list[str] | None = None,
         completion_criteria: list[str] | None = None,
@@ -4657,6 +4678,7 @@ def create_app(
             out_of_scope=out_of_scope,
             invariants=invariants,
             unresolved_questions=unresolved_questions,
+            architecture_refs=architecture_refs,
             source_refs=source_refs,
             baseline_refs=baseline_refs,
             completion_criteria=completion_criteria,
@@ -5225,6 +5247,7 @@ def create_app(
         out_of_scope: list[str] | None = None,
         invariants: list[str] | None = None,
         unresolved_questions: list[str] | None = None,
+        architecture_refs: list[dict[str, object]] | None = None,
         target_policy: str = "code_targets_required",
         active_provider: str = "",
         source_revision: str = "",
@@ -5263,6 +5286,7 @@ def create_app(
             out_of_scope=out_of_scope,
             invariants=invariants,
             unresolved_questions=unresolved_questions,
+            architecture_refs=architecture_refs,
             target_policy=target_policy,
             active_provider=active_provider,
             source_revision=source_revision,
@@ -5436,9 +5460,16 @@ def create_app(
             limit=limit,
         )
 
+    def fow_architecture(
+        project_id: str, operation: Literal["inspect", "propose", "adopt"],
+        payload: dict[str, Any] | None = None, actor: str = "", request_id: str = "",
+    ) -> dict[str, object]:
+        return handle_architecture(runtime, project_id=project_id, operation=operation,
+                                   payload=payload, actor=actor, request_id=request_id)
+
     def fow_external_work(
         project_id: str, change_id: str, packet_id: str,
-        operation: Literal["set_mode", "criteria", "reconcile_criteria", "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation", "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"],
+        operation: Literal["provider_validation", "select_executor", "negotiate_provider", "set_mode", "criteria", "reconcile_criteria", "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation", "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"],
         payload: dict[str, Any] | None = None, actor: str = "", request_id: str = "",
     ) -> dict[str, object]:
         return handle_external_work(runtime, project_id=project_id, change_id=change_id, packet_id=packet_id, operation=operation, payload=payload, actor=actor, request_id=request_id)

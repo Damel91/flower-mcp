@@ -310,6 +310,7 @@ class ChangeStoreMixin:
                         "packet creation request_id conflicts with durable history"
                     )
                 return replay_packet_id
+        self._validate_architecture_refs(connection, project_id, draft.architecture_refs or ())
         timestamp = occurred_at or _utc_now()
         sequence = connection.execute(
             "SELECT next_packet_ordinal FROM change_sequences WHERE project_id = ?",
@@ -371,6 +372,10 @@ class ChangeStoreMixin:
             ),
         )
         connection.execute(
+            "UPDATE implementation_packets SET architecture_refs_json=? WHERE project_id=? AND change_id=? AND packet_id=?",
+            (self._json(list(draft.architecture_refs or ())), project_id, change_id, packet_id),
+        )
+        connection.execute(
             "UPDATE change_sequences SET next_packet_ordinal = ? WHERE project_id = ?",
             (packet_global_ordinal + 1, project_id),
         )
@@ -392,6 +397,7 @@ class ChangeStoreMixin:
             out_of_scope=draft.out_of_scope,
             invariants=draft.invariants,
             unresolved_questions=draft.unresolved_questions,
+            architecture_refs=draft.architecture_refs or (),
             navigation_audit_ids=draft.navigation_audit_ids,
             target_binding_ids=draft.target_binding_ids,
             candidate_set_ids=draft.candidate_set_ids,
@@ -447,6 +453,9 @@ class ChangeStoreMixin:
             )
             if replay is not None:
                 return self._change_value(connection, project_id, change_id)
+            architecture_refs = (draft.architecture_refs if draft.architecture_refs is not None
+                                 else tuple(json.loads(packet["architecture_refs_json"])))
+            self._validate_architecture_refs(connection, project_id, architecture_refs)
             current_semantic = self._packet_semantic_projection(packet)
             requested_semantic = {
                 "title": draft.title,
@@ -458,6 +467,7 @@ class ChangeStoreMixin:
                 "out_of_scope": list(draft.out_of_scope),
                 "invariants": list(draft.invariants),
                 "unresolved_questions": list(draft.unresolved_questions),
+                "architecture_refs": list(architecture_refs),
                 "navigation_audit_ids": list(draft.navigation_audit_ids),
                 "target_binding_ids": list(draft.target_binding_ids),
                 "candidate_set_ids": list(draft.candidate_set_ids),
@@ -479,7 +489,7 @@ class ChangeStoreMixin:
                 UPDATE implementation_packets
                 SET title = ?, objective = ?, rationale = ?, requirement_ids_json = ?,
                     goal_ids_json = ?, in_scope_json = ?, out_of_scope_json = ?,
-                    invariants_json = ?, unresolved_questions_json = ?,
+                    invariants_json = ?, unresolved_questions_json = ?, architecture_refs_json = ?,
                     navigation_audit_ids_json = ?, target_binding_ids_json = ?,
                     candidate_set_ids_json = ?, context_snapshot_ids_json = ?,
                     target_policy = ?, readiness_state = ?, readiness_blockers_json = ?,
@@ -497,6 +507,7 @@ class ChangeStoreMixin:
                     self._json(list(draft.out_of_scope)),
                     self._json(list(draft.invariants)),
                     self._json(list(draft.unresolved_questions)),
+                    self._json(list(architecture_refs)),
                     self._json(list(draft.navigation_audit_ids)),
                     self._json(list(draft.target_binding_ids)),
                     self._json(list(draft.candidate_set_ids)),
@@ -758,6 +769,7 @@ class ChangeStoreMixin:
             "unresolved_questions": ChangeStoreMixin._json_list(
                 packet["unresolved_questions_json"]
             ),
+            "architecture_refs": json.loads(packet["architecture_refs_json"]),
             "navigation_audit_ids": ChangeStoreMixin._json_list(
                 packet["navigation_audit_ids_json"]
             ),
@@ -788,6 +800,7 @@ class ChangeStoreMixin:
             "out_of_scope": list(draft.out_of_scope),
             "invariants": list(draft.invariants),
             "unresolved_questions": list(draft.unresolved_questions),
+            "architecture_refs": list(draft.architecture_refs or ()),
             "navigation_audit_ids": list(draft.navigation_audit_ids),
             "target_binding_ids": list(draft.target_binding_ids),
             "candidate_set_ids": list(draft.candidate_set_ids),
@@ -1342,7 +1355,7 @@ class ChangeStoreMixin:
             """,
             (project_id, change_id, packet_id),
         ).fetchall()
-        return {
+        value = {
             "project_id": str(row["project_id"]),
             "change_id": str(row["change_id"]),
             "packet_id": str(row["packet_id"]),
@@ -1398,6 +1411,10 @@ class ChangeStoreMixin:
                 ),
             },
         }
+        architecture_refs = json.loads(row["architecture_refs_json"])
+        if architecture_refs:
+            value["architecture_refs"] = architecture_refs
+        return value
 
     @staticmethod
     def _append_change_revision(
@@ -1472,6 +1489,7 @@ class ChangeStoreMixin:
         successor_packet_id: str,
         actor: str,
         occurred_at: str,
+        architecture_refs: tuple[Mapping[str, object], ...] = (),
     ) -> None:
         connection.execute(
             """
@@ -1518,6 +1536,10 @@ class ChangeStoreMixin:
                 occurred_at,
             ),
         )
+        connection.execute(
+            "UPDATE implementation_packet_revisions SET architecture_refs_json=? WHERE project_id=? AND change_id=? AND packet_id=? AND revision=?",
+            (json.dumps(list(architecture_refs), sort_keys=True, separators=(",", ":")), project_id, change_id, packet_id, revision),
+        )
 
     def _append_packet_revision_from_current(
         self,
@@ -1547,6 +1569,7 @@ class ChangeStoreMixin:
             out_of_scope=tuple(self._json_string_list(row["out_of_scope_json"])),
             invariants=tuple(self._json_string_list(row["invariants_json"])),
             unresolved_questions=tuple(self._json_string_list(row["unresolved_questions_json"])),
+            architecture_refs=tuple(json.loads(row["architecture_refs_json"])),
             navigation_audit_ids=tuple(self._json_string_list(row["navigation_audit_ids_json"])),
             target_binding_ids=tuple(self._json_string_list(row["target_binding_ids_json"])),
             candidate_set_ids=tuple(self._json_string_list(row["candidate_set_ids_json"])),

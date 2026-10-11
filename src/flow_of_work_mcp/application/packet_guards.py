@@ -50,6 +50,19 @@ class PacketGuardDecision:
     required_provider_capability: str = ""
     workflow_version: str = PACKET_WORKFLOW_VERSION
 
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, object]) -> "PacketGuardDecision":
+        """Rehydrate an internal, pure canonical gate projection."""
+        return cls(
+            state=str(payload['state']), authoring_ready=bool(payload['authoring_ready']),
+            provider_ready=bool(payload['provider_ready']), execution_ready=bool(payload['execution_ready']),
+            blockers=tuple(PacketGuardBlocker(**item) for item in payload['blockers']),
+            semantic_decisions=tuple(payload['semantic_decisions']), residual_risks=tuple(payload['residual_risks']),
+            next_operation=str(payload['next_operation']),
+            required_provider_capability=str(payload.get('required_provider_capability') or ''),
+            workflow_version=str(payload.get('workflow_version') or PACKET_WORKFLOW_VERSION),
+        )
+
     def as_payload(self) -> dict[str, object]:
         return {
             "state": self.state,
@@ -73,7 +86,8 @@ class PacketGuardEvaluator:
     """Pure precedence evaluator over one coherent packet snapshot."""
 
     @staticmethod
-    def evaluate(snapshot: Mapping[str, object]) -> PacketGuardDecision:
+    def evaluate_upstream(snapshot: Mapping[str, object]) -> PacketGuardDecision | None:
+        """Preserve canonical prerequisites before any provider delivery gate."""
         packet = _mapping(snapshot.get("packet"))
         plan = _mapping(snapshot.get("work_plan"))
         construction = _mapping(snapshot.get("construction"))
@@ -247,6 +261,18 @@ class PacketGuardEvaluator:
                 residual_risks=risks,
                 next_operation="decide_residual_risk",
             )
+        return None
+
+    @staticmethod
+    def evaluate(snapshot: Mapping[str, object]) -> PacketGuardDecision:
+        upstream = PacketGuardEvaluator.evaluate_upstream(snapshot)
+        if upstream is not None:
+            return upstream
+        packet_socket = _mapping(snapshot.get('packet_socket'))
+        workspace_review = _mapping(snapshot.get('workspace_review'))
+        verification_campaign = _mapping(snapshot.get('verification_campaign'))
+        pressure = _mapping(snapshot.get('pressure'))
+        risks = tuple(str(item) for item in pressure.get('residual_risks', []) if str(item))
 
         if not bool(packet_socket.get("enabled")):
             return PacketGuardDecision(
@@ -392,13 +418,30 @@ class PacketGuardService:
             return _decision("external_mode_required", (
                 _blocker("context_only_requires_external_mode", "packet_validation", "external_select_mode"),
             ), (), (), "external_select_mode")
-        if self._external_work is not None and plan and any(
+        if self._external_work is not None and (packet.get('architecture_refs') or (plan and any(
             unit.get(field) for unit in plan.get("units", [])
             for field in ("implements", "provides", "requires", "verifies")
-        ) and self._external_work.mode_for_packet(project_id, packet_id) != "external_agent":
-            return _decision("external_mode_required", (
-                _blocker("standalone_validation_requires_external_mode", "packet_validation", "external_select_mode"),
-            ), (), (), "external_select_mode")
+        ))) and self._external_work.mode_for_packet(project_id, packet_id) != "external_agent":
+            admission = self._external_work.provider_admission(project_id, change_id, packet_id)
+            if not admission['allowed']:
+                reason = str(admission.get('reason') or 'provider_validation_open')
+                # Current coding authority can close while an admitted write is
+                # uncertain or running. The overlay retains only exact durable
+                # recovery / frozen observation routes; it admits no fresh work.
+                recovery = self._packet_provider_overlay.projection(
+                    project_id, change_id, packet_id, packet=packet, work_plan=plan)
+                recovery_operation = str(recovery.get('next_operation') or '')
+                if recovery_operation in {'deliver_provider_command', 'observe_provider_packet'}:
+                    return PacketGuardDecision(
+                        'provider_recovery_pending', False, True, False,
+                        (_blocker(reason, 'packet_validation', 'provider_validation'),),
+                        (), (), recovery_operation, 'packet_provider')
+                if admission.get('upstream_gate'):
+                    return PacketGuardDecision.from_payload(admission['upstream_gate'])
+                route = str(admission.get('next_operation') or 'provider_validation')
+                return _decision('provider_validation_open', (
+                    _blocker(reason, 'packet_validation', route),
+                ), (), (), route)
         if self._external_work is not None and self._external_work.mode_for_packet(
             project_id, packet_id
         ) == "external_agent":

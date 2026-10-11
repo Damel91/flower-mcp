@@ -109,6 +109,7 @@ class ChangeControlService:
         out_of_scope: tuple[str, ...] | None = None,
         invariants: tuple[str, ...] | None = None,
         unresolved_questions: tuple[str, ...] | None = None,
+        architecture_refs: tuple[Mapping[str, object], ...] | None = None,
         completion_criteria: tuple[str, ...] | None = None,
         target_policy: str = "",
         readiness_state: str = "",
@@ -151,6 +152,8 @@ class ChangeControlService:
                 if unresolved_questions is not None
                 else _packet_tuple(packet, "unresolved_questions")
             ),
+            architecture_refs=(architecture_refs if architecture_refs is not None
+                               else tuple(packet.get("architecture_refs", []))),
             navigation_audit_ids=(
                 navigation_audit_ids
                 if navigation_audit_ids is not None

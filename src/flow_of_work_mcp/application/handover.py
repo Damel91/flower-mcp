@@ -6,6 +6,7 @@ from typing import Mapping
 from flow_of_work_mcp.core.domain import HandoverDraft
 from flow_of_work_mcp.core.domain.identifiers import required_text
 from flow_of_work_mcp.core.ports import ExecutionRunRepository
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 
 
 class HandoverService:
@@ -88,6 +89,19 @@ class ExternalRecoveryProjection:
         # explicitly selected external packet receives the external contract.
         if not packet_id or not change_id:
             return value
+        packet = next((p for p in self._ledger.change_state(project_id, change_id)['packets']
+                       if p['packet_id'] == packet_id), None)
+        if packet is None:
+            raise ChangeControlBlockedError('packet_not_found')
+        architecture = self._ledger.resolve_architecture_refs(project_id, packet.get('architecture_refs', []))
+        if architecture is not None:
+            value['architecture'] = architecture
+        executor = self._external_work.executor_state(project_id, change_id, packet_id)
+        if executor and executor.get('selection'):
+            value['executor'] = executor
+            if executor['selection']['executor'] == 'provider':
+                value['provider_validation'] = self._external_work.provider_validation(project_id, change_id, packet_id)
+                value['provider_validation']['offline_boundary'] = 'Provider ownership remains selected while Flower is offline. Retain admitted command/evidence identities; no external-agent fallback or run transfer is authorized.'
         state = self._ledger.external_work_state(project_id, change_id, packet_id)
         if state["consumption_mode"] != "external_agent":
             return value
@@ -170,6 +184,8 @@ class ExternalRecoveryProjection:
             "historical_boundary": "Frozen at capture. Resume with handover_id to compare current authority; get_handover never refreshes history.",
             "offline_boundary": "Execute only the issued complete Markdown artifact offline; reconnect and report with its original revisions and fingerprint. Stale reports remain history.",
         }
+        if architecture is not None:
+            value['recovery']['architecture'] = architecture
         return value
 
     def resume(self, project_id: str, *, change_id: str = "", packet_id: str = "",
@@ -187,6 +203,23 @@ class ExternalRecoveryProjection:
             context = self.compose(self._ledger.resume_context(
                 project_id, change_id=change_id, packet_id=packet_id, run_id=run_id))
             if historical is not None:
+                if 'architecture' in historical['payload'] or 'architecture' in context:
+                    before_arch = historical['payload'].get('architecture')
+                    after_arch = context.get('architecture')
+                    context['architecture_comparison'] = {
+                        'state': 'current' if before_arch == after_arch else 'stale',
+                        'frozen_context': before_arch, 'current_context': after_arch,
+                        'historical_payload_unchanged': True,
+                    }
+                if 'provider_validation' in historical['payload'] or 'provider_validation' in context:
+                    before_provider = historical['payload'].get('provider_validation', {}).get('authority_fingerprint')
+                    after_provider = context.get('provider_validation', {}).get('authority_fingerprint')
+                    context['provider_authority_comparison'] = {
+                        'state': 'current' if before_provider == after_provider else 'stale',
+                        'frozen_authority_fingerprint': before_provider,
+                        'current_authority_fingerprint': after_provider,
+                        'historical_payload_unchanged': True,
+                    }
                 frozen = historical["payload"].get("recovery") or {}
                 current = context.get("recovery") or {}
                 before, after = frozen.get("authority"), current.get("authority")

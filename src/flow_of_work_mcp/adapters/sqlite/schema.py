@@ -9,7 +9,7 @@ import sqlite3
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
 
 
-CURRENT_SCHEMA_VERSION = 52
+CURRENT_SCHEMA_VERSION = 55
 
 
 class SchemaMixin:
@@ -3251,3 +3251,51 @@ class SchemaMixin:
                         connection.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + declaration)
             connection.execute(
                 "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(52, ?)", (_utc_now(),))
+
+    def migrate_architecture(self) -> None:
+        """Add immutable project design authority without inventing old records."""
+        with self._transaction() as connection:
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS architecture_revisions (
+                    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE RESTRICT,
+                    revision INTEGER NOT NULL CHECK(revision > 0),
+                    base_revision INTEGER NOT NULL CHECK(base_revision >= 0),
+                    definition_json TEXT NOT NULL,
+                    definition_fingerprint TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(project_id, revision)
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS architecture_adoptions (
+                    adoption_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    previous_revision INTEGER NOT NULL CHECK(previous_revision >= 0),
+                    rationale TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    adopted_at TEXT NOT NULL,
+                    UNIQUE(project_id, revision),
+                    FOREIGN KEY(project_id, revision)
+                        REFERENCES architecture_revisions(project_id, revision) ON DELETE RESTRICT
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS architecture_requests (
+                    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE RESTRICT,
+                    request_id TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    request_fingerprint TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(project_id, request_id)
+                )
+            """)
+            for table in ("implementation_packets", "implementation_packet_revisions"):
+                columns = {row["name"] for row in connection.execute("PRAGMA table_info(" + table + ")")}
+                if "architecture_refs_json" not in columns:
+                    connection.execute("ALTER TABLE " + table + " ADD COLUMN architecture_refs_json TEXT NOT NULL DEFAULT '[]'")
+            connection.execute(
+                "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(53, ?)", (_utc_now(),))

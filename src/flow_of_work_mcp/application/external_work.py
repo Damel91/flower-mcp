@@ -12,7 +12,7 @@ from flow_of_work_mcp.core.domain.external_work import (canonical_json, fields, 
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
 
-READ_OPERATIONS = frozenset({'criteria', 'validation', 'todo'})
+READ_OPERATIONS = frozenset({'criteria', 'validation', 'provider_validation', 'todo'})
 MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
 
 
@@ -38,11 +38,12 @@ def _verification_error(snapshot, unit, *, field, received, expected, message, c
 
 
 class ExternalWorkService:
-    def __init__(self, ledger, *, execution_guard: Callable[[str, str], None] | None = None, engineer_projection=None) -> None:
+    def __init__(self, ledger, *, execution_guard: Callable[[str, str], None] | None = None, engineer_projection=None, packet_executor=None) -> None:
         self._ledger = ledger
         self._changes = ChangeControlService(ledger)
         self._execution_guard = execution_guard
         self._engineer_projection = engineer_projection
+        self._packet_executor = packet_executor
 
     def _assert_execution_allowed(self, snapshot) -> None:
         if snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES:
@@ -57,11 +58,47 @@ class ExternalWorkService:
                     return str(self._ledger.external_work_state(project_id, change['change_id'], packet_id)['consumption_mode'])
         raise ChangeControlBlockedError('packet_not_found')
 
+    def executor_state(self, project_id: str, change_id: str, packet_id: str):
+        return self._packet_executor.inspect(project_id, change_id, packet_id) if self._packet_executor else None
+
+    def provider_admission(self, project_id: str, change_id: str, packet_id: str):
+        if self._packet_executor is None:
+            return {'allowed': False, 'reason': 'packet_executor_unavailable', 'next_operation': 'executor_select'}
+        return self._packet_executor.admission(project_id, change_id, packet_id)
+
     def call(self, project_id: str, change_id: str, packet_id: str, operation: str,
              *, actor: str = '', request_id: str = '', payload: Mapping[str, object] | None = None) -> Mapping[str, object]:
         operation = text(operation, 'operation')
         payload = dict(payload or {})
+        if operation in {'select_executor', 'negotiate_provider'}:
+            if self._packet_executor is None:
+                raise ChangeControlBlockedError('packet_executor_unavailable')
+            return self._packet_executor.call(project_id, change_id, packet_id, operation,
+                payload=payload, actor=actor, request_id=request_id)
         if operation in READ_OPERATIONS:
+            if operation == 'provider_validation':
+                fields(payload, {'detail'}, operation)
+                detail = payload.get('detail', 'standard')
+                if detail not in {'standard', 'full'}:
+                    raise ValueError('detail must be standard or full')
+                with self._ledger.consistent_read():
+                    projection = self.provider_validation(project_id, change_id, packet_id)
+                    admission = (self._packet_executor.admission(project_id, change_id, packet_id)
+                                 if self._packet_executor else {'allowed': False, 'reason': 'packet_executor_unavailable', 'next_operation': 'executor_select'})
+                    upstream_action = (self._packet_executor.upstream_action(admission,
+                        project_id=project_id, change_id=change_id, packet_id=packet_id,
+                        spec_revision=projection['spec_revision'], plan_revision=projection['plan_revision'])
+                        if self._packet_executor else None)
+                    return {'status': 'success' if admission['allowed'] else 'blocked',
+                        'reason': admission.get('reason', ''),
+                        'validation': projection if detail == 'full' else {k: projection[k] for k in (
+                            'contract_version', 'consumer_scope', 'status', 'authority_fingerprint', 'spec_revision', 'plan_revision', 'next_gap')},
+                        'executor': self._packet_executor.inspect(project_id, change_id, packet_id) if self._packet_executor else None,
+                        'execution_admission': admission,
+                        'next_gate': upstream_action or {'tool': 'fow_external_work', 'operation': {
+                            'executor_select': 'select_executor', 'provider_negotiate': 'negotiate_provider',
+                            'provider_validation': 'provider_validation',
+                        }.get(admission.get('next_operation'), 'provider_validation')}}
             if operation == 'criteria':
                 fields(payload, set(), operation)
                 with self._ledger.consistent_read():
@@ -99,6 +136,12 @@ class ExternalWorkService:
                 # including unknown writes; selecting a lens never erases it.
                 if self._ledger.packet_provider_outbox_entries(project_id, change_id, packet_id) or self._ledger.packet_provider_receipts(project_id, change_id, packet_id):
                     raise ChangeControlBlockedError('external_mode_provider_effect_present')
+                if self._packet_executor is not None and snapshot['external']['consumption_mode'] != 'external_agent':
+                    self._packet_executor.call(project_id, change_id, packet_id, 'select_executor',
+                        payload={'executor': 'external_agent',
+                                 'expected_spec_revision': payload['expected_spec_revision'],
+                                 'expected_plan_revision': payload['expected_plan_revision']},
+                        actor=actor, request_id=request_id)
                 self._ledger.set_external_work_mode(project_id, change_id, packet_id, 'external_agent')
                 result = {'status': 'success', 'consumption_mode': 'external_agent'}
             elif operation == 'upgrade_validation':
@@ -202,6 +245,10 @@ class ExternalWorkService:
                            'goals': goals, 'goal_edges': goal_edges, 'accepted_answers': answers, 'accepted_risk_context': pressure_context, 'referenced_authority': resolved,
                            'predecessor_authority': [{'packet_id': predecessor['packet_id'], 'authority_fingerprint': fingerprint(predecessor['authority_basis'])}
                                                      for predecessor in predecessors]}
+        architecture = self._ledger.resolve_architecture_refs(project_id, packet.get('architecture_refs', []))
+        if architecture is not None:
+            basis_packet['architecture_refs'] = packet['architecture_refs']
+            authority_basis['architecture'] = architecture
         if milestone_id:
             authority_basis['milestone'] = milestone
         snapshot = {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id, 'packet': packet, 'change': basis_change,
@@ -210,6 +257,7 @@ class ExternalWorkService:
                 'construction': construction, 'answers': answers, 'resolved_authorities': resolved,
                 'goal_edges': goal_edges, 'pressure_context': pressure_context, 'pressure_stale': pressure_stale,
                 'campaigns': campaigns, 'authority_basis': authority_basis,
+                'architecture': architecture,
                 'missing_milestone_ids': [milestone_id] if milestone_id and milestone is None else [],
                 'missing_requirement_ids': sorted(requirement_ids - {r['requirement_id'] for r in requirements}),
                 'missing_goal_ids': sorted(goal_ids - {g['goal_node_id'] for g in goals})}
@@ -260,8 +308,13 @@ class ExternalWorkService:
                     'packet_dependencies': dependencies}
 
     @staticmethod
-    def _projection(snapshot) -> dict[str, object]:
-        projection = derive_packet_validation(snapshot)
+    def _projection(snapshot, *, consumer_scope='external_agent') -> dict[str, object]:
+        projection = derive_packet_validation(snapshot, consumer_scope=consumer_scope)
+        architecture = snapshot.get('architecture')
+        if architecture:
+            projection['gaps'].extend(architecture.get('gaps', []))
+            if architecture.get('applicability', {}).get('status') == 'stale' and projection['status'] != 'historical_unprojected':
+                projection['status'] = 'stale'
         for kind in ('requirement', 'goal', 'milestone'):
             for identity in snapshot.get('missing_' + kind + '_ids', []):
                 projection['gaps'].append({'code': kind + '_authority_missing', 'reference': identity})
@@ -275,7 +328,7 @@ class ExternalWorkService:
         pressure = snapshot.get('pressure_context')
         if pressure and pressure['residual_risks'] and not pressure['accepted_risk_refs']:
             projection['gaps'].append({'code': 'residual_risk_authority_missing', 'risks': pressure['residual_risks']})
-        for predecessor in snapshot.get('predecessor_packets', []):
+        for predecessor in (snapshot.get('predecessor_packets', []) if consumer_scope == 'external_agent' else []):
             predecessor_projection = ExternalWorkService._projection(predecessor)
             if predecessor_projection['status'] != 'closed' or predecessor['external']['consumption_mode'] != 'external_agent':
                 projection['gaps'].append({'code': 'packet_dependency_plan_not_executable', 'packet_id': predecessor['packet_id'],
@@ -285,6 +338,41 @@ class ExternalWorkService:
             projection['status'] = 'open'
         projection['next_gap'] = projection['gaps'][0] if projection['gaps'] else None
         return projection
+
+    def provider_validation(self, project_id: str, change_id: str, packet_id: str) -> dict[str, object]:
+        """One pure semantic snapshot; provider target/materialization truth stays separate."""
+        with self._ledger.consistent_read():
+            snapshot = self._snapshot(project_id, change_id, packet_id)
+            projection = self._projection(snapshot, consumer_scope='provider')
+            projection['authority_context'] = {key: value for key, value in snapshot['authority_basis'].items()
+                                               if key not in {'plan', 'criteria'}}
+            admission = None
+            try:
+                self._assert_execution_allowed(snapshot)
+            except ChangeControlBlockedError as exc:
+                admission = {'reason': exc.reason, 'details': dict(exc.details)}
+            if admission is None:
+                blocked = []
+                for predecessor in snapshot.get('predecessor_packets', []):
+                    if predecessor['external']['consumption_mode'] == 'external_agent':
+                        closure = self._local_closure(predecessor, self._projection(predecessor), self._packet_dependencies(predecessor))
+                    elif self._packet_executor is not None:
+                        closure = self._packet_executor.implementation_closure(project_id, change_id, predecessor['packet_id'])
+                    else:
+                        closure = {'complete': predecessor['packet']['status'] == 'implemented', 'reason': 'canonical_packet_not_implemented'}
+                    if not closure['complete']:
+                        blocked.append({'packet_id': predecessor['packet_id'], 'reason': closure.get('reason', '')})
+                if blocked:
+                    admission = {'reason': 'packet_dependencies_unresolved', 'details': {'dependencies': blocked}}
+            projection['execution_admission'] = admission
+            from flow_of_work_mcp.application.packet_guards import PacketGuardEvaluator
+            upstream = PacketGuardEvaluator.evaluate_upstream({
+                'packet': snapshot['packet'], 'work_plan': snapshot['plan'] or {},
+                'construction': snapshot['construction'], 'pressure': snapshot['pressure_context'] or {},
+                'reconciliation': self._ledger.packet_reconciliation_for_packet(project_id, change_id, packet_id) or {},
+            })
+            projection['upstream_gate'] = upstream.as_payload() if upstream is not None else None
+            return projection
 
     @staticmethod
     def _local_closure(snapshot, projection, dependencies):

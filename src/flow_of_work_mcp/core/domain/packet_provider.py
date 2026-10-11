@@ -7,6 +7,10 @@ import json
 from typing import Mapping, Sequence
 
 from flow_of_work_mcp.core.domain.identifiers import required_text
+from flow_of_work_mcp.core.domain.provider_validation import (
+    COMMAND_VERSION as VALIDATION_COMMAND_VERSION,
+    RECEIPT_VERSION as VALIDATION_RECEIPT_VERSION, validate_ack, validate_context,
+)
 
 
 PACKET_PROVIDER_COMMAND_VERSION = "flow.packet_provider.semantic.v2"
@@ -146,9 +150,10 @@ class PacketProviderCommand:
     flow_unit_ref: str = ""
     delivery_fingerprint: str = ""
     contract_version: str = PACKET_PROVIDER_COMMAND_VERSION
+    validation_context: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.contract_version != PACKET_PROVIDER_COMMAND_VERSION:
+        if self.contract_version not in {PACKET_PROVIDER_COMMAND_VERSION, VALIDATION_COMMAND_VERSION}:
             raise ValueError("packet provider command contract is unsupported")
         object.__setattr__(
             self,
@@ -169,6 +174,19 @@ class PacketProviderCommand:
         operation = PacketProviderOperation(self.operation)
         object.__setattr__(self, "operation", operation)
         unit_ref = str(self.flow_unit_ref or "").strip()
+        if self.contract_version == VALIDATION_COMMAND_VERSION:
+            context = validate_context(self.validation_context)
+            if context['unit_key'] != unit_ref:
+                raise ValueError('packet provider validation context unit mismatch')
+            if operation not in {PacketProviderOperation.STOP, PacketProviderOperation.STATUS} and context['spec_revision'] != self.flow_spec_revision:
+                raise ValueError('packet provider validation context revision mismatch')
+            if unit_ref and operation in {PacketProviderOperation.ADD, PacketProviderOperation.EDIT} and not any(u['unit_key'] == unit_ref for u in context['units']):
+                raise ValueError('packet provider validation context selected unit missing')
+            if operation in {PacketProviderOperation.START, PacketProviderOperation.STOP, PacketProviderOperation.STATUS} and unit_ref:
+                raise ValueError('packet provider control validation unit must be empty')
+            object.__setattr__(self, 'validation_context', context)
+        elif self.validation_context:
+            raise ValueError('legacy packet provider command cannot carry validation context')
         fingerprint = str(self.delivery_fingerprint or "").strip()
         if len(unit_ref) > 256 or len(fingerprint) > 256:
             raise ValueError("packet provider correlation exceeds the supported bound")
@@ -197,9 +215,12 @@ class PacketProviderCommand:
         object.__setattr__(self, "flow_unit_ref", unit_ref)
         object.__setattr__(self, "delivery_fingerprint", fingerprint)
         object.__setattr__(self, "semantic_input", semantic)
+        if self.contract_version == VALIDATION_COMMAND_VERSION and len(
+                json.dumps(self.as_payload(), sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')) > _MAX_COMMAND_BYTES:
+            raise ValueError('packet provider complete command exceeds the supported bound')
 
     def as_payload(self) -> dict[str, object]:
-        return {
+        payload = {
             "contract_version": self.contract_version,
             "flow_session_ref": self.flow_session_ref,
             "flow_packet_ref": self.flow_packet_ref,
@@ -209,6 +230,9 @@ class PacketProviderCommand:
             "semantic_input": dict(self.semantic_input),
             "delivery_fingerprint": self.delivery_fingerprint,
         }
+        if self.contract_version == VALIDATION_COMMAND_VERSION:
+            payload['validation_context'] = dict(self.validation_context)
+        return payload
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, object]) -> "PacketProviderCommand":
@@ -227,6 +251,7 @@ class PacketProviderCommand:
             operation=str(payload.get("operation") or ""),
             semantic_input=semantic,
             delivery_fingerprint=str(payload.get("delivery_fingerprint") or ""),
+            validation_context=payload.get('validation_context', {}),
         )
 
 
@@ -293,10 +318,17 @@ class PacketProviderReceipt:
     readiness_gaps_truncated: bool = False
     choices_truncated: bool = False
     contract_version: str = PACKET_PROVIDER_RECEIPT_VERSION
+    validation_ack: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if self.contract_version != PACKET_PROVIDER_RECEIPT_VERSION:
+        if self.contract_version not in {PACKET_PROVIDER_RECEIPT_VERSION, VALIDATION_RECEIPT_VERSION}:
             raise ValueError("packet provider receipt contract is unsupported")
+        if self.contract_version == VALIDATION_RECEIPT_VERSION:
+            if self.provider_contract_version != 'codingcastle.packet.receipt.v3':
+                raise ValueError('provider validation consumer receipt contract mismatch')
+            object.__setattr__(self, 'validation_ack', validate_ack(self.validation_ack))
+        elif self.validation_ack:
+            raise ValueError('legacy packet provider receipt cannot carry validation acknowledgement')
         for field_name in (
             "provider_kind",
             "provider_contract_version",
@@ -420,6 +452,8 @@ class PacketProviderReceipt:
         }
         if include_choices:
             payload["choices"] = [dict(item) for item in self.choices]
+        if self.contract_version == VALIDATION_RECEIPT_VERSION:
+            payload['validation_ack'] = dict(self.validation_ack)
         return payload
 
     def persisted_payload(self) -> dict[str, object]:

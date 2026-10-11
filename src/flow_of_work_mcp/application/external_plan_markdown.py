@@ -204,6 +204,10 @@ def render_plan(
     for answer in snapshot.get('answers', []):
         _section(lines, answer.get('prompt') or answer['question_key'], 3)
         _record(lines, answer, level=4)
+    if snapshot.get('architecture'):
+        _section(lines, 'Selected project architecture authority')
+        lines.append('These adopted components, interfaces and decisions are the selected technical authority. Planned interfaces do not attest that their implementation exists. A stale selection requires ordinary packet review and revision before coding.')
+        _record(lines, snapshot['architecture'], level=3)
     if snapshot.get('pressure_context'):
         _section(lines, 'Recorded current risk disposition', 3)
         _record(lines, snapshot['pressure_context'], level=4)
@@ -268,6 +272,35 @@ def render_plan(
         'Artifacts: reference, description, optional sha256. Produced contracts: name and included artifact_ref. Verification: exact declared criterion, kind and statement; status pass/fail/not_run; evidence_ref and provenance. A complete report requires every local check to pass, every produced contract to reference an artifact, and no unresolved unit obligations. Deferred campaign/Oracle checks remain deferred.', '',
         'Use the same report_key/request_id to recover a lost response. Conflicting reports require explicit reconcile_outcome with rationale. Old authority reports remain historical; changed plans require current reconciliation and never imply code replay. Host evidence remains host-reported. No agent report grants human acceptance.',
     ])
+    _section(lines, 'Exact offline outcome report contract', 3)
+    lines.extend([
+        'Prepare one JSON object per unit as the payload of fow_external_work. Its outer arguments are project_id, change_id, packet_id, operation="report_outcome", actor, request_id and payload. Use the project/change/packet identities printed above; actor and request_id are nonempty strings chosen by the reporting host. Keep a stable request_id for exact retries.', '',
+        'Use only the following payload fields. Criterion references are positive integer stable numbers, never criterion statement text. Copy verification kind and statement exactly from that unit’s Verification obligations. Provenance is a nonempty description supplied by the host, not a provider attestation.', '',
+    ])
+    _table(lines, ['Payload field', 'Type and value'], [
+        ['report_key', 'Nonempty stable string identifying this unit outcome.'],
+        ['expected_spec_revision', f"Positive integer {projection['spec_revision']}; retain the issued value."],
+        ['expected_plan_revision', f"Positive integer {projection['plan_revision']}; retain the issued value."],
+        ['authority_fingerprint', f"String {projection['authority_fingerprint']}; retain the issued value."],
+        ['unit_key', 'Exact string key of the reported unit.'],
+        ['outcome', 'String: complete, blocked or failed.'],
+        ['summary', 'Nonempty string describing observed work and limits.'],
+        ['source_revision', 'Nonempty string identifying the actual inspected/output source. Use a real commit if available, or explicitly labelled artifact content identity; never invent a repository revision.'],
+        ['artifacts', 'Array of objects: reference (nonempty string), description (nonempty string), optional sha256 (64 lowercase hexadecimal characters).'],
+        ['produced_contracts', 'Array of objects: name (declared contract name string), artifact_ref (string equal to an included artifact reference).'],
+        ['verification', 'Array of objects with exactly criterion, kind, statement, status, evidence_ref and provenance; see below.'],
+        ['unresolved', 'Array of nonempty strings; [] is required for complete.'],
+    ])
+    lines.append('')
+    _table(lines, ['Verification field', 'Type and value'], [
+        ['criterion', 'Positive integer stable criterion number declared by this unit, for example 1; do not send the criterion text.'],
+        ['kind', 'Exact declared string: unit_check, deterministic_campaign, live_campaign, oracle or explicit_authority.'],
+        ['statement', 'Exact declared verification statement string, without paraphrasing.'],
+        ['status', 'String: pass, fail or not_run.'],
+        ['evidence_ref', 'String referencing actual evidence; nonempty for pass/fail, may be empty for not_run.'],
+        ['provenance', 'Nonempty host-declared string, for example host_reported_test_execution; Flower preserves this declaration.'],
+    ])
+    lines.extend(['', 'Include every successful unit-local check for complete. Deferred checks may be omitted or reported as not_run; do not claim them passed because coding finished. Supplemental checks belong in evidence artifacts unless they are ordinary accepted verification declarations. Store these payloads with the evidence while offline, then submit producer outcomes before their consumers after reconnection.'])
     return '\n'.join(lines).rstrip() + '\n'
 
 

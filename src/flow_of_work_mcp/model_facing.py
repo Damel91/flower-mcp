@@ -49,7 +49,8 @@ class ProjectionSpec:
 
 
 _SPECS: dict[str, ProjectionSpec] = {
-    "fow_external_work": ProjectionSpec("Flower External Work", "Standalone Plan And Outcome", frozenset({"content", "markdown"})),
+    "fow_architecture": ProjectionSpec("Flower Architecture", "Architecture Authority"),
+    "fow_external_work": ProjectionSpec("Flower External Work", "Plan, Executor And Outcome", frozenset({"content", "markdown"})),
     "fow_bindings": ProjectionSpec("Flower Associations", "Association Receipt"),
     "fow_semantic": ProjectionSpec("Flower Semantic Assignment", "Assignment State", frozenset({"prompt", "content", "markdown", "task_markdown"})),
     "fow_capabilities": ProjectionSpec("Flower Capabilities", "Capability Catalog"),
@@ -144,6 +145,17 @@ def projector_names() -> frozenset[str]:
 
 def operation_projector_routes() -> frozenset[tuple[str, str]]:
     return frozenset(_OPERATION_SPECS)
+
+
+def _has_semantic_recovery(value: object) -> bool:
+    """Recognize selected architecture/provider context in current or frozen HAND."""
+    if isinstance(value, Mapping):
+        return bool({"architecture", "provider_validation"} & set(value)) or any(
+            _has_semantic_recovery(item) for item in value.values()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_has_semantic_recovery(item) for item in value)
+    return False
 
 
 def assert_projector_registry(tool_names: Iterable[str]) -> None:
@@ -269,7 +281,8 @@ def project_markdown(
         output_budget = None
     result = payload.get("result", {})
     assurance_intent = tool_name == "fow_assurance" and operation in {"get_finding", "reassess_intent"}
-    if assurance_intent or tool_name == "fow_external_work" or (
+    semantic_recovery = tool_name == "fow_handover" and _has_semantic_recovery(result)
+    if assurance_intent or semantic_recovery or tool_name in {"fow_external_work", "fow_architecture"} or (
         tool_name == "fow_packet_inspect"
         and isinstance(result, Mapping)
         and (

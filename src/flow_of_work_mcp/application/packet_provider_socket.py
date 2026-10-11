@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from contextlib import nullcontext
+from dataclasses import replace
 from typing import Mapping, Protocol
 
 from flow_of_work_mcp.application.packet_provider_delivery import (
@@ -17,10 +19,13 @@ from flow_of_work_mcp.core.domain.packet_provider import (
     PacketProviderReceipt,
 )
 from flow_of_work_mcp.core.errors import (
+    ChangeControlBlockedError,
+    ImplementationProviderContractError,
     ImplementationProviderError,
     ImplementationProviderUnavailableError,
     PacketProviderRejectedError,
 )
+from flow_of_work_mcp.core.domain.provider_validation import COMMAND_VERSION
 from flow_of_work_mcp.core.ports.packet_provider import PacketProvider
 
 
@@ -116,10 +121,12 @@ class PacketProviderSocketService:
         *,
         mode: PacketProviderMode | str,
         provider: PacketProvider | None,
+        executor=None,
     ) -> None:
         self._repository = repository
         self._mode = PacketProviderMode(mode)
         self._provider = provider
+        self._executor = executor
 
     @property
     def mode(self) -> str:
@@ -132,6 +139,69 @@ class PacketProviderSocketService:
     @property
     def provider_kind(self) -> str:
         return self._provider.kind if self._provider is not None else ""
+
+    def validation_fields(self, project_id, change_id, packet_id, *, operation, unit_key=''):
+        """Construct the negotiated envelope; leave the legacy wire unchanged."""
+        if self._executor is None or not self._executor.requires_validation(project_id, change_id, packet_id):
+            return {}
+        context = (self._executor.frozen_context(project_id, change_id, packet_id, unit_key=unit_key)
+                   if str(operation) in {'stop', 'status'} else
+                   self._executor.validation_context(project_id, change_id, packet_id, unit_key=unit_key))
+        return {'contract_version': COMMAND_VERSION, 'validation_context': context}
+
+    def _admit(self, project_id, change_id, packet_id, command, *, recovering=False):
+        context_reader = getattr(self._repository, 'remediation_context', None)
+        context = context_reader(project_id, change_id, packet_id) if callable(context_reader) else None
+        if isinstance(context, Mapping) and context.get('predecessor_dependency_policy') == 'context_only':
+            raise ChangeControlBlockedError('context_only_provider_execution_prohibited')
+        if self._executor is not None:
+            if command.contract_version == COMMAND_VERSION and not callable(getattr(self._require_provider(), 'execute_bound', None)):
+                raise ChangeControlBlockedError('provider_validation_bound_transport_required')
+            capability = self._executor.admit_command(project_id, change_id, packet_id, command, recovering=recovering)
+            if capability is not None and capability['provider_kind'] != self.provider_kind:
+                raise ChangeControlBlockedError('provider_executor_kind_mismatch')
+            return capability
+        elif command.contract_version == COMMAND_VERSION:
+            raise ChangeControlBlockedError('provider_executor_service_required')
+        else:
+            # Keep direct application callers from bypassing the same ownership
+            # boundary when they omit the composed executor service.
+            external_reader = getattr(self._repository, 'external_work_state', None)
+            if callable(external_reader) and external_reader(project_id, change_id, packet_id)['consumption_mode'] == 'external_agent':
+                raise ChangeControlBlockedError('external_agent_mode_provider_execution_prohibited')
+            executor_reader = getattr(self._repository, 'packet_executor_state', None)
+            if callable(executor_reader) and executor_reader(project_id, change_id, packet_id).get('selection'):
+                raise ChangeControlBlockedError('provider_executor_service_required')
+            plan_reader = getattr(self._repository, 'packet_work_plan_state', None)
+            state_reader = getattr(self._repository, 'change_state', None)
+            plan = plan_reader(project_id, change_id, packet_id) or {} if callable(plan_reader) else {}
+            packets = state_reader(project_id, change_id)['packets'] if callable(state_reader) else []
+            packet = next((p for p in packets if p['packet_id'] == packet_id), {})
+            if packet.get('architecture_refs') or any(u.get(f) for u in plan.get('units', []) for f in ('implements', 'provides', 'requires', 'verifies')):
+                raise ChangeControlBlockedError('provider_executor_not_selected')
+
+    @staticmethod
+    def _validate_receipt(command, receipt):
+        from flow_of_work_mcp.application.packet_executor import PacketExecutorService
+        try:
+            PacketExecutorService.validate_receipt(command, receipt)
+        except ValueError as exc:
+            raise ImplementationProviderContractError(str(exc)) from exc
+
+    def _atomic(self):
+        transaction = getattr(self._repository, 'atomic', None)
+        return transaction() if callable(transaction) else nullcontext()
+
+    def _execute(self, command, *, capability=None):
+        provider = self._require_provider()
+        if command.contract_version == COMMAND_VERSION:
+            if capability is None:
+                raise ChangeControlBlockedError('provider_admission_receipt_missing')
+            receipt = provider.execute_bound(command, binding_identity=dict(capability['binding_identity']))
+        else:
+            receipt = provider.execute(command)
+        self._validate_receipt(command, receipt)
+        return receipt
 
     def ensure_draft(
         self,
@@ -176,6 +246,7 @@ class PacketProviderSocketService:
             flow_spec_revision=flow_spec_revision,
             operation=PacketProviderOperation.ADD,
             semantic_input={},
+            **self.validation_fields(project_id, change_id, packet_id, operation='add'),
             delivery_fingerprint=_stable_delivery_fingerprint(
                 project_id,
                 change_id,
@@ -213,6 +284,7 @@ class PacketProviderSocketService:
             flow_unit_ref="",
             operation=PacketProviderOperation.ADD,
             semantic_input={},
+            **self.validation_fields(project_id, change_id, packet_id, operation='add'),
             delivery_fingerprint=_stable_delivery_fingerprint(
                 project_id,
                 change_id,
@@ -242,8 +314,18 @@ class PacketProviderSocketService:
         request_id: str,
     ) -> Mapping[str, object]:
         provider = self._require_provider()
+        if command.contract_version == COMMAND_VERSION:
+            # Even draft/target scaffolding can have effects. Retain its exact
+            # admitted context in the existing outbox for honest recovery.
+            command = replace(command, delivery_fingerprint=_stable_delivery_fingerprint(
+                command.delivery_fingerprint, str(command.validation_context['context_sha256'])))
+            result = self.submit(project_id, change_id, packet_id, command=command,
+                                 actor=actor, request_id=request_id)
+            return {**result, 'state': 'provider_observed' if result['state'] == 'provider_delivered' else result['state']}
+        self._admit(project_id, change_id, packet_id, command)
         try:
             receipt = provider.execute(command)
+            self._validate_receipt(command, receipt)
         except PacketProviderRejectedError as exc:
             return {
                 "state": "provider_rejected",
@@ -289,15 +371,15 @@ class PacketProviderSocketService:
         deliver: bool = True,
     ) -> Mapping[str, object]:
         provider = self._require_provider()
-        entry = self._repository.enqueue_packet_provider_command(
-            project_id,
-            change_id,
-            packet_id,
-            provider_kind=provider.kind,
-            command=command,
-            actor=actor,
-            request_id=request_id,
-        )
+        with self._atomic():
+            capability = self._admit(project_id, change_id, packet_id, command)
+            entry = self._repository.enqueue_packet_provider_command(
+                project_id, change_id, packet_id, provider_kind=provider.kind,
+                command=command, actor=actor, request_id=request_id,
+            )
+            if command.contract_version == COMMAND_VERSION:
+                self._executor.record_admission(project_id, change_id, packet_id,
+                    entry=entry, capability=capability, command=command, actor=actor)
         if not deliver:
             return {
                 "state": str(entry["state"]),
@@ -320,7 +402,7 @@ class PacketProviderSocketService:
         request_id: str = "",
     ) -> Mapping[str, object]:
         provider = self._require_provider()
-        entry = self._repository.claim_packet_provider_command(project_id, outbox_id)
+        entry = self._repository.packet_provider_outbox_entry(project_id, outbox_id)
         state = str(entry["state"])
         if state == PacketProviderOutboxState.DELIVERED.value:
             return self._terminal_delivery_projection(entry, "provider_delivered")
@@ -330,9 +412,29 @@ class PacketProviderSocketService:
         if not isinstance(command_payload, Mapping):
             raise ValueError("stored packet provider command is invalid")
         command = PacketProviderCommand.from_payload(command_payload)
+        with self._atomic():
+            entry = self._repository.packet_provider_outbox_entry(project_id, outbox_id)
+            state = str(entry['state'])
+            if state == PacketProviderOutboxState.DELIVERED.value:
+                return self._terminal_delivery_projection(entry, 'provider_delivered')
+            if state == PacketProviderOutboxState.REJECTED.value:
+                return self._terminal_delivery_projection(entry, 'provider_rejected')
+            capability = self._admit(project_id, str(entry['change_id']), str(entry['packet_id']), command,
+                        recovering=state in {'unknown', 'delivering'})
+            entry = self._repository.claim_packet_provider_command(project_id, outbox_id)
+        if str(entry['state']) == PacketProviderOutboxState.DELIVERED.value:
+            return self._terminal_delivery_projection(entry, 'provider_delivered')
+        if str(entry['state']) == PacketProviderOutboxState.REJECTED.value:
+            return self._terminal_delivery_projection(entry, 'provider_rejected')
         try:
-            receipt = provider.execute(command)
+            receipt = self._execute(command, capability=capability)
         except PacketProviderRejectedError as exc:
+            if command.contract_version == COMMAND_VERSION and state in {'unknown', 'delivering'}:
+                # A later rejection cannot prove that an earlier uncertain
+                # dispatch had no effect. Keep its original ambiguity durable.
+                unknown = self._repository.mark_packet_provider_command_unknown(project_id, outbox_id, reason=exc.reason)
+                return {'state': 'provider_unknown', 'outbox': unknown, 'reason': exc.reason,
+                        'next_action': 'reconcile the original uncertain provider effect'}
             rejected = self._repository.reject_packet_provider_command(
                 project_id, outbox_id, reason=exc.reason
             )
@@ -423,16 +525,10 @@ class PacketProviderSocketService:
                 str(entry.get("outbox_id") or outbox_id),
             ),
             contract_version=command.contract_version,
+            validation_context=command.validation_context,
         )
-        queued = self._repository.enqueue_packet_provider_command(
-            project_id,
-            str(entry["change_id"]),
-            str(entry["packet_id"]),
-            provider_kind=provider.kind,
-            command=retry,
-            actor=actor,
-            request_id=request_id,
-        )
+        queued = self.submit(project_id, str(entry['change_id']), str(entry['packet_id']),
+                             command=retry, actor=actor, request_id=request_id, deliver=False)['outbox']
         return {
             "state": "provider_retry_pending",
             "outbox": queued,
@@ -470,9 +566,13 @@ class PacketProviderSocketService:
             flow_packet_ref=packet_id,
             flow_spec_revision=flow_spec_revision,
             operation=PacketProviderOperation.STATUS,
+            **self.validation_fields(project_id, change_id, packet_id, operation='status'),
         )
+        reader = getattr(self._repository, 'consistent_read', None)
+        with reader() if callable(reader) else nullcontext():
+            capability = self._admit(project_id, change_id, packet_id, command)
         try:
-            receipt = provider.execute(command)
+            receipt = self._execute(command, capability=capability)
         except PacketProviderRejectedError as exc:
             return {
                 "state": "provider_rejected",
