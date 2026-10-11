@@ -50,7 +50,12 @@ def load_backend(path: Path):
     require(path.is_file() and not path.is_symlink(), "Installer must be a regular file")
     specification = importlib.util.spec_from_file_location("flower_upgrade_installer", path)
     module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
+    bytecode = sys.dont_write_bytecode
+    try:
+        sys.dont_write_bytecode = True
+        specification.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = bytecode
     return module
 
 
@@ -152,6 +157,21 @@ def database_state(path: Path) -> str:
         return hashlib.sha256("\n".join(connection.iterdump()).encode("utf-8")).hexdigest()
 
 
+def historical_requirement(current: dict, project: str) -> dict:
+    """Separate the new recovery route from immutable requirement authority."""
+    value = dict(current)
+    recovery = value.pop("evidence_recovery", None)
+    require(isinstance(recovery, dict) and set(recovery) == {"description", "next_tool_call"},
+            "Current requirement omitted its bounded evidence recovery guidance")
+    require(isinstance(recovery["description"], str) and bool(recovery["description"]),
+            "Current evidence recovery description is empty")
+    require(recovery["next_tool_call"] == {"tool": "fow_traceability", "arguments": {
+        "project_id": project, "detail_level": "audit", "offset": 0, "limit": 10}},
+        "Current requirement returned a different evidence recovery route")
+    require(set(value) == {"requirement", "revisions", "events"}, "Unexpected requirement authority fields")
+    return value
+
+
 async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> dict:
     # Import MCP only in the installed interpreter, never a source checkout.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -225,7 +245,7 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
             require(not (root / "profiles" / "upgrade-backups").exists(), "Busy upgrade created a backup before obtaining ownership")
         if phase != "before":
             before = read_json(root / "before-mcp.json")
-            require(requirement == before["requirement"], "Original requirement changed through upgrade")
+            require(historical_requirement(requirement, PROJECT) == before["requirement"], "Original requirement changed through upgrade")
             require(handover == before["handover"], "Frozen HAND changed through upgrade")
             comparable_traceability = {**traceability, "projection": dict(traceability["projection"])}
             namespace = comparable_traceability["projection"].pop("source_ledger_version_namespace", None)

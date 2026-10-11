@@ -72,6 +72,33 @@ class UpgradeSmokeTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1] / "tools/install_flower.py"
         return smoke.load_backend(source)
 
+    def test_loading_backend_does_not_mutate_release_asset_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "install_flower.py"
+            path.write_bytes((Path(__file__).resolve().parents[1] / "tools/install_flower.py").read_bytes())
+            original = smoke.state_snapshot(root)
+            smoke.load_backend(path)
+            self.assertEqual(smoke.state_snapshot(root), original)
+
+    def test_historical_requirement_retains_authority_while_validating_new_recovery_route(self):
+        authority = {"requirement": {"statement": "original intent"}, "revisions": [{"revision": 1}], "events": []}
+        current = {**authority, "evidence_recovery": {"description": "Read original evidence.", "next_tool_call": {
+            "tool": "fow_traceability", "arguments": {"project_id": smoke.PROJECT, "detail_level": "audit", "offset": 0, "limit": 10}}}}
+        self.assertEqual(smoke.historical_requirement(current, smoke.PROJECT), authority)
+        self.assertIn("evidence_recovery", current)
+        current["evidence_recovery"]["next_tool_call"]["arguments"]["project_id"] = "another-project"
+        with self.assertRaisesRegex(RuntimeError, "different evidence recovery route"):
+            smoke.historical_requirement(current, smoke.PROJECT)
+
+    def test_historical_requirement_does_not_silently_drop_unknown_fields(self):
+        current = {"requirement": {}, "revisions": [], "events": [], "unknown_authority": "changed",
+                   "evidence_recovery": {"description": "Read original evidence.", "next_tool_call": {
+                       "tool": "fow_traceability", "arguments": {"project_id": smoke.PROJECT,
+                           "detail_level": "audit", "offset": 0, "limit": 10}}}}
+        with self.assertRaisesRegex(RuntimeError, "Unexpected requirement authority fields"):
+            smoke.historical_requirement(current, smoke.PROJECT)
+
     def assets(self, root, backend, content=b"synthetic wheel bytes"):
         name = f"flow_of_work_mcp-{backend.DEFAULT_VERSION}-py3-none-any.whl"
         (root / name).write_bytes(content)
