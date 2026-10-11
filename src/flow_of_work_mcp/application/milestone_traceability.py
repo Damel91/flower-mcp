@@ -22,6 +22,9 @@ from flow_of_work_mcp.core.domain import PACKET_INACTIVE_STATUS_VALUES, PacketSt
 from flow_of_work_mcp.core.domain.external_work import fingerprint
 
 
+REQUIREMENT_LEDGER_VERSION_NAMESPACE = "requirement_events.max_event_id.v1"
+
+
 class MilestoneTraceabilityProjectionService:
     """Build read-only lifecycle projections from canonical ledger state."""
 
@@ -212,6 +215,7 @@ class MilestoneTraceabilityProjectionService:
             "scope": "milestone" if milestone_id else "project",
             "milestone_id": milestone_id,
             "source_ledger_version": self._ledger_versions.ledger_version(project_id),
+            "source_ledger_version_namespace": REQUIREMENT_LEDGER_VERSION_NAMESPACE,
             "milestones": [
                 {
                     "milestone_id": str(milestone["milestone_id"]),

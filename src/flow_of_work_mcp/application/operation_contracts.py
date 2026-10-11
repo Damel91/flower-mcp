@@ -2026,18 +2026,25 @@ _EXTERNAL_WORK_FIELDS = {
 _EXTERNAL_WORK = {
     op: _c(
         "fow_external_work", op,
-        ("project_id", "change_id", "packet_id", *required, *(() if op in {"criteria", "validation", "todo"} else ("actor", "request_id"))),
+        ("project_id", "change_id", "packet_id", "operation", *required, *(() if op in {"criteria", "validation", "todo"} else ("actor", "request_id"))),
         (*optional, *(("request_id",) if op in {"criteria", "validation", "todo"} else ())),
+        enums={"operation": (op,)},
         guidance={
             "scope": "Flower-to-external-agent handoff only; full cross-server PVP is deferred.",
-            "authority": "Use current specification/plan revisions and authority_fingerprint returned by validation/todo. Stale reports remain history and cannot complete current work.",
+            "authority": (
+                "Retain the issued expected_spec_revision, expected_plan_revision and authority_fingerprint from the plan/TODO used for the work, including offline execution. Read current validation/TODO to compare authorities; never replace issued authority with current values to make old evidence appear current. Stale reports remain historical and cannot complete current work."
+                if op == "report_outcome" else
+                "Use current expected_spec_revision and expected_plan_revision to select an existing current-authority report_key with an explicit rationale. Reconciliation resolves competing reports; it cannot promote stale reports or imply acceptance. This operation has no authority_fingerprint payload field."
+                if op == "reconcile_outcome" else
+                "Use current specification/plan revisions and authority_fingerprint returned by validation/todo. Stale reports remain history and cannot complete current work."
+            ),
             "report_schema": {
                 "artifacts": [{"reference": "repository-relative or declared evidence locator", "description": "what was produced", "sha256": "optional content SHA-256"}],
                 "produced_contracts": [{"name": "producer declaration name", "artifact_ref": "one reported artifact reference"}],
                 "verification": [{"criterion": 1, "kind": "unit_check|deterministic_campaign|live_campaign|oracle|explicit_authority", "statement": "exact declared verification intent", "status": "pass|fail|not_run", "evidence_ref": "declared evidence", "provenance": "host-reported"}],
                 "unresolved": ["remaining obligations"],
             } if op == "report_outcome" else {},
-            **({"verification_identity": "Copy the exact criterion/kind/statement from this unit's current TODO declarations. No approximate matching is accepted. Rejections identify the input field, unit, expected and received declaration and a bounded public recovery call; invalid reports persist no outcome."} if op == "report_outcome" else {}),
+            **({"verification_identity": "Copy the exact criterion/kind/statement from this unit's issued plan/TODO declarations used for the work. No approximate matching is accepted. Rejections identify the input field, unit, expected and received declaration and a bounded public recovery call; invalid reports persist no outcome."} if op == "report_outcome" else {}),
         },
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
 }

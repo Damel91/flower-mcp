@@ -91,6 +91,7 @@ class ExternalRecoveryProjection:
         state = self._ledger.external_work_state(project_id, change_id, packet_id)
         if state["consumption_mode"] != "external_agent":
             return value
+        value["source_ledger_version_namespace"] = "lifecycle_events.sum_max_event_ids.v1"
         snapshot = self._snapshot.snapshot(project_id, focus_kind="packet", focus_ref=packet_id, limit=self._limit)
         value["provider_run_context"] = {
             "applicability": "not_applicable_to_external_execution",
@@ -103,6 +104,8 @@ class ExternalRecoveryProjection:
         value["runs"] = []
         value["task_views"] = []
         value["blockers"] = snapshot["blockers"]
+        value["blockers_scope"] = snapshot["blockers_scope"]
+        value["execution_admission_source"] = snapshot["execution_admission_source"]
         value["next_action"] = snapshot["next_gate"]
         todo = self._external_work.todo(project_id, change_id, packet_id)
         validation = self._external_work.validation(project_id, change_id, packet_id)
@@ -141,6 +144,7 @@ class ExternalRecoveryProjection:
             "contract": "flower.external-recovery.v1",
             "project_id": project_id, "change_id": change_id, "packet_id": packet_id,
             "source_ledger_version": context["source_ledger_version"],
+            "source_ledger_version_namespace": value["source_ledger_version_namespace"],
             "consumption_mode": "external_agent",
             "authority": {"spec_revision": structural.get("spec_revision"),
                           "plan_revision": structural.get("plan_revision", plan.get("plan_revision")),
@@ -192,6 +196,7 @@ class ExternalRecoveryProjection:
                     "frozen_authority": before, "current_authority": after,
                     "frozen_ledger_version": historical["payload"]["source_ledger_version"],
                     "current_ledger_version": context["source_ledger_version"],
+                    "source_ledger_version_namespace": "lifecycle_events.sum_max_event_ids.v1",
                     "outcomes_may_have_changed": historical["payload"]["source_ledger_version"] != context["source_ledger_version"],
                     "historical_payload_unchanged": True,
                 }

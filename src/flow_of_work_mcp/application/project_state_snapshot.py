@@ -14,6 +14,7 @@ from flow_of_work_mcp.application.grounding_readiness import (
 from flow_of_work_mcp.application.lifecycle_control import LifecycleControlService
 from flow_of_work_mcp.application.milestone_traceability import (
     MilestoneTraceabilityProjectionService,
+    REQUIREMENT_LEDGER_VERSION_NAMESPACE,
 )
 from flow_of_work_mcp.application.packet_lifecycle_projection import (
     PacketLifecycleProjectionService,
@@ -195,7 +196,12 @@ class ProjectStateSnapshotService:
                 "profile_version": SNAPSHOT_PROFILE_VERSION,
                 "project_id": project_id,
                 "goal_graph": graph,
-                "traceability": traceability,
+                # Clock labels describe existing values without changing the
+                # authority fingerprint issued before those labels existed.
+                "traceability": {
+                    key: value for key, value in traceability.items()
+                    if key != "source_ledger_version_namespace"
+                },
                 "changes": changes,
                 "grounding_audits": grounding_audits,
                 "lifecycle_actions": lifecycle_actions,
@@ -235,6 +241,7 @@ class ProjectStateSnapshotService:
             "project": {"project_id": project_id},
             "project_revision": (f"flow:{source_version}:{project_fingerprint[:16]}"),
             "source_ledger_version": source_version,
+            "source_ledger_version_namespace": REQUIREMENT_LEDGER_VERSION_NAMESPACE,
             "snapshot_fingerprint": fingerprint,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "focus": dict(focus),
@@ -243,6 +250,8 @@ class ProjectStateSnapshotService:
             "next_gate": next_gate,
             "secondary_actions": secondary_actions,
             "blockers": blockers["items"],
+            "blockers_scope": "current_gate_and_lifecycle_obligations",
+            "execution_admission_source": "active_work.packet.readiness",
             "open_decisions": decisions["items"],
             "open_decisions_scope": "bounded_current_focus_semantic_actions",
             "accepted_evidence_boundary": accepted_evidence_boundary,
@@ -627,15 +636,27 @@ class _SnapshotContext:
         limit: int,
     ) -> Mapping[str, object]:
         values: list[Mapping[str, object]] = []
+        seen: set[str] = set()
+
+        def append(value: Mapping[str, object], *, source: str, scope_kind: str) -> None:
+            # Preserve the existing identity/order: descriptive source labels
+            # must not duplicate a gate already represented by its guard.
+            key = json.dumps(value, sort_keys=True, separators=(",", ":"))
+            if key not in seen:
+                seen.add(key)
+                values.append({**value, "source": source, "scope_kind": scope_kind})
+
         gate_kind = str(next_gate.get("kind") or "")
         if gate_kind in {"technical_blockage", "authority_decision_required"}:
-            values.append(
+            append(
                 {
                     "code": str(next_gate.get("reason") or gate_kind),
                     "scope_ref": str(
                         active.get("packet_id") or active.get("change_id") or ""
                     ),
-                }
+                },
+                source="next_gate",
+                scope_kind="active_gate",
             )
         packet_owner = self.packet_owner.get(active["packet_id"])
         if packet_owner:
@@ -643,12 +664,15 @@ class _SnapshotContext:
             readiness = packet_lifecycle["packet"]["readiness"]
             if readiness["consumption_mode"] == "external_agent":
                 codes = [str(item["code"]) for item in readiness["blockers"]]
+                source = "packet_guard"
             else:
                 codes = list(packet.get("readiness_blockers", [])) + list(
                     packet.get("blocking_reasons", [])
                 )
+                source = "provider_readiness"
             for code in codes:
-                values.append({"code": str(code), "scope_ref": active["packet_id"]})
+                append({"code": str(code), "scope_ref": active["packet_id"]},
+                       source=source, scope_kind="current_packet")
         for gap in self.traceability.get("gaps", []):
             if isinstance(gap, Mapping):
                 relevant = self._active_requirement_ids(active)
@@ -657,19 +681,20 @@ class _SnapshotContext:
                 }
                 if relevant and not relevant.intersection(gap_requirements):
                     continue
-                values.append(
+                append(
                     {
                         "code": str(gap.get("reason") or ""),
                         "requirement_ids": [
                             str(item) for item in gap.get("requirement_ids", [])[:5]
                         ],
-                    }
+                    },
+                    source="traceability",
+                    scope_kind="lifecycle_obligation",
                 )
-        deduped = _dedupe_mappings(values)
         return {
-            "items": deduped[:limit],
-            "truncated": len(deduped) > limit,
-            "omitted_count": max(0, len(deduped) - limit),
+            "items": values[:limit],
+            "truncated": len(values) > limit,
+            "omitted_count": max(0, len(values) - limit),
         }
 
     def detail_references(

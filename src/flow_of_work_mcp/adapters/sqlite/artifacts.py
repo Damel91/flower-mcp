@@ -127,7 +127,8 @@ class ArtifactStoreMixin:
                    ORDER BY a.artifact_id DESC LIMIT ?""",
                 (project_id, packet_id, limit),
             ).fetchall()
-            return [dict(row) for row in rows]
+            return [{**dict(row), "source_ledger_version_namespace": "requirement_events.max_event_id.v1"}
+                    for row in rows]
 
     def artifact_generations(self, project_id: str) -> list[Mapping[str, object]]:
         with self._read_connection() as connection:
