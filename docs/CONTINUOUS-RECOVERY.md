@@ -6,8 +6,9 @@ export a complete implementation plan, execute it while Flower is offline and
 report the results after reconnecting. Coding, repository investigation and
 local verification remain the agent's responsibility.
 
-This guide describes the current development correction after release 0.3.0.
-The already published 0.3.0 assets are unchanged. Installed distribution metadata
+Release 0.3.1 includes these recovery corrections. Use the [safe upgrade
+plan](UPGRADING.md) to preserve an existing installation's ledger and profile;
+the already published 0.3.0 assets remain unchanged. Installed distribution metadata
 identifies the package version; it does not establish that a development checkout
 matches a published release or that a client is attached to the intended ledger.
 

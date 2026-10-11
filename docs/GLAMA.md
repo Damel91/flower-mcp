@@ -15,7 +15,7 @@ and publishing a Glama release are separate account actions.
 2. Connect `Damel91/flower-mcp` using Glama's GitHub integration and select its
    root [Dockerfile](../Dockerfile). The image installs the source's current
    `flow-of-work-mcp` package with its core dependencies. Select a source revision
-   deliberately; GitHub `v0.3.0` includes these container files, while the
+   deliberately; GitHub `v0.3.1` includes these container files, while the
    historical `v0.1.1` tag predates them.
 3. If the dashboard asks for the startup command, use these executable arguments:
 
@@ -47,6 +47,10 @@ Keep the whole `/data/profiles/default` directory: it contains `flower.yaml`,
 and `logs/`. A single server process owns a ledger. Do not start another process
 against the same volume or remove its lock file to bypass ownership.
 Before replacing an instance, stop its server and retain or back up the profile.
+For an image upgrade, keep the same persistent volume and profile arguments;
+never remove the named volume as an update step. The Python release installer's
+`--upgrade` applies to installer-owned environments, not a container image.
+See [upgrade and recovery boundaries](UPGRADING.md).
 
 Connect the coding client to the gateway endpoint returned by Glama, using the
 platform's connection credentials. The coding agent works on its own repository

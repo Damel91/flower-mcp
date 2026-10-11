@@ -1,6 +1,6 @@
 # Antigravity and Gemini CLI
 
-Flower 0.3.0 adds installation targets `antigravity` and `gemini-cli` on Windows,
+Flower supports installation targets `antigravity` and `gemini-cli` on Windows,
 macOS and Linux. The ordinary installer installs Flower core; no Flower model,
 Google Cloud project, gcloud tool or inference extra is needed for MCP. Install
 and sign in to your chosen Google coding client separately using its official
@@ -18,7 +18,7 @@ release assets and Python dependencies.
 Select either client with the release installer:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh | bash -s -- --platform antigravity
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/install.sh | bash -s -- --platform antigravity
 # For Gemini CLI, replace antigravity with gemini-cli.
 ```
 
@@ -29,7 +29,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 # For Gemini CLI, use -Platform gemini-cli.
 ```
 
-For an already installed Flower environment, use its absolute executable path:
+Updating Flower code uses the separate [safe upgrade route](UPGRADING.md),
+without changing the existing Google client registration. The commands below
+register a client; they are not needed for an ordinary package upgrade.
+Use the already installed Flower environment's absolute executable path:
 
 ```sh
 /absolute/flower-venv/bin/flower-mcp install --platform gemini-cli --dry-run

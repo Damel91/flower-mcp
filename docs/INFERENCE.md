@@ -7,7 +7,7 @@ execute returned tool calls or provide an embedding/retrieval consumer.
 
 ## Install the optional runtime
 
-Release 0.3.0 updates the optional generation runtime to
+Release 0.3.1 retains the optional generation runtime introduced in 0.3.0:
 `runtime-llama==0.4.0`, import `runtime_llama`. Upstream has not published a
 PyPI package or Git remote. Flower redistributes the delivered wheel unchanged:
 
@@ -17,7 +17,7 @@ PyPI package or Git remote. Flower redistributes the delivered wheel unchanged:
 - MIT license, notices and vendored attribution: [third_party/runtime-llama](../third_party/runtime-llama/).
 
 Download both wheels and `SHA256SUMS` from the
-[0.3.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.3.0).
+[0.3.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.3.1).
 Compare each wheel's digest with its exact manifest entry before installing;
 stop on mismatch. Use `sha256sum` on Linux, `shasum -a 256` on macOS or
 `Get-FileHash -Algorithm SHA256` in PowerShell, as in the
@@ -27,14 +27,14 @@ The `.venv` paths below refer to the manual installation example. For an
 automatic installation, use its returned environment/interpreter path instead:
 
 ```sh
-.venv/bin/python -m pip install './flow_of_work_mcp-0.3.0-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
+.venv/bin/python -m pip install './flow_of_work_mcp-0.3.1-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 Windows, using that same directory and environment:
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install './flow_of_work_mcp-0.3.0-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install './flow_of_work_mcp-0.3.1-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -45,6 +45,11 @@ the inspected delivered artifact. Dependencies such as `requests` still
 need their normal package source. Merely enabling YAML does not install the wheel.
 Core installers intentionally omit this extra. Do not use a wildcard to install
 all release wheels when you intend to install only core.
+
+For an existing installation, first follow [safe upgrades](UPGRADING.md).
+Upgrading Flower does not migrate model settings, install the inference extra
+or change its endpoint. An already installed compatible runtime remains in the
+environment; its locked version is still 0.4.0.
 
 ## Operator configuration and migration
 
