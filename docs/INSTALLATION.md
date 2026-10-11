@@ -1,13 +1,13 @@
 # Flower MCP installation
 
-Flower MCP `0.2.0` requires Python 3.11 or newer and is licensed under
+Flower MCP `0.3.0` requires Python 3.11 or newer and is licensed under
 [Apache-2.0](../LICENSE), with attribution in [NOTICE](../NOTICE).
 The distribution is `flow-of-work-mcp`; the primary command is `flower-mcp`.
 Core runs without a model, CodingCastle or a private network.
 
 ## Testing status and release access
 
-Flower is in testing. Release `v0.2.0` includes the installation assets used
+Flower is in testing. Release `v0.3.0` includes the installation assets used
 below. Automatic installers require publicly accessible GitHub release assets.
 If access is still private, use an authorized clone or manually download the
 wheel and checksum through an authorized browser/CLI. Both installers fetch
@@ -15,14 +15,14 @@ remaining assets anonymously; a prior authenticated script download does not
 authenticate those requests.
 
 Local macOS installed-package/public MCP qualification is recorded in the
-[0.2.0 release notes](RELEASE-NOTES-0.2.0.md). The [CI workflow](https://github.com/Damel91/flower-mcp/actions/workflows/ci.yml)
+[0.3.0 release notes](RELEASE-NOTES-0.3.0.md). The [CI workflow](https://github.com/Damel91/flower-mcp/actions/workflows/ci.yml)
 checks Windows PowerShell 5.1 helpers and the current installed wheel's metadata,
 dependencies, bootstrap and public MCP lifecycle outside the checkout.
 Managed Python preparation when Python is absent, manual Windows routes and
 target workstation/client MCP workflows require their own qualification.
-The 0.2.0 release qualification is recorded in its release notes. The PowerShell
+Current qualification is recorded in the [0.3.0 release notes](RELEASE-NOTES-0.3.0.md). The PowerShell
 launcher with managed Python preparation is included as `install.ps1` in release
-`v0.2.0`, with its checksum in `SHA256SUMS`. These instructions do not certify
+`v0.3.0`, with its checksum in `SHA256SUMS`. These instructions do not certify
 an untested OS or client.
 
 ## Prerequisites
@@ -36,7 +36,7 @@ These prerequisites cover core installation. Choose your route before installing
 | Manual downloaded wheel or source archive | Python 3.11+ with ssl, venv and ensurepip; downloaded files and Internet access for dependencies. Git and curl are not required. |
 | PowerShell release launcher, Windows | Windows PowerShell 5.1+, HTTPS trust and Internet access; suitable Python is reused or managed Python 3.11 is prepared. No Git or curl required. |
 | Python release installer, including Windows | Python 3.11+ with ssl, venv and ensurepip; public release download access. Git and curl are not required. |
-| Agent registration | The selected Codex, Claude Code or Cursor client must be installed to use the integration. Flower does not install it. |
+| Agent registration | The selected Codex, Claude Code, Cursor, Antigravity or Gemini CLI client must be installed to use the integration. Flower does not install it. |
 
 Use a writable user directory for the environment, temporary downloads, Flower
 profiles and client configuration. Flower itself does not require a system-wide
@@ -178,7 +178,7 @@ workstation and client still require their own test, beyond the recorded CI scop
 On macOS or Linux, after prerequisite setup, with release assets publicly accessible:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh | bash
 ```
 
 Choose Codex, Claude Code, Cursor, or installation without agent registration.
@@ -188,17 +188,18 @@ SHA-256 checksum and installs the declared dependencies. It then invokes
 Flower's agent registration and doctor commands. Reload the selected client
 and follow its connection/trust prompt.
 
-Release `v0.2.0` contains the Python installer, model `BOOTSTRAP.md`
+Release `v0.3.0` contains the Python installer, model `BOOTSTRAP.md`
 and `SHA256SUMS`. Anonymous download access is unavailable while the repository
 is private. Downloads and dependency installation need Internet access.
 
 For unattended use, select the destination explicitly:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh | bash -s -- --platform codex
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh | bash -s -- --platform codex
 ```
 
-Use `--platform claude-code`, `--platform cursor` or `--no-register` as needed.
+Use `--platform claude-code`, `--platform cursor`, `--platform antigravity`,
+`--platform gemini-cli` or `--no-register` as needed.
 `--client-config`, `--profile`, `--profile-root` and `--venv` select custom paths.
 An existing environment requires explicit `--upgrade`. The installer prints
 the absolute command path; agent configuration uses the installed interpreter
@@ -218,7 +219,7 @@ The launcher is available as a version-pinned release asset. Download it, then r
 an isolated PowerShell process with an explicit client or `-NoRegister`:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -238,8 +239,8 @@ The default venv is `%LOCALAPPDATA%\Flower MCP Install\venv`.
 
 Options are PowerShell named parameters:
 
-- `-Platform codex|claude-code|cursor` or `-NoRegister`, exactly one required.
-- `-Version 0.2.0` selects the stable release; this is the current default.
+- `-Platform codex|claude-code|cursor|antigravity|gemini-cli` or `-NoRegister`, exactly one required.
+- `-Version 0.3.0` selects the stable release; this is the current default.
 - `-Venv 'C:\Users\tester\Flower test\venv'` selects an installation location.
 - `-Upgrade` explicitly upgrades an environment already owned by the backend.
 - `-Profile default` and `-ProfileRoot 'C:\Users\tester\Flower data'` select lifecycle storage.
@@ -264,7 +265,7 @@ the client workflow. Use the absolute executable path printed by the installer
 if `flower-mcp` is not on PATH.
 
 The Windows script, Python backend and wheel above all refer to the same
-`v0.2.0` release. Source checkout installation is a separate route.
+`v0.3.0` release. Source checkout installation is a separate route.
 
 ## Python release installer on Windows
 
@@ -274,11 +275,12 @@ It does not install Python on Windows or authenticate GitHub downloads.
 With release assets publicly accessible, download it in PowerShell:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install_flower.py" -OutFile ".\install_flower.py"
-py -3 .\install_flower.py --version 0.2.0 --platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install_flower.py" -OutFile ".\install_flower.py"
+py -3 .\install_flower.py --version 0.3.0 --platform codex
 ```
 
-Use `--platform claude-code`, `--platform cursor`, or `--no-register` as needed.
+Use `--platform claude-code`, `--platform cursor`, `--platform antigravity`,
+`--platform gemini-cli` or `--no-register` as needed.
 The default environment is `%LOCALAPPDATA%\Flower MCP Install\venv`; the installer
 checks the release wheel checksum, installs dependencies, and runs registration
 and diagnosis when selected. `--venv`, `--profile-root` and `--client-config`
@@ -294,7 +296,7 @@ For managed Python preparation, use the PowerShell release launcher above.
 
 Have Git and Python 3.11+ available, then clone with authorized access if private.
 These examples install the checked-out source revision. To use the exact
-published `v0.2.0` bytes, select the release wheel route instead.
+published `v0.3.0` bytes, select the release wheel route instead.
 No checkout configuration file needs to be copied.
 
 **macOS/Linux:**
@@ -323,8 +325,8 @@ activation is optional and unnecessary for these examples.
 
 ## Manual installation from a release wheel
 
-Download `flow_of_work_mcp-0.2.0-py3-none-any.whl` and `SHA256SUMS` from the
-[GitHub Release](https://github.com/Damel91/flower-mcp/releases/tag/v0.2.0), using
+Download `flow_of_work_mcp-0.3.0-py3-none-any.whl` and `SHA256SUMS` from the
+[GitHub Release](https://github.com/Damel91/flower-mcp/releases/tag/v0.3.0), using
 an authorized browser or GitHub CLI while it is private. Put both files in the
 same writable directory, then open a terminal there. Have Python 3.11+ ready;
 Git and curl are not needed.
@@ -333,9 +335,9 @@ Git and curl are not needed.
 
 ```sh
 # Linux
-sha256sum flow_of_work_mcp-0.2.0-py3-none-any.whl
+sha256sum flow_of_work_mcp-0.3.0-py3-none-any.whl
 # macOS
-shasum -a 256 flow_of_work_mcp-0.2.0-py3-none-any.whl
+shasum -a 256 flow_of_work_mcp-0.3.0-py3-none-any.whl
 ```
 
 Compare the hash with the wheel's exact entry in `SHA256SUMS`. Stop if it differs.
@@ -343,14 +345,14 @@ Then install:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install ./flow_of_work_mcp-0.2.0-py3-none-any.whl
+.venv/bin/python -m pip install ./flow_of_work_mcp-0.3.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 **Windows, in PowerShell:** check the digest first:
 
 ```powershell
-Get-FileHash .\flow_of_work_mcp-0.2.0-py3-none-any.whl -Algorithm SHA256
+Get-FileHash .\flow_of_work_mcp-0.3.0-py3-none-any.whl -Algorithm SHA256
 Get-Content .\SHA256SUMS
 ```
 
@@ -359,7 +361,7 @@ Then install:
 
 ```powershell
 py -3 -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install .\flow_of_work_mcp-0.2.0-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install .\flow_of_work_mcp-0.3.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -390,8 +392,10 @@ For the manual `.venv` used above:
 
 For a release installer environment, use its returned absolute `command` path
 instead. Run preflight first and stop on a conflict before actual registration.
-Supported platform names are `codex`, `claude-code` and `cursor`. Defaults target
-the user's Codex TOML, Claude Code user JSON or Cursor user JSON. Use
+Supported platform names are `codex`, `claude-code`, `cursor`, `antigravity` and `gemini-cli`. Defaults target
+the user's Codex TOML, Claude Code user JSON, Cursor user JSON or the selected
+Google client's user JSON. See [Google clients](GOOGLE-CLIENTS.md) for the exact
+Antigravity/Gemini paths, environment override and connection steps. Use
 `--client-config /absolute/path` for another supported config file.
 Claude Code's nested local-scope config is unsupported. JSON must be strict JSON.
 
@@ -534,7 +538,7 @@ snapshot instead of replaying an uncertain mutation.
 ## Optional integrations
 
 Core installers do not install inference. Explicit internal semantic execution
-uses the optional `runtime-llama==0.3.0.dev0` dependency and an operator-managed
+uses the optional `runtime-llama==0.4.0` dependency and an operator-managed
 llama.cpp endpoint. The exact wheel is an additional asset in the Flower release;
 it is also retained in the source archive with its license and provenance.
 There is no assumed upstream PyPI package or Git repository.

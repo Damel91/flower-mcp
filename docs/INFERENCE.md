@@ -7,17 +7,17 @@ execute returned tool calls or provide an embedding/retrieval consumer.
 
 ## Install the optional runtime
 
-Release 0.2.0 replaces the historical LM Studio dependency with
-`runtime-llama==0.3.0.dev0`, import `runtime_llama`. Upstream has not published a
+Release 0.3.0 updates the optional generation runtime to
+`runtime-llama==0.4.0`, import `runtime_llama`. Upstream has not published a
 PyPI package or Git remote. Flower redistributes the delivered wheel unchanged:
 
-- File: `runtime_llama-0.3.0.dev0-py3-none-any.whl`
-- SHA256: `6a24fc89318fc27f4bcf6e007d6e81e749a2ebef353a1c55ddcdf45a2c160b2e`
-- Upstream revision: `9538540e4e9fc285068fa18bc011650642636e97`
+- File: `runtime_llama-0.4.0-py3-none-any.whl`
+- SHA256: `129c461771256d8107d7aeba6f6e7818975052952ad291b068662fe337061fc8`
+- Upstream revision: `420acd46a1cc761c6c07cee2fa7ffb9814621597`
 - MIT license, notices and vendored attribution: [third_party/runtime-llama](../third_party/runtime-llama/).
 
 Download both wheels and `SHA256SUMS` from the
-[0.2.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.2.0).
+[0.3.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.3.0).
 Compare each wheel's digest with its exact manifest entry before installing;
 stop on mismatch. Use `sha256sum` on Linux, `shasum -a 256` on macOS or
 `Get-FileHash -Algorithm SHA256` in PowerShell, as in the
@@ -27,19 +27,19 @@ The `.venv` paths below refer to the manual installation example. For an
 automatic installation, use its returned environment/interpreter path instead:
 
 ```sh
-.venv/bin/python -m pip install './flow_of_work_mcp-0.2.0-py3-none-any.whl[inference]' ./runtime_llama-0.3.0.dev0-py3-none-any.whl
+.venv/bin/python -m pip install './flow_of_work_mcp-0.3.0-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 Windows, using that same directory and environment:
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install './flow_of_work_mcp-0.2.0-py3-none-any.whl[inference]' ./runtime_llama-0.3.0.dev0-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install './flow_of_work_mcp-0.3.0-py3-none-any.whl[inference]' ./runtime_llama-0.4.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
 For a source checkout or extracted source archive, use
-`python -m pip install '.[inference]' third_party/runtime-llama/runtime_llama-0.3.0.dev0-py3-none-any.whl`
+`python -m pip install '.[inference]' third_party/runtime-llama/runtime_llama-0.4.0-py3-none-any.whl`
 with the chosen environment's interpreter. Passing the wheel explicitly selects
 the inspected delivered artifact. Dependencies such as `requests` still
 need their normal package source. Merely enabling YAML does not install the wheel.
@@ -111,6 +111,8 @@ Adapters are reused by semantic role and owned by the Flower runtime. Shutdown
 drains workers, then adapters, then releases ledger ownership. Model availability
 and execution failures do not authorize automatic fallback to another provider.
 
-The upstream library also supports embedding discovery. Flower currently has no
+The upstream 0.4.0 library also adds distributed embedding budgets and exact
+embedding preparation APIs. The generation contract used here is unchanged.
+The upstream library supports embedding discovery. Flower currently has no
 application embedding consumer, so this release does not configure or qualify
 replica pools, vector stores, retrieval quality or embedding identity.

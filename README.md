@@ -11,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Version: `0.2.0` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Version: `0.3.0` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -79,17 +79,17 @@ deployment and monitoring. Follow the story in
 ## Quick start
 
 Choose one installation route. Use a writable user directory and have a
-**Codex, Claude Code or Cursor** client installed. Downloads require Internet
+**Codex, Claude Code, Cursor, Antigravity or Gemini CLI** client installed. Downloads require Internet
 access and trusted HTTPS certificates. Check the
 [prerequisites](docs/INSTALLATION.md#prerequisites) first.
 
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -101,11 +101,12 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
-Use `-Platform claude-code`, `-Platform cursor` or `-NoRegister` as appropriate.
+Use `-Platform claude-code`, `-Platform cursor`, `-Platform antigravity`,
+`-Platform gemini-cli` or `-NoRegister` as appropriate.
 The launcher reuses or prepares Python and installs the checked release wheel.
 The execution-policy option applies only to that process.
 
@@ -115,9 +116,11 @@ Both require Python 3.11+ with SSL, `venv` and `ensurepip`; cloning also require
 Git. The [installation guide](docs/INSTALLATION.md) covers downloads, upgrades,
 profiles, removal and recovery.
 
+See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI.
+
 ### Optional internal inference
 
-Release 0.2.0 uses `runtime-llama` with an operator-managed llama.cpp endpoint.
+Release 0.3.0 uses `runtime-llama` with an operator-managed llama.cpp endpoint.
 Core installers do not install it. The exact optional runtime wheel, checksums
 and licenses ship with the release; see [inference setup and migration](docs/INFERENCE.md).
 Host-produced semantic results continue to work without a model.
@@ -128,7 +131,7 @@ The repository includes maintainer metadata and a core-only Dockerfile for
 Glama's build workflow. See the [Glama and container guide](docs/GLAMA.md) for
 startup arguments, persistent SQLite storage and client setup. Glama account
 claim, hosted deployment and platform release are separate steps; the
-GitHub `v0.2.0` release includes these container files.
+GitHub `v0.3.0` release includes these container files.
 
 ### Connect an agent and start a project
 
@@ -190,7 +193,7 @@ Read the method in [English](docs/presentation/eng/method.md) or
 
 ## Status and operating limits
 
-Flower `0.2.0` is in testing. The [release notes](docs/RELEASE-NOTES-0.2.0.md) and
+Flower `0.3.0` is in testing. The [release notes](docs/RELEASE-NOTES-0.3.0.md) and
 [installation status](docs/INSTALLATION.md#testing-status-and-release-access)
 distinguish installed-package and CI checks from end-to-end installer and
 target-client qualification.

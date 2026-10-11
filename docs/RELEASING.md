@@ -8,8 +8,8 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; the current version is `0.2.0`. Tags use the `v` prefix,
-for example `v0.2.0`. Version `0.x` means the public interface is still evolving;
+`MAJOR.MINOR.PATCH`; the current version is `0.3.0`. Tags use the `v` prefix,
+for example `v0.3.0`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
 increments for fixes that preserve the advertised interface. A future `1.0.0`
 requires a deliberately declared stable public interface.
@@ -32,13 +32,13 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify the current `0.2.0` checkout locally, use Python 3.11 or newer in an
+To qualify the current `0.3.0` checkout locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.2.0 --output dist
+python tools/build_release.py --version 0.3.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -46,7 +46,7 @@ This creates wheel and source distributions, copies the Bash, PowerShell and Pyt
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.2.0 --output dist --verify-only
+python tools/build_release.py --version 0.3.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -80,7 +80,7 @@ the requested new version tag at the full tested SHA and publishes:
 - `install.ps1`
 - `install_flower.py`
 - `BOOTSTRAP.md`
-- `runtime_llama-0.3.0.dev0-py3-none-any.whl` (optional inference)
+- `runtime_llama-0.4.0-py3-none-any.whl` (optional inference)
 - `SHA256SUMS`
 
 `VERSION` is the requested version declared in `pyproject.toml`.
@@ -116,11 +116,11 @@ supplied target and uploads assets before publication; see [the release command]
 The primary installer uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.2.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.0/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
-Claude Code or Cursor, and configures the selected client. The downloaded Python
+Claude Code, Cursor, Antigravity or Gemini CLI, and configures the selected client. The downloaded Python
 backend and wheel are checked against the release's `SHA256SUMS`.
 
 Manual installation from the wheel or source distribution is documented in
