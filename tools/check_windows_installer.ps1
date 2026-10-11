@@ -72,11 +72,16 @@ try {
     Assert-HTTPS ([uri]'https://github.com/Damel91/flower-mcp')
     Assert-Rejected { Assert-HTTPS ([uri]'http://github.com/file') } 'HTTPS'
     Assert-Rejected { Assert-HTTPS ([uri]'https://secret@example.com/file') } 'credentials'
-    $arguments = Get-BackendArguments '0.1.0' 'codex' $false 'C:\Flower test\venv' `
-        $true 'C:\Agent config\config.json' 'friend-test' 'C:\Flower test\data'
-    $expected = @('--version', '0.1.0', '--profile', 'friend-test', '--platform', 'codex',
-        '--venv', 'C:\Flower test\venv', '--upgrade', '--client-config',
-        'C:\Agent config\config.json', '--profile-root', 'C:\Flower test\data')
+    Assert-Selection '' $false '' '0.3.1' $true $true 'C:\Flower backups'
+    Assert-Rejected { Assert-Selection 'codex' $false '' '0.3.1' $true } 'cannot register'
+    Assert-Rejected { Assert-Selection '' $false 'config.json' '0.3.1' $true } 'cannot register'
+    Assert-Rejected { Assert-Selection '' $true '' '0.3.1' $false $true } 'require -Upgrade'
+    Assert-Rejected { Assert-Selection '' $true '' '0.3.1' $false $false 'backups' } 'require -Upgrade'
+    $arguments = Get-BackendArguments '0.3.1' '' $false 'C:\Flower test\venv' `
+        $true '' 'friend-test' 'C:\Flower test\data' $true 'C:\Flower backups'
+    $expected = @('--version', '0.3.1', '--profile', 'friend-test', '--no-register',
+        '--venv', 'C:\Flower test\venv', '--upgrade', '--dry-run', '--backup-root',
+        'C:\Flower backups', '--profile-root', 'C:\Flower test\data')
     Assert-True ($arguments.Count -eq $expected.Count) 'Argument count changed.'
     for ($index = 0; $index -lt $expected.Count; $index++) {
         Assert-True ($arguments[$index] -ceq $expected[$index]) 'Literal argument or ordering changed.'

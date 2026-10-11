@@ -105,6 +105,11 @@ def asset_names(project: dict) -> set[str]:
             f"{normalized_name}-{version}.tar.gz"} | set(ASSET_SOURCES)
 
 
+def release_documentation(project: dict) -> set[str]:
+    return {"docs/INSTALLATION.md", "docs/UPGRADING.md",
+            f"docs/RELEASE-NOTES-{project['version']}.md"}
+
+
 def check_inventory(dist: Path, project: dict, *, require_copied_assets: bool = True) -> None:
     expected = asset_names(project)
     actual = {path.name for path in dist.iterdir()}
@@ -171,7 +176,8 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
             if path.is_file() and path.suffix in PRESENTATION_SUFFIXES
         )
         for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
-                     *sorted(CONTAINER_SOURCES), *sorted(THIRD_PARTY_SOURCES), *presentation):
+                     *sorted(CONTAINER_SOURCES), *sorted(THIRD_PARTY_SOURCES),
+                     *sorted(release_documentation(project)), *presentation):
             try:
                 member = archive.getmember(prefix + name)
             except KeyError as exc:
@@ -214,21 +220,32 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             "Assets: Flower Python wheel, source distribution, optional runtime_llama-0.4.0 wheel, "
             "install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
             "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
-            "This release adds Antigravity and Gemini CLI installation and updates optional runtime-llama to 0.4.0 for operator-managed llama.cpp inference. "
-            "Google client setup and core execution need no inference endpoint. The upstream runtime is pinned and distributed here as an unmodified wheel; "
-            "no upstream PyPI or Git URL is required. Existing LM Studio model configuration requires explicit migration. "
-            "Glama/container build inputs, the version-pinned Windows PowerShell launcher and the bilingual offline presentation are included. "
+            "This patch corrects continuous external-agent recovery, mode-aware readiness, original evidence inspection and offline report guidance. "
+            "It also adds a planned, backed-up upgrade route for installer-owned environments while retaining the existing SQLite ledger, profile and client registration. "
+            "There is no SQLite schema migration and the 36 public MCP tools retain their names. "
+            "Optional runtime-llama remains 0.4.0; core and host execution need no model endpoint. "
             "Flower remains in testing.\n\n"
             "Install this release and choose your coding client in the terminal:\n\n"
             f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash\n```\n\n"
             "The installer prepares the Python environment and checks downloaded backend and wheel hashes.\n"
+            "Already installed? Stop all Flower processes and clients sharing its environment before updating. "
+            "Use the same environment, profile and profile root. An owned upgrade defaults to no registration, "
+            "requires the existing profile, and creates a consistent SQLite backup plus the exact profile YAML before package changes.\n\n"
+            f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash -s -- --upgrade --dry-run\n```\n\n"
+            "Inspect the returned plan, then repeat without --dry-run to perform the upgrade. "
+            "Supply the original --venv, --profile and --profile-root options for a custom installation. "
+            "Do not pass --platform or --client-config during an upgrade. "
+            "The installer does not stop clients, restore data automatically or promise atomic pip rollback. "
+            f"See [safe upgrades and manual installations](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/UPGRADING.md).\n\n"
             "The ordinary installer installs only Flower core. For internal inference, verify the optional runtime wheel against SHA256SUMS "
             f"and follow [optional inference setup](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/INFERENCE.md). Core/host execution needs no model endpoint.\n\n"
-            "Windows: obtain the included install.ps1 from this release's assets. "
+            "Windows: obtain the version-pinned Windows PowerShell launcher, install.ps1, from this release's assets. "
             "Run the download and execution commands separately, inspecting the script before execution:\n\n"
             f"```powershell\nInvoke-WebRequest -UseBasicParsing -Uri \"https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.ps1\" -OutFile \".\\install.ps1\"\n```\n\n"
             f"```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\install.ps1 -Version '{project['version']}' -Platform codex\n```\n\n"
             "Use -Platform claude-code, -Platform cursor, -Platform antigravity, -Platform gemini-cli or -NoRegister instead. The execution-policy setting applies only to this process.\n"
+            "For an existing owned installation, use -Upgrade -DryRun without -Platform, inspect the plan, then repeat without -DryRun. "
+            "Keep the original -Venv, -Profile and -ProfileRoot values.\n"
             "Windows requires PowerShell 5.1 or newer; see the installation guide for prerequisites. "
             "Windows installation and coding-client usability require separate platform verification.\n"
             f"Full version notes: https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/RELEASE-NOTES-{project['version']}.md\n\n"

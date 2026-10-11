@@ -3,10 +3,12 @@
 set -euo pipefail
 
 FLOWER_REPOSITORY="https://github.com/Damel91/flower-mcp"
-FLOWER_VERSION="0.3.0"
+FLOWER_VERSION="0.3.1"
 UV_VERSION="0.12.21"
 selection=""
 has_client_config=0
+upgrade=0
+upgrade_options=0
 backend_args=()
 
 fail() { printf 'Flower installation failed: %s\n' "$*" >&2; exit 1; }
@@ -21,12 +23,18 @@ Options:
   --platform codex|claude-code|cursor|antigravity|gemini-cli
                                        Register this agent without a menu
   --no-register                       Install without registering an agent
-  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.3.0)
+  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.3.1)
   --venv PATH                          Dedicated installation environment
   --upgrade                            Upgrade an existing owned installation
+  --dry-run                            Upgrade plan only; backend makes no changes
+  --backup-root PATH                   Upgrade backup parent (outside profile data)
   --client-config PATH                 Explicit agent configuration file
   --profile NAME                       Persistent profile (default: default)
   --profile-root PATH                  Persistent lifecycle data directory
+
+Upgrade skips client selection and registration. Stop all Flower processes using
+the installation first. This launcher downloads the verified Python backend even
+for --dry-run; that backend's plan performs no downloads, locks or writes.
 HELP
 }
 
@@ -44,14 +52,24 @@ while [[ $# -gt 0 ]]; do
         --version)
             [[ $# -ge 2 ]] || fail "--version requires MAJOR.MINOR.PATCH"
             FLOWER_VERSION="$2"; shift 2 ;;
-        --venv|--client-config|--profile|--profile-root)
+        --venv|--client-config|--profile|--profile-root|--backup-root)
             [[ $# -ge 2 ]] || fail "$1 requires a value"
             if [[ "$1" == --client-config ]]; then has_client_config=1; fi
+            if [[ "$1" == --backup-root ]]; then upgrade_options=1; fi
             backend_args+=("$1" "$2"); shift 2 ;;
-        --upgrade) backend_args+=("$1"); shift ;;
+        --upgrade) upgrade=1; backend_args+=("$1"); shift ;;
+        --dry-run) upgrade_options=1; backend_args+=("$1"); shift ;;
         *) fail "unknown option: $1 (use --help)" ;;
     esac
 done
+
+if [[ "$upgrade" == 1 ]]; then
+    [[ -z "$selection" || "$selection" == "none" ]] || fail "--upgrade cannot register an agent; use the separate flower-mcp install command"
+    [[ "$has_client_config" == 0 ]] || fail "--upgrade cannot be combined with --client-config"
+    selection="none"
+elif [[ "$upgrade_options" == 1 ]]; then
+    fail "--dry-run and --backup-root require --upgrade"
+fi
 
 [[ "$FLOWER_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || fail "version must be a stable MAJOR.MINOR.PATCH release"
 case "$(uname -s)" in

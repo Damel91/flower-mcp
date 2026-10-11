@@ -31,8 +31,10 @@ class ReleaseAssetsTests(unittest.TestCase):
             for path in (SOURCE / "docs/presentation").rglob("*")
             if path.is_file() and path.suffix in release.PRESENTATION_SUFFIXES
         }
+        self.release_docs = release.release_documentation(release.validate_project(SOURCE))
         sources = {"pyproject.toml", "LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
-                   *release.CONTAINER_SOURCES, *release.THIRD_PARTY_SOURCES, *self.presentation}
+                   *release.CONTAINER_SOURCES, *release.THIRD_PARTY_SOURCES,
+                   *self.release_docs, *self.presentation}
         for relative in sources:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +64,7 @@ class ReleaseAssetsTests(unittest.TestCase):
         payloads = {relative: (self.root / relative).read_bytes()
                     for relative in ("LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
                                      *sorted(release.CONTAINER_SOURCES), *sorted(release.THIRD_PARTY_SOURCES),
-                                     *sorted(self.presentation))}
+                                     *sorted(self.release_docs), *sorted(self.presentation))}
         payloads["PKG-INFO"] = metadata
         if replace:
             payloads.update(replace)
@@ -131,6 +133,13 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.assertIn("-NoRegister", text)
         self.assertNotIn("releases/download/v0.1.0/install.ps1", text)
         self.assertIn("docs/presentation/index.html", text)
+        self.assertIn("continuous external-agent recovery", text)
+        self.assertIn("--upgrade --dry-run", text)
+        self.assertIn("-Upgrade -DryRun", text)
+        self.assertIn(f"blob/v{self.project['version']}/docs/UPGRADING.md", text)
+        self.assertIn("consistent SQLite backup", text)
+        self.assertIn("atomic pip rollback", text)
+        self.assertNotIn("This release adds Antigravity", text)
 
     def test_source_runtime_hash_tampering_blocks_build(self):
         wheel = self.root / release.THIRD_PARTY_ROOT / release.RUNTIME_WHEEL
@@ -184,6 +193,18 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_sdist_must_include_the_offline_reader(self):
         self.packages(omit="docs/presentation/index.html")
         with self.assertRaisesRegex(ValueError, "source distribution omits required source docs/presentation/index.html"):
+            release.prepare(self.root, self.dist)
+
+    def test_sdist_must_include_the_current_installation_upgrade_and_release_guides(self):
+        for source in sorted(self.release_docs):
+            with self.subTest(source=source):
+                self.packages(omit=source)
+                with self.assertRaisesRegex(ValueError, f"source distribution omits required source {source}"):
+                    release.prepare(self.root, self.dist)
+
+    def test_sdist_upgrade_instructions_must_match_the_checked_source(self):
+        self.packages(replace={"docs/UPGRADING.md": b"Unexpected stale upgrade instructions.\n"})
+        with self.assertRaisesRegex(ValueError, "source distribution docs/UPGRADING.md differs"):
             release.prepare(self.root, self.dist)
 
     def test_sdist_must_include_each_container_build_source(self):

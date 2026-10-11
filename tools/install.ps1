@@ -8,6 +8,9 @@ otherwise managed Python is prepared without persistent PATH or registry changes
 Choose -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.
 The Python backend owns
 installation receipts, explicit upgrades and client registration.
+Upgrade skips client registration. -DryRun and -BackupRoot require -Upgrade.
+This launcher still downloads the verified backend and may prepare Python for
+-DryRun; the backend's upgrade plan performs no downloads, locks or writes.
 .EXAMPLE
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 .EXAMPLE
@@ -17,9 +20,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 param(
     [ValidateSet('codex', 'claude-code', 'cursor', 'antigravity', 'gemini-cli')][string]$Platform,
     [switch]$NoRegister,
-    [string]$Version = '0.3.0',
+    [string]$Version = '0.3.1',
     [string]$Venv,
     [switch]$Upgrade,
+    [switch]$DryRun,
+    [string]$BackupRoot,
     [string]$ClientConfig,
     [string]$Profile = 'default',
     [string]$ProfileRoot
@@ -30,8 +35,15 @@ $ErrorActionPreference = 'Stop'
 
 function Assert-Selection {
     param([string]$SelectedPlatform, [bool]$WithoutRegistration, [string]$SelectedClientConfig,
-          [string]$SelectedVersion)
-    if ([bool]$SelectedPlatform -eq $WithoutRegistration) {
+          [string]$SelectedVersion, [bool]$DoUpgrade = $false,
+          [bool]$PlanOnly = $false, [string]$SelectedBackupRoot = '')
+    if ($DoUpgrade -and ($SelectedPlatform -or $SelectedClientConfig)) {
+        throw '-Upgrade cannot register a client or use -ClientConfig; use the separate flower-mcp install command.'
+    }
+    if (-not $DoUpgrade -and ($PlanOnly -or $SelectedBackupRoot)) {
+        throw '-DryRun and -BackupRoot require -Upgrade.'
+    }
+    if (-not $DoUpgrade -and ([bool]$SelectedPlatform -eq $WithoutRegistration)) {
         throw 'Choose exactly one of -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.'
     }
     if ($WithoutRegistration -and $SelectedClientConfig) {
@@ -45,12 +57,15 @@ function Assert-Selection {
 function Get-BackendArguments {
     param([string]$SelectedVersion, [string]$SelectedPlatform, [bool]$WithoutRegistration,
           [string]$SelectedVenv, [bool]$DoUpgrade, [string]$SelectedClientConfig,
-          [string]$SelectedProfile, [string]$SelectedProfileRoot)
+          [string]$SelectedProfile, [string]$SelectedProfileRoot,
+          [bool]$PlanOnly = $false, [string]$SelectedBackupRoot = '')
     $items = @('--version', $SelectedVersion, '--profile', $SelectedProfile)
-    if ($WithoutRegistration) { $items += '--no-register' }
+    if ($WithoutRegistration -or $DoUpgrade) { $items += '--no-register' }
     else { $items += @('--platform', $SelectedPlatform) }
     if ($SelectedVenv) { $items += @('--venv', $SelectedVenv) }
     if ($DoUpgrade) { $items += '--upgrade' }
+    if ($PlanOnly) { $items += '--dry-run' }
+    if ($SelectedBackupRoot) { $items += @('--backup-root', $SelectedBackupRoot) }
     if ($SelectedClientConfig) { $items += @('--client-config', $SelectedClientConfig) }
     if ($SelectedProfileRoot) { $items += @('--profile-root', $SelectedProfileRoot) }
     return ,$items
@@ -174,7 +189,8 @@ $environmentNames = @('UV_INSTALL_DIR', 'CARGO_DIST_FORCE_INSTALL_DIR', 'UV_UNMA
     'UV_PYTHON_NO_REGISTRY', 'TEMP', 'TMP')
 $savedTLS = [Net.ServicePointManager]::SecurityProtocol
 try {
-    Assert-Selection $Platform $NoRegister.IsPresent $ClientConfig $Version
+    Assert-Selection $Platform $NoRegister.IsPresent $ClientConfig $Version `
+        $Upgrade.IsPresent $DryRun.IsPresent $BackupRoot
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
         throw 'This PowerShell installer supports Windows; macOS/Linux use install.sh.'
     }
@@ -225,7 +241,7 @@ try {
         $python = @{ Executable = (Join-Path $bootstrap 'Scripts\python.exe'); Prefix = @() }
     }
     $backendArguments = Get-BackendArguments $Version $Platform $NoRegister.IsPresent $Venv `
-        $Upgrade.IsPresent $ClientConfig $Profile $ProfileRoot
+        $Upgrade.IsPresent $ClientConfig $Profile $ProfileRoot $DryRun.IsPresent $BackupRoot
     $arguments = $python.Prefix + @('-I', $backend) + $backendArguments
     & $python.Executable @arguments
     $exitCode = $LASTEXITCODE

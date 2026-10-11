@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+"""Qualify a published 0.3.0 installation upgrade using isolated public MCP state.
+
+Only release downloads are replaced with checksum-verified local asset copies.
+Environment creation, pip, registration, OS ownership, backup and diagnosis are
+real. This is package mechanics qualification, not anonymous release delivery.
+The requested root must not exist; all generated state is retained there.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+
+
+BASELINE_VERSION = "0.3.0"
+BASELINE_WHEEL_SHA256 = "b8c2146eb7b1ef252293df84fdc6b900ca24d68ecc975151ca8c196ee77c0924"
+BASELINE_INSTALLER_SHA256 = "b27d23fcf2491b28e2948bfd58d93d7b26404d6dddca5746d47030130f42b539"
+REPOSITORY = "https://github.com/Damel91/flower-mcp"
+PROJECT = "flower-upgrade-smoke"
+PROFILE = "upgrade-smoke"
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise RuntimeError(message)
+
+
+def read_json(path: Path) -> dict:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    require(isinstance(value, dict), "Expected a JSON object: " + str(path))
+    return value
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_backend(path: Path):
+    require(path.is_file() and not path.is_symlink(), "Installer must be a regular file")
+    specification = importlib.util.spec_from_file_location("flower_upgrade_installer", path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def local_assets(backend, assets: Path) -> None:
+    """Replace exactly the network boundary; validate every requested copy."""
+    manifest = assets / "SHA256SUMS"
+    require(manifest.is_file() and not manifest.is_symlink(), "Missing regular release manifest")
+
+    def download(url: str, destination: Path, *, max_bytes: int) -> str:
+        backend.require_https(url)
+        name = Path(urllib.parse.urlsplit(url).path).name
+        require(name in {"SHA256SUMS", f"flow_of_work_mcp-{backend.DEFAULT_VERSION}-py3-none-any.whl"},
+                "Unexpected installer download: " + name)
+        source = assets / name
+        require(source.is_file() and not source.is_symlink(), "Missing regular release asset: " + name)
+        require(source.stat().st_size <= max_bytes, "Release asset exceeds installer download limit")
+        actual = digest(source)
+        if name != "SHA256SUMS":
+            require(actual == backend.checksum_for(manifest.read_text(encoding="utf-8"), name),
+                    "Local release asset differs from its manifest: " + name)
+        with destination.open("xb") as output, source.open("rb") as content:
+            shutil.copyfileobj(content, output)
+        return actual
+
+    backend.download_asset = download
+
+
+def baseline_assets(destination: Path, supplied: Path | None) -> Path:
+    """Pin the real published baseline, never a development wheel with its name."""
+    destination.mkdir()
+    names = ("SHA256SUMS", "install_flower.py", "flow_of_work_mcp-0.3.0-py3-none-any.whl")
+    for name in names:
+        target = destination / name
+        if supplied is not None:
+            source = supplied / name
+            require(source.is_file() and not source.is_symlink(), "Missing regular baseline asset: " + name)
+            with target.open("xb") as output, source.open("rb") as content:
+                shutil.copyfileobj(content, output)
+        else:
+            request = urllib.request.Request(
+                REPOSITORY + "/releases/download/v0.3.0/" + name,
+                headers={"User-Agent": "Flower-MCP-Upgrade-Qualification"})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                require(urllib.parse.urlsplit(response.geturl()).scheme == "https", "Baseline redirected away from HTTPS")
+                limit = 128 * 1024 * 1024 if name.endswith(".whl") else 1024 * 1024
+                with target.open("xb") as output:
+                    total = 0
+                    while chunk := response.read(64 * 1024):
+                        total += len(chunk)
+                        require(total <= limit, "Baseline asset exceeds qualification limit")
+                        output.write(chunk)
+    wheel = destination / names[-1]
+    require(digest(wheel) == BASELINE_WHEEL_SHA256, "Baseline is not the immutable published 0.3.0 wheel")
+    require(digest(destination / "install_flower.py") == BASELINE_INSTALLER_SHA256,
+            "Baseline installer differs from the immutable published 0.3.0 backend")
+    # Verify the executable before importing it, using the pinned release manifest.
+    manifest = (destination / "SHA256SUMS").read_text(encoding="utf-8")
+    for name in names[1:]:
+        entries = [line.split() for line in manifest.splitlines() if line.strip()]
+        matches = [parts[0] for parts in entries if len(parts) == 2 and parts[1].lstrip("*") == name]
+        require(matches == [digest(destination / name)], "Baseline manifest mismatch: " + name)
+    return destination
+
+
+def clean_environment() -> dict[str, str]:
+    result = dict(os.environ)
+    for key in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "FLOWER_HOME"):
+        result.pop(key, None)
+    return result
+
+
+def run_worker(python: Path, root: Path, phase: str, assets: Path | None = None) -> dict:
+    options = [] if assets is None else ["--assets", str(assets)]
+    completed = subprocess.run(
+        [str(python), "-I", str(Path(__file__).resolve()), "--worker", phase, "--root", str(root), *options],
+        cwd=root, env=clean_environment(), text=True, encoding="utf-8", capture_output=True, timeout=180)
+    require(completed.returncode == 0, f"Public MCP {phase} failed: {completed.stderr}")
+    return read_json(root / f"{phase}-mcp.json")
+
+
+def state_snapshot(root: Path) -> dict:
+    """Detect changes to persistent state, including identical-byte rewrites."""
+    result = {}
+    for path in sorted(root.rglob("*")):
+        require(not path.is_symlink(), "Unexpected symlink in qualification state")
+        info = path.stat()
+        require(path.is_file() or path.is_dir(), "Unexpected special file in qualification state")
+        value = {"mtime_ns": info.st_mtime_ns, "mode": info.st_mode}
+        if path.is_file():
+            value.update(size=info.st_size, sha256=digest(path))
+        result[path.relative_to(root).as_posix()] = value
+    return result
+
+
+def database_state(path: Path) -> str:
+    require(path.is_file() and not path.is_symlink(), "Expected regular existing SQLite database")
+    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+        require(connection.execute("PRAGMA integrity_check").fetchone() == ("ok",), "SQLite integrity check failed")
+        return hashlib.sha256("\n".join(connection.iterdump()).encode("utf-8")).hexdigest()
+
+
+async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> dict:
+    # Import MCP only in the installed interpreter, never a source checkout.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from smoke_mcp import StdioServerParameters, public_session
+
+    command = Path(sys.prefix) / ("Scripts/flower-mcp.exe" if os.name == "nt" else "bin/flower-mcp")
+    parameters = StdioServerParameters(
+        command=str(command), args=["serve", "--profile", PROFILE, "--profile-root", str(root / "profiles"),
+                                   "--transport", "stdio"], cwd=str(root), env=clean_environment())
+    receipts = []
+    busy = None
+
+    async def call(session, name, arguments):
+        response = await session.call_tool(name, arguments)
+        require(not response.isError, f"Public MCP transport rejection: {response}")
+        value = response.structuredContent["result"]
+        markdown = "\n".join(block.text for block in response.content if block.type == "text")
+        require(markdown.startswith("#") and "\n" in markdown, "Missing model-facing multiline Markdown")
+        require(value["status"] == "success", f"Public operation rejected: {value}")
+        receipts.append({"tool": name, "arguments": arguments, "envelope": value, "markdown": markdown})
+        return value["result"]
+
+    async with public_session(parameters, strict=True) as session:
+        catalog = await session.list_tools()
+        require(len(catalog.tools) == 36, "Public tool inventory changed unexpectedly")
+        catalog_values = [tool.model_dump(mode="json") for tool in catalog.tools]
+        await call(session, "fow_capabilities", {"view": "summary"})
+        if phase == "before":
+            address = {"project_id": PROJECT, "actor": "synthetic-upgrade-engineer"}
+            contract = await call(session, "fow_capabilities", {
+                "view": "operation", "operation_tool": "fow_bootstrap", "operation_name": "start"})
+            start = contract["operation_contract"]["example"]
+            start.update(**address, project_name="Public upgrade fixture", path="guided_engineering", request_id="upgrade-start")
+            await call(session, "fow_bootstrap", start)
+            requirement = await call(session, "fow_register_requirement", {**address,
+                "title": "Retain the integer successor scenario", "statement": "The API shall return the integer successor.",
+                "category": "functional", "rationale": "Synthetic upgrade qualification only.", "request_id": "upgrade-requirement"})
+            requirement_id = requirement["requirement_id"]
+            await call(session, "fow_record_verification", {**address, "requirement_id": requirement_id,
+                "verification_kind": "tested_deterministically", "outcome": "passed", "reference": "synthetic:upgrade-fixture",
+                "metadata": {"provenance": "declared_host_fixture", "original_detail": "Keep this exact evidence through upgrade."},
+                "request_id": "upgrade-evidence"})
+            handover = await call(session, "fow_handover", {**address, "operation": "create_handover", "request_id": "upgrade-handover"})
+            identity = {"project_id": PROJECT, "requirement_id": requirement_id, "handover_id": handover["handover"]["handover_id"]}
+            (root / "fixture.json").write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
+        else:
+            identity = read_json(root / "fixture.json")
+        requirement = await call(session, "fow_get_requirement", {
+            "project_id": PROJECT, "requirement_id": identity["requirement_id"]})
+        handover = await call(session, "fow_handover", {
+            "project_id": PROJECT, "operation": "get_handover", "handover_id": identity["handover_id"]})
+        traceability = await call(session, "fow_traceability", {"project_id": PROJECT, "detail_level": "audit"})
+        if phase == "before" and assets is not None:
+            # Keep the real MCP foreground process alive while an actual upgrade
+            # attempts its ownership gate. No service is stopped by the installer.
+            backend = load_backend(assets / "install_flower.py")
+            local_assets(backend, assets)
+            environment = root / "venv"
+            receipt = environment / backend.OWNER_FILE
+            owner_before = receipt.read_bytes()
+            options = backend.build_parser().parse_args([
+                "--upgrade", "--venv", str(environment), "--profile", PROFILE, "--profile-root", str(root / "profiles")])
+            try:
+                await asyncio.to_thread(backend.installation, options)
+            except backend.InstallationError as exc:
+                require("ledger_runtime_in_use" in str(exc), "Busy runtime failed for a different reason: " + str(exc))
+                busy = {"status": "rejected", "reason": "ledger_runtime_in_use", "message": str(exc)}
+            else:
+                raise RuntimeError("Upgrade proceeded while the public MCP server owned its ledger")
+            require(receipt.read_bytes() == owner_before, "Busy upgrade changed installed ownership")
+            require(not (root / "profiles" / "upgrade-backups").exists(), "Busy upgrade created a backup before obtaining ownership")
+        if phase != "before":
+            before = read_json(root / "before-mcp.json")
+            require(requirement == before["requirement"], "Original requirement changed through upgrade")
+            require(handover == before["handover"], "Frozen HAND changed through upgrade")
+            comparable_traceability = {**traceability, "projection": dict(traceability["projection"])}
+            namespace = comparable_traceability["projection"].pop("source_ledger_version_namespace", None)
+            require(namespace in {None, "requirement_events.max_event_id.v1"}, "Current traceability returned an unexpected ledger clock namespace")
+            require(comparable_traceability == before["traceability"], "Original verification evidence changed through upgrade")
+            resumed = await call(session, "fow_handover", {
+                "project_id": PROJECT, "operation": "resume_context", "handover_id": identity["handover_id"]})
+            comparison = resumed["handover"]["historical_comparison"]
+            require(comparison["state"] == "legacy_without_recovery" and comparison["historical_payload_unchanged"] is True,
+                    "Legacy HAND recovery did not identify unchanged historical authority")
+    return {"status": "passed", "phase": phase, "catalog": catalog_values, "receipts": receipts,
+            "requirement": requirement, "handover": handover, "traceability": traceability, "busy_upgrade": busy}
+
+
+def qualify(args) -> dict:
+    root = args.root.expanduser().absolute()
+    require(not root.exists() and not root.is_symlink(), "Qualification requires an absent isolated root")
+    if args.output is not None:
+        require(not args.output.exists() and not args.output.is_symlink(), "Qualification output must not replace an existing file")
+    assets = args.assets.resolve()
+    backend = load_backend(assets / "install_flower.py")
+    require(tuple(map(int, backend.DEFAULT_VERSION.split("."))) > tuple(map(int, BASELINE_VERSION.split("."))),
+            "Current assets must be newer than published 0.3.0")
+    root.mkdir(parents=True, exist_ok=False)
+    result = {"status": "running", "scope": "Real published-baseline package mechanics; local verified current assets, not anonymous delivery",
+              "baseline_version": BASELINE_VERSION, "version": backend.DEFAULT_VERSION, "root": str(root)}
+    try:
+        baseline = baseline_assets(root / "baseline-assets", args.baseline_assets)
+        old_backend = load_backend(baseline / "install_flower.py")
+        local_assets(old_backend, baseline)
+        environment = root / "venv"
+        profiles = root / "profiles"
+        client = root / "gemini-settings.json"
+        client.write_text('{"mcpServers": {}, "ui": {"theme": "synthetic-upgrade"}}\n', encoding="utf-8")
+        common = ["--venv", str(environment), "--profile", PROFILE, "--profile-root", str(profiles)]
+        original = old_backend.installation(old_backend.build_parser().parse_args([
+            *common, "--platform", "gemini-cli", "--client-config", str(client)]))
+        python = old_backend.interpreter_in(environment)
+        result["baseline_installation"] = original
+        result["before"] = run_worker(python, root, "before", assets)
+        profile = profiles / "profiles" / PROFILE
+        config = profile / "flower.yaml"
+        database = profile / "ledger.sqlite3"
+        original_database = database_state(database)
+        original_profile = state_snapshot(profiles)
+        original_config = config.read_bytes()
+        original_client = client.read_bytes()
+        local_assets(backend, assets)
+        # A dry run must not download, write, create locks, or refresh ownership.
+        def unexpected_download(*unused, **keywords):
+            raise RuntimeError("Upgrade dry run attempted a download")
+        download = backend.download_asset
+        backend.download_asset = unexpected_download
+        receipt = environment / backend.OWNER_FILE
+        owner_bytes = receipt.read_bytes()
+        plan = backend.installation(backend.build_parser().parse_args([*common, "--upgrade", "--dry-run"]))
+        require(state_snapshot(profiles) == original_profile and receipt.read_bytes() == owner_bytes,
+                "Upgrade dry run changed persistent state or ownership receipt")
+        require(client.read_bytes() == original_client, "Upgrade dry run changed coding-client registration")
+        backend.download_asset = download
+        result["dry_run"] = plan
+        updated = backend.installation(backend.build_parser().parse_args([*common, "--upgrade"]))
+        require(database_state(database) == original_database, "Upgrade changed the original SQLite authority")
+        require(config.read_bytes() == original_config, "Upgrade changed profile YAML")
+        require(client.read_bytes() == original_client, "Upgrade changed coding-client registration")
+        after_profile = state_snapshot(profiles)
+        require(all(key in after_profile for key in original_profile), "Upgrade removed original profile paths")
+        require(all(after_profile[key] == value for key, value in original_profile.items()
+                    if not key.endswith(".runtime.lock") and not key.endswith("/ledger.sqlite3")),
+                "Upgrade rewrote original persistent profile files")
+        backups = list(profiles.rglob("*.sqlite3"))
+        backup_databases = [path for path in backups if path != database]
+        require(len(backup_databases) == 1, "Upgrade did not produce exactly one consistent SQLite backup")
+        require(database_state(backup_databases[0]) == original_database, "Backup differs from the original SQLite authority")
+        backup_yamls = [path for path in profiles.rglob("*.yaml") if path != config]
+        require(len(backup_yamls) == 1 and backup_yamls[0].read_bytes() == config.read_bytes(), "Backup does not retain exact profile YAML")
+        require(read_json(receipt)["version"] == backend.DEFAULT_VERSION, "Upgrade did not update owned installation version")
+        result["upgrade"] = updated
+        result["preservation"] = {"sqlite_logical_sha256": original_database, "database": str(database),
+                                  "backup": str(backup_databases[0]), "client_sha256": digest(client), "profile_sha256": digest(config)}
+        result["after"] = run_worker(python, root, "after")
+        result["restart"] = run_worker(python, root, "restart")
+        require(database_state(database) == original_database, "Read-only recovery changed existing ledger authority")
+        result["status"] = "passed"
+    except BaseException as exc:
+        result.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        (root / "upgrade-smoke.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        if args.output:
+            args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--assets", type=Path, help="current build_release.py output directory")
+    parser.add_argument("--baseline-assets", type=Path, help="optional actual published 0.3.0 assets; otherwise download anonymously")
+    parser.add_argument("--root", type=Path, required=True, help="absent isolated work directory, retained after qualification")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--worker", choices=("before", "after", "restart"), help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if args.worker:
+        result = asyncio.run(asyncio.wait_for(public_fixture(args.root, args.worker, args.assets), timeout=120))
+        (args.root / f"{args.worker}-mcp.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    else:
+        if args.assets is None:
+            parser.error("--assets is required")
+        result = qualify(args)
+    print(json.dumps({key: value for key, value in result.items() if key in {"status", "scope", "baseline_version", "version", "root", "phase"}}))
+
+
+if __name__ == "__main__":
+    main()

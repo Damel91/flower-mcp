@@ -34,6 +34,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p test_release_assets.py -v
           python -m unittest discover -s tests -p test_google_installation.py -v
+          python -m unittest discover -s tests -p test_upgrade_smoke.py -v
       - name: Build packages and release assets
         run: |
           python -m pip install build
@@ -50,7 +51,7 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.metadata import version; from importlib.resources import files; import flow_of_work_mcp; import os; from pathlib import Path; assert Path(flow_of_work_mcp.__file__).is_relative_to(Path("flower-wheel").resolve()); assert files("flow_of_work_mcp").joinpath("resources/standalone.yaml").is_file(); installed = version("flow-of-work-mcp"); assert installed == os.environ["FLOWER_EXPECTED_VERSION"], f"Installed version differs: {installed}"; print(installed)'
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.util import find_spec; assert find_spec("runtime_llama") is None; assert find_spec("lmstudio_agent_runtime") is None'
           "$RUNNER_TEMP/flower-wheel/bin/python" -m pip install 'pytest>=8,<10'
-          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_installation_identity_and_probe.py" "$GITHUB_WORKSPACE/tests/test_mcp_probe_transport.py"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_installation_identity_and_probe.py" "$GITHUB_WORKSPACE/tests/test_mcp_probe_transport.py" "$GITHUB_WORKSPACE/tests/test_safe_upgrade.py"
           export FLOWER_HOME="$RUNNER_TEMP/bootstrap-no-profile"
           test ! -e "$FLOWER_HOME"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" bootstrap > "$RUNNER_TEMP/flower-bootstrap.md"
@@ -58,6 +59,17 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from pathlib import Path; from importlib.resources import files; import os; output = Path(os.environ["RUNNER_TEMP"]).joinpath("flower-bootstrap.md").read_bytes(); canonical = files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_bytes(); assert output == canonical, "Bootstrap command differs from its bundled instructions"; assert all(marker in output for marker in (b"fow_interaction", b"fow_capabilities", b"fow_handover", b"<!-- flower-mcp:begin -->", b"<!-- flower-mcp:end -->")), "Bootstrap command omits essential instructions"'
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_mcp.py" --command "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --output "$RUNNER_TEMP/flower-mcp-smoke.json"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_client_registration.py" --python "$RUNNER_TEMP/flower-wheel/bin/python" --output "$RUNNER_TEMP/flower-google-client-smoke.json"
+      - name: Upgrade the published baseline while preserving public lifecycle state
+        if: matrix.python == '3.11'
+        run: python tools/smoke_upgrade.py --assets dist --root "$RUNNER_TEMP/flower-upgrade" --output "$RUNNER_TEMP/flower-upgrade-smoke.json"
+      - name: Retain the Linux public upgrade receipts
+        if: always() && matrix.python == '3.11'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flower-linux-upgrade-qualification
+          path: ${{ runner.temp }}/flower-upgrade-smoke.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Install the exact optional runtime from the current release assets
         shell: bash
         run: |
@@ -123,6 +135,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Current wheel installation failed.' }
           & $python -m pip check
           if ($LASTEXITCODE -ne 0) { throw 'Installed dependencies are inconsistent.' }
+          & $python -m pip install 'pytest>=8,<10'
+          if ($LASTEXITCODE -ne 0) { throw 'Installed upgrade-test runner preparation failed.' }
           if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
             throw 'No-register installation created a lifecycle profile.'
           }
@@ -145,6 +159,10 @@ jobs:
           assert output == files('flow_of_work_mcp').joinpath('resources/agent-bootstrap.md').read_text(encoding='utf-8')
           assert not Path(os.environ['FLOWER_HOME']).exists()
           '@
+          $savedPythonPath = $env:PYTHONPATH
+          Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+          $pytestConfig = Join-Path $env:RUNNER_TEMP 'flower-empty-pytest.ini'
+          Set-Content -LiteralPath $pytestConfig -Value '[pytest]' -Encoding ASCII
           Push-Location $env:RUNNER_TEMP
           try {
             & $command --help
@@ -155,11 +173,31 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Installed public MCP lifecycle smoke failed.' }
             & $python (Join-Path $env:GITHUB_WORKSPACE 'tools\smoke_client_registration.py') --python $python --output (Join-Path $env:RUNNER_TEMP 'flower-windows-google-client-smoke.json')
             if ($LASTEXITCODE -ne 0) { throw 'Installed Google registration and generated MCP smoke failed.' }
+            & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_safe_upgrade.py')
+            if ($LASTEXITCODE -ne 0) { throw 'Installed native Windows upgrade regressions failed.' }
           }
-          finally { Pop-Location }
+          finally {
+            Pop-Location
+            if ($null -eq $savedPythonPath) { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
+            else { $env:PYTHONPATH = $savedPythonPath }
+          }
           if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
             throw 'Bootstrap created a lifecycle profile.'
           }
+      - name: Upgrade the published baseline on Windows with its SQLite state
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/smoke_upgrade.py --assets dist --root (Join-Path $env:RUNNER_TEMP 'flower-upgrade') --output (Join-Path $env:RUNNER_TEMP 'flower-upgrade-smoke.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Published-baseline Windows upgrade failed.' }
+      - name: Retain the Windows public upgrade receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flower-windows-upgrade-qualification
+          path: ${{ runner.temp }}/flower-upgrade-smoke.json
+          if-no-files-found: warn
+          retention-days: 14
   container:
     name: Core container and durable public MCP / Linux amd64
     needs: packages
