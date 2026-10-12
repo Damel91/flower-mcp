@@ -230,8 +230,15 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft7Validator
           manifest = json.loads(Path('glama.json').read_text())
-          with urllib.request.urlopen(manifest['$schema'], timeout=30) as response:
-              schema = json.load(response)
+          request = urllib.request.Request(manifest['$schema'], headers={
+              'Accept': 'application/json', 'User-Agent': 'Flower-MCP-Qualification'})
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = response.read(1024 * 1024 + 1)
+              print('Glama schema response:', response.status, response.geturl(), response.headers.get('Content-Type'))
+          Path('glama-schema-response.bin').write_bytes(payload)
+          if len(payload) > 1024 * 1024:
+              raise ValueError('Glama schema exceeds the qualification limit')
+          schema = json.loads(payload)
           Draft7Validator.check_schema(schema)
           Draft7Validator(schema).validate(manifest)
           Path('glama-schema-checked.json').write_text(json.dumps(schema, indent=2) + '\n')
@@ -262,5 +269,6 @@ jobs:
           path: |
             flower-container-smoke.json
             glama-schema-checked.json
+            glama-schema-response.bin
           if-no-files-found: warn
           retention-days: 14
