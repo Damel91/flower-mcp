@@ -11,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Version: `0.4.0` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Version: `0.4.1` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -83,13 +83,17 @@ Choose one installation route. Use a writable user directory and have a
 access and trusted HTTPS certificates. Check the
 [prerequisites](docs/INSTALLATION.md#prerequisites) first.
 
+For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
+with its original environment and profile. The commands below require matching
+published release assets; changes on `main` do not publish a release.
+
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -101,7 +105,7 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -125,7 +129,7 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Release 0.4.0 retains `runtime-llama` 0.4.0 with an operator-managed llama.cpp endpoint.
+Release 0.4.1 retains `runtime-llama` 0.4.0 with an operator-managed llama.cpp endpoint.
 Core installers do not install it. The exact optional runtime wheel, checksums
 and licenses ship with the release; see [inference setup and migration](docs/INFERENCE.md).
 Host-produced semantic results continue to work without a model.
@@ -136,7 +140,7 @@ The repository includes maintainer metadata and a core-only Dockerfile for
 Glama's build workflow. See the [Glama and container guide](docs/GLAMA.md) for
 startup arguments, persistent SQLite storage and client setup. Glama account
 claim, hosted deployment and platform release are separate steps; the
-GitHub `v0.4.0` release includes these container files.
+GitHub `v0.4.1` release includes these container files.
 
 ### Connect an agent and start a project
 
@@ -192,14 +196,21 @@ existing project and verify another restart.
 
 The [presentation index](docs/presentation/README.md) also links the offline readers.
 
-Release 0.4.0 retains [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
+Release 0.4.1 retains [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
 frozen handovers, current authority, original evidence, offline outcomes and the
 installed HTTP probe. Historical 0.3.0 assets remain unchanged.
 
-Release 0.4.0 also includes [project architecture and negotiated PVP
+Release 0.4.1 retains [project architecture and negotiated PVP
 handoff](docs/NOXI-INTEGRATION.md). Standalone external
 plans remain independent; real provider pairing requires compatible consumer
 support and separate qualification.
+
+The 0.4.1 patch preserves every finding when an SRS import or revision is
+rejected, including repeated diagnostic codes. It adds no tool or database
+migration. Already using Flower? Follow the [upgrade plan](docs/UPGRADING.md)
+with the same environment and profile: preview, stop all clients, back up before
+pip, update and verify the existing project after restart. Do not reinstall into
+a new profile to recover project state.
 
 ## Development method
 
@@ -214,7 +225,7 @@ Read the method in [English](docs/presentation/eng/method.md) or
 
 ## Status and operating limits
 
-Flower `0.4.0` is in testing. The [release notes](docs/RELEASE-NOTES-0.4.0.md) and
+Flower `0.4.1` is in testing. The [release notes](docs/RELEASE-NOTES-0.4.1.md) and
 [installation status](docs/INSTALLATION.md#testing-status-and-release-access)
 distinguish installed-package and CI checks from end-to-end installer and
 target-client qualification.

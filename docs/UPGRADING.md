@@ -1,15 +1,21 @@
 # Upgrade Flower without losing project data
 
-Flower MCP 0.4.0 updates the installed code in place and retains the existing
+Flower MCP 0.4.1 updates the installed code in place and retains the existing
 SQLite ledger. The Python environment owns code; the persistent profile owns
 `flower.yaml`, lifecycle data, bindings, imports, logs and evidence. Keep their
-paths unchanged. Upgrading from 0.3.1 (schema 52) to 0.4.0 applies additive
-migrations 53–55 on the first server start: seven new tables and two packet
-columns. Existing projects, authority revisions, evidence and handovers remain
-in the same database. The installer backs it up before changing packages;
-`doctor` reads configuration and does not apply or verify these migrations.
+paths unchanged. This patch fixes rejected SRS diagnostics and adds no migration.
+
+| Existing version | Database behavior on the first 0.4.1 server start |
+| --- | --- |
+| 0.4.0, schema 55 | Schema stays at 55; no new migration. |
+| 0.3.1, schema 52 | Existing additive migrations 53–55 create seven tables and two packet columns. |
+
+Existing projects, authority revisions, evidence and handovers remain in the
+same database. The installer backs it up before changing packages. `doctor`
+reads configuration; it does not start Flower or verify database migration.
 After starting Flower, verify the same project through public MCP and restart.
-A package downgrade does not reverse a migrated database.
+A package downgrade does not reverse a migrated database. Release commands
+below require the matching published 0.4.1 assets; source on `main` is not a release.
 
 The safe release upgrade is for environments created by the Flower release
 installer. A manual pip environment uses the [manual procedure below](#manual-pip-installations).
@@ -69,30 +75,37 @@ Prerequisites remain those in [INSTALLATION.md](INSTALLATION.md#prerequisites).
 macOS/Linux, with default installation paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Windows, run the download separately and inspect the script before execution:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.ps1' -OutFile '.\install.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.ps1' -OutFile '.\install.ps1'
 ```
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.0' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.1' -Upgrade -DryRun
 ```
 
 For a custom installation, add its original environment and data options to
 both preview and execution. For example, on macOS/Linux:
 
 ```sh
-python3 -I ./install_flower.py --version 0.4.0 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
+python3 -I ./install_flower.py --version 0.4.1 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
 ```
 
 Here `install_flower.py` is the new release's downloaded backend, checked
 against `SHA256SUMS`. The launchers perform that backend checksum check.
 On Windows, the corresponding PowerShell options are `-Venv`, `-Profile` and
 `-ProfileRoot`; the Python backend uses the same long flags on every OS.
+
+For example, preview an existing custom Windows installation with its original
+values, replacing these example paths:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.1' -Upgrade -DryRun -Venv 'C:\absolute\flower-venv' -Profile 'default' -ProfileRoot 'C:\absolute\private\flower-state'
+```
 
 The returned `flower.release-upgrade-plan.v1` identifies the previous/requested
 version, environment, existing profile/config/database, backup location and
@@ -117,13 +130,13 @@ After inspecting the plan and stopping clients, repeat the same command without
 `--dry-run` / `-DryRun`. For default macOS/Linux paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash -s -- --upgrade
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash -s -- --upgrade
 ```
 
 For Windows:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.0' -Upgrade
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.1' -Upgrade
 ```
 
 The backend verifies the release wheel, acquires the existing selected-ledger
@@ -143,7 +156,7 @@ of all imports or logs. The original imports, logs and registrations stay in pla
 On success, retain the returned old/new versions and backup paths. Run the
 same absolute Flower executable with `doctor` and the original profile options,
 then reconnect/reload your coding client. Ask the agent to check Flower's
-advertised installed distribution version, select the **known existing project**,
+advertised installed distribution version is **0.4.1**, select the **known existing project**,
 read its current snapshot and use `fow_handover` with `resume_context` when a
 handover is available. Get/replay preserves historical handover payloads; current
 resume compares authority instead of rewriting them. Verify another restart
@@ -174,7 +187,7 @@ separate private directory; preserve the original files.
 Manual environments have no release-installer ownership receipt. Do not create
 one by hand. Stop all clients sharing the environment, record the existing
 profile/config/database paths with `doctor`, and back up before pip mutation.
-Download the 0.4.0 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
+Download the 0.4.1 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
 SHA256 using the [manual installation checks](INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 For a consistent SQLite backup, save the following as `backup_flower.py` outside
@@ -219,7 +232,7 @@ print(destination)
 Use your existing environment's Python to run this script. For example:
 
 ```sh
-/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.4.0
+/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.4.1
 ```
 
 On Windows use `& 'C:\absolute\flower-venv\Scripts\python.exe'` and your actual
@@ -231,12 +244,12 @@ and its configuration.
 Upgrade the verified core wheel **in the same environment**, then check dependencies:
 
 ```sh
-.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.4.0-py3-none-any.whl
+.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.4.1-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.4.0-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.4.1-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 

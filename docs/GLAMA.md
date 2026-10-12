@@ -15,7 +15,7 @@ and publishing a Glama release are separate account actions.
 2. Connect `Damel91/flower-mcp` using Glama's GitHub integration and select its
    root [Dockerfile](../Dockerfile). The image installs the source's current
    `flow-of-work-mcp` package with its core dependencies. Select a source revision
-   deliberately; GitHub `v0.4.0` includes these container files, while the
+   deliberately; GitHub `v0.4.1` includes these container files, while the
    historical `v0.1.1` tag predates them.
 3. If the dashboard asks for the startup command, use these executable arguments:
 

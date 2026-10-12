@@ -18,7 +18,7 @@ release assets and Python dependencies.
 Select either client with the release installer:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash -s -- --platform antigravity
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash -s -- --platform antigravity
 # For Gemini CLI, replace antigravity with gemini-cli.
 ```
 
