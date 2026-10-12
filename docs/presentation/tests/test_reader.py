@@ -227,7 +227,7 @@ class ReaderChecks(unittest.TestCase):
                              f"{distribution}-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md",
                              f"runtime_llama-{runtime}-py3-none-any.whl"):
                     self.assertIn(f"/releases/download/v{version}/{name}", source)
-                self.assertIn(f"/blob/v{version}/docs/UPGRADING.md", source)
+                self.assertIn(f"/blob/{manifest['product_revision']}/docs/UPGRADING.md", source)
                 self.assertIn("--upgrade --dry-run", source)
                 self.assertIn(f"-Version '{version}' -Upgrade -DryRun", source)
                 for option in ("--venv", "--profile", "--profile-root",
