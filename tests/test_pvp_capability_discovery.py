@@ -75,12 +75,15 @@ def test_absent_or_incompatible_capability_is_unsupported_not_rejected(tmp_path,
 @pytest.mark.parametrize('patch', [
     {'status': {'available': True}}, {'status': []}, {'status': True}, {'status': None},
     {'status': ''}, {'status': '   '}, {'result': None}, {'result': []}, {'result': 'invalid'},
+    {'status': 'blocked', 'reason': 'provider_policy_refused', 'result': None},
+    {'status': 'error', 'reason': 'provider_policy_refused', 'result': []},
     {'status': {'available': True}, 'contract_version': 'codingcastle.orientation.v2', 'group': 'other'},
     {'status': {'available': 'true'}, 'contract_version': 'codingcastle.orientation.v2', 'group': 'overview'},
     {'status': 'success', 'contract_version': 'codingcastle.orientation.v2', 'group': 'overview'},
     {**_overview(True), 'result': _registry()},
 ], ids=['unknown-health', 'list-status', 'boolean-status', 'null-status', 'empty-status',
-        'blank-status', 'null-result', 'list-result', 'scalar-result', 'wrong-overview-group',
+        'blank-status', 'null-result', 'list-result', 'scalar-result', 'negative-null-result',
+        'negative-list-result', 'wrong-overview-group',
         'nonboolean-health', 'overview-with-verdict', 'overview-with-result'])
 def test_malformed_envelopes_are_contract_errors_even_with_valid_sibling_ad(tmp_path, patch):
     payload = {**_registry(), **patch}

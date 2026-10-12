@@ -289,6 +289,9 @@ def _unwrap_capability_result(payload: Mapping[str, object]) -> Mapping[str, obj
     for _ in range(4):
         if not isinstance(current, Mapping):
             break
+        result = current.get('result')
+        if 'result' in current and not isinstance(result, Mapping):
+            break
         status = current.get('status')
         if isinstance(status, str) and status.strip():
             if status.strip().lower() not in {'ok', 'success', 'accepted'}:
@@ -307,9 +310,6 @@ def _unwrap_capability_result(payload: Mapping[str, object]) -> Mapping[str, obj
             break
         if 'result' not in current:
             return current
-        result = current['result']
-        if not isinstance(result, Mapping):
-            break
         current = result
     raise ImplementationProviderContractError('provider_validation_capability_envelope_invalid')
 
