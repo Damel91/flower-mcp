@@ -73,7 +73,7 @@ class BaselineImportService:
                 source_path=source_path,
                 profile_id=standard_profile,
                 disposition=audit.disposition,
-                finding_codes=tuple(item.code for item in audit.findings),
+                finding_codes=tuple(sorted({item.code for item in audit.findings})),
                 actor=actor,
                 request_id=audit_request_id,
             )
@@ -154,7 +154,7 @@ class BaselineImportService:
                 source_path=source_path,
                 profile_id=standard_profile,
                 disposition=audit.disposition,
-                finding_codes=tuple(item.code for item in audit.findings),
+                finding_codes=tuple(sorted({item.code for item in audit.findings})),
                 actor=actor,
                 request_id=audit_request_id,
             )
