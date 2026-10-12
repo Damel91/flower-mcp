@@ -270,7 +270,33 @@ def test_adapter_discovers_only_explicit_capability_route(tmp_path):
     client = _Client({'status': 'success', 'result': {'packet_validation': capability.capability}})
     adapter = McpCodingCastlePacketProvider(client=client, bindings=(), binding_resolver=ledger)
     assert adapter.validation_capabilities(ids[0]) == capability.capability
-    assert client.calls == [('codingcastle_capabilities', {})]
+    assert client.calls == [('codingcastle_capabilities', {'group': 'all'})]
+
+
+def test_negotiated_deferred_only_unit_keeps_empty_checks_in_adapter_delivery(tmp_path):
+    from tests.test_pvp_temporal_authoring import replace_with_deferred
+
+    ledger, external, _, capability, ids, _ = fixture(tmp_path)
+    revs, _ = replace_with_deferred(ledger, ids)
+    client = _Client({'status': 'success', 'result': {'packet_validation': capability.capability}})
+    adapter = McpCodingCastlePacketProvider(client=client, bindings=(), binding_resolver=ledger)
+    executor = PacketExecutorService(ledger, provider=adapter, semantic_projection=external.provider_validation)
+    select(executor, ids, revs)
+    assert negotiate(executor, ids, revs)['status'] == 'success'
+    socket = PacketProviderSocketService(ledger, mode='required', provider=adapter, executor=executor)
+    command = unit_command(executor, ids, revs, key='deferred-only-command')
+    client.responses.append(v3_response(command))
+    result = socket.submit(*ids, command=command, actor='engineer')
+    assert result['state'] == 'provider_delivered'
+    assert client.calls[0] == ('codingcastle_capabilities', {'group': 'all'})
+    assert client.calls[1][1]['unit']['unit_checks'] == []
+    context = client.metas[1][CONTEXT_VERSION]
+    assert context == command.validation_context
+    assert all(unit['local_verification'] == [] for unit in context['units'])
+    assert all(unit['deferred_verification'] for unit in context['units'])
+    assert 'Deferred verification' not in str(client.calls[1][1])
+    assert context['units'][1]['resolved_requires'][0]['contract'] == context['units'][0]['provides'][0]
+    assert ledger.packet_provider_receipts(*ids)[0]['receipt']['contract_version'] == RECEIPT_VERSION
 
 
 def rebind(ledger, ids):

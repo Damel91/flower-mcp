@@ -5,7 +5,7 @@ import hashlib
 import json
 from typing import Mapping
 
-from flow_of_work_mcp.core.domain.external_work import normalize_declarations
+from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verification, normalize_declarations
 from flow_of_work_mcp.application.navigation_audit import NavigationAuditService
 from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
 from flow_of_work_mcp.core.domain.packet_operations import PacketTaskOperationKind
@@ -632,12 +632,16 @@ def _normalize_unit_intent(unit: Mapping[str, object]) -> Mapping[str, object]:
         "file_path": file_path,
         "surface": surface,
     }
+    declarations = normalize_declarations(value)
     for field in _LIST_FIELDS:
         items = _string_list(value.get(field), field)
-        if field in {"instructions", "unit_checks"} and not items:
+        required = field == 'instructions' or (
+            field == 'unit_checks' and not has_only_deferred_verification(declarations['verifies'])
+        )
+        if required and not items:
             raise ValueError(f"unit requires {field}")
         normalized[field] = items
-    normalized.update(normalize_declarations(value))
+    normalized.update(declarations)
     return normalized
 
 

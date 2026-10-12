@@ -238,7 +238,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "Which existing contracts must be reused rather than redeclared?",
                 "Which predecessor output must exist first?",
                 "What exclusion prevents duplicate, dead, or widened work?",
-                "What local observable check proves this unit complete?",
+                "Which checks are evaluable at this unit boundary, and which obligations must remain deferred?",
             ),
             evidence=(
                 "current readable target or explicit future destination",
@@ -247,7 +247,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             ),
             stop_conditions=(
                 "an existing target remains ambiguous or ungrounded",
-                "instructions or unit checks are incomplete",
+                "instructions or verification obligations are incomplete; empty unit checks require nonempty exclusively deferred verifies",
                 "a construction, risk, or authority gate remains unresolved",
                 "the configured provider cannot honor the packet socket contract",
             ),

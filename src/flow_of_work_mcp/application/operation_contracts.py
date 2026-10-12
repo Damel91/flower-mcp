@@ -1125,7 +1125,9 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
         ),
         "unit_check_rule": (
             "Keep unit_checks local to this unit instead of copying packet-wide "
-            "completion criteria into every unit."
+            "completion criteria into every unit. An empty list is allowed only "
+            "with nonempty verifies containing exclusively deferred intents; "
+            "do not invent a local check to satisfy authoring."
         ),
         "standalone_validation_declarations": {
             "implements": [1],
@@ -1134,7 +1136,7 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "verifies": [{"criterion": 1, "kind": "unit_check", "statement": "The API exposes the declared behavior."}],
             "contract_kinds": ["symbol", "api", "data_shape", "protocol", "behavioral_boundary"],
             "verification_kinds": ["unit_check", "deterministic_campaign", "live_campaign", "oracle", "explicit_authority"],
-            "temporal_rule": "Only unit_check is current local work. Campaign/Oracle/explicit-authority checks remain deferred. Planned paths/symbols do not assert source exists. Consumer refers to one declared predecessor contract without copying clauses.",
+            "temporal_rule": "Only unit_check is current local work. Campaign/Oracle/explicit-authority checks remain deferred; exclusively deferred verifies permits empty unit_checks without claiming local verification passed. Planned paths/symbols do not assert source exists. Contract kind is semantic, never an AST type; no symbol_kind or expected_kind field exists. Consumer refers to one declared predecessor contract without copying clauses.",
         },
         "deletion_rule": (
             "delete_existing selects exactly one current parser symbol; Flower emits "

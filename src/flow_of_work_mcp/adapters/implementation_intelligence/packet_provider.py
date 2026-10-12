@@ -226,7 +226,9 @@ class McpCodingCastlePacketProvider:
 
     def validation_capabilities(self, project_id: str) -> Mapping[str, object]:
         self.binding_identity(project_id)
-        payload = _unwrap_public_result(self._client.call_tool('codingcastle_capabilities', {}))
+        payload = _unwrap_capability_result(
+            self._client.call_tool('codingcastle_capabilities', {'group': 'all'})
+        )
         capability = payload.get('packet_validation')
         return dict(capability) if isinstance(capability, Mapping) else {}
 
@@ -279,6 +281,37 @@ class McpCodingCastlePacketProvider:
             numbers.append(correlation.unit_number)
         translated["depends_on"] = numbers
         return translated, tuple(correlations)
+
+
+def _unwrap_capability_result(payload: Mapping[str, object]) -> Mapping[str, object]:
+    """Separate registry verdicts from the known non-negotiating health view."""
+    current = payload
+    for _ in range(4):
+        if not isinstance(current, Mapping):
+            break
+        status = current.get('status')
+        if isinstance(status, str) and status.strip():
+            if status.strip().lower() not in {'ok', 'success', 'accepted'}:
+                detail = current.get('result')
+                detail = detail if isinstance(detail, Mapping) else current
+                raise PacketProviderRejectedError(str(
+                    detail.get('reason') or current.get('reason') or 'packet_provider_rejected'
+                ))
+        if current.get('contract_version') == 'codingcastle.orientation.v2':
+            if (current.get('group') == 'overview' and isinstance(status, Mapping)
+                    and isinstance(status.get('available'), bool) and 'result' not in current):
+                # Health/availability never advertises packet execution support.
+                return {}
+            break
+        if 'status' in current and (not isinstance(status, str) or not status.strip()):
+            break
+        if 'result' not in current:
+            return current
+        result = current['result']
+        if not isinstance(result, Mapping):
+            break
+        current = result
+    raise ImplementationProviderContractError('provider_validation_capability_envelope_invalid')
 
 
 def _unwrap_public_result(payload: Mapping[str, object], *, rejection_validator=None) -> Mapping[str, object]:

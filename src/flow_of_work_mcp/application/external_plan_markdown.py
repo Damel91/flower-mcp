@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
+from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verification
 from flow_of_work_mcp.markdown_adapter import safe_heading, safe_inline
 
 
@@ -108,7 +109,11 @@ def render_unit(lines: list[str], unit: Mapping[str, Any], *, level: int = 3) ->
         ('Unit-local checks', unit.get('unit_checks', [])),
     ):
         _section(lines, label, level + 1)
-        _list(lines, values)
+        if (label == 'Unit-local checks' and not values
+                and has_only_deferred_verification(unit.get('verifies', []))):
+            lines.append('No unit-local checks authored; deferred obligations below remain pending.')
+        else:
+            _list(lines, values)
     _section(lines, 'Planned producer contracts', level + 1)
     if not unit.get('provides'):
         lines.append('None declared.')

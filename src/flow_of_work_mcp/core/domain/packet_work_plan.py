@@ -6,7 +6,7 @@ from enum import StrEnum
 import re
 from typing import Mapping
 
-from flow_of_work_mcp.core.domain.external_work import normalize_declarations
+from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verification, normalize_declarations
 
 from flow_of_work_mcp.core.domain.change_control import validate_change_id, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import required_text
@@ -122,7 +122,10 @@ class WorkPlanUnit:
         object.__setattr__(
             self,
             "unit_checks",
-            _bounded_text_tuple(self.unit_checks, "unit_checks", required=True),
+            _bounded_text_tuple(
+                self.unit_checks, "unit_checks",
+                required=not has_only_deferred_verification(self.verifies),
+            ),
         )
         object.__setattr__(
             self, "constraints", _bounded_text_tuple(self.constraints, "constraints")

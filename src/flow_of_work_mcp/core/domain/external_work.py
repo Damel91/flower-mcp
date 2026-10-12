@@ -144,3 +144,8 @@ def normalize_declarations(value: Mapping[str, object]) -> dict[str, object]:
     if len({(item['criterion'], item['kind'], item['statement']) for item in verifies}) != len(verifies):
         raise ValueError('verification intents must be unique')
     return {'implements': implements, 'provides': provides, 'requires': requires, 'verifies': verifies}
+
+
+def has_only_deferred_verification(intents: list[Mapping[str, object]] | tuple[Mapping[str, object], ...]) -> bool:
+    """Apply only to normalized intents; absence is not a deferred obligation."""
+    return bool(intents) and all(intent['kind'] != 'unit_check' for intent in intents)
