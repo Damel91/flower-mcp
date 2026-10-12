@@ -289,6 +289,7 @@ def test_negotiated_deferred_only_unit_keeps_empty_checks_in_adapter_delivery(tm
     result = socket.submit(*ids, command=command, actor='engineer')
     assert result['state'] == 'provider_delivered'
     assert client.calls[0] == ('codingcastle_capabilities', {'group': 'all'})
+    assert client.calls[1][1]['detail_level'] == 'verbose'
     assert client.calls[1][1]['unit']['unit_checks'] == []
     context = client.metas[1][CONTEXT_VERSION]
     assert context == command.validation_context

@@ -146,7 +146,7 @@ class McpCodingCastlePacketProvider:
         arguments: dict[str, object] = {
             "session_id": session_id,
             "operation": command.operation.value,
-            "detail_level": "audit",
+            "detail_level": "verbose",
         }
         semantic = dict(command.semantic_input)
         selected_correlation: CodingCastleProviderUnitCorrelation | None = None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Mapping
 
 import pytest
@@ -43,9 +44,19 @@ class _Client:
     ) -> Mapping[str, object]:
         self.calls.append((tool_name, dict(arguments)))
         self.metas.append(dict(meta) if meta is not None else None)
+        if tool_name == "codingcastle_packet" and arguments.get("detail_level") not in {
+            "minimal", "standard", "verbose"
+        }:
+            raise ValueError("unknown CodingCastle detail_level")
         if not self.responses:
             raise AssertionError("unexpected provider call")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if tool_name == "codingcastle_packet" and arguments["detail_level"] != "verbose":
+            # CC's canonical packet projection omits machine audit at lower levels.
+            response = deepcopy(response)
+            if isinstance(response.get("result"), dict):
+                response["result"].pop("audit", None)
+        return response
 
 
 def _public_receipt(
@@ -143,7 +154,7 @@ def test_codingcastle_adapter_adds_one_unit_through_public_semantic_tool() -> No
             {
                 "session_id": "coding-session",
                 "operation": "add",
-                "detail_level": "audit",
+                "detail_level": "verbose",
                 "unit": _future_unit(),
             },
         )
@@ -153,6 +164,28 @@ def test_codingcastle_adapter_adds_one_unit_through_public_semantic_tool() -> No
     assert receipt.unit_receipts[0].provider_unit_ref == "provider-unit-9"
     assert receipt.unit_receipts[0].unit_number == 1
     assert client.metas == [None]
+
+
+@pytest.mark.parametrize("operation", ["add", "edit", "remove", "start", "stop", "status"])
+def test_every_packet_operation_retains_required_machine_audit(operation: str) -> None:
+    client = _Client(_public_receipt())
+    provider = _provider(client, resolver=lambda *_: {
+        "provider_unit_ref": "provider-unit-9", "unit_number": 1,
+    })
+    semantic = ({"unit": _future_unit()} if operation == "add" else
+                {"changes": {"instructions": ["Keep the module typed."]}} if operation == "edit" else {})
+    command = PacketProviderCommand(
+        flow_session_ref="flow-project", flow_packet_ref="PACKET-000001",
+        flow_spec_revision=3, operation=operation,
+        flow_unit_ref="unit-1" if operation in {"add", "edit", "remove"} else "",
+        semantic_input=semantic, delivery_fingerprint="profile-" + operation,
+    )
+    receipt = provider.execute(command)
+    assert client.calls[0][1]["detail_level"] == "verbose"
+    assert len(client.calls) == 1  # No invalid-profile retry or fallback.
+    assert receipt.provider_packet_ref == "provider-packet-1"
+    assert receipt.provider_packet_revision == 2
+    assert receipt.event_seq == 7
 
 
 def test_transient_target_choices_are_not_persisted_as_provider_authority() -> None:
@@ -249,7 +282,7 @@ def test_edit_resolves_internal_provider_identity_to_human_unit_number() -> None
             {
                 "session_id": "coding-session",
                 "operation": "edit",
-                "detail_level": "audit",
+                "detail_level": "verbose",
                 "unit_number": 1,
                 "changes": {
                     "instructions": ["Keep the configuration typed."]
@@ -298,7 +331,7 @@ def test_flow_dependency_refs_are_translated_to_packet_local_numbers() -> None:
             {
                 "session_id": "coding-session",
                 "operation": "add",
-                "detail_level": "audit",
+                "detail_level": "verbose",
                 "unit": {**unit, "depends_on": [2]},
             },
         )

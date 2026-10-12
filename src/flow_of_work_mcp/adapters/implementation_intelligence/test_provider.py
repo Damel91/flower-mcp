@@ -215,7 +215,7 @@ class McpCodingCastleTestProvider:
         arguments: dict[str, object] = {
             "session_id": binding.provider_session_id,
             "operation": operation_map[command.operation],
-            "detail_level": "audit",
+            "detail_level": "verbose",
         }
         harness = _harness_input(command.semantic_input)
         if harness["disposition"] == "repository" and binding.repository is not None:
