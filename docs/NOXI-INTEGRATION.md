@@ -1,8 +1,9 @@
 # Noxi and Flower integration
 
-Flower MCP 0.4.0 adds durable
-project architecture and an optional, explicitly negotiated provider handoff.
-Published 0.3.1 remains immutable; Flower does not install a Noxi agent loop.
+Flower MCP 0.4.0 introduced durable project architecture and an optional,
+explicitly negotiated provider handoff; 0.4.1 retains them. The discovery and
+deferred-only authoring correction described below is newer unreleased source.
+Flower does not install a Noxi agent loop or alter historical release assets.
 Actual paired consumer qualification is recorded separately from Flow protocol
 tests; check the installed server's capabilities before using optional delivery.
 
@@ -129,6 +130,33 @@ Unit-local checks stay separate from deferred campaign, Oracle and
 explicit-authority obligations; those deferred obligations do not become current
 coding tasks.
 
+### Unreleased discovery and temporal-authoring correction
+
+The source after published 0.4.1 explicitly requests
+`codingcastle_capabilities({"group":"all"})`. A complete registry without a
+`packet_validation` advertisement is unsupported. A known overview health object
+is also unsupported; it never advertises execution support. Invalid envelopes
+are contract errors and explicit provider rejections retain their bounded reason.
+No alternate route or legacy-receipt downgrade is attempted. Only an explicit
+compatible v3/context-v1/receipt-v3 advertisement authorizes new enriched work.
+
+Planned contract `kind` is semantic (`symbol`, `api`, `data_shape`, `protocol`,
+`behavioral_boundary`). Its only optional technical fields are `file_path`,
+`symbol` and `signature`. There is no `symbol_kind` or AST `expected_kind` field;
+do not derive one from the semantic kind. Unsupported consumer materialization
+must reject before effect. Resolve technical gaps through investigation and
+ordinary accepted plan authority; new fields require a versioned contract.
+
+For a PVP unit with nonempty exclusively deferred `verifies`, canonical authoring
+can retain `unit_checks=[]`. Legacy units and units with local or mixed intents
+still require local checks. The context carries the exact empty
+`local_verification` and separate deferred intents. No compiler may fabricate a
+local check or turn a deferred obligation into current work. Consumer technical
+validation remains independently required. An outcome may report
+`verification=[]` when no local check applies; local progress is not_applicable,
+with no percentage for zero applicable criteria. Deferred checks and acceptance
+remain pending. Exported Markdown explains that distinction for offline work.
+
 The consumer owns materialization/compiler behavior and returns a matching
 context/authority/unit acknowledgement with a compilation digest. Flower requires
 current matching unit acknowledgements before START. A digest records declared
@@ -137,6 +165,12 @@ was provider-audited or establish human acceptance. Missing/mismatched replies
 after a possible write retain unknown delivery and reconcile only the same
 durable command. STOP/STATUS may observe the admitted run using its frozen
 context without admitting new stale coding work.
+
+`compiled_context_sha256` must identify the actual deterministic technical
+representation materialized by the consumer, persisted atomically with its
+effect and ACK. An echo or rehash of the incoming context is not compilation
+evidence. Flower validates format and correlation and preserves consumer-declared
+provenance; the digest alone does not independently audit compiler contents.
 
 Compatible unenriched legacy commands keep v2 delivery. The original full
 cross-server PVP draft and CodingCastle IMPL-67 remain deferred; this bounded
@@ -158,8 +192,8 @@ Inspect the dry-run plan and retain its consistent SQLite backup and profile
 copy. Normal startup performs the additive migration transaction. A package
 version rollback alone does not roll back a migrated ledger; restore the
 matching saved database/profile only through an explicit recovery procedure.
-Published 0.3.1 remains its separately qualified schema 52 release. This source
-increment is distributed as 0.4.0/schema55.
+Published 0.3.1 remains its separately qualified schema 52 release. Published
+0.4.0 and 0.4.1 use schema55; this discovery/authoring correction adds no migration.
 
 ## Continue while Flower is offline
 
