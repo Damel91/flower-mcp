@@ -1,9 +1,15 @@
 # Upgrade Flower without losing project data
 
-Flower MCP 0.3.1 updates the installed code in place and retains the existing
+Flower MCP 0.4.0 updates the installed code in place and retains the existing
 SQLite ledger. The Python environment owns code; the persistent profile owns
 `flower.yaml`, lifecycle data, bindings, imports, logs and evidence. Keep their
-paths unchanged. This patch has no SQLite schema migration.
+paths unchanged. Upgrading from 0.3.1 (schema 52) to 0.4.0 applies additive
+migrations 53–55 on the first server start: seven new tables and two packet
+columns. Existing projects, authority revisions, evidence and handovers remain
+in the same database. The installer backs it up before changing packages;
+`doctor` reads configuration and does not apply or verify these migrations.
+After starting Flower, verify the same project through public MCP and restart.
+A package downgrade does not reverse a migrated database.
 
 The safe release upgrade is for environments created by the Flower release
 installer. A manual pip environment uses the [manual procedure below](#manual-pip-installations).
@@ -63,24 +69,24 @@ Prerequisites remain those in [INSTALLATION.md](INSTALLATION.md#prerequisites).
 macOS/Linux, with default installation paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Windows, run the download separately and inspect the script before execution:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/install.ps1' -OutFile '.\install.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.ps1' -OutFile '.\install.ps1'
 ```
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.3.1' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.0' -Upgrade -DryRun
 ```
 
 For a custom installation, add its original environment and data options to
 both preview and execution. For example, on macOS/Linux:
 
 ```sh
-python3 -I ./install_flower.py --version 0.3.1 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
+python3 -I ./install_flower.py --version 0.4.0 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
 ```
 
 Here `install_flower.py` is the new release's downloaded backend, checked
@@ -111,13 +117,13 @@ After inspecting the plan and stopping clients, repeat the same command without
 `--dry-run` / `-DryRun`. For default macOS/Linux paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/install.sh | bash -s -- --upgrade
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash -s -- --upgrade
 ```
 
 For Windows:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.3.1' -Upgrade
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.0' -Upgrade
 ```
 
 The backend verifies the release wheel, acquires the existing selected-ledger
@@ -159,15 +165,16 @@ a diagnosed package repair; changing client ownership or data is a separate
 operation. For data recovery, keep the original profile untouched, restore the
 backup into a separate private runtime directory and explicitly select a copied
 configuration pointing there. Never overwrite a running or existing ledger.
-An arbitrary downgrade after later schema-changing releases is not qualified
-by this patch's unchanged schema.
+Do not run an older Flower against the migrated ledger. A recovery requiring
+an older package also requires its matching saved database/profile in a
+separate private directory; preserve the original files.
 
 ## Manual pip installations
 
 Manual environments have no release-installer ownership receipt. Do not create
 one by hand. Stop all clients sharing the environment, record the existing
 profile/config/database paths with `doctor`, and back up before pip mutation.
-Download the 0.3.1 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
+Download the 0.4.0 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
 SHA256 using the [manual installation checks](INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 For a consistent SQLite backup, save the following as `backup_flower.py` outside
@@ -212,7 +219,7 @@ print(destination)
 Use your existing environment's Python to run this script. For example:
 
 ```sh
-/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.3.1
+/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.4.0
 ```
 
 On Windows use `& 'C:\absolute\flower-venv\Scripts\python.exe'` and your actual
@@ -224,12 +231,12 @@ and its configuration.
 Upgrade the verified core wheel **in the same environment**, then check dependencies:
 
 ```sh
-.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.3.1-py3-none-any.whl
+.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.4.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.3.1-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.4.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 

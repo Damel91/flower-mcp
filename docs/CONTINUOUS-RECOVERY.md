@@ -6,7 +6,7 @@ export a complete implementation plan, execute it while Flower is offline and
 report the results after reconnecting. Coding, repository investigation and
 local verification remain the agent's responsibility.
 
-Release 0.3.1 includes these recovery corrections. Use the [safe upgrade
+Release 0.4.0 retains the recovery corrections introduced in0.3.1. Use the [safe upgrade
 plan](UPGRADING.md) to preserve an existing installation's ledger and profile;
 the already published 0.3.0 assets remain unchanged. Installed distribution metadata
 identifies the package version; it does not establish that a development checkout

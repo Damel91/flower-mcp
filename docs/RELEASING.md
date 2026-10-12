@@ -8,8 +8,8 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; the current version is `0.3.1`. Tags use the `v` prefix,
-for example `v0.3.1`. Version `0.x` means the public interface is still evolving;
+`MAJOR.MINOR.PATCH`; the current version is `0.4.0`. Tags use the `v` prefix,
+for example `v0.4.0`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
 increments for fixes that preserve the advertised interface. A future `1.0.0`
 requires a deliberately declared stable public interface.
@@ -34,13 +34,13 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify the current `0.3.1` checkout locally, use Python 3.11 or newer in an
+To qualify the current `0.4.0` checkout locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.3.1 --output dist
+python tools/build_release.py --version 0.4.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -48,7 +48,7 @@ This creates wheel and source distributions, copies the Bash, PowerShell and Pyt
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.3.1 --output dist --verify-only
+python tools/build_release.py --version 0.4.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -118,7 +118,7 @@ supplied target and uploads assets before publication; see [the release command]
 The primary installer uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.0/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
@@ -141,5 +141,7 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. This patch retains the existing SQLite
-schema and optional runtime-llama 0.4.0.
+client usability as separate evidence. This release applies additive SQLite
+migrations52→55 on first server start and retains optional runtime-llama0.4.0.
+The primary upgrade fixture pins the published0.3.1 wheel/backend; retain older
+0.3.0 qualification as separate historical evidence.

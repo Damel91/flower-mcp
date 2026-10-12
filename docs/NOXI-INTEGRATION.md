@@ -1,8 +1,8 @@
 # Noxi and Flower integration
 
-This source increment is unreleased after Flower MCP 0.3.1. It adds durable
+Flower MCP 0.4.0 adds durable
 project architecture and an optional, explicitly negotiated provider handoff.
-It does not change the published 0.3.1 release or install a Noxi agent loop.
+Published 0.3.1 remains immutable; Flower does not install a Noxi agent loop.
 Actual paired consumer qualification is recorded separately from Flow protocol
 tests; check the installed server's capabilities before using optional delivery.
 
@@ -159,7 +159,7 @@ copy. Normal startup performs the additive migration transaction. A package
 version rollback alone does not roll back a migrated ledger; restore the
 matching saved database/profile only through an explicit recovery procedure.
 Published 0.3.1 remains its separately qualified schema 52 release. This source
-increment has not been released under a new version.
+increment is distributed as 0.4.0/schema55.
 
 ## Continue while Flower is offline
 
