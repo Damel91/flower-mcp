@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import hashlib
+import io
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -144,7 +146,7 @@ class UpgradeSmokeTests(unittest.TestCase):
             supplied = root / "supplied"
             supplied.mkdir()
             payloads = {"install_flower.py": b"raise RuntimeError('must not execute')\n",
-                        "flow_of_work_mcp-0.3.0-py3-none-any.whl": b"development build"}
+                        "flow_of_work_mcp-0.3.1-py3-none-any.whl": b"development build"}
             for name, content in payloads.items():
                 (supplied / name).write_bytes(content)
             (supplied / "SHA256SUMS").write_text("".join(
@@ -157,7 +159,7 @@ class UpgradeSmokeTests(unittest.TestCase):
             root = Path(directory)
             supplied = root / "supplied"
             supplied.mkdir()
-            wheel = supplied / "flow_of_work_mcp-0.3.0-py3-none-any.whl"
+            wheel = supplied / "flow_of_work_mcp-0.3.1-py3-none-any.whl"
             wheel.write_bytes(b"bounded synthetic wheel")
             backend = supplied / "install_flower.py"
             backend.write_bytes(b"raise RuntimeError('must not execute')\n")
@@ -166,6 +168,40 @@ class UpgradeSmokeTests(unittest.TestCase):
             with patch.object(smoke, "BASELINE_WHEEL_SHA256", smoke.digest(wheel)):
                 with self.assertRaisesRegex(RuntimeError, "Baseline installer differs"):
                     smoke.baseline_assets(root / "destination", supplied)
+
+    def test_baseline_download_selects_only_published031_assets(self):
+        wheel_name = "flow_of_work_mcp-0.3.1-py3-none-any.whl"
+        payloads = {wheel_name: b"bounded synthetic wheel", "install_flower.py": b"# bounded synthetic backend\n"}
+        payloads["SHA256SUMS"] = "".join(
+            hashlib.sha256(content).hexdigest() + "  " + name + "\n"
+            for name, content in payloads.items()).encode()
+        requests = []
+
+        def download(request, timeout):
+            requests.append(request.full_url)
+            content = io.BytesIO(payloads[request.full_url.rsplit("/", 1)[-1]])
+            content.geturl = lambda: request.full_url
+            return content
+
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(smoke.urllib.request, "urlopen", side_effect=download), \
+                patch.object(smoke, "BASELINE_WHEEL_SHA256", hashlib.sha256(payloads[wheel_name]).hexdigest()), \
+                patch.object(smoke, "BASELINE_INSTALLER_SHA256", hashlib.sha256(payloads["install_flower.py"]).hexdigest()):
+            destination = smoke.baseline_assets(Path(directory) / "baseline", None)
+            for name, content in payloads.items():
+                self.assertEqual((destination / name).read_bytes(), content)
+        self.assertEqual(requests, ["https://github.com/Damel91/flower-mcp/releases/download/v0.3.1/" + name
+                                    for name in ("SHA256SUMS", "install_flower.py", wheel_name)])
+
+    def test_previous_release_assets_cannot_substitute_for_current_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            supplied = root / "supplied"
+            supplied.mkdir()
+            for name in ("SHA256SUMS", "install_flower.py", "flow_of_work_mcp-0.3.0-py3-none-any.whl"):
+                (supplied / name).write_bytes(b"previous generation")
+            with self.assertRaisesRegex(RuntimeError, "Missing regular baseline asset.*0.3.1"):
+                smoke.baseline_assets(root / "destination", supplied)
 
     def test_existing_output_is_rejected_without_replacing_it(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -209,6 +245,34 @@ class UpgradeSmokeTests(unittest.TestCase):
                            "detail_level": "audit", "offset": 0, "limit": 10}}}}
         with self.assertRaisesRegex(RuntimeError, "Unexpected requirement authority fields"):
             smoke.historical_requirement(current, smoke.PROJECT)
+
+    def test_public031_state_preservation_retains_guidance_namespace_and_evidence(self):
+        before = {
+            "requirement": {"requirement": {"statement": "original intent"}, "revisions": [{"revision": 1}], "events": [],
+                "evidence_recovery": {"description": "Read original evidence.", "next_tool_call": {
+                    "tool": "fow_traceability", "arguments": {"project_id": smoke.PROJECT,
+                        "detail_level": "audit", "offset": 0, "limit": 10}}}},
+            "handover": {"handover": {"payload": {"objective": {"packet_id": ""}}}},
+            "traceability": {"projection": {"source_ledger_version_namespace": "requirement_events.max_event_id.v1"},
+                "requirements": [{"evidence": [{"metadata": {"provenance": "declared_host_fixture"}}]}]},
+        }
+        current = deepcopy(before)
+        smoke.require_public_state_preserved(**current, before=before)
+        self.assertEqual(current, before)
+        mutations = (
+            (lambda value: value["requirement"]["requirement"].update(statement="changed intent"), "Original requirement"),
+            (lambda value: value["requirement"]["evidence_recovery"].update(description="different guidance"), "Original requirement"),
+            (lambda value: value["handover"]["handover"]["payload"]["objective"].update(packet_id="other"), "Frozen HAND"),
+            (lambda value: value["traceability"]["projection"].pop("source_ledger_version_namespace"), "Original verification evidence"),
+            (lambda value: value["traceability"]["requirements"][0]["evidence"][0]["metadata"].update(provenance="provider-audited"), "Original verification evidence"),
+        )
+        for mutate, expected in mutations:
+            with self.subTest(expected=expected):
+                changed = deepcopy(before)
+                mutate(changed)
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    smoke.require_public_state_preserved(**changed, before=before)
+        self.assertEqual(current, before)
 
     def assets(self, root, backend, content=b"synthetic wheel bytes"):
         name = f"flow_of_work_mcp-{backend.DEFAULT_VERSION}-py3-none-any.whl"

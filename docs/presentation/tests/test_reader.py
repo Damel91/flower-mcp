@@ -51,7 +51,7 @@ class ReaderChecks(unittest.TestCase):
                 output, report = reader.compile_reader(root)
                 self.assertEqual(report["pages"], 18)
                 self.assertEqual(report["language"], language)
-                self.assertEqual(report["public_tools_checked"], 36)
+                self.assertEqual(report["public_tools_checked"], 37)
                 self.assertGreater(report["links_checked"], 100)
                 self.assertEqual(output, (root / "index.html").read_text(encoding="utf-8"))
                 self.assertEqual(report, json.loads((root / "build-report.json").read_text(encoding="utf-8")))
@@ -221,10 +221,19 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(paths[paths.index("06-operate.md") + 1], "try-flower.md")
                 self.assertIn("try-flower.md", (root / "06-operate.md").read_text(encoding="utf-8"))
                 source = (root / "try-flower.md").read_text(encoding="utf-8")
+                runtime = project["optional-dependencies"]["inference"][0].removeprefix("runtime-llama==")
                 for name in ("install.sh", "install.ps1", "install_flower.py",
                              f"{distribution}-{version}-py3-none-any.whl",
-                             f"{distribution}-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md"):
+                             f"{distribution}-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md",
+                             f"runtime_llama-{runtime}-py3-none-any.whl"):
                     self.assertIn(f"/releases/download/v{version}/{name}", source)
+                self.assertIn(f"/blob/v{version}/docs/UPGRADING.md", source)
+                self.assertIn("--upgrade --dry-run", source)
+                self.assertIn(f"-Version '{version}' -Upgrade -DryRun", source)
+                for option in ("--venv", "--profile", "--profile-root",
+                               "-Venv", "-Profile", "-ProfileRoot",
+                               "-Platform antigravity", "-Platform gemini-cli"):
+                    self.assertIn(option, source)
                 self.assertNotIn("https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1", source)
 
     def test_english_shell_and_errors_are_localized(self):

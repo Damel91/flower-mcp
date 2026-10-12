@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify a published 0.3.0 installation upgrade using isolated public MCP state.
+"""Qualify a published 0.3.1 installation upgrade using isolated public MCP state.
 
 Only release downloads are replaced with checksum-verified local asset copies.
 Environment creation, pip, registration, OS ownership, backup and diagnosis are
@@ -24,9 +24,9 @@ import sys
 import urllib.parse
 import urllib.request
 
-BASELINE_VERSION = "0.3.0"
-BASELINE_WHEEL_SHA256 = "b8c2146eb7b1ef252293df84fdc6b900ca24d68ecc975151ca8c196ee77c0924"
-BASELINE_INSTALLER_SHA256 = "b27d23fcf2491b28e2948bfd58d93d7b26404d6dddca5746d47030130f42b539"
+BASELINE_VERSION = "0.3.1"
+BASELINE_WHEEL_SHA256 = "f665570e15f45f57629082faa9547b536fb44db7b61cd042bf2c46629852458c"
+BASELINE_INSTALLER_SHA256 = "a0625e31e6f40ae19ad940e3765d037f97a2213fc02fcabcfc8cef901da57889"
 REPOSITORY = "https://github.com/Damel91/flower-mcp"
 PROJECT = "flower-upgrade-smoke"
 PROFILE = "upgrade-smoke"
@@ -148,7 +148,7 @@ def local_assets(backend, assets: Path) -> None:
 def baseline_assets(destination: Path, supplied: Path | None) -> Path:
     """Pin the real published baseline, never a development wheel with its name."""
     destination.mkdir()
-    names = ("SHA256SUMS", "install_flower.py", "flow_of_work_mcp-0.3.0-py3-none-any.whl")
+    names = ("SHA256SUMS", "install_flower.py", f"flow_of_work_mcp-{BASELINE_VERSION}-py3-none-any.whl")
     for name in names:
         target = destination / name
         if supplied is not None:
@@ -158,7 +158,7 @@ def baseline_assets(destination: Path, supplied: Path | None) -> Path:
                 shutil.copyfileobj(content, output)
         else:
             request = urllib.request.Request(
-                REPOSITORY + "/releases/download/v0.3.0/" + name,
+                REPOSITORY + "/releases/download/v" + BASELINE_VERSION + "/" + name,
                 headers={"User-Agent": "Flower-MCP-Upgrade-Qualification"})
             with urllib.request.urlopen(request, timeout=30) as response:
                 require(urllib.parse.urlsplit(response.geturl()).scheme == "https", "Baseline redirected away from HTTPS")
@@ -170,9 +170,9 @@ def baseline_assets(destination: Path, supplied: Path | None) -> Path:
                         require(total <= limit, "Baseline asset exceeds qualification limit")
                         output.write(chunk)
     wheel = destination / names[-1]
-    require(digest(wheel) == BASELINE_WHEEL_SHA256, "Baseline is not the immutable published 0.3.0 wheel")
+    require(digest(wheel) == BASELINE_WHEEL_SHA256, f"Baseline is not the immutable published {BASELINE_VERSION} wheel")
     require(digest(destination / "install_flower.py") == BASELINE_INSTALLER_SHA256,
-            "Baseline installer differs from the immutable published 0.3.0 backend")
+            f"Baseline installer differs from the immutable published {BASELINE_VERSION} backend")
     # Verify the executable before importing it, using the pinned release manifest.
     manifest = (destination / "SHA256SUMS").read_text(encoding="utf-8")
     for name in names[1:]:
@@ -300,7 +300,7 @@ def require_additive_migration(path: Path, before: dict) -> dict:
 
 
 def historical_requirement(current: dict, project: str) -> dict:
-    """Separate the new recovery route from immutable requirement authority."""
+    """Validate the evidence recovery route established in published 0.3.1."""
     value = dict(current)
     recovery = value.pop("evidence_recovery", None)
     require(isinstance(recovery, dict) and set(recovery) == {"description", "next_tool_call"},
@@ -312,6 +312,15 @@ def historical_requirement(current: dict, project: str) -> dict:
         "Current requirement returned a different evidence recovery route")
     require(set(value) == {"requirement", "revisions", "events"}, "Unexpected requirement authority fields")
     return value
+
+
+def require_public_state_preserved(requirement: dict, handover: dict, traceability: dict, before: dict) -> None:
+    """Compare the full 0.3.1 public payloads, including established guidance."""
+    historical_requirement(before["requirement"], PROJECT)
+    historical_requirement(requirement, PROJECT)
+    require(requirement == before["requirement"], "Original requirement changed through upgrade")
+    require(handover == before["handover"], "Frozen HAND changed through upgrade")
+    require(traceability == before["traceability"], "Original verification evidence changed through upgrade")
 
 
 async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> dict:
@@ -390,12 +399,7 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
             require(not (root / "profiles" / "upgrade-backups").exists(), "Busy upgrade created a backup before obtaining ownership")
         if phase != "before":
             before = read_json(root / "before-mcp.json")
-            require(historical_requirement(requirement, PROJECT) == before["requirement"], "Original requirement changed through upgrade")
-            require(handover == before["handover"], "Frozen HAND changed through upgrade")
-            comparable_traceability = {**traceability, "projection": dict(traceability["projection"])}
-            namespace = comparable_traceability["projection"].pop("source_ledger_version_namespace", None)
-            require(namespace in {None, "requirement_events.max_event_id.v1"}, "Current traceability returned an unexpected ledger clock namespace")
-            require(comparable_traceability == before["traceability"], "Original verification evidence changed through upgrade")
+            require_public_state_preserved(requirement, handover, traceability, before)
             resumed = await call(session, "fow_handover", {
                 "project_id": PROJECT, "operation": "resume_context", "handover_id": identity["handover_id"]})
             comparison = resumed["handover"]["historical_comparison"]
@@ -413,7 +417,7 @@ def qualify(args) -> dict:
     assets = args.assets.resolve()
     backend = load_backend(assets / "install_flower.py")
     require(tuple(map(int, backend.DEFAULT_VERSION.split("."))) > tuple(map(int, BASELINE_VERSION.split("."))),
-            "Current assets must be newer than published 0.3.0")
+            f"Current assets must be newer than published {BASELINE_VERSION}")
     root.mkdir(parents=True, exist_ok=False)
     result = {"status": "running", "scope": "Real published-baseline package mechanics; local verified current assets, not anonymous delivery",
               "baseline_version": BASELINE_VERSION, "version": backend.DEFAULT_VERSION, "root": str(root)}
@@ -492,7 +496,7 @@ def qualify(args) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assets", type=Path, help="current build_release.py output directory")
-    parser.add_argument("--baseline-assets", type=Path, help="optional actual published 0.3.0 assets; otherwise download anonymously")
+    parser.add_argument("--baseline-assets", type=Path, help=f"optional actual published {BASELINE_VERSION} assets; otherwise download anonymously")
     parser.add_argument("--root", type=Path, required=True, help="absent isolated work directory, retained after qualification")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--worker", choices=("before", "after", "restart"), help=argparse.SUPPRESS)

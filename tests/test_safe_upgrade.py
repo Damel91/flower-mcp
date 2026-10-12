@@ -379,7 +379,7 @@ printf '%s\\n' "$@" > "$FLOWER_TEST_CAPTURE"
                             capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
     arguments = capture.read_text().splitlines()[2:]
-    assert arguments == ["--upgrade", "--dry-run", "--backup-root", str(backup), "--no-register", "--version", "0.3.1"]
+    assert arguments == ["--upgrade", "--dry-run", "--backup-root", str(backup), "--no-register", "--version", installer.DEFAULT_VERSION]
     assert "Select an agent" not in result.stderr and not backup.exists()
 
 

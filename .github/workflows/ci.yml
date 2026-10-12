@@ -35,6 +35,8 @@ jobs:
           python -m unittest discover -s tests -p test_release_assets.py -v
           python -m unittest discover -s tests -p test_google_installation.py -v
           python -m unittest discover -s tests -p test_upgrade_smoke.py -v
+      - name: Check the packaged bilingual reader
+        run: python -m unittest discover -s docs/presentation/tests -p test_reader.py -v
       - name: Build packages and release assets
         run: |
           python -m pip install build
