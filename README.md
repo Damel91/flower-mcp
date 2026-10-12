@@ -180,8 +180,9 @@ Already installed? Follow the [SQLite-preserving upgrade plan](docs/UPGRADING.md
 Stop clients sharing the Flower environment, preview with the new installer's
 `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then upgrade with the same
 environment/profile paths. Flower backs up SQLite and YAML before package
-changes; first startup applies additive schema52→55 migrations. Resume the
-existing project and verify another restart.
+changes. Updating 0.4.0 to 0.4.1 keeps schema 55 unchanged; older 0.3.1/schema52
+installations use the existing additive migrations to 55. Resume the existing
+project and verify another restart.
 
 ## Documentation
 

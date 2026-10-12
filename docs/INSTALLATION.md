@@ -517,9 +517,9 @@ Repeat without `-DryRun` to execute; preserve custom `-Venv`, `-Profile` and
 
 Manual pip environments use the [manual backup and wheel upgrade
 procedure](UPGRADING.md#manual-pip-installations); they are not silently adopted
-by the release installer. Upgrading 0.4.0 to 0.4.1 leaves schema55 unchanged;
+by the release installer. Upgrading 0.4.0 to 0.4.1 leaves schema 55 unchanged;
 this patch adds no migration. An older 0.3.1/schema52 ledger uses the existing
-additive migrations to schema55 on first server start. Diagnosis alone does not
+additive migrations to schema 55 on first server start. Diagnosis alone does not
 start Flower or verify migration.
 Keep the backup and verify the same project after startup and another restart.
 Failures retain original lifecycle data and completed backups, but pip may have
