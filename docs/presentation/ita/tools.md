@@ -3,7 +3,7 @@
 [Indice](README.md) · [Concetti](concepts.md) · [Fonti](sources.md#catalogo)
 
 I nomi conservano il prefisso tecnico `fow_`. Un client può aggiungere un proprio
-prefisso. Questa mappa descrive i **37 tool di Flower MCP 0.4.0**
+prefisso. Questa mappa descrive i **37 tool di Flower MCP 0.4.1**
 (36 nella release storica 0.3.1); non è un elenco di payload da copiare.
 Un tool multiplexato offre più operazioni con
 prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operativa.
