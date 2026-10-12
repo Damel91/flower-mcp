@@ -3,9 +3,9 @@
 [Index](README.md) · [Concepts](concepts.md) · [Sources](sources.md#catalog)
 
 Names retain the technical `fow_` prefix. A client may add its own prefix. This
-map describes the **37 tools in the current development source** (36 in release
-0.3.1); it is not a list of
-payloads to copy. A multiplexed tool offers several operations with different
+map describes the **37 tools in Flower MCP 0.4.0** (36 in historical release
+0.3.1); it is not a list of payloads to copy. A multiplexed tool offers several
+operations with different
 prerequisites. The current server catalog remains the operational authority.
 
 ## Orientation and bootstrap
@@ -46,7 +46,7 @@ prerequisites. The current server catalog remains the operational authority.
 | `fow_packet_author` | Build canonical packets, units, declarations and plans. |
 | `fow_packet_advance` | Advance deterministic gates to a decision or asynchronous boundary. The selected technical path may require a provider. |
 | `fow_packet_inspect` | Read scope, units, gates or history through bounded projections. |
-| `fow_external_work` | Validate/export standalone plans, read TODOs and record/reconcile outcomes. Development also adds explicit new-work executor selection, pure provider validation and intentional capability negotiation. It does not execute repository code. |
+| `fow_external_work` | Validate/export standalone plans, read TODOs and record/reconcile outcomes. Select the executor for new work, read provider validation and explicitly negotiate optional provider capabilities. It does not execute repository code. |
 | `fow_run` | Manage implementation-run records, steps, dependencies and work views. It is not a new coding agent. |
 | `fow_what_next` | Derive next work from durable state, with pagination. |
 
