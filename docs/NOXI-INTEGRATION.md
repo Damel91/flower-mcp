@@ -132,6 +132,14 @@ coding tasks.
 
 ### Unreleased discovery and temporal-authoring correction
 
+Flower calls `codingcastle_packet` and `codingcastle_tests` with the canonical
+`detail_level="verbose"` response profile. CodingCastle permits only `minimal`,
+`standard` and `verbose`; the former `audit` request value is invalid. Packet
+responses below `verbose` omit `result.audit`, which Flower needs for durable
+correlations and `validation_ack`. Test calls also retain the complete integration
+response. This profile choice leaves receipt fields, wire versions and recovery
+guards unchanged. Flower's own tools retain their separately defined detail levels.
+
 The source after published 0.4.1 explicitly requests
 `codingcastle_capabilities({"group":"all"})`. A complete registry without a
 `packet_validation` advertisement is unsupported. A known overview health object
