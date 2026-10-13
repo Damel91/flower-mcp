@@ -8,7 +8,10 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; the current version is `0.4.1`. Tags use the `v` prefix,
+`MAJOR.MINOR.PATCH`; current source retains `0.4.1` as an unreleased candidate.
+Published `v0.4.1` and its eight historical assets remain immutable. A new release
+requires a new user-selected version; do not republish this candidate as `v0.4.1`.
+Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
 increments for fixes that preserve the advertised interface. A future `1.0.0`
@@ -44,7 +47,9 @@ python tools/build_release.py --version 0.4.1 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
-`BOOTSTRAP.md` and the exact optional runtime wheel, and writes `SHA256SUMS`. Stale or unexpected files in the output directory fail the
+`BOOTSTRAP.md`, and writes `SHA256SUMS`: seven candidate assets in total. The
+optional runtime is an independent public dependency and is not copied into
+Flower assets or either package. Stale or unexpected files in the output directory fail the
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
@@ -82,15 +87,19 @@ the requested new version tag at the full tested SHA and publishes:
 - `install.ps1`
 - `install_flower.py`
 - `BOOTSTRAP.md`
-- `runtime_llama-0.4.0-py3-none-any.whl` (optional inference)
 - `SHA256SUMS`
 
 `VERSION` is the requested version declared in `pyproject.toml`.
-The optional wheel must match `third_party/runtime-llama/provenance.json` and
-its declared SHA256. The source archive includes its licenses, notices and
-provenance; the core Flower wheel and core container exclude it. Select the
-Flower wheel explicitly when installing core; do not install `dist/*.whl`.
-See [INFERENCE.md](INFERENCE.md) for the explicit optional installation route.
+The builder verifies that both package metadata files confine the exact public
+runtime-llama `0.4.1` URL/SHA256 to the inference extra. It rejects copied runtime
+wheels, vendor payloads and runtime core-dependency leakage. Building Flower does
+not fetch inference. The optional CI lane installs the candidate wheel's extra,
+checks the upstream artifact provenance/attribution and runs gateway regressions;
+core/uv/container lanes retain their independent no-inference boundary.
+Flower's own Apache LICENSE/NOTICE remain in both packages. Upstream runtime
+LICENSE/NOTICE and its vendored MIT attribution remain in that separately
+installed distribution. Select the Flower wheel explicitly for core; see
+[INFERENCE.md](INFERENCE.md) for the optional installation and offline routes.
 
 Release notes include version, license and installation commands. No packages
 are published to PyPI. The install script downloads the explicit wheel asset;
@@ -144,6 +153,9 @@ after restart. Keep source tests, native CI, actual downloaded asset checks and
 client usability as separate evidence. The 0.4.1 patch adds no SQLite migration:
 an existing 0.4.0/schema55 ledger stays at 55. The existing 0.3.1/schema52 route
 still applies additive migrations 52→55 on first server start. Optional
-runtime-llama remains 0.4.0. The CI upgrade fixture pins the published 0.3.1
+runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
+current source uses the independently published runtime `0.4.1` through its
+explicit inference extra. Updating core/profile state does not request that
+extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
 wheel/backend; that path is distinct from exact published 0.4.0→0.4.1 qualification.
 Retain earlier release qualification as historical evidence.
