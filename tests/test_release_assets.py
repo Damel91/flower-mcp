@@ -5,9 +5,11 @@ import hashlib
 import importlib.util
 import io
 from pathlib import Path
+import re
 import shutil
 import tarfile
 import tempfile
+import tomllib
 import unittest
 import zipfile
 
@@ -16,6 +18,17 @@ SOURCE = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("flower_build_release", SOURCE / "tools/build_release.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+
+# Independently lock the upstream identity; these tests must detect builder drift.
+RUNTIME_URL = (
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
+    "runtime_llama-0.4.1-py3-none-any.whl#sha256="
+    "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
+)
+RUNTIME_REQUIREMENT = f"runtime-llama @ {RUNTIME_URL}"
+ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
+                 "install_flower.py": "tools/install_flower.py",
+                 "BOOTSTRAP.md": "src/flow_of_work_mcp/resources/agent-bootstrap.md"}
 
 
 class ReleaseAssetsTests(unittest.TestCase):
@@ -31,41 +44,57 @@ class ReleaseAssetsTests(unittest.TestCase):
             for path in (SOURCE / "docs/presentation").rglob("*")
             if path.is_file() and path.suffix in release.PRESENTATION_SUFFIXES
         }
-        self.release_docs = release.release_documentation(release.validate_project(SOURCE))
-        sources = {"pyproject.toml", "LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
-                   *release.CONTAINER_SOURCES, *release.THIRD_PARTY_SOURCES,
+        self.project = tomllib.loads((SOURCE / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        self.project["optional-dependencies"]["inference"] = [RUNTIME_REQUIREMENT]
+        self.release_docs = release.release_documentation(self.project)
+        sources = {"pyproject.toml", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                   *release.CONTAINER_SOURCES,
                    *self.release_docs, *self.presentation}
         for relative in sources:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SOURCE / relative, destination)
-        self.project = release.validate_project(self.root)
+        project_file = self.root / "pyproject.toml"
+        project_file.write_text(re.sub(r'^inference = .*$', f'inference = ["{RUNTIME_REQUIREMENT}"]',
+                                      project_file.read_text(encoding="utf-8"), flags=re.MULTILINE),
+                                encoding="utf-8")
         self.packages()
 
+    def metadata(self, requirements=None):
+        if requirements is None:
+            requirements = [f'{RUNTIME_REQUIREMENT}; extra == "inference"']
+        return (
+            "Metadata-Version: 2.4\n"
+            f"Name: {self.project['name']}\nVersion: {self.project['version']}\n"
+            "License-Expression: Apache-2.0\nLicense-File: LICENSE\nLicense-File: NOTICE\n"
+            f"Requires-Python: {self.project['requires-python']}\n"
+            "Provides-Extra: inference\n"
+            + "".join(f"Requires-Dist: {item}\n" for item in requirements) + "\n"
+        ).encode()
+
     def packages(self, *, omit: str | None = None, replace: dict[str, bytes] | None = None,
-                 nonregular: str | None = None):
+                 nonregular: str | None = None, wheel_members: dict[str, bytes] | None = None,
+                 sdist_members: dict[str, bytes] | None = None, wheel_metadata: bytes | None = None,
+                 sdist_metadata: bytes | None = None):
         """Write minimal package fixtures at the release metadata/asset seam."""
         name = self.project["name"].replace("-", "_")
         version = self.project["version"]
-        metadata = (
-            "Metadata-Version: 2.4\n"
-            f"Name: {self.project['name']}\nVersion: {version}\n"
-            "License-Expression: Apache-2.0\nLicense-File: LICENSE\nLicense-File: NOTICE\n"
-            f"Requires-Python: {self.project['requires-python']}\n"
-            f'Requires-Dist: runtime-llama=={release.RUNTIME_VERSION}; extra == "inference"\n\n'
-        ).encode()
+        metadata = self.metadata()
         distinfo = f"{name}-{version}.dist-info"
         with zipfile.ZipFile(self.dist / f"{name}-{version}-py3-none-any.whl", "w") as archive:
-            archive.writestr(f"{distinfo}/METADATA", metadata)
+            archive.writestr(f"{distinfo}/METADATA", wheel_metadata or metadata)
             for relative in ("LICENSE", "NOTICE"):
                 archive.writestr(f"{distinfo}/licenses/{relative}", (self.root / relative).read_bytes())
             archive.writestr(release.BOOTSTRAP_RESOURCE.removeprefix("src/"),
                              (self.root / release.BOOTSTRAP_RESOURCE).read_bytes())
+            for relative, payload in (wheel_members or {}).items():
+                archive.writestr(relative, payload)
         payloads = {relative: (self.root / relative).read_bytes()
-                    for relative in ("LICENSE", "NOTICE", *release.ASSET_SOURCES.values(),
-                                     *sorted(release.CONTAINER_SOURCES), *sorted(release.THIRD_PARTY_SOURCES),
+                    for relative in ("LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                                     *sorted(release.CONTAINER_SOURCES),
                                      *sorted(self.release_docs), *sorted(self.presentation))}
-        payloads["PKG-INFO"] = metadata
+        payloads["PKG-INFO"] = sdist_metadata or metadata
+        payloads.update(sdist_members or {})
         if replace:
             payloads.update(replace)
         if omit:
@@ -106,10 +135,10 @@ class ReleaseAssetsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "PowerShell installer default release version"):
             release.validate_project(self.root)
 
-    def test_prepare_copies_powershell_and_runtime_and_checks_exact_eight_asset_inventory(self):
+    def test_prepare_copies_installers_and_checks_exact_seven_asset_inventory(self):
         notes = self.root / "release-notes.md"
         result = release.prepare(self.root, self.dist, notes=notes)
-        self.assertEqual(len(result["assets"]), 8)
+        self.assertEqual(len(result["assets"]), 7)
         self.assertEqual(set(result["assets"]), {path.name for path in self.dist.iterdir()})
         self.assertEqual((self.dist / "install.ps1").read_bytes(),
                          (self.root / "tools/install.ps1").read_bytes())
@@ -120,10 +149,11 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.assertIn("install.ps1", text)
         self.assertIn("version-pinned Windows PowerShell launcher", text)
         self.assertIn("runtime-llama", text)
-        self.assertEqual((self.dist / release.RUNTIME_WHEEL).read_bytes(),
-                         (self.root / release.THIRD_PARTY_ROOT / release.RUNTIME_WHEEL).read_bytes())
-        self.assertIn(f"{release.RUNTIME_SHA256}  {release.RUNTIME_WHEEL}\n",
-                      (self.dist / "SHA256SUMS").read_text(encoding="utf-8"))
+        self.assertFalse(any(path.name.startswith("runtime_llama") for path in self.dist.iterdir()))
+        self.assertIn(RUNTIME_URL, text)
+        self.assertIn("UNRELEASED source candidate", text)
+        self.assertIn("immutable published Flower 0.4.1", text)
+        self.assertNotIn("verify the optional runtime wheel against SHA256SUMS", text)
         self.assertIn(f"releases/download/v{self.project['version']}/install.ps1", text)
         self.assertIn(
             "```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -148,54 +178,109 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.assertIn("atomic pip rollback", text)
         self.assertNotIn("This release adds Antigravity", text)
 
-    def test_source_runtime_hash_tampering_blocks_build(self):
-        wheel = self.root / release.THIRD_PARTY_ROOT / release.RUNTIME_WHEEL
-        with wheel.open("ab") as stream:
-            stream.write(b"tampered")
-        with self.assertRaisesRegex(ValueError, "delivered SHA-256"):
-            release.prepare(self.root, self.dist)
+    def test_project_dependency_accepts_normalized_name_and_spacing(self):
+        self.change_inference(f" Runtime.Llama@  {RUNTIME_URL} ")
+        release.validate_project(self.root)
 
-    def test_missing_runtime_provenance_blocks_build(self):
-        (self.root / release.THIRD_PARTY_ROOT / "provenance.json").unlink()
-        with self.assertRaisesRegex(ValueError, "provenance sources must be regular files"):
-            release.prepare(self.root, self.dist)
+    def change_inference(self, requirement):
+        path = self.root / "pyproject.toml"
+        path.write_text(re.sub(r'^inference = .*$', f'inference = ["{requirement}"]',
+                               path.read_text(encoding="utf-8"), flags=re.MULTILINE), encoding="utf-8")
 
-    def test_runtime_attribution_must_match_its_original_wheel(self):
-        (self.root / release.THIRD_PARTY_ROOT / "llamatelemetry.LICENSE").write_bytes(b"changed")
-        with self.assertRaisesRegex(ValueError, "attribution differs"):
-            release.prepare(self.root, self.dist)
+    def test_project_rejects_wrong_public_identity_and_duplicate_dependency(self):
+        for requirement in ("runtime-llama==0.4.1", RUNTIME_REQUIREMENT.replace("0.4.1", "0.4.0"),
+                            RUNTIME_REQUIREMENT.replace("8c512", "0c512"),
+                            RUNTIME_REQUIREMENT.split("#", 1)[0],
+                            RUNTIME_REQUIREMENT + "; python_version >= '3.11'"):
+            with self.subTest(requirement=requirement):
+                self.change_inference(requirement)
+                with self.assertRaisesRegex(ValueError, "inference extra"):
+                    release.validate_project(self.root)
+        self.change_inference(RUNTIME_REQUIREMENT)
+        path = self.root / "pyproject.toml"
+        path.write_text(path.read_text().replace(f'inference = ["{RUNTIME_REQUIREMENT}"]',
+                                                f'inference = ["{RUNTIME_REQUIREMENT}", "{RUNTIME_REQUIREMENT}"]'))
+        with self.assertRaisesRegex(ValueError, "inference extra"):
+            release.validate_project(self.root)
 
-    def test_sdist_must_include_each_optional_runtime_source(self):
-        for source in sorted(release.THIRD_PARTY_SOURCES):
-            with self.subTest(source=source):
-                self.packages(omit=source)
-                with self.assertRaisesRegex(ValueError, "source distribution omits required source"):
+    def test_project_rejects_normalized_runtime_core_and_other_extra_leakage(self):
+        path = self.root / "pyproject.toml"
+        original = path.read_text(encoding="utf-8")
+        for changed in (original.replace("dependencies = [", 'dependencies = [\n    "Runtime.Llama==0.4.1",', 1),
+                        original.replace("[project.optional-dependencies]",
+                                         '[project.optional-dependencies]\nother = ["runtime_llama==0.4.1"]')):
+            with self.subTest(changed=changed):
+                path.write_text(changed, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "confined to the inference extra"):
+                    release.validate_project(self.root)
+
+    def test_metadata_accepts_normalized_runtime_name_spacing_and_only_inference_marker(self):
+        for marker in ('extra == "inference"', "extra=='inference'", '( extra == "inference" )',
+                       '"inference" == extra'):
+            with self.subTest(marker=marker):
+                release.check_metadata(self.metadata([f" Runtime.Llama@ {RUNTIME_URL} ; {marker}"]), self.project)
+
+    def test_metadata_rejects_wrong_identity_duplicates_and_core_leakage(self):
+        correct = f'{RUNTIME_REQUIREMENT}; extra == "inference"'
+        for requirements in ([RUNTIME_REQUIREMENT], [correct, correct],
+                             [correct, "Runtime.Llama==0.4.1"], ["runtime-llama==0.4.0; extra == 'inference'"],
+                             [correct.replace("8c512", "0c512")],
+                             [correct.replace('; extra == "inference"', '')],
+                             [correct + ' or python_version >= "3.11"'],
+                             [correct + ' and python_version >= "3.11"'],
+                             [correct + ' # ignored Python comment'],
+                             [correct.replace('"inference"', '"infer" "ence"')],
+                             [correct.replace('"inference"', '"other"')],
+                             [f'runtime-llama[unexpected] @ {RUNTIME_URL}; extra == "inference"'], []):
+            with self.subTest(requirements=requirements):
+                with self.assertRaisesRegex(ValueError, "confined to the inference extra"):
+                    release.check_metadata(self.metadata(requirements), self.project)
+
+    def test_metadata_must_advertise_the_inference_extra_once(self):
+        metadata = self.metadata()
+        for altered in (metadata.replace(b"Provides-Extra: inference\n", b""),
+                        metadata.replace(b"Provides-Extra: inference\n", b"Provides-Extra: inference\n" * 2)):
+            with self.subTest(metadata=altered):
+                with self.assertRaisesRegex(ValueError, "confined to the inference extra"):
+                    release.check_metadata(altered, self.project)
+
+    def test_both_archive_metadata_files_enforce_the_optional_boundary(self):
+        invalid = self.metadata([RUNTIME_REQUIREMENT])
+        for package in ("wheel_metadata", "sdist_metadata"):
+            with self.subTest(package=package):
+                self.packages(**{package: invalid})
+                with self.assertRaisesRegex(ValueError, "confined to the inference extra"):
                     release.prepare(self.root, self.dist)
 
-    def test_package_validation_identifies_flower_when_runtime_is_listed_first(self):
-        release.prepare(self.root, self.dist)
-        files = release.release_assets(self.root, self.dist, self.project)
-        runtime = self.dist / release.RUNTIME_WHEEL
-        release.check_packages(self.root, [runtime, *(path for path in files if path != runtime)], self.project)
+    def test_both_archives_reject_runtime_wheels_packages_and_vendor_payload(self):
+        for path in ("runtime_llama-0.4.1-py3-none-any.whl", "third_party/runtime-llama/LICENSE",
+                     "src/runtime_llama/__init__.py", "runtime_llama/__init__.py",
+                     "runtime_llama-0.4.1.dist-info/METADATA", "src/flow_of_work_mcp/_vendor/llamatelemetry.py"):
+            for package in ("wheel_members", "sdist_members"):
+                with self.subTest(path=path, package=package):
+                    self.packages(**{package: {path: b"unexpected runtime"}})
+                    with self.assertRaisesRegex(ValueError, "must not contain the optional runtime"):
+                        release.prepare(self.root, self.dist)
 
-    def test_core_wheel_cannot_bundle_optional_runtime(self):
-        name = self.project["name"].replace("-", "_")
-        wheel = self.dist / f"{name}-{self.project['version']}-py3-none-any.whl"
-        with zipfile.ZipFile(wheel, "a") as archive:
-            archive.writestr("third_party/runtime-llama/" + release.RUNTIME_WHEEL, b"unexpected")
-        with self.assertRaisesRegex(ValueError, "core wheel must not contain"):
-            release.prepare(self.root, self.dist)
+    def test_runtime_and_other_unexpected_release_assets_block_inventory(self):
+        for name in ("runtime_llama-0.4.1-py3-none-any.whl", "unexpected.txt"):
+            with self.subTest(name=name):
+                path = self.dist / name
+                path.write_bytes(b"unexpected")
+                with self.assertRaisesRegex(ValueError, "dist must contain exactly"):
+                    release.prepare(self.root, self.dist)
+                path.unlink()
 
-    def test_altered_runtime_release_asset_blocks_verification(self):
+    def test_extra_checksum_member_is_rejected(self):
         release.prepare(self.root, self.dist)
-        (self.dist / release.RUNTIME_WHEEL).write_bytes(b"replaced")
-        with self.assertRaisesRegex(ValueError, "release .* differs from the checked source"):
+        with (self.dist / "SHA256SUMS").open("a", encoding="utf-8") as stream:
+            stream.write("0" * 64 + "  runtime_llama-0.4.1-py3-none-any.whl\n")
+        with self.assertRaisesRegex(ValueError, "SHA256SUMS does not match"):
             release.prepare(self.root, self.dist, verify_checksums=True)
 
-    def test_unexpected_second_runtime_wheel_blocks_inventory(self):
-        (self.dist / "runtime_llama-99.0.0-py3-none-any.whl").write_bytes(b"unexpected")
-        with self.assertRaisesRegex(ValueError, "dist must contain exactly"):
-            release.prepare(self.root, self.dist)
+    def test_no_runtime_vendor_source_or_manifest_rule_remains(self):
+        self.assertFalse((SOURCE / "third_party/runtime-llama").exists())
+        self.assertNotIn("third_party/runtime-llama", (SOURCE / "MANIFEST.in").read_text(encoding="utf-8"))
 
     def test_sdist_must_include_the_offline_reader(self):
         self.packages(omit="docs/presentation/index.html")

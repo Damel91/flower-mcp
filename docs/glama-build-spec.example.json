@@ -1,0 +1,25 @@
+{
+  "baseImage": "debian:trixie-slim",
+  "buildSteps": [
+    "uv sync --no-dev --no-editable"
+  ],
+  "cmdArguments": [
+    "mcp-proxy",
+    "--",
+    "uv",
+    "run",
+    "--no-sync",
+    "flower-mcp",
+    "serve",
+    "--profile",
+    "default",
+    "--profile-root",
+    "/data",
+    "--transport",
+    "stdio"
+  ],
+  "nodeVersion": "24",
+  "pinnedCommit": null,
+  "placeholderArguments": {},
+  "pythonVersion": "3.14"
+}

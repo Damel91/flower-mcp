@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-inference = ["runtime-llama==0.4.0"]
+inference = ["runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl#sha256=8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"]
 
 [project.urls]
 Homepage = "https://github.com/Damel91/flower-mcp"

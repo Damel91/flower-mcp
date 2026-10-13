@@ -1,7 +1,7 @@
 include LICENSE NOTICE README.md
 include Dockerfile .dockerignore glama.json
-recursive-include third_party/runtime-llama *.whl LICENSE NOTICE *.LICENSE provenance.json
 recursive-include docs *.md
+include docs/glama-build-spec.example.json
 recursive-include docs/presentation *.html *.json *.css *.js *.png *.txt *.py
 recursive-include tools *.py *.sh *.ps1
 include assets/flower-mcp-logo.png

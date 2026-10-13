@@ -49,11 +49,12 @@ def build_model_gateway(config: ModelConfig) -> ModelGateway | None:
         if exc.name != "runtime_llama":
             raise
         raise FlowConfigError(
-            "internal inference requires the optional inference dependency; "
-            "install the verified runtime-llama wheel supplied in the Flower release, "
-            "then flow-of-work-mcp[inference] using that wheel's directory with --find-links; "
-            "configure an authorized model "
-            "endpoint, or set model.enabled=false to use Flower core"
+            "internal inference requires flow-of-work-mcp[inference]; "
+            "install the selected current Flower source or wheel with its inference extra "
+            "(for a source checkout: python -m pip install '.[inference]'); "
+            "this downloads the hash-pinned public runtime-llama dependency; "
+            "configure an authorized model endpoint, or set model.enabled=false "
+            "to use Flower core"
         ) from exc
 
     return RuntimeLlamaModelGateway(

@@ -24,43 +24,46 @@ INSTALLERS = {"install.sh", "install.ps1", "install_flower.py"}
 BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
 CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
-RUNTIME_VERSION = "0.4.0"
-RUNTIME_WHEEL = f"runtime_llama-{RUNTIME_VERSION}-py3-none-any.whl"
-RUNTIME_SHA256 = "129c461771256d8107d7aeba6f6e7818975052952ad291b068662fe337061fc8"
-RUNTIME_COMMIT = "420acd46a1cc761c6c07cee2fa7ffb9814621597"
-THIRD_PARTY_ROOT = "third_party/runtime-llama"
-THIRD_PARTY_SOURCES = {f"{THIRD_PARTY_ROOT}/{name}" for name in
-                       (RUNTIME_WHEEL, "LICENSE", "NOTICE", "llamatelemetry.LICENSE", "provenance.json")}
+RUNTIME_URL = (
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
+    "runtime_llama-0.4.1-py3-none-any.whl#sha256="
+    "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
+)
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
                  "install_flower.py": "tools/install_flower.py",
-                 "BOOTSTRAP.md": BOOTSTRAP_RESOURCE,
-                 RUNTIME_WHEEL: f"{THIRD_PARTY_ROOT}/{RUNTIME_WHEEL}"}
+                 "BOOTSTRAP.md": BOOTSTRAP_RESOURCE}
 
 
-def validate_runtime(root: Path) -> None:
-    for relative in THIRD_PARTY_SOURCES:
-        source = root / relative
-        if source.is_symlink() or not source.is_file():
-            raise ValueError("optional runtime artifact and provenance sources must be regular files")
-    provenance = json.loads((root / THIRD_PARTY_ROOT / "provenance.json").read_text(encoding="utf-8"))
-    expected = {"distribution": "runtime-llama", "version": RUNTIME_VERSION,
-                "source_commit": RUNTIME_COMMIT, "artifact": RUNTIME_WHEEL,
-                "sha256": RUNTIME_SHA256, "license": "MIT",
-                "license_files": ["LICENSE", "NOTICE", "llamatelemetry.LICENSE"]}
-    if not isinstance(provenance, dict) or any(provenance.get(key) != value for key, value in expected.items()):
-        raise ValueError("optional runtime provenance differs from the delivered artifact contract")
-    wheel = root / THIRD_PARTY_ROOT / RUNTIME_WHEEL
-    if hashlib.sha256(wheel.read_bytes()).hexdigest() != RUNTIME_SHA256:
-        raise ValueError("optional runtime wheel differs from the delivered SHA-256")
-    with zipfile.ZipFile(wheel) as archive:
-        prefix = f"runtime_llama-{RUNTIME_VERSION}.dist-info/"
-        metadata = BytesParser().parsebytes(archive.read(prefix + "METADATA"))
-        if metadata["Name"] != "runtime-llama" or metadata["Version"] != RUNTIME_VERSION:
-            raise ValueError("optional runtime metadata differs from its locked identity")
-        for name, relative in (("LICENSE", "LICENSE"), ("NOTICE", "NOTICE"),
-                               ("llamatelemetry.LICENSE", "src/runtime_llama/_vendor/llamatelemetry.LICENSE")):
-            if archive.read(prefix + "licenses/" + relative) != (root / THIRD_PARTY_ROOT / name).read_bytes():
-                raise ValueError("optional runtime attribution differs from the delivered wheel")
+def normalized_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def is_runtime_requirement(requirement: str) -> bool:
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+    return match is not None and normalized_name(match[1]) == "runtime-llama"
+
+
+def exact_runtime_requirement(requirement: str, *, inference_marker: bool = False) -> bool:
+    match = re.fullmatch(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*@\s*([^\s;]+)\s*(?:;\s*(.+))?\s*", requirement)
+    if match is None or normalized_name(match[1]) != "runtime-llama" or match[2] != RUNTIME_URL:
+        return False
+    marker = match[3]
+    if not inference_marker:
+        return marker is None
+    if marker is None:
+        return False
+    marker = marker.strip()
+    while marker.startswith("(") and marker.endswith(")"):
+        marker = marker[1:-1].strip()
+    return re.fullmatch(r'''(?:extra\s*==\s*(["'])inference\1|(["'])inference\2\s*==\s*extra)''', marker) is not None
+
+
+def forbidden_runtime_member(name: str) -> bool:
+    return name.lower().endswith(".whl") or any(
+        normalized_name(part) == "third-party" or part.lower() in {"vendor", "_vendor"}
+        or re.match(r"runtime[-_.]+llama(?:$|[-_.])", part, re.IGNORECASE)
+        for part in name.replace("\\", "/").split("/")
+    )
 
 
 def validate_project(root: Path, requested_version: str | None = None) -> dict:
@@ -92,9 +95,15 @@ def validate_project(root: Path, requested_version: str | None = None) -> dict:
                 and any(isinstance(target, ast.Name) and target.id == "DEFAULT_VERSION" for target in node.targets)]
     if len(defaults) != 1 or not isinstance(defaults[0], ast.Constant) or defaults[0].value != version:
         raise ValueError("Python installer default release version differs from pyproject.toml")
-    if project.get("optional-dependencies", {}).get("inference") != [f"runtime-llama=={RUNTIME_VERSION}"]:
-        raise ValueError("inference extra must name only the exact delivered runtime version")
-    validate_runtime(root)
+    extras = project.get("optional-dependencies", {})
+    inference = extras.get("inference", [])
+    if len(inference) != 1 or not exact_runtime_requirement(inference[0]):
+        raise ValueError("inference extra must name only the exact public runtime URL and SHA-256")
+    if any(is_runtime_requirement(item) for item in project.get("dependencies", [])) or any(
+        is_runtime_requirement(item) for extra, requirements in extras.items() if extra != "inference"
+        for item in requirements
+    ):
+        raise ValueError("runtime dependency must remain confined to the inference extra")
     return project
 
 
@@ -106,7 +115,7 @@ def asset_names(project: dict) -> set[str]:
 
 
 def release_documentation(project: dict) -> set[str]:
-    return {"docs/INSTALLATION.md", "docs/UPGRADING.md",
+    return {"docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/glama-build-spec.example.json",
             f"docs/RELEASE-NOTES-{project['version']}.md"}
 
 
@@ -115,7 +124,7 @@ def check_inventory(dist: Path, project: dict, *, require_copied_assets: bool = 
     actual = {path.name for path in dist.iterdir()}
     required = expected if require_copied_assets else expected - set(ASSET_SOURCES)
     if actual - expected - {"SHA256SUMS"} or required - actual:
-        raise ValueError("dist must contain exactly the Flower wheel, sdist, optional runtime wheel, installers, BOOTSTRAP.md and optional SHA256SUMS")
+        raise ValueError("dist must contain exactly the Flower wheel, sdist, three installers, BOOTSTRAP.md and optional SHA256SUMS")
     if any(path.is_symlink() or not path.is_file() for path in dist.iterdir()):
         raise ValueError("release assets must be regular files")
 
@@ -139,8 +148,9 @@ def check_metadata(payload: bytes, project: dict) -> None:
     if metadata["Requires-Python"] != project["requires-python"]:
         raise ValueError("built Python requirement differs from pyproject.toml")
     requirements = metadata.get_all("Requires-Dist") or []
-    runtime_requirements = [item for item in requirements if re.match(r"runtime[-_]llama(?:\s|[<=>!])", item)]
-    if runtime_requirements != [f'runtime-llama=={RUNTIME_VERSION}; extra == "inference"']:
+    runtime_requirements = [item for item in requirements if is_runtime_requirement(item)]
+    advertised_extras = [normalized_name(extra) for extra in metadata.get_all("Provides-Extra") or []]
+    if advertised_extras.count("inference") != 1 or len(runtime_requirements) != 1 or not exact_runtime_requirement(runtime_requirements[0], inference_marker=True):
         raise ValueError("built package must keep the exact runtime dependency confined to the inference extra")
 
 
@@ -149,14 +159,13 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
     wheel_name = f"{normalized_name}-{project['version']}-py3-none-any.whl"
     wheel = next(path for path in files if path.name == wheel_name)
     with zipfile.ZipFile(wheel) as archive:
+        if any(forbidden_runtime_member(name) for name in archive.namelist()):
+            raise ValueError("Flower core wheel must not contain the optional runtime artifact or package")
         metadata_names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(metadata_names) != 1:
             raise ValueError("wheel must contain one package metadata file")
         metadata_name = metadata_names[0]
         check_metadata(archive.read(metadata_name), project)
-        if any(name.startswith(("third_party/", "runtime_llama/")) or name.endswith(".whl")
-               for name in archive.namelist()):
-            raise ValueError("Flower core wheel must not contain the optional runtime artifact or package")
         distinfo = metadata_name.rsplit("/", 1)[0]
         for name in ("LICENSE", "NOTICE"):
             if archive.read(f"{distinfo}/licenses/{name}") != (root / name).read_bytes():
@@ -170,13 +179,15 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
         if len(roots) != 1:
             raise ValueError("source distribution must have one root")
         prefix = roots.pop() + "/"
+        if any(forbidden_runtime_member(member.name.removeprefix(prefix)) for member in members):
+            raise ValueError("Flower source distribution must not contain the optional runtime artifact or package")
         presentation = sorted(
             path.relative_to(root).as_posix()
             for path in (root / "docs/presentation").rglob("*")
             if path.is_file() and path.suffix in PRESENTATION_SUFFIXES
         )
         for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
-                     *sorted(CONTAINER_SOURCES), *sorted(THIRD_PARTY_SOURCES),
+                     *sorted(CONTAINER_SOURCES),
                      *sorted(release_documentation(project)), *presentation):
             try:
                 member = archive.getmember(prefix + name)
@@ -215,21 +226,32 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
     if notes is not None:
         notes.parent.mkdir(parents=True, exist_ok=True)
         notes.write_text(
-            f"Flower MCP {project['version']}\n\n"
+            f"Flower MCP {project['version']} — UNRELEASED source candidate\n\n"
             "Python 3.11 or newer. Apache-2.0; LICENSE and NOTICE are included inside both packages.\n\n"
-            "Assets: Flower Python wheel, source distribution, optional runtime_llama-0.4.0 wheel, "
+            "Seven candidate assets: Flower Python wheel, source distribution, "
             "install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
             "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
-            "This patch restores complete SRS rejection diagnostics for initial imports and baseline revisions when several findings share a code. "
+            "The immutable published Flower 0.4.1 release and its eight historical assets, including runtime 0.4.0, remain unchanged. "
+            f"This candidate keeps the source version at {project['version']}; it is not a replacement published release. "
+            "The candidate's inference extra instead acquires the independently released public runtime-llama 0.4.1 wheel. "
+            "The Flower build and core installers do not download inference.\n\n"
+            "The candidate retains complete SRS rejection diagnostics for initial imports and baseline revisions when several findings share a code. "
             "Rejected documents remain rejected; all detailed findings and anchors are retained, without materializing baseline authority. "
             "It retains durable architecture authority, explicit executor selection, negotiated PVP handoff and continuous external-agent recovery from 0.4.0. "
             "The existing 37 public MCP tools and their schemas are unchanged. "
             "Upgrading 0.4.0 to 0.4.1 requires no new SQLite migration: schema 55 and the same local ledger are retained. "
             "Upgrading an older 0.3.1 installation still applies the existing additive SQLite migrations 52 to 55 on first server start. "
             "Use the planned, backed-up upgrade route for installer-owned environments to retain the existing profile and client registration. "
-            "Optional runtime-llama remains 0.4.0; core and host execution need no model endpoint. "
+            "Optional runtime-llama is independently upgraded only when explicitly installed; core and host execution need no model endpoint. "
             "Real paired provider qualification and human acceptance remain separate. Flower remains in testing.\n\n"
-            "Install this release and choose your coding client in the terminal:\n\n"
+            "Install the checked candidate wheel explicitly:\n\n"
+            f"```sh\npython -m pip install ./flow_of_work_mcp-{project['version']}-py3-none-any.whl\n```\n\n"
+            "For optional internal inference, install the extra from this same candidate wheel, then configure an authorized endpoint:\n\n"
+            f"```sh\npython -m pip install './flow_of_work_mcp-{project['version']}-py3-none-any.whl[inference]'\n```\n\n"
+            f"Pinned upstream dependency: `runtime-llama @ {RUNTIME_URL}`. "
+            "Its SHA-256 belongs to llama-runtime's release, not Flower's SHA256SUMS. "
+            "For verified offline acquisition and explicit runtime upgrades, see docs/INFERENCE.md from this candidate source.\n\n"
+            "The following installer commands select the immutable published release, not this source candidate, and choose your coding client in the terminal:\n\n"
             f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash\n```\n\n"
             "The installer prepares the Python environment and checks downloaded backend and wheel hashes.\n"
             "Already installed? Stop all Flower processes and clients sharing its environment before updating. "
@@ -241,9 +263,9 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             "Do not pass --platform or --client-config during an upgrade. "
             "The installer does not stop clients, restore data automatically or promise atomic pip rollback. "
             f"See [safe upgrades and manual installations](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/UPGRADING.md).\n\n"
-            "The ordinary installer installs only Flower core. For internal inference, verify the optional runtime wheel against SHA256SUMS "
-            f"and follow [optional inference setup](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/INFERENCE.md). Core/host execution needs no model endpoint.\n\n"
-            "Windows: obtain the version-pinned Windows PowerShell launcher, install.ps1, from this release's assets. "
+            "The ordinary installer installs only Flower core. Its published package retains its historical inference metadata. "
+            "Use the candidate wheel-extra command above for the new public dependency; core/host execution needs no model endpoint.\n\n"
+            "Windows: obtain the version-pinned Windows PowerShell launcher, install.ps1, from the published release's historical assets. "
             "Run the download and execution commands separately, inspecting the script before execution:\n\n"
             f"```powershell\nInvoke-WebRequest -UseBasicParsing -Uri \"https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.ps1\" -OutFile \".\\install.ps1\"\n```\n\n"
             f"```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\install.ps1 -Version '{project['version']}' -Platform codex\n```\n\n"
@@ -257,7 +279,7 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             "BOOTSTRAP.md is the same model instruction text bundled with the installed package.\n"
             "The source archive includes the bilingual presentation and its offline HTML readers under docs/presentation; "
             "extract the archive and open docs/presentation/index.html without starting a server.\n"
-            "See docs/INSTALLATION.md in the tagged source for manual installation and configuration.\n",
+            "See docs/INSTALLATION.md in this candidate source for current manual installation and configuration.\n",
             encoding="utf-8",
         )
     return {"version": project["version"], "assets": [path.name for path in files] + ["SHA256SUMS"]}
