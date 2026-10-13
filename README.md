@@ -11,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Version: `0.4.1` · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Source version: `0.4.1` · **Unreleased candidate; in testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -129,9 +129,16 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Release 0.4.1 retains `runtime-llama` 0.4.0 with an operator-managed llama.cpp endpoint.
-Core installers do not install it. The exact optional runtime wheel, checksums
-and licenses ship with the release; see [inference setup and migration](docs/INFERENCE.md).
+Current source is an unreleased `0.4.1` candidate. Its `inference` extra uses
+the independently published `runtime-llama` `0.4.1` wheel from
+[llama-runtime](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
+pinned by URL and SHA256. Install that extra from the selected current source
+or candidate Flower wheel; the immutable published Flower `v0.4.1` wheel still
+requires runtime `0.4.0` and its eight historical assets remain unchanged.
+Current candidate builds contain seven Flower assets and no runtime wheel.
+Core installers remain core-only. See [inference setup and migration](docs/INFERENCE.md)
+for verified downloads, offline installation and explicit optional-runtime upgrades.
+An operator-managed llama.cpp endpoint is required only for internal inference.
 Host-produced semantic results continue to work without a model.
 
 ### Glama and containers

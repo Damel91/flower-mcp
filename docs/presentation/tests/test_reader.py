@@ -12,6 +12,15 @@ import unittest
 from markdown_it import MarkdownIt
 
 ROOT = Path(__file__).resolve().parents[1]
+# These are independent published identities. The historical Flower release does
+# not change when the current source dependency or Flower version changes.
+PUBLISHED_FLOWER_VERSION = "0.4.1"
+PUBLISHED_FLOWER_RUNTIME = "0.4.0"
+UPSTREAM_RUNTIME_URL = (
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
+    "runtime_llama-0.4.1-py3-none-any.whl"
+)
+UPSTREAM_RUNTIME_SHA256 = "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
 SPEC = importlib.util.spec_from_file_location("flower_presentation_reader", ROOT / "build_reader.py")
 reader = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reader)
@@ -209,10 +218,14 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(set(re.findall(r"https?://[^)\s]+", editions[0])), set(re.findall(r"https?://[^)\s]+", editions[1])))
                 self.assertEqual(len(re.findall(r"^#{1,6} ", editions[0], re.MULTILINE)), len(re.findall(r"^#{1,6} ", editions[1], re.MULTILINE)))
 
-    def test_installation_closes_the_story_with_version_pinned_release_assets(self):
-        project = tomllib.loads((ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-        version = project["version"]
-        distribution = project["name"].replace("-", "_")
+    def test_installation_closes_the_story_with_historical_flower_release_assets(self):
+        version = PUBLISHED_FLOWER_VERSION
+        expected_assets = {
+            "install.sh", "install.ps1", "install_flower.py",
+            f"flow_of_work_mcp-{version}-py3-none-any.whl",
+            f"flow_of_work_mcp-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md",
+            f"runtime_llama-{PUBLISHED_FLOWER_RUNTIME}-py3-none-any.whl",
+        }
         for folder in reader.LANGUAGES:
             with self.subTest(folder=folder):
                 root = ROOT / folder
@@ -221,12 +234,13 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(paths[paths.index("06-operate.md") + 1], "try-flower.md")
                 self.assertIn("try-flower.md", (root / "06-operate.md").read_text(encoding="utf-8"))
                 source = (root / "try-flower.md").read_text(encoding="utf-8")
-                runtime = project["optional-dependencies"]["inference"][0].removeprefix("runtime-llama==")
-                for name in ("install.sh", "install.ps1", "install_flower.py",
-                             f"{distribution}-{version}-py3-none-any.whl",
-                             f"{distribution}-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md",
-                             f"runtime_llama-{runtime}-py3-none-any.whl"):
-                    self.assertIn(f"/releases/download/v{version}/{name}", source)
+                downloads = set(re.findall(
+                    re.escape(reader.REPOSITORY_URL) + r"/releases/download/v([^/]+)/([^\s)\"']+)",
+                    source,
+                ))
+                self.assertEqual(downloads, {(version, name) for name in expected_assets})
+                historical_inventory = {"eng": "eight historical assets", "ita": "otto asset storici"}
+                self.assertIn(historical_inventory[folder], " ".join(source.split()))
                 self.assertIn(f"/blob/{manifest['product_revision']}/docs/UPGRADING.md", source)
                 self.assertIn("--upgrade --dry-run", source)
                 self.assertIn(f"-Version '{version}' -Upgrade -DryRun", source)
@@ -235,6 +249,31 @@ class ReaderChecks(unittest.TestCase):
                                "-Platform antigravity", "-Platform gemini-cli"):
                     self.assertIn(option, source)
                 self.assertNotIn("https://raw.githubusercontent.com/Damel91/flower-mcp/main/tools/install.ps1", source)
+
+    def test_current_optional_runtime_has_independent_upstream_identity_and_source_route(self):
+        project = tomllib.loads((ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+        self.assertEqual(project["optional-dependencies"]["inference"], [
+            f"runtime-llama @ {UPSTREAM_RUNTIME_URL}#sha256={UPSTREAM_RUNTIME_SHA256}",
+        ])
+        for folder in reader.LANGUAGES:
+            root = ROOT / folder
+            for page in ("try-flower.md", "sources.md"):
+                with self.subTest(folder=folder, page=page):
+                    source = (root / page).read_text(encoding="utf-8")
+                    self.assertIn(f"]({UPSTREAM_RUNTIME_URL})", source)
+                    self.assertIn(f"`{UPSTREAM_RUNTIME_SHA256}`", source)
+                    self.assertNotIn(
+                        reader.REPOSITORY_URL + "/releases/download/v0.4.1/runtime_llama-0.4.1",
+                        source,
+                    )
+                    self.assertNotIn("--find-links", source)
+                    self.assertNotIn("--with-inference", source)
+            source = (root / "try-flower.md").read_text(encoding="utf-8")
+            self.assertIn("pip install '.[inference]'", source)
+            self.assertIn("./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]", source)
+            candidate_inventory = {"eng": "seven Flower assets", "ita": "sette asset Flower"}
+            self.assertIn(candidate_inventory[folder], " ".join(source.split()))
+            self.assertIn("--upgrade --dry-run", source)
 
     def test_english_shell_and_errors_are_localized(self):
         output, _ = reader.compile_reader(ROOT / "eng")

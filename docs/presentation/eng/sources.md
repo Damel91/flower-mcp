@@ -17,9 +17,11 @@ A CodingCastle engine capability is not attributed to Flower.
 
 The public Flower sources below are pinned to
 `51d1a86e5304c6ef71335dd130c193c84a35f80f`, declared version `0.4.1`.
-The implementation and installation guides share this source checkpoint;
-download links target release `0.4.1`. This editorial source snapshot does not
-qualify release binaries. Historical published `0.3.1` and `0.4.0` remain immutable.
+The implementation and installation guides share this unreleased candidate
+source checkpoint; Flower's declared version has not changed. Flower download
+links target the separate immutable published release `0.4.1`, including its
+historical runtime `0.4.0`. This editorial snapshot does not qualify binaries.
+Published `0.3.1`, `0.4.0` and `0.4.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.
 
@@ -109,16 +111,31 @@ pair. References remain pinned to the Flower source identified above.
 
 The closing [Now try Flower](try-flower.md) page uses the [public repository](https://github.com/Damel91/flower-mcp),
 the [v0.4.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) and
-the [installation guide for that release](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md).
-The eight release assets include the PowerShell launcher, Bash and Python
+the [installation guide at the source checkpoint](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md).
+The eight historical published release assets include the PowerShell launcher, Bash and Python
 installers, Flower wheel, source, bootstrap, optional runtime-llama `0.4.0` wheel
-and checksums. Download links are release pinned; installation guides and runtime
-sources retain the complete source checkpoint identified above.
+and checksums. Current unreleased candidate builds contain seven Flower assets,
+without a copied runtime wheel. Flower download links remain release pinned;
+installation guides and Flower runtime sources retain the complete source
+checkpoint identified above.
 Release commands require the matching published assets.
+
+The new optional dependency belongs to the independent
+[llama-runtime `0.4.1` release](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
+with [upstream wheel](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl)
+SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
+It is not a Flower asset. Its wheel includes Apache-2.0 `LICENSE`/`NOTICE` and
+vendored llamatelemetry MIT attribution. The
+[inference guide](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INFERENCE.md)
+describes the explicit current source/candidate extra, verified offline acquisition
+and optional-runtime upgrade. The old published Flower extra still selects `0.4.0`;
+a core/profile upgrade does not request the new runtime or configure a provider.
 
 Link availability, installed-package tests and client qualification are separate
 checks. The reader does not certify a new installation or native Windows/Linux
-experience. The README on `main` is current.
+experience. Package, mocked-gateway and container checks do not establish live
+model behavior, authenticated hosted Glama deployment or human acceptance.
+The README on `main` is current.
 
 ## Explicit limits
 

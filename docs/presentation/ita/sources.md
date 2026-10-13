@@ -18,10 +18,11 @@ Una capacità del motore CodingCastle non viene attribuita a Flower.
 
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
 `51d1a86e5304c6ef71335dd130c193c84a35f80f`, versione dichiarata `0.4.1`.
-Implementazione e guide di installazione condividono questo checkpoint;
-i download puntano alla release `0.4.1`. Questa fotografia editoriale delle
-fonti non qualifica i binari della release. Le release storiche pubblicate `0.3.1`
-e `0.4.0` rimangono immutabili.
+Implementazione e guide di installazione condividono questo checkpoint sorgente
+del candidato non pubblicato; la versione dichiarata di Flower non cambia.
+I download Flower puntano alla distinta release pubblicata immutabile `0.4.1`,
+incluso il suo runtime storico `0.4.0`. Questa fotografia editoriale non qualifica
+i binari. Le release pubblicate `0.3.1`, `0.4.0` e `0.4.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
 
@@ -111,16 +112,33 @@ runtime. I riferimenti restano fissati al sorgente Flower dichiarato sopra.
 
 La conclusione [Ora prova Flower](try-flower.md) usa la [repository pubblica](https://github.com/Damel91/flower-mcp),
 la [release v0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) e
-la [guida di installazione della release](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md).
-Gli otto asset della release includono il launcher PowerShell, gli installer
+la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md).
+Gli otto asset storici della release pubblicata includono il launcher PowerShell, gli installer
 Bash e Python, wheel Flower, sorgente, bootstrap, wheel opzionale runtime-llama
-`0.4.0` e checksum. I download sono fissati alla release; le guide di installazione
-e i sorgenti runtime mantengono il checkpoint completo identificato sopra.
+`0.4.0` e checksum. Le build del candidato corrente non pubblicato contengono
+sette asset Flower, senza un wheel runtime copiato. I download Flower restano
+fissati alla release; le guide di installazione e i sorgenti runtime di Flower
+mantengono il checkpoint completo identificato sopra.
 I comandi della release richiedono i corrispondenti asset pubblicati.
+
+La nuova dipendenza opzionale appartiene alla
+[release llama-runtime `0.4.1`](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1)
+indipendente, con [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl)
+SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
+Non è un asset Flower. Il wheel include `LICENSE`/`NOTICE` Apache-2.0 e
+l'attribuzione MIT di llamatelemetry incorporato. La
+[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INFERENCE.md)
+descrive l'extra esplicito da sorgente/candidato corrente, l'acquisizione offline
+verificata e l'aggiornamento del runtime opzionale. Il vecchio extra Flower
+pubblicato seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
+il nuovo runtime e non configura un provider.
 
 Disponibilità dei collegamenti, test del pacchetto installato e qualificazione
 del client sono controlli distinti. Il reader non certifica una nuova
-installazione o esperienza nativa Windows/Linux. Il README su `main` è corrente.
+installazione o esperienza nativa Windows/Linux. I controlli di pacchetto,
+gateway simulato e container non dimostrano comportamento del modello live,
+deployment Glama ospitato autenticato o accettazione umana.
+Il README su `main` è corrente.
 
 ## Limiti espliciti
 

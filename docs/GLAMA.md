@@ -40,6 +40,48 @@ Glama's release is a platform build and publication; it is separate from the
 GitHub release and its downloadable Python installers. Hosting is a separately
 billed service. Repository CI does not perform any account-side deployment.
 
+## Generated uv builds
+
+Glama can also generate its own Dockerfile instead of using this repository's
+Dockerfile. A maintainer-supplied build report from 2026-10-13, using source
+`6af3912`, failed during `uv sync`: the old optional `runtime-llama==0.4.0`
+requirement was unavailable in the package registry. uv resolves optional
+requirements while locking even when it installs only core. Current source uses
+an independently published, SHA-256-pinned runtime URL; this change is not yet
+part of the immutable published Flower 0.4.1 release.
+
+For the generated-build route, use the [example build spec](glama-build-spec.example.json)
+and select the source revision whose CI passed. Replace its `pinnedCommit: null`
+with that full commit SHA in the dashboard before building. The example retains
+Glama's Debian/Python 3.14/Node 24 environment and `mcp-proxy` wrapper. Its build
+step is:
+
+```sh
+uv sync --no-dev --no-editable
+```
+
+Its executable arguments select uv's project environment explicitly:
+
+```json
+["mcp-proxy", "--", "uv", "run", "--no-sync", "flower-mcp", "serve", "--profile", "default", "--profile-root", "/data", "--transport", "stdio"]
+```
+
+The supplied generated Dockerfile does not add `/app/.venv/bin` to PATH, so a
+bare `flower-mcp` command cannot be assumed to exist globally. `uv run --no-sync`
+uses the environment prepared during build without resynchronizing it at server
+startup. See uv's [environment guidance](https://docs.astral.sh/uv/guides/integration/docker/#using-the-environment)
+and [locking/syncing distinction](https://docs.astral.sh/uv/concepts/projects/sync/).
+Do not install the inference extra for this core route. Resolving its public
+artifact metadata does not enable inference or configure a model.
+
+Keep `/data` persistent and writable by the runtime user selected by this
+particular generated image. The UID 10001 setting below belongs to Flower's
+repository Dockerfile; do not assume Glama's generated image uses that same UID.
+The current CI uv checkpoint exercises the inner command and durable MCP state;
+it does not qualify Glama's `mcp-proxy`, gateway, account build or hosted volume.
+After selecting the corrected source/settings, rerun the account build and
+inspect its tools and synthetic-project recovery before a platform release.
+
 ## State and agent setup
 
 Keep the whole `/data/profiles/default` directory: it contains `flower.yaml`,

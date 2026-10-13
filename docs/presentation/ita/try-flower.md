@@ -10,8 +10,8 @@ server Flower MCP, nome pubblico di Flow of Work MCP.
 ## Repository e download pubblici
 
 - [Repository GitHub](https://github.com/Damel91/flower-mcp): codice, README e documentazione corrente.
-- [Release Flower MCP 0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1): pacchetti e note della versione.
-- [Guida di installazione della release](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md): procedure complete, configurazione e rimozione.
+- [Release pubblicata Flower MCP 0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1): pacchetti storici immutabili e note della versione.
+- [Guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md): procedure complete, configurazione e rimozione.
 - [Prerequisiti per sistema operativo](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md#prerequisites): cosa preparare prima del download.
 
 | File | A cosa serve |
@@ -23,15 +23,50 @@ server Flower MCP, nome pubblico di Flow of Work MCP.
 | [Archivio sorgente](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/flow_of_work_mcp-0.4.1.tar.gz) | Sorgente confezionato della release. |
 | [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/SHA256SUMS) | Checksum per verificare i file della release. |
 | [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/BOOTSTRAP.md) | Istruzioni pubbliche per avviare il lavoro dell'agente con Flower. |
-| [Wheel runtime opzionale](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/runtime_llama-0.4.0-py3-none-any.whl) | Configurazione esplicita dell'inferenza interna; l'installazione core lo esclude. |
+| [Wheel runtime opzionale storico](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/runtime_llama-0.4.0-py3-none-any.whl) | Runtime `0.4.0` conservato nella release pubblicata immutabile; l'installazione core lo esclude. |
 
-L'inventario della release `v0.4.1` comprende otto asset, inclusi `install.ps1` e il wheel opzionale
-runtime-llama `0.4.0`. Verifica tutti i download rispetto a `SHA256SUMS`.
+L'inventario della release pubblicata `v0.4.1` comprende otto asset storici,
+inclusi `install.ps1` e il wheel opzionale runtime-llama `0.4.0`. L'extra del suo
+wheel Flower richiede ancora quel runtime precedente. Verifica questi download
+rispetto allo `SHA256SUMS` pubblicato.
 Il launcher Windows installa il wheel `0.4.1`.
 Il nome della distribuzione Python resta `flow-of-work-mcp`; il comando è
-`flower-mcp`. I download sono fissati alla release e la guida di installazione
-al suo checkpoint documentato. Esegui i comandi solo quando i corrispondenti asset sono pubblicati.
+`flower-mcp`. I download sono fissati alla release storica e la guida di
+installazione al checkpoint sorgente corrente documentato. Esegui i comandi solo quando i corrispondenti asset sono pubblicati.
 Il README corrente segue invece gli aggiornamenti della repository.
+
+## Sorgente corrente e runtime opzionale
+
+Il sorgente corrente mantiene la versione Flower `0.4.1` come **candidato non
+pubblicato**. Le sue build contengono sette asset Flower: wheel, archivio sorgente,
+tre installer, `BOOTSTRAP.md` e `SHA256SUMS`. Non copiano più un wheel runtime.
+Questo non sostituisce né rinomina gli otto asset Flower pubblicati sopra.
+
+L'extra `inference` del sorgente/candidato corrente seleziona la
+[release llama-runtime `0.4.1`](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1)
+pubblicata indipendentemente e il suo [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl).
+Il suo SHA256 è
+`8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
+Il wheel upstream include `LICENSE`/`NOTICE` Apache-2.0 e l'attribuzione MIT
+di llamatelemetry incorporato.
+
+Dal sorgente corrente selezionato, usa l'ambiente dedicato di Flower:
+
+```sh
+.venv/bin/python -m pip install '.[inference]'
+.venv/bin/python -m pip check
+```
+
+Per un wheel candidato corrente verificato, usa invece
+`'./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]'`.
+Windows usa `& .\.venv\Scripts\python.exe` con gli stessi argomenti pip.
+La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
+Flower pubblicato per questo nuovo runtime. Consulta la
+[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INFERENCE.md)
+per il percorso completo da sorgente/wheel, la verifica indipendente del checksum
+e l'acquisizione del wheelhouse offline. Conserva commit sorgente e inventario
+checksum del candidato: nome del file e versione coincidono con il wheel Flower
+storico. Gli installer core restano core-only e non configurano provider impliciti.
 
 ## Prima di installare
 
@@ -78,6 +113,12 @@ automaticamente un backup; un errore di pip può modificare parzialmente l'ambie
 Le installazioni pip manuali usano la procedura separata di backup
 nella stessa guida. Dopo il riavvio riprendi il progetto noto; non crearne uno
 sostitutivo per recuperare lo stato.
+
+Questo aggiornamento di core/profilo non richiede l'extra inference e non cambia
+le impostazioni del modello. Aggiornare il runtime opzionale è un'operazione
+esplicita separata dal sorgente/candidato corrente selezionato; segui la guida
+all'inferenza prima di sostituire pacchetti Flower della stessa versione.
+Conserva endpoint e profilo originali.
 
 ## Scegli una strada
 

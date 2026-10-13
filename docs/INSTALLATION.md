@@ -7,8 +7,16 @@ Core runs without a model, CodingCastle or a private network.
 
 ## Testing status and release access
 
-Flower is in testing. The commands below target release `v0.4.1` and require
-its matching published assets. Source changes on `main` do not publish a release.
+Flower is in testing. Release installer and release-wheel commands below target
+the immutable published `v0.4.1` assets. Source commands install the selected
+checkout, currently an unreleased candidate with the same `0.4.1` metadata.
+Source changes on `main` do not publish a release.
+The published release has eight assets, including its historical optional
+`runtime_llama-0.4.0-py3-none-any.whl`. Current candidate builds have seven:
+the Flower wheel, source archive, three installers, `BOOTSTRAP.md` and
+`SHA256SUMS`. The new optional runtime `0.4.1` comes from the independent
+[llama-runtime release](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1);
+it is not a Flower release asset or embedded package payload.
 Automatic installers require publicly accessible GitHub release assets.
 If access is still private, use an authorized clone or manually download the
 wheel and checksum through an authorized browser/CLI. Both installers fetch
@@ -301,6 +309,9 @@ Have Git and Python 3.11+ available, then clone with authorized access if privat
 These examples install the checked-out source revision. To use the exact
 published `v0.4.1` bytes, select the release wheel route instead.
 No checkout configuration file needs to be copied.
+Record the selected commit with `git rev-parse HEAD`; the candidate and published
+wheel share a filename/version, so retain the candidate's build provenance and
+`SHA256SUMS` rather than identifying it by its filename alone.
 
 **macOS/Linux:**
 
@@ -325,6 +336,11 @@ py -3 -m venv .venv
 Keep the environment path stable after client registration. Run each step
 separately and stop on errors. Use the venv command paths in the following sections;
 activation is optional and unnecessary for these examples.
+
+These commands install core only. For the current source/candidate optional
+runtime, use the explicit [inference-extra route](INFERENCE.md#install-from-current-source-or-a-candidate-wheel).
+The published release wheel's older extra constraint does not select the new
+upstream runtime.
 
 ## Manual installation from a release wheel
 
@@ -522,6 +538,10 @@ this patch adds no migration. An older 0.3.1/schema52 ledger uses the existing
 additive migrations to schema 55 on first server start. Diagnosis alone does not
 start Flower or verify migration.
 Keep the backup and verify the same project after startup and another restart.
+An optional-runtime upgrade is a separate explicit package change; a core/profile
+upgrade does not request the inference extra or change endpoint settings.
+Follow the [runtime upgrade procedure](INFERENCE.md#upgrading-the-optional-runtime)
+when moving to the current source/candidate dependency.
 Failures retain original lifecycle data and completed backups, but pip may have
 partly changed the environment. There is no automatic restore or atomic package
 rollback. Restart with the same profile, verify a known project through MCP and
@@ -564,11 +584,13 @@ snapshot instead of replaying an uncertain mutation.
 
 ## Optional integrations
 
-Core installers do not install inference. Explicit internal semantic execution
-uses the optional `runtime-llama==0.4.0` dependency and an operator-managed
-llama.cpp endpoint. The exact wheel is an additional asset in the Flower release;
-it is also retained in the source archive with its license and provenance.
-There is no assumed upstream PyPI package or Git repository.
+Core installers do not install inference or configure a provider. Current
+source/candidate internal semantic execution uses the optional public
+`runtime-llama` `0.4.1` wheel through an exact upstream URL/SHA256 dependency and
+an operator-managed llama.cpp endpoint. Install the extra from that selected
+source/candidate wheel, not the historical published Flower wheel. The runtime
+remains independently distributed; Flower no longer copies it into candidate
+assets or source archives.
 
 See [INFERENCE.md](INFERENCE.md) for checksum verification, Linux/macOS and
 Windows installation, endpoint configuration and migration from the historical
