@@ -89,29 +89,6 @@ class PacketUnitAuthoringService:
         current_plan_revision = (
             int(current_plan.get("plan_revision") or 0) if current_plan else 0
         )
-        if (
-            expected_spec_revision is not None
-            and int(expected_spec_revision) not in {0, current_spec_revision}
-        ):
-            raise ChangeControlBlockedError(
-                "stale_packet_revision",
-                details={
-                    "expected_spec_revision": current_spec_revision,
-                    "received_spec_revision": int(expected_spec_revision),
-                },
-            )
-        if (
-            expected_plan_revision is not None
-            and int(expected_plan_revision) != current_plan_revision
-        ):
-            raise ChangeControlBlockedError(
-                "stale_current_work_plan_revision",
-                details={
-                    "expected_plan_revision": current_plan_revision,
-                    "received_plan_revision": int(expected_plan_revision),
-                },
-            )
-
         key = str(client_unit_key or "").strip()
         if unit is not None:
             normalized_unit = _normalize_unit_intent(unit)
@@ -138,22 +115,7 @@ class PacketUnitAuthoringService:
                 raise RequirementConflictError(
                     "client_unit_key already belongs to another authoring intent"
                 )
-        else:
-            intent = self._repository.save_packet_unit_authoring_intent(
-                project_id,
-                change_id,
-                packet_id,
-                key,
-                intent_fingerprint=fingerprint,
-                unit=normalized_unit,
-                candidate_window=[],
-                spec_revision=current_spec_revision,
-                plan_revision=current_plan_revision,
-                actor=actor,
-                request_id=f"{request_id}:intent",
-            )
-
-        if str(intent.get("state") or "") == "committed":
+        if intent is not None and str(intent.get("state") or "") == "committed":
             committed_revision = int(intent.get("committed_plan_revision") or 0)
             committed_plan = (
                 self._repository.packet_work_plan_state(
@@ -169,6 +131,43 @@ class PacketUnitAuthoringService:
                 intent,
                 committed_plan or current_plan,
                 replayed=True,
+            )
+
+        if (
+            expected_spec_revision is not None
+            and int(expected_spec_revision) not in {0, current_spec_revision}
+        ):
+            raise ChangeControlBlockedError(
+                "stale_packet_revision",
+                details={
+                    "expected_spec_revision": current_spec_revision,
+                    "received_spec_revision": int(expected_spec_revision),
+                },
+            )
+        if (
+            expected_plan_revision is not None
+            and int(expected_plan_revision) != current_plan_revision
+        ):
+            raise ChangeControlBlockedError(
+                "stale_current_work_plan_revision",
+                details={
+                    "expected_plan_revision": current_plan_revision,
+                    "received_plan_revision": int(expected_plan_revision),
+                },
+            )
+        if intent is None:
+            intent = self._repository.save_packet_unit_authoring_intent(
+                project_id,
+                change_id,
+                packet_id,
+                key,
+                intent_fingerprint=fingerprint,
+                unit=normalized_unit,
+                candidate_window=[],
+                spec_revision=current_spec_revision,
+                plan_revision=current_plan_revision,
+                actor=actor,
+                request_id=f"{request_id}:intent",
             )
 
         if int(intent["spec_revision"]) != current_spec_revision or int(

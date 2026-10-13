@@ -81,6 +81,12 @@ class PacketWorkPlanRepository(Protocol):
         request_fingerprint: str = "",
     ) -> Mapping[str, object]: ...
 
+    def packet_work_plan_request_exists(
+        self,
+        project_id: str,
+        request_id: str,
+    ) -> bool: ...
+
     def packet_work_plan_request_replay(
         self,
         project_id: str,

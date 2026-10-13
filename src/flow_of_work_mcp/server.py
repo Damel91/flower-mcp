@@ -85,6 +85,7 @@ from flow_of_work_mcp.core.errors import (
     ImplementationProviderUnavailableError,
     InputValidationError,
     LifecycleError,
+    PacketValidationAlreadyUpgradedError,
     ProjectNotFoundError,
     RequirementConflictError,
     RequirementMutationBlockedError,
@@ -250,6 +251,13 @@ def _guard(
         return envelope(
             tool=tool, status="rejected", reason=exc.reason,
             result=_recovery_result(recovery, _bootstrap_start_conflict_result(exc)),
+        )
+    except PacketValidationAlreadyUpgradedError as exc:
+        return envelope(
+            tool=tool,
+            status="rejected",
+            reason=exc.reason,
+            result=dict(exc.details),
         )
     except RequirementConflictError:
         return envelope(
@@ -761,11 +769,8 @@ def handle_packet_author(
                 actor=actor,
                 request_id=request_id,
             )
-        lifecycle = runtime.packet_lifecycle.get_packet(
-            project_id,
-            change_id,
-            created_packet_id,
-            view="gates",
+        continuation = _packet_author_continuation(
+            runtime, project_id, change_id, created_packet_id
         )
         return envelope(
             tool="fow_packet_author",
@@ -777,8 +782,7 @@ def handle_packet_author(
                     "purpose": str(created["purpose"]),
                 },
                 "provider_queue": dict(provider_queue),
-                "gate": lifecycle.get("gate", {}),
-                "next_action": lifecycle.get("next_action", {}),
+                **continuation,
             },
             audit_reference={
                 "change_id": change_id,
@@ -792,13 +796,31 @@ def handle_packet_author(
         change_id=change_id,
         packet_id=packet_id,
     )
-    runtime.packet_factory.ensure_packet_lifecycle(
-        project_id,
-        change_id,
-        packet_id,
-        actor=actor,
-        request_id=f"{request_id}:repair",
+    plan_request_id = f"{request_id}:plan" if operation == "add_unit" else request_id
+    existing_plan_request = operation in {
+        "add_unit", "replace_plan", "revise_unit", "remove_unit",
+        "rebind_unit", "set_dependencies",
+    } and runtime.ledger.packet_work_plan_request_exists(
+        project_id, plan_request_id
     )
+    if operation == "add_unit" and not existing_plan_request:
+        unit_key = str((unit or {}).get("client_unit_key") or client_unit_key).strip()
+        intent = runtime.ledger.packet_unit_authoring_intent(
+            project_id, change_id, packet_id, unit_key
+        ) if unit_key else None
+        existing_plan_request = bool(
+            intent and str(intent.get("state") or "") == "committed"
+        )
+    # Presence only suppresses ancillary repair. Canonical author services below
+    # still validate the request fingerprint and scope before returning a replay.
+    if not existing_plan_request:
+        runtime.packet_factory.ensure_packet_lifecycle(
+            project_id,
+            change_id,
+            packet_id,
+            actor=actor,
+            request_id=f"{request_id}:repair",
+        )
     change = runtime.changes.get_change(project_id, change_id)
     packet = next(
         (
@@ -833,6 +855,7 @@ def handle_packet_author(
     answer_result: Mapping[str, object] | None = None
     audit_id = ""
     if operation == "add_unit":
+        provider_queue: Mapping[str, object] = {}
         with runtime.ledger.atomic():
             authored = runtime.packet_unit_authoring.add_unit(
                 project_id,
@@ -848,36 +871,34 @@ def handle_packet_author(
                 actor=actor,
                 request_id=request_id,
             )
-            after_plan = runtime.ledger.packet_work_plan_state(
-                project_id, change_id, packet_id
-            )
-            current_spec_revision, _ = _current_packet_revisions(
-                runtime, project_id, change_id, packet_id
-            )
-            provider_queue = runtime.packet_provider_overlay.queue_plan_delta(
-                project_id,
-                change_id,
-                packet_id,
-                flow_spec_revision=current_spec_revision,
-                before=current_plan,
-                after=after_plan,
-                actor=actor,
-                request_id=request_id,
-            )
-        lifecycle = runtime.packet_lifecycle.get_packet(
-            project_id, change_id, packet_id, view="gates"
+            if authored.get("state") == "unit_added" and not authored.get("replayed", False):
+                after_plan = runtime.ledger.packet_work_plan_state(
+                    project_id, change_id, packet_id
+                )
+                current_spec_revision, _ = _current_packet_revisions(
+                    runtime, project_id, change_id, packet_id
+                )
+                provider_queue = runtime.packet_provider_overlay.queue_plan_delta(
+                    project_id,
+                    change_id,
+                    packet_id,
+                    flow_spec_revision=current_spec_revision,
+                    before=current_plan,
+                    after=after_plan,
+                    actor=actor,
+                    request_id=request_id,
+                )
+        continuation = _packet_author_continuation(
+            runtime, project_id, change_id, packet_id
         )
         return envelope(
             tool="fow_packet_author",
             status="success",
             result={
                 "unit_authoring": dict(authored),
-                "current_authority": dict(zip(("expected_spec_revision", "expected_plan_revision"),
-                    _current_packet_revisions(runtime, project_id, change_id, packet_id))),
                 "provider_queue": dict(provider_queue),
                 "semantic_delta": dict(authored.get("semantic_delta") or {}),
-                "gate": dict(lifecycle.get("gate") or {}),
-                "next_action": dict(lifecycle.get("next_action") or {}),
+                **continuation,
             },
             audit_reference={
                 "change_id": change_id,
@@ -1041,8 +1062,8 @@ def handle_packet_author(
                 or 0
             )
 
-        lifecycle = runtime.packet_lifecycle.get_packet(
-            project_id, change_id, packet_id, view="gates"
+        continuation = _packet_author_continuation(
+            runtime, project_id, change_id, packet_id
         )
         return envelope(
             tool="fow_packet_author",
@@ -1062,8 +1083,7 @@ def handle_packet_author(
                     "plan_revision": int((plan_result or {}).get("plan_revision") or 0),
                     "replayed": replayed,
                 },
-                "gate": dict(lifecycle.get("gate") or {}),
-                "next_action": dict(lifecycle.get("next_action") or {}),
+                **continuation,
             },
             audit_reference={"change_id": change_id, "packet_id": packet_id},
         )
@@ -1126,9 +1146,10 @@ def handle_packet_author(
         ]
         temporal_authority = str(gate_response.get("temporal_authority") or "").strip()
         if supplied_claim_fields and not claim_translation_available:
-            spec_revision, plan_revision = _current_packet_revisions(
+            continuation = _packet_author_continuation(
                 runtime, project_id, change_id, packet_id
             )
+            authority = continuation["current_authority"]
             return envelope(
                 tool="fow_packet_author",
                 status="blocked",
@@ -1139,11 +1160,10 @@ def handle_packet_author(
                         "project_id": project_id,
                         "change_id": change_id,
                         "packet_id": packet_id,
-                        "spec_revision": spec_revision,
-                        "plan_revision": plan_revision,
+                        "spec_revision": authority["expected_spec_revision"],
+                        "plan_revision": authority["expected_plan_revision"],
                     },
-                    "gate": dict(gate),
-                    "next_action": dict(current.get("next_action") or {}),
+                    **continuation,
                 },
                 audit_reference={"change_id": change_id, "packet_id": packet_id},
             )
@@ -1273,8 +1293,8 @@ def handle_packet_author(
                     int(current_plan["plan_revision"]),
                     construction_audit_id=audit_id,
                 )
-        lifecycle = runtime.packet_lifecycle.get_packet(
-            project_id, change_id, packet_id, view="gates"
+        continuation = _packet_author_continuation(
+            runtime, project_id, change_id, packet_id
         )
         return envelope(
             tool="fow_packet_author",
@@ -1291,8 +1311,7 @@ def handle_packet_author(
                         else {}
                     ),
                 },
-                "gate": dict(lifecycle.get("gate") or {}),
-                "next_action": dict(lifecycle.get("next_action") or {}),
+                **continuation,
             },
             audit_reference={"change_id": change_id, "packet_id": packet_id},
         )
@@ -1349,7 +1368,7 @@ def handle_packet_author(
                 unit_patch=unit_patch,
                 depends_on=depends_on,
             )
-        if answers and operation == "replace_plan":
+        if answers and operation == "replace_plan" and not result.get("replayed", False):
             audit = runtime.packet_construction.audit_for_packet(
                 project_id, change_id, packet_id
             )
@@ -1371,12 +1390,21 @@ def handle_packet_author(
                 actor=actor,
                 request_id=f"{request_id}:answers" if request_id else "",
             )
-        result = runtime.ledger.finalize_packet_authoring_revision(
-            project_id,
-            str(result["work_plan_id"]),
-            int(result["plan_revision"]),
-            construction_audit_id=audit_id,
-        )
+        mutation_metadata = {
+            key: result[key]
+            for key in ("mutation_operation", "affected_unit_key", "replayed")
+            if key in result
+        }
+        if not result.get("replayed", False):
+            result = {
+                **runtime.ledger.finalize_packet_authoring_revision(
+                    project_id,
+                    str(result["work_plan_id"]),
+                    int(result["plan_revision"]),
+                    construction_audit_id=audit_id,
+                ),
+                **mutation_metadata,
+            }
         provider_queue: Mapping[str, object] | None = None
         if operation in {
             "replace_plan",
@@ -1384,7 +1412,7 @@ def handle_packet_author(
             "remove_unit",
             "rebind_unit",
             "set_dependencies",
-        }:
+        } and not result.get("replayed", False):
             current_spec_revision, _ = _current_packet_revisions(
                 runtime, project_id, change_id, packet_id
             )
@@ -1398,21 +1426,6 @@ def handle_packet_author(
                 actor=actor,
                 request_id=request_id,
             )
-    guard = runtime.packet_guards.evaluate(project_id, change_id, packet_id)
-    current_spec_revision, current_plan_revision = _current_packet_revisions(
-        runtime,
-        project_id,
-        change_id,
-        packet_id,
-    )
-    next_action = runtime.packet_next_action.project(
-        guard,
-        project_id=project_id,
-        change_id=change_id,
-        packet_id=packet_id,
-        spec_revision=current_spec_revision,
-        plan_revision=current_plan_revision,
-    )
     preview = runtime.packet_work_plan.preview(
         project_id,
         change_id,
@@ -1420,8 +1433,8 @@ def handle_packet_author(
         plan_revision=int(result["plan_revision"]),
         detail_level="standard",
     )
-    lifecycle = runtime.packet_lifecycle.get_packet(
-        project_id, change_id, packet_id, view="gates"
+    continuation = _packet_author_continuation(
+        runtime, project_id, change_id, packet_id
     )
     return envelope(
         tool="fow_packet_author",
@@ -1446,10 +1459,10 @@ def handle_packet_author(
                 "operation": operation,
                 "affected_unit_key": str(result.get("affected_unit_key") or ""),
                 "plan_revision": int(result.get("plan_revision") or 0),
-                "semantic_revision": current_spec_revision,
+                "semantic_revision": int(result["packet_revision"]),
+                "replayed": bool(result.get("replayed", False)),
             },
-            "gate": dict(lifecycle.get("gate") or {}),
-            "next_action": dict(lifecycle.get("next_action") or next_action),
+            **continuation,
         },
         audit_reference={
             "change_id": change_id,
@@ -1457,6 +1470,30 @@ def handle_packet_author(
             "work_plan_id": result["work_plan_id"],
         },
     )
+
+
+def _packet_author_continuation(
+    runtime: McpRuntime,
+    project_id: str,
+    change_id: str,
+    packet_id: str,
+) -> dict[str, object]:
+    """Project the current head separately from the mutation's historical result."""
+    with runtime.ledger.consistent_read():
+        spec_revision, plan_revision = _current_packet_revisions(
+            runtime, project_id, change_id, packet_id
+        )
+        lifecycle = runtime.packet_lifecycle.get_packet(
+            project_id, change_id, packet_id, view="gates"
+        )
+        return {
+            "current_authority": {
+                "expected_spec_revision": spec_revision,
+                "expected_plan_revision": plan_revision,
+            },
+            "gate": dict(lifecycle.get("gate") or {}),
+            "next_action": dict(lifecycle.get("next_action") or {}),
+        }
 
 
 def _current_packet_revisions(

@@ -473,7 +473,7 @@ class PacketWorkPlanStoreMixin:
                         raise RequirementConflictError(
                             "request_id already belongs to another packet work plan"
                         )
-                    return value
+                    return {**value, "replayed": True}
 
             current_packet_revision = int(packet["spec_revision"])
             compatibility_revision = int(packet["current_revision"])
@@ -682,9 +682,29 @@ class PacketWorkPlanStoreMixin:
                 },
                 occurred_at=occurred_at,
             )
-            return self._work_plan_revision_value(
-                connection, project_id, work_plan_id, plan_revision
-            )
+            return {
+                **self._work_plan_revision_value(
+                    connection, project_id, work_plan_id, plan_revision
+                ),
+                "replayed": False,
+            }
+
+    def packet_work_plan_request_exists(
+        self,
+        project_id: str,
+        request_id: str,
+    ) -> bool:
+        """Read project-scoped presence; canonical services validate payload/scope."""
+        project_id = validate_project_id(project_id)
+        request_id = required_text(request_id, "request_id")
+        with self._read_connection() as connection:
+            return connection.execute(
+                """
+                SELECT 1 FROM packet_work_plan_revisions
+                WHERE project_id = ? AND request_id = ? LIMIT 1
+                """,
+                (project_id, request_id),
+            ).fetchone() is not None
 
     def packet_work_plan_request_replay(
         self,
@@ -855,6 +875,17 @@ class PacketWorkPlanStoreMixin:
             ).fetchone()
             if plan is None:
                 raise RequirementConflictError(f"unknown packet work plan: {work_plan_id}")
+            current_plan_revision = connection.execute(
+                """
+                SELECT MAX(plan_revision) FROM packet_work_plan_revisions
+                WHERE project_id = ? AND work_plan_id = ?
+                """,
+                (project_id, work_plan_id),
+            ).fetchone()[0]
+            if int(plan_revision) != current_plan_revision:
+                raise RequirementConflictError(
+                    "cannot finalize a historical work-plan revision"
+                )
             packet = self._packet_row(
                 connection, project_id, str(plan["change_id"]), str(plan["packet_id"])
             )

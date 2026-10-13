@@ -106,7 +106,16 @@ class PacketWorkPlanService:
                 or str(replay.get("packet_id") or "") != packet_id
             ):
                 raise ChangeControlBlockedError("packet_work_plan_request_scope_conflict")
-            return replay
+            return {
+                **dict(replay),
+                "mutation_operation": operation,
+                "affected_unit_key": (
+                    str((unit or {}).get("client_unit_key") or "").strip()
+                    if operation == "add_unit"
+                    else str(client_unit_key or "").strip()
+                ),
+                "replayed": True,
+            }
 
         state = self._repository.packet_work_plan_state(
             project_id,
@@ -139,7 +148,7 @@ class PacketWorkPlanService:
             if not isinstance(unit, Mapping):
                 raise ValueError("add_unit requires unit")
             units.append(_unit_payload(unit))
-            affected_key = str(unit.get("client_unit_key") or "")
+            affected_key = str(unit.get("client_unit_key") or "").strip()
         else:
             if not key:
                 raise ValueError(f"{operation} requires client_unit_key")

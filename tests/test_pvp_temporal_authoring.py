@@ -105,8 +105,9 @@ def test_canonical_add_and_revise_preserve_empty_checks_and_exact_replay(tmp_pat
     revised = plans.mutate_plan(*ids, **arguments)
     before_replay = ledger.ledger_version(ids[0])
     replay = plans.mutate_plan(*ids, **arguments)
-    assert replay == {key: value for key, value in revised.items()
-                      if key not in {"affected_unit_key", "mutation_operation"}}
+    assert revised["replayed"] is False and replay["replayed"] is True
+    assert {key: value for key, value in replay.items() if key != "replayed"} == {
+        key: value for key, value in revised.items() if key != "replayed"}
     assert ledger.ledger_version(ids[0]) == before_replay
     accept(plans, ids, revised)
     current = ledger.packet_work_plan_state(*ids)

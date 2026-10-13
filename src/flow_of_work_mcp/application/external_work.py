@@ -10,7 +10,9 @@ from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGenera
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES
 from flow_of_work_mcp.core.domain.external_work import (canonical_json, fields, fingerprint, number, objects, strings, text)
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
+from flow_of_work_mcp.core.errors import (
+    ChangeControlBlockedError, InputValidationError, PacketValidationAlreadyUpgradedError, RequirementConflictError,
+)
 
 READ_OPERATIONS = frozenset({'criteria', 'validation', 'provider_validation', 'todo'})
 MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
@@ -147,6 +149,30 @@ class ExternalWorkService:
             elif operation == 'upgrade_validation':
                 fields(payload, {'expected_spec_revision', 'expected_plan_revision'}, operation)
                 self._expect(snapshot, payload, plan_required=True)
+                if snapshot['external']['validation_version']:
+                    address = {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id}
+                    criterion_stale = snapshot['external']['criterion_statement_fingerprint'] != fingerprint(snapshot['packet']['completion_criteria'])
+                    recovery_calls = {'criteria': {
+                        'tool': 'fow_external_work', 'arguments': {**address, 'operation': 'criteria'},
+                    }}
+                    if criterion_stale:
+                        recovery_calls['reconcile_criteria_help'] = {
+                            'tool': 'fow_capabilities', 'arguments': {'view': 'operation',
+                                'operation_tool': 'fow_external_work', 'operation_name': 'reconcile_criteria'},
+                        }
+                    raise PacketValidationAlreadyUpgradedError(details={
+                        'operation': operation, **address,
+                        'validation_version': snapshot['external']['validation_version'],
+                        'current_authority': {
+                            'expected_spec_revision': snapshot['packet']['spec_revision'],
+                            'expected_plan_revision': (snapshot['plan'] or {}).get('plan_revision', 0),
+                        },
+                        'criterion_authority_stale': criterion_stale,
+                        'next_tool_call': {'tool': 'fow_external_work', 'arguments': {
+                            **address, 'operation': 'validation', 'payload': {'detail': 'full'},
+                        }},
+                        'recovery_calls': recovery_calls,
+                    })
                 self._ledger.upgrade_external_criteria(project_id, change_id, packet_id,
                                                       list(snapshot['packet']['completion_criteria']),
                                                       spec_revision=snapshot['packet']['spec_revision'], actor=actor)

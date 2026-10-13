@@ -46,6 +46,15 @@ class RequirementConflictError(LifecycleError):
     """Raised for deterministic duplicate or conflicting requirement input."""
 
 
+class PacketValidationAlreadyUpgradedError(RequirementConflictError):
+    """Known rejected upgrade with safe facts for read-only public recovery."""
+
+    def __init__(self, *, details: Mapping[str, object]) -> None:
+        self.reason = "packet_validation_already_upgraded"
+        self.details = dict(details)
+        super().__init__(self.reason)
+
+
 class BootstrapStartConflictError(RequirementConflictError):
     """Known rejected start with safe facts for explicit public recovery."""
 
