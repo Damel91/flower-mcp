@@ -2,7 +2,7 @@
   "title": "Flower MCP",
   "language": "en",
   "subtitle": "From requirements to software",
-  "product_revision": "754c763643dc75b17ce227877763803729d64e3a",
+  "product_revision": "fcfcda07f74f4cafdfe31e087e8d49ae29141b74",
   "pages": [
     {"path": "README.md", "label": "The presentation", "group": "The story"},
     {"path": "01-require.md", "label": "1. Require", "group": "The story"},
