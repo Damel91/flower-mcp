@@ -17,7 +17,7 @@ soltanto ritagli degli elenchi documentali, selezionati dall'autore.
 Una capacità del motore CodingCastle non viene attribuita a Flower.
 
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
-`51d1a86e5304c6ef71335dd130c193c84a35f80f`, versione dichiarata `0.4.1`.
+`754c763643dc75b17ce227877763803729d64e3a`, versione dichiarata `0.4.1`.
 Implementazione e guide di installazione condividono questo checkpoint sorgente
 del candidato non pubblicato; la versione dichiarata di Flower non cambia.
 I download Flower puntano alla distinta release pubblicata immutabile `0.4.1`,
@@ -30,25 +30,25 @@ prodotto vanno riesaminati quando cambia il comportamento del server.
 
 Problema originario: non confondere dialogo, proposta e intento corrente.
 
-- [Template pubblico dell'agente](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/resources/agent-bootstrap.md): ruolo dell'ingegnere, scenari, conferma reale della roadmap.
-- [Recipe di ciclo di vita](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/lifecycle_recipes.py): `engineering-bootstrap` e confini di autorità.
-- [Guided bootstrap](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/guided_bootstrap.py): risposte, corrispondenze e conferme.
+- [Template pubblico dell'agente](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/resources/agent-bootstrap.md): ruolo dell'ingegnere, scenari, conferma reale della roadmap.
+- [Recipe di ciclo di vita](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/lifecycle_recipes.py): `engineering-bootstrap` e confini di autorità.
+- [Guided bootstrap](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/guided_bootstrap.py): risposte, corrispondenze e conferme.
 
 ## Plan
 
 Problema originario: un output futuro non è una dipendenza già materializzata;
 copertura strutturale e giudizio semantico non sono intercambiabili.
 
-- [PVP standalone](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/core/domain/packet_validation_projection.py): derivazione della validazione del piano.
-- [Contratti delle operazioni](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/operation_contracts.py): dichiarazioni di unità e route esterne.
-- [Recipe standalone](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/lifecycle_recipes.py): produttori, consumatori, verifiche e ammissione.
+- [PVP standalone](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/core/domain/packet_validation_projection.py): derivazione della validazione del piano.
+- [Contratti delle operazioni](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/operation_contracts.py): dichiarazioni di unità e route esterne.
+- [Recipe standalone](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/lifecycle_recipes.py): produttori, consumatori, verifiche e ammissione.
 
 ## Build
 
 Problema originario: un'interruzione o una revisione non deve promuovere un
 report vecchio a completamento del lavoro corrente.
 
-- [External work](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/external_work.py): TODO, export e risultati dichiarati.
+- [External work](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/external_work.py): TODO, export e risultati dichiarati.
 - [Bootstrap pubblico](../../BOOTSTRAP.md): istruzioni persistenti, lavoro offline e riconciliazione.
 - [Mappa dei tool](tools.md): distingue osservazione, dichiarazione ed esecuzione.
 
@@ -57,9 +57,9 @@ report vecchio a completamento del lavoro corrente.
 Problema originario: compilazione, test, evidenza dichiarata e accettazione
 rispondono a domande diverse.
 
-- [Catalogo pubblico](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/operation_contracts.py): campagne, verification e prerequisiti semantici.
-- [Recipe semantiche e campagne](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/lifecycle_recipes.py): adozione di audit e autorità dell'oracolo.
-- [Smoke pubblico](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/tools/smoke_mcp.py): una verifica meccanica del pacchetto installato, non un benchmark cognitivo.
+- [Catalogo pubblico](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/operation_contracts.py): campagne, verification e prerequisiti semantici.
+- [Recipe semantiche e campagne](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/lifecycle_recipes.py): adozione di audit e autorità dell'oracolo.
+- [Smoke pubblico](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/tools/smoke_mcp.py): una verifica meccanica del pacchetto installato, non un benchmark cognitivo.
 
 ## Deploy
 
@@ -67,20 +67,20 @@ Problema originario: una consegna deve dichiarare scope, evidenza e obblighi
 aperti, senza scambiare un messaggio dell'agente per accettazione.
 
 - [README pubblico](../../../README.md): proprietà del core e separazione dalle azioni dell'agente.
-- [Contratti delle operazioni](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/operation_contracts.py): milestone e handover.
+- [Contratti delle operazioni](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/operation_contracts.py): milestone e handover.
 
 ## Operate
 
 Problema originario: non cambiare l'intento per giustificare una realizzazione
 sbagliata; conservare la storia senza renderla autorità corrente per errore.
 
-- [Recipe pubbliche](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/lifecycle_recipes.py): rivalutazione corrente e correzione entro l'intento.
-- [Template dell'agente](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/resources/agent-bootstrap.md): progressi, gap semantici e responsabilità.
+- [Recipe pubbliche](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/lifecycle_recipes.py): rivalutazione corrente e correzione entro l'intento.
+- [Template dell'agente](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/resources/agent-bootstrap.md): progressi, gap semantici e responsabilità.
 
 ## Catalogo
 
 Le nove lens e i 37 nomi della [mappa](tools.md) corrispondono a `_WORK_AREAS` e
-`_PUBLIC_TOOLS` nel [registro pubblico](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/operation_contracts.py).
+`_PUBLIC_TOOLS` nel [registro pubblico](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/operation_contracts.py).
 Il controllo editoriale verifica che il sito non ometta o inventi nomi.
 
 ## Confronto tra plane
@@ -101,18 +101,18 @@ La [pagina avanzata](advanced.md) distingue il core standalone dagli adapter
 opzionali. Non esporta configurazioni private né certifica una nuova coppia di
 runtime. I riferimenti restano fissati al sorgente Flower dichiarato sopra.
 
-- [Factory dei provider](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/runtime_factory.py): percorsi opzionali e adapter selezionati.
-- [Associazioni portabili](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/association_receipts.py): receipt e autorizzazione delle route.
-- [Orientamento tecnico](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py) e [proiezione delle lens](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/interaction_projection.py): discovery read-only e disponibilità coordinata.
-- [Snapshot MCP](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py): evidenza e canale strutturato.
-- [Adapter packet](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py) e [adapter test](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py): integrazione CodingCastle presente nel sorgente.
-- [Recipe di ciclo di vita](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/src/flow_of_work_mcp/application/lifecycle_recipes.py): ownership, review, campagne e PVP cross-server differita.
+- [Factory dei provider](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/runtime_factory.py): percorsi opzionali e adapter selezionati.
+- [Associazioni portabili](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/association_receipts.py): receipt e autorizzazione delle route.
+- [Orientamento tecnico](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py) e [proiezione delle lens](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/interaction_projection.py): discovery read-only e disponibilità coordinata.
+- [Snapshot MCP](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py): evidenza e canale strutturato.
+- [Adapter packet](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py) e [adapter test](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py): integrazione CodingCastle presente nel sorgente.
+- [Recipe di ciclo di vita](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/src/flow_of_work_mcp/application/lifecycle_recipes.py): ownership, review, campagne e PVP cross-server differita.
 
 ## Installazione e download
 
 La conclusione [Ora prova Flower](try-flower.md) usa la [repository pubblica](https://github.com/Damel91/flower-mcp),
 la [release v0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) e
-la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INSTALLATION.md).
+la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/docs/INSTALLATION.md).
 Gli otto asset storici della release pubblicata includono il launcher PowerShell, gli installer
 Bash e Python, wheel Flower, sorgente, bootstrap, wheel opzionale runtime-llama
 `0.4.0` e checksum. Le build del candidato corrente non pubblicato contengono
@@ -127,7 +127,7 @@ indipendente, con [wheel upstream](https://github.com/Damel91/llama-runtime/rele
 SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
 Non è un asset Flower. Il wheel include `LICENSE`/`NOTICE` Apache-2.0 e
 l'attribuzione MIT di llamatelemetry incorporato. La
-[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/51d1a86e5304c6ef71335dd130c193c84a35f80f/docs/INFERENCE.md)
+[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/754c763643dc75b17ce227877763803729d64e3a/docs/INFERENCE.md)
 descrive l'extra esplicito da sorgente/candidato corrente, l'acquisizione offline
 verificata e l'aggiornamento del runtime opzionale. Il vecchio extra Flower
 pubblicato seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
