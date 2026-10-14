@@ -11,8 +11,8 @@ server Flower MCP, nome pubblico di Flow of Work MCP.
 
 - [Repository GitHub](https://github.com/Damel91/flower-mcp): codice, README e documentazione corrente.
 - [Release pubblicata Flower MCP 0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1): pacchetti storici immutabili e note della versione.
-- [Guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/INSTALLATION.md): procedure complete, configurazione e rimozione.
-- [Prerequisiti per sistema operativo](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/INSTALLATION.md#prerequisites): cosa preparare prima del download.
+- [Guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md): procedure complete, configurazione e rimozione.
+- [Prerequisiti per sistema operativo](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#prerequisites): cosa preparare prima del download.
 
 | File | A cosa serve |
 | --- | --- |
@@ -62,7 +62,7 @@ Per un wheel candidato corrente verificato, usa invece
 Windows usa `& .\.venv\Scripts\python.exe` con gli stessi argomenti pip.
 La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
 Flower pubblicato per questo nuovo runtime. Consulta la
-[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/INFERENCE.md)
+[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 per il percorso completo da sorgente/wheel, la verifica indipendente del checksum
 e l'acquisizione del wheelhouse offline. Conserva commit sorgente e inventario
 checksum del candidato: nome del file e versione coincidono con il wheel Flower
@@ -80,12 +80,12 @@ storico. Gli installer core restano core-only e non configurano provider implici
 **Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.**
 L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
-configurato; vedi la [guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/INFERENCE.md).
+configurato; vedi la [guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md).
 Il reader è consultabile offline, mentre una nuova installazione scarica pacchetti e dipendenze.
 
 ## Usi già Flower? Conserva il ledger
 
-Segui il [piano di aggiornamento sicuro](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/UPGRADING.md)
+Segui il [piano di aggiornamento sicuro](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/UPGRADING.md)
 con l'ambiente, il profilo e la radice dei profili originali. Ferma tutti i processi
 Flower e i coding client che condividono quell'ambiente. Per un'installazione
 creata dall'installer, visualizza il piano prima di modificare i pacchetti:
@@ -151,7 +151,7 @@ leggere lo script prima di avviarlo. `-Platform claude-code`, `-Platform cursor`
 `-NoRegister` installa senza registrarne uno.
 L'opzione di execution policy vale solo per quel processo PowerShell.
 
-Per installare manualmente, segui [la procedura con wheel e checksum](https://github.com/Damel91/flower-mcp/blob/3aa12c1efc12cbbc915bca00c65b921adc5dd805/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+Per installare manualmente, segui [la procedura con wheel e checksum](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 ## Dall'installazione al primo requisito
 
