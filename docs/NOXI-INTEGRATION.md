@@ -235,6 +235,29 @@ Source/installed public-MCP checks with a synthetic provider and real paired
 Noxi pre-first-START qualification are recorded separately. The mode does not
 qualify a consumer or complete the deferred full cross-server PVP contract.
 
+## Provider timeouts and exact recovery (unreleased)
+
+The configured `timeout_seconds` is one total budget per provider RPC, including
+startup, request processing, implicit tool discovery and session cleanup.
+One `fow_packet_advance` call can perform several RPCs; the setting is not a
+total deadline for the whole packet advancement. Allow ordinary startup costs
+when choosing the budget for your deployment.
+
+Expiry returns the sanitized reason `implementation_provider_timeout`.
+After a possible write, Flower records UNKNOWN with the original durable
+command, captured context and fingerprint. A response received before expiry
+is still not adopted if its invocation fails to finish within the budget.
+The agent must inspect and reconcile that same command; a timeout does not
+establish rejection, completion or permission to create a replacement job.
+The consumer must persist its exact ACK atomically with its effect and replay
+that ACK idempotently when the original command returns.
+
+`sync_only` continues to hold an uncertain START/STOP unchanged. Choosing the
+ordinary recovery route remains a separate explicit decision. The timeout
+correction changes no provider wire/context/ACK or SQLite schema. Its source,
+installed-package and actual Noxi consumer qualification are recorded separately;
+historical published 0.4.1 does not contain this unreleased correction.
+
 ## Upgrade and persistence boundary
 
 This development increment adds SQLite migrations 53–55 for immutable
