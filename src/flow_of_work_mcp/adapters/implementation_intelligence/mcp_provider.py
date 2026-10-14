@@ -234,12 +234,21 @@ def _invoke_transport_worker(payload: bytes, deadline: float, expired: Event) ->
             # Never expose a result/exception while owned I/O can continue.
             if child is not None:
                 _kill_transport_child(child)
+                cleanup_error = None
                 if not communicated:
-                    child.communicate()  # Drain/close pipes and join Windows reader threads.
+                    try:
+                        child.communicate()  # Drain without sending new input.
+                    except Exception as exc:  # noqa: BLE001 - collect failed cleanup, never report success
+                        # Closing stdin or starting a reader can fail before
+                        # communicate joins threads. Settlement still continues.
+                        cleanup_error = exc
                 child.wait()
+                for name in ("_stdin_thread", "stdout_thread", "stderr_thread"):
+                    reader = getattr(child, name, None)
+                    if reader is not None and reader.ident is not None:
+                        reader.join()
                 # Retrying communicate(None) can leave a partially written
                 # stdin open after TimeoutExpired. The child is reaped now.
-                close_error = None
                 for pipe in (child.stdin, child.stdout, child.stderr):
                     if pipe is not None:
                         try:
@@ -247,11 +256,11 @@ def _invoke_transport_worker(payload: bytes, deadline: float, expired: Event) ->
                         except OSError as exc:
                             # Match subprocess's dead-reader handling on Windows.
                             if exc.errno != errno.EPIPE and not (sys.platform == "win32" and exc.errno == errno.EINVAL):
-                                close_error = close_error or exc
-                if close_error is not None:
+                                cleanup_error = cleanup_error or exc
+                if cleanup_error is not None:
                     if caller_cancellation is None:
-                        raise close_error
-                    caller_cancellation.add_note("Provider transport pipe cleanup failed after the owned child was reaped.")
+                        raise cleanup_error
+                    caller_cancellation.add_note("Provider transport cleanup failed after the owned child was reaped.")
         finally:
             stop_watchdog.set()
             if watchdog is not None and watchdog.ident is not None:

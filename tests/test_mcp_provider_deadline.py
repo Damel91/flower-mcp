@@ -59,7 +59,7 @@ def _assert_settled(children):
         for name in ("stdin", "stdout", "stderr"):
             pipe = getattr(child, name, None)
             assert pipe is None or pipe.closed
-        for name in ("_stdout_thread", "_stderr_thread"):
+        for name in ("stdout_thread", "stderr_thread", "_stdin_thread"):
             reader = getattr(child, name, None)
             assert reader is None or not reader.is_alive()
     assert not [thread for thread in threading.enumerate() if thread.name == "fow-provider-deadline"]
@@ -255,6 +255,87 @@ print(json.dumps({"version": request["version"], "status": "ok", "result": {"ack
     assert "dead_stdin_error" in handled
     assert handled.index("dead_stdin_error") < len(handled) - 1
     assert handled[-1] == "stdout_attempted_after_stdin"
+    _assert_settled(children)
+
+
+@pytest.mark.parametrize("interrupt_type", [KeyboardInterrupt, asyncio.CancelledError])
+def test_cleanup_communicate_error_still_joins_reader_and_preserves_cancellation(monkeypatch, tmp_path, interrupt_type):
+    _install_worker(monkeypatch, tmp_path, "time.sleep(10)\n")
+    original_spawn = subprocess.Popen
+    interrupt = interrupt_type("caller canceled before cleanup drain")
+    children, events = [], []
+    def spawn(*args, **kwargs):
+        child = original_spawn(*args, **kwargs)
+        children.append(child)
+        # Model an actual Windows Popen-owned reader with a real child pipe.
+        # It must finish before the client exposes the caller's cancellation.
+        def read_stdout():
+            try:
+                time.sleep(0.08)
+                child.stdout.read()
+            finally:
+                child.stdout.close()
+                events.append("reader_finished")
+        child.stdout_thread = threading.Thread(target=read_stdout, name="fixture-provider-stdout-reader")
+        child.stdout_thread.start()
+        first = True
+        def communicate(*_positional, **_named):
+            nonlocal first
+            if first:
+                first = False
+                events.append("caller_canceled")
+                raise interrupt
+            events.append("cleanup_drain_failed")
+            raise OSError(errno.EIO, "fixture private cleanup communicate failure")
+        child.communicate = communicate
+        return child
+    monkeypatch.setattr(provider_module.subprocess, "Popen", spawn)
+    try:
+        with pytest.raises(interrupt_type) as error:
+            _client(3).call_tool("fixture_tool", {})
+        assert error.value is interrupt
+        assert "cleanup_drain_failed" in events and "reader_finished" in events
+        assert "private" not in str(getattr(error.value, "__notes__", []))
+        _assert_settled(children)
+    finally:
+        # Failed regressions must not leave their owned fixture behind.
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+            child.wait()
+            child.stdout_thread.join()
+            for pipe in (child.stdin, child.stdout, child.stderr):
+                if pipe is not None:
+                    pipe.close()
+
+
+def test_unstarted_reader_and_repeated_cleanup_runtime_error_fail_closed_after_settlement(monkeypatch, tmp_path):
+    _install_worker(monkeypatch, tmp_path, "time.sleep(10)\n")
+    original_spawn = subprocess.Popen
+    children, events = [], []
+    def spawn(*args, **kwargs):
+        child = original_spawn(*args, **kwargs)
+        children.append(child)
+        # CPython stores this Thread before start(); no OS reader was started.
+        child.stdout_thread = threading.Thread(target=lambda: None, name="fixture-unstarted-provider-reader")
+        first = True
+        def communicate(*_positional, **_named):
+            nonlocal first
+            if first:
+                first = False
+                events.append("reader_start_failed")
+                raise RuntimeError("fixture private thread start failure")
+            events.append("drain_join_failed")
+            raise RuntimeError("fixture private cannot join thread before it is started")
+        child.communicate = communicate
+        return child
+    monkeypatch.setattr(provider_module.subprocess, "Popen", spawn)
+    with pytest.raises(ImplementationProviderUnavailableError) as error:
+        _client(3).call_tool("fixture_tool", {})
+    assert error.value.terminal_reason == "implementation_provider_transport_unavailable"
+    assert "private" not in str(error.value)
+    assert "reader_start_failed" in events and "drain_join_failed" in events
+    assert children[0].stdout_thread.ident is None
     _assert_settled(children)
 
 
