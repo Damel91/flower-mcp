@@ -2,7 +2,8 @@
 
 Flower MCP 0.4.0 introduced durable project architecture and an optional,
 explicitly negotiated provider handoff; 0.4.1 retains them. The discovery and
-deferred-only authoring correction described below is newer unreleased source.
+deferred-only authoring correction and sync-only mode described below are newer
+unreleased source.
 Flower does not install a Noxi agent loop or alter historical release assets.
 Actual paired consumer qualification is recorded separately from Flow protocol
 tests; check the installed server's capabilities before using optional delivery.
@@ -184,6 +185,55 @@ Compatible unenriched legacy commands keep v2 delivery. The original full
 cross-server PVP draft and CodingCastle IMPL-67 remain deferred; this bounded
 Flow bridge does not establish their acceptance. Consumer implementation and real
 paired qualification must be coordinated separately.
+
+## Synchronize deltas before execution (unreleased)
+
+Use `fow_packet_advance` with top-level `mode="sync_only"` to deliver admitted
+ADD/EDIT/REMOVE without starting execution. Discover the installed operation
+schema first: the default remains `mode="advance"`, and historical published
+0.4.1 does not contain this new mode. Use current packet identities and revisions
+from inspection, for example:
+
+```json
+{
+  "project_id": "example-project",
+  "packet_id": "PACKET-000001",
+  "actor": "coding-agent",
+  "request_id": "sync-authored-deltas-1",
+  "mode": "sync_only",
+  "expected_spec_revision": 1,
+  "expected_plan_revision": 2
+}
+```
+
+Synchronization can scaffold a provider draft, resolve a current target decision,
+deliver deltas and reconcile their exact receipts. It is an explicit provider
+operation with ledger effects, not a pure read. Existing PVP, negotiation,
+currentness, ownership and correlation guards still apply. It does not accept
+plans, advance evidence/acceptance work, send START/STOP or cancel a run.
+
+At the execution boundary, `advancement.state="provider_synchronized"` and
+`reason="sync_only_start_boundary"` mean the call stopped before sending START.
+They preserve the actual provider state/run phase; they do not assert that an
+earlier run never started. Inspect the result or author further deltas, retaining
+`mode="sync_only"` on subsequent synchronization calls. Starting requires a
+separate explicit `mode="advance"` call with current revisions; the synchronized
+response returns that decision to the model rather than starting automatically.
+
+A pending, delivering or unknown START/STOP remains unchanged and holds later
+deltas in order. The response returns `provider_control_pending`,
+`reason="sync_only_control_pending"` and the exact `pending_control` identity.
+Use read-only `fow_packet_inspect` with `view="gates"` to inspect it before
+choosing a separate control/recovery action. Explicit retry of a rejected control
+is also held. An unknown delta reconciles only its original durable command;
+an unresolved UNKNOWN never authorizes falling through to START. START/STOP
+decisions, private force flags and non-provider semantic decisions conflict with
+sync-only mode and are rejected before effects.
+
+This addition changes no provider wire/context/ACK schema or SQLite schema.
+Source/installed public-MCP checks with a synthetic provider and real paired
+Noxi pre-first-START qualification are recorded separately. The mode does not
+qualify a consumer or complete the deferred full cross-server PVP contract.
 
 ## Upgrade and persistence boundary
 

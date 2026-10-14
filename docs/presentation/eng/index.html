@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: b3eb1a4eddd126c034b645f61d51676efdbe538c060c8b20779a69d8c2a556f9. -->
+<!-- Generated from linked Markdown. Source digest: 9d2ce9636338cb5ad15cd3bf58f18b47d171fbb8f99e6f0eb3e0c630ed517408. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -494,8 +494,8 @@ server, the public name of Flow of Work MCP.</p>
 <ul>
 <li><a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">GitHub repository</a>: code, README and current documentation.</li>
 <li><a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1" rel="noopener noreferrer">Published Flower MCP 0.4.1 release</a>: immutable historical packages and version notes.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INSTALLATION.md" rel="noopener noreferrer">Installation guide at the source checkpoint</a>: full procedures, configuration and removal.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INSTALLATION.md#prerequisites" rel="noopener noreferrer">Operating-system prerequisites</a>: what to prepare before downloading.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INSTALLATION.md" rel="noopener noreferrer">Installation guide at the source checkpoint</a>: full procedures, configuration and removal.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INSTALLATION.md#prerequisites" rel="noopener noreferrer">Operating-system prerequisites</a>: what to prepare before downloading.</li>
 </ul>
 <table>
 <thead>
@@ -569,7 +569,7 @@ llamatelemetry MIT attribution.</p>
 Windows uses <code>&amp; .\.venv\Scripts\python.exe</code> with the same pip arguments.
 The dependency pins the upstream URL and SHA256. Do not use the published
 Flower wheel's old extra for this new runtime. See the
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>
 for the complete source/wheel route, independent checksum verification and
 offline wheelhouse acquisition. Keep the candidate's source commit and checksum
 inventory: its filename and version match the historical Flower wheel.
@@ -604,10 +604,10 @@ Core installers remain core-only and configure no implicit provider.</p>
 <p><strong>The core requires no LM Studio, internal model, CodingCastle or VPN.</strong> Inference
 normally remains with your chosen coding agent. Optional Flower internal inference
 requires an explicitly installed runtime and configured endpoint; see the
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>.
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>.
 The reader works offline, while a fresh installation downloads packages and dependencies.</p>
 <h2 id="doc-d92560641e4a--already-using-flower-keep-your-ledger">Already using Flower? Keep your ledger</h2>
-<p>Follow the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/UPGRADING.md" rel="noopener noreferrer">safe upgrade plan</a>
+<p>Follow the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/UPGRADING.md" rel="noopener noreferrer">safe upgrade plan</a>
 using the original environment, profile and profile root. Stop all Flower processes
 and coding clients sharing that environment. For an installer-owned installation,
 preview the upgrade before changing packages:</p>
@@ -652,7 +652,7 @@ script before starting it. <code>-Platform claude-code</code>, <code>-Platform c
 <code>-Platform antigravity</code> or <code>-Platform gemini-cli</code> selects another client;
 <code>-NoRegister</code> installs without registering one. The execution
 policy option applies only to that PowerShell process.</p>
-<p>For manual installation, follow <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INSTALLATION.md#manual-installation-from-a-release-wheel" rel="noopener noreferrer">the wheel and checksum procedure</a>.</p>
+<p>For manual installation, follow <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INSTALLATION.md#manual-installation-from-a-release-wheel" rel="noopener noreferrer">the wheel and checksum procedure</a>.</p>
 <h2 id="doc-d92560641e4a--from-installation-to-the-first-requirement">From installation to the first requirement</h2>
 <ol>
 <li>Keep the executable path and bootstrap command returned by the installer.
@@ -928,7 +928,7 @@ prerequisites. The current server catalog remains the operational authority.</p>
 </tr>
 <tr>
 <td><code>fow_packet_advance</code></td>
-<td>Advance deterministic gates to a decision or asynchronous boundary. The selected technical path may require a provider.</td>
+<td>Advance deterministic gates to a decision or asynchronous boundary. In unreleased source, <code>mode=&quot;sync_only&quot;</code> delivers provider deltas and stops before START; <code>mode=&quot;advance&quot;</code> remains the default behavior.</td>
 </tr>
 <tr>
 <td><code>fow_packet_inspect</code></td>
@@ -1085,7 +1085,7 @@ not measure the correctness of the software produced.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/README.md" rel="noopener noreferrer">Flower MCP</a></td>
+<td><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/README.md" rel="noopener noreferrer">Flower MCP</a></td>
 <td>Requirements, goals, milestones, changes, work, evidence, acceptance and handover in a persistent ledger.</td>
 <td>Connects intent and current work; separates completion, verification and acceptance; offers Markdown plans and TODOs for external agents.</td>
 <td>More concepts to learn than a backlog. Host declarations are not an automatic source-code audit.</td>
@@ -1171,7 +1171,7 @@ receives a plan or TODO, works through its own host and reports outcomes. The
 integrated path adds direct exchanges with compatible services. CodingCastle is
 the technical provider for which the public source contains packet and test
 adapters; it is not a dependency of Flower's core.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>.</p>
 <h2 id="doc-f5ec36cbd880--who-owns-what">Who owns what</h2>
 <table>
 <thead>
@@ -1201,7 +1201,7 @@ adapters; it is not a dependency of Flower's core.
 </table>
 <p>A reachable provider is not automatically the project's provider. A passing
 test is not automatically an accepted milestone. These distinctions are part
-of the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">public recipes</a>.</p>
+of the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">public recipes</a>.</p>
 <h2 id="doc-f5ec36cbd880--portable-associations-not-hidden-configuration">Portable associations, not hidden configuration</h2>
 <p><code>fow_bindings</code> can inspect, export and import host/project or project/provider
 associations through versioned JSON receipts. The logical association can
@@ -1211,7 +1211,7 @@ revision, and a conflicting replacement requires an explicit reason.</p>
 commands. The operator must already have authorized the provider route. Moving
 an association does not mean moving the whole runtime or obtaining authority
 to modify a repository.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Association contract</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Association contract</a>.</p>
 <h2 id="doc-f5ec36cbd880--coordinated-lens-orientation">Coordinated lens orientation</h2>
 <p>When the technical context is associated, <code>fow_interaction</code> can combine
 Flower's areas with those discovered through <code>codingcastle_interaction</code>, showing
@@ -1220,21 +1220,21 @@ discovery is read-only and does not alter its standalone lens.</p>
 <p>A lens changes attention, not the tool catalog, lifecycle or permissions. If
 the provider is unavailable, the frame exposes degraded coordinated mode and
 any blocked technical area rather than pretending it is available.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Orientation adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">interaction projection</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Orientation adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">interaction projection</a>.</p>
 <h2 id="doc-f5ec36cbd880--source-snapshots-and-intent-grounding">Source snapshots and intent grounding</h2>
 <p>Evidence adapters receive bounded snapshots of implementation, bootstrap
 behavior and packet targets. They check the contract, binding and required
 revision references: names or descriptions alone are not current evidence.
 Search and the graph remain in the provider; Flower consumes a projection
 for its engineering work.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Snapshot adapters</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Snapshot adapters</a>.</p>
 <p>Grounding relates intent to observed implementation. <code>fow_ground_intent</code> is the
 internal path using a model and source provider. <code>fow_semantic</code> also offers
 host-executed assignments with inputs and an output contract prepared by Flower;
 host grounding uses a closed evidence receipt and preserves host-declared
 provenance. It does not automatically convert that evidence into provider
 attestation.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic recipe</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic recipe</a>.</p>
 <h2 id="doc-f5ec36cbd880--from-semantic-packet-to-technical-work">From semantic packet to technical work</h2>
 <p>Flower maintains ordered instructions, checks, dependencies and unit intent.
 The orchestrator chooses readable candidates; the provider resolves exact
@@ -1246,14 +1246,22 @@ paste into a plan.</p>
 the workspace belong to CodingCastle; Flower does not become a second
 compilation engine. An absent or incompatible provider, or stale evidence,
 leaves a gate open rather than authorizing invented execution.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">reconciliation recipes</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">reconciliation recipes</a>.</p>
 <p>Flower 0.4.0 adds explicit executor selection for new work and negotiation before
 an enriched provider handoff. Read-only validation does not probe the provider.
 The Flow-owned bridge carries the selected architecture, producer/consumer
 contracts and verification obligations; the consumer must advertise compatible
 capabilities and acknowledge the exact context before execution can start.
 This does not transfer admitted work to another executor or qualify a real
-consumer. See the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/NOXI-INTEGRATION.md" rel="noopener noreferrer">integration guide</a>.</p>
+consumer. See the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/NOXI-INTEGRATION.md" rel="noopener noreferrer">integration guide</a>.</p>
+<p>Unreleased source adds <code>mode=&quot;sync_only&quot;</code> to <code>fow_packet_advance</code>: it delivers
+admitted ADD/EDIT/REMOVE and stops at <code>provider_synchronized</code> without sending
+START/STOP. Subsequent synchronization calls retain that mode; starting requires
+an explicit <code>mode=&quot;advance&quot;</code> call. A pending or UNKNOWN control remains unchanged
+and holds later deltas: the next step is read-only gate inspection. The result
+preserves actual provider state and does not assert that an earlier run never
+started. PVP gates and ACKs remain unchanged; real paired qualification is
+separate from synthetic-provider checks.</p>
 <h2 id="doc-f5ec36cbd880--workspace-review-and-semantic-correction">Workspace review and semantic correction</h2>
 <p>A review must address the current candidate and make targets, coverage and
 evidence explicit. Flower records the disposition and finding history; the
@@ -1262,7 +1270,7 @@ approval merely because it contains no error.</p>
 <p>A semantic defect found after review feeds an ordinary corrective packet. It
 is not automatic technical retry of failed compilation. The recipe separates
 continuation, verification, remediation and blockage.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Review and remediation recipes</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Review and remediation recipes</a>.</p>
 <h2 id="doc-f5ec36cbd880--campaigns-oracles-and-provider-tests">Campaigns, oracles and provider tests</h2>
 <p>Flower defines expected behavior, cases, obligations and oracle meaning. The
 provider materializes and runs tests in the supported path. The
@@ -1273,13 +1281,13 @@ or framework.</p>
 <p>Progression requires materialization authority and current attested results.
 A test that compiles but lacks the required attestation cannot establish
 authoritative product failure. Acceptance remains a separate decision.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">Test adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">campaign recipes</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">Test adapter</a>, <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">campaign recipes</a>.</p>
 <h2 id="doc-f5ec36cbd880--two-audiences-two-projections">Two audiences, two projections</h2>
 <p>The model receives readable Markdown content. Server-to-server exchanges
 instead consume MCP <code>structuredContent</code> under versioned contracts: they do
 not reinterpret model-facing text as JSON. Readable output and structured
 receipts serve different audiences.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Structured-channel decoding</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">Structured-channel decoding</a>.</p>
 <h2 id="doc-f5ec36cbd880--what-is-present-and-what-remains-open">What is present and what remains open</h2>
 <table>
 <thead>
@@ -1326,7 +1334,7 @@ receipts serve different audiences.
 <p>The presence of adapters in source <strong>does not certify every running version
 combination</strong>. This page describes capabilities and boundaries of the reference
 source, not a new live campaign for the Flower/CodingCastle pair.
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Factory</a>, <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">status declared in recipes</a>.</p>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Factory</a>, <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">status declared in recipes</a>.</p>
 <h2 id="doc-f5ec36cbd880--spazio-comune-with-a-provider">Spazio Comune with a provider</h2>
 <p>In our example, Flower preserves the rule &quot;two concurrent bookings must not
 occupy the same room&quot; and governs its corrective packet. A compatible provider
@@ -1491,7 +1499,7 @@ this site</strong>: no private documents, runtimes, hosts, credentials or logs. 
 <a href="#page=method.md" data-page="method.md">method page</a> shows only cropped document lists selected by the author.
 A CodingCastle engine capability is not attributed to Flower.</p>
 <p>The public Flower sources below are pinned to
-<code>fcfcda07f74f4cafdfe31e087e8d49ae29141b74</code>, declared version <code>0.4.1</code>.
+<code>febfdff537cf68a004f2698bcab5ed0db22f3497</code>, declared version <code>0.4.1</code>.
 The implementation and installation guides share this unreleased candidate
 source checkpoint; Flower's declared version has not changed. Flower download
 links target the separate immutable published release <code>0.4.1</code>, including its
@@ -1502,23 +1510,23 @@ server behavior changes.</p>
 <h2 id="doc-9f8babe31a3f--require">Require</h2>
 <p>Original problem: do not confuse conversation, proposals and current intent.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Public agent template</a>: engineering role, scenarios and real roadmap confirmation.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: <code>engineering-bootstrap</code> and authority boundaries.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/guided_bootstrap.py" rel="noopener noreferrer">Guided bootstrap</a>: answers, correspondences and confirmations.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Public agent template</a>: engineering role, scenarios and real roadmap confirmation.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: <code>engineering-bootstrap</code> and authority boundaries.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/guided_bootstrap.py" rel="noopener noreferrer">Guided bootstrap</a>: answers, correspondences and confirmations.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--plan">Plan</h2>
 <p>Original problem: a future output is not a materialized dependency; structural
 coverage and semantic judgment are not interchangeable.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/core/domain/packet_validation_projection.py" rel="noopener noreferrer">Standalone PVP</a>: derived plan validation.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: unit declarations and external routes.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Standalone recipes</a>: producers, consumers, verification and admission.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/core/domain/packet_validation_projection.py" rel="noopener noreferrer">Standalone PVP</a>: derived plan validation.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: unit declarations and external routes.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Standalone recipes</a>: producers, consumers, verification and admission.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--build">Build</h2>
 <p>Original problem: an interruption or revision must not promote an old report
 to completion of current work.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/external_work.py" rel="noopener noreferrer">External work</a>: TODOs, exports and declared outcomes.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/external_work.py" rel="noopener noreferrer">External work</a>: TODOs, exports and declared outcomes.</li>
 <li><a href="#page=..%2F..%2FBOOTSTRAP.md" data-page="../../BOOTSTRAP.md">Public bootstrap</a>: persistent instructions, offline work and reconciliation.</li>
 <li><a href="#page=tools.md" data-page="tools.md">Tool map</a>: observation, declaration and execution are distinct.</li>
 </ul>
@@ -1526,27 +1534,27 @@ to completion of current work.</p>
 <p>Original problem: compilation, tests, declared evidence and acceptance answer
 different questions.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Public catalog</a>: campaigns, verification and semantic prerequisites.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic and campaign recipes</a>: audit adoption and oracle authority.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/tools/smoke_mcp.py" rel="noopener noreferrer">Public smoke check</a>: mechanical verification of the installed package, not a cognitive benchmark.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Public catalog</a>: campaigns, verification and semantic prerequisites.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Semantic and campaign recipes</a>: audit adoption and oracle authority.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/tools/smoke_mcp.py" rel="noopener noreferrer">Public smoke check</a>: mechanical verification of the installed package, not a cognitive benchmark.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--deploy">Deploy</h2>
 <p>Original problem: delivery must state scope, evidence and open obligations,
 without treating an agent message as acceptance.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/README.md" rel="noopener noreferrer">Public README</a>: core ownership and separation from agent actions.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: milestones and handover.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/README.md" rel="noopener noreferrer">Public README</a>: core ownership and separation from agent actions.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">Operation contracts</a>: milestones and handover.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--operate">Operate</h2>
 <p>Original problem: do not change intent to justify an incorrect implementation;
 preserve history without accidentally making it current authority.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Public recipes</a>: current reassessment and correction within intent.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Agent template</a>: progress, semantic gaps and responsibilities.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Public recipes</a>: current reassessment and correction within intent.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/resources/agent-bootstrap.md" rel="noopener noreferrer">Agent template</a>: progress, semantic gaps and responsibilities.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--catalog">Catalog</h2>
 <p>The nine lenses and 37 names in the <a href="#page=tools.md" data-page="tools.md">map</a> match <code>_WORK_AREAS</code> and
-<code>_PUBLIC_TOOLS</code> in the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">public registry</a>.
+<code>_PUBLIC_TOOLS</code> in the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/operation_contracts.py" rel="noopener noreferrer">public registry</a>.
 The editorial check verifies that no tool names are omitted or invented.</p>
 <h2 id="doc-9f8babe31a3f--comparing-planes">Comparing planes</h2>
 <p>The <a href="#page=comparison.md" data-page="comparison.md">comparison page</a> uses the projects' official sources,
@@ -1564,17 +1572,17 @@ are editorial assessments; we have not measured a winner.</p>
 adapters. It neither exports private configuration nor certifies a new runtime
 pair. References remain pinned to the Flower source identified above.</p>
 <ul>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>: optional paths and selected adapters.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Portable associations</a>: receipts and route authorization.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Technical orientation</a> and <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">lens projection</a>: read-only discovery and coordinated availability.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">MCP snapshots</a>: evidence and structured channel.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a> and <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">test adapter</a>: CodingCastle integration present in source.</li>
-<li><a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: ownership, review, campaigns and deferred cross-server PVP.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Provider factory</a>: optional paths and selected adapters.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/association_receipts.py" rel="noopener noreferrer">Portable associations</a>: receipts and route authorization.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/interaction_provider.py" rel="noopener noreferrer">Technical orientation</a> and <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/interaction_projection.py" rel="noopener noreferrer">lens projection</a>: read-only discovery and coordinated availability.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py" rel="noopener noreferrer">MCP snapshots</a>: evidence and structured channel.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py" rel="noopener noreferrer">Packet adapter</a> and <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py" rel="noopener noreferrer">test adapter</a>: CodingCastle integration present in source.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/src/flow_of_work_mcp/application/lifecycle_recipes.py" rel="noopener noreferrer">Lifecycle recipes</a>: ownership, review, campaigns and deferred cross-server PVP.</li>
 </ul>
 <h2 id="doc-9f8babe31a3f--installation-and-downloads">Installation and downloads</h2>
 <p>The closing <a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a> page uses the <a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">public repository</a>,
 the <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1" rel="noopener noreferrer">v0.4.1 release</a> and
-the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INSTALLATION.md" rel="noopener noreferrer">installation guide at the source checkpoint</a>.
+the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INSTALLATION.md" rel="noopener noreferrer">installation guide at the source checkpoint</a>.
 The eight historical published release assets include the PowerShell launcher, Bash and Python
 installers, Flower wheel, source, bootstrap, optional runtime-llama <code>0.4.0</code> wheel
 and checksums. Current unreleased candidate builds contain seven Flower assets,
@@ -1588,7 +1596,7 @@ with <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/
 SHA256 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
 It is not a Flower asset. Its wheel includes Apache-2.0 <code>LICENSE</code>/<code>NOTICE</code> and
 vendored llamatelemetry MIT attribution. The
-<a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>
+<a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>
 describes the explicit current source/candidate extra, verified offline acquisition
 and optional-runtime upgrade. The old published Flower extra still selects <code>0.4.0</code>;
 a core/profile upgrade does not request the new runtime or configure a provider.</p>
@@ -1773,7 +1781,7 @@ choice or connection prerequisite is missing, report it instead of guessing.</p>
 </blockquote>
 <p>Replace &quot;the installed Flower MCP command&quot; with its actual executable path when
 needed. If you installed with <code>--no-register</code>, first configure the intended agent
-using the <a href="https://github.com/Damel91/flower-mcp/blob/fcfcda07f74f4cafdfe31e087e8d49ae29141b74/docs/INSTALLATION.md" rel="noopener noreferrer">installation instructions</a>.</p>
+using the <a href="https://github.com/Damel91/flower-mcp/blob/febfdff537cf68a004f2698bcab5ed0db22f3497/docs/INSTALLATION.md" rel="noopener noreferrer">installation instructions</a>.</p>
 <p>The model reads existing project instructions, discovers projects through
 <code>fow_interaction</code>, explicitly selects the intended one and reads the durable
 snapshot through <code>fow_handover</code>. An empty profile requires a new project only

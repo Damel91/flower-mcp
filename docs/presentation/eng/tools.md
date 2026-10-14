@@ -44,7 +44,7 @@ prerequisites. The current server catalog remains the operational authority.
 | `fow_change` | Govern changes, dependencies, state and evidence; packets have dedicated surfaces. |
 | `fow_architecture` | Inspect, propose and adopt immutable project components, interfaces and technical decisions. Adoption is engineering authority, distinct from human acceptance. |
 | `fow_packet_author` | Build canonical packets, units, declarations and plans. |
-| `fow_packet_advance` | Advance deterministic gates to a decision or asynchronous boundary. The selected technical path may require a provider. |
+| `fow_packet_advance` | Advance deterministic gates to a decision or asynchronous boundary. In unreleased source, `mode="sync_only"` delivers provider deltas and stops before START; `mode="advance"` remains the default behavior. |
 | `fow_packet_inspect` | Read scope, units, gates or history through bounded projections. |
 | `fow_external_work` | Validate/export standalone plans, read TODOs and record/reconcile outcomes. Select the executor for new work, read provider validation and explicitly negotiate optional provider capabilities. It does not execute repository code. |
 | `fow_run` | Manage implementation-run records, steps, dependencies and work views. It is not a new coding agent. |

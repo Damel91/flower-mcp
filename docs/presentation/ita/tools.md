@@ -44,7 +44,7 @@ prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operati
 | `fow_change` | Governare cambiamenti, dipendenze, stato ed evidenze; i packet hanno superfici dedicate. |
 | `fow_architecture` | Ispezionare, proporre e adottare componenti, interfacce e decisioni tecniche immutabili. L’adozione registra autorità ingegneristica, distinta dall’accettazione umana. |
 | `fow_packet_author` | Costruire packet, unità, dichiarazioni e piani canonici. |
-| `fow_packet_advance` | Avanzare i gate deterministici fino a una decisione o a un confine asincrono. Il percorso tecnico scelto può richiedere provider. |
+| `fow_packet_advance` | Avanzare i gate deterministici fino a una decisione o a un confine asincrono. Nel sorgente non ancora rilasciato, `mode="sync_only"` consegna le delta al provider e si ferma prima di START; `mode="advance"` resta il comportamento predefinito. |
 | `fow_packet_inspect` | Leggere scope, unità, gate o storia con proiezioni bounded. |
 | `fow_external_work` | Validare/esportare piani, leggere TODO e registrare/riconciliare esiti. Scegliere l'esecutore per il nuovo lavoro, leggere la validazione provider e negoziare esplicitamente le capacità opzionali del provider. Non esegue codice nel repository. |
 | `fow_run` | Gestire record di run, step, dipendenze e viste del lavoro di implementazione. Non è un nuovo agente di coding. |
