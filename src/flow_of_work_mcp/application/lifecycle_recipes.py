@@ -135,12 +135,14 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "Does the canonical configured provider binding advertise the exact context/command/receipt versions?",
                 "Are producer contracts, consumer references, unit-local checks and separately deferred obligations closed and preserved?",
                 "Do current matching acknowledgements permit START, or does stale/unknown delivery require existing-command reconciliation?",
+                "Should this call only synchronize admitted deltas with mode=sync_only and return before START? Starting requires a separate explicit mode=advance call.",
             ),
             evidence=(
                 "explicit current-revision executor selection receipt",
                 "durable capability observation bound to selection, canonical route/binding revision and authority",
                 "pure provider_validation semantic closure and executor admission state",
                 "exact typed validation context/digest and matching current unit compilation acknowledgements",
+                "sync_only provider_synchronized boundary or exact unchanged pending_control; continued synchronization keeps mode=sync_only and never recovers START/STOP implicitly",
             ),
             stop_conditions=(
                 "prior opposite ownership, provider/report/run history or completed work would make selection a transfer",

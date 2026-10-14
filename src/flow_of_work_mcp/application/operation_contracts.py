@@ -502,7 +502,7 @@ _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         "fow_packet_advance",
         "packet_lifecycle",
-        "Advance deterministic packet gates to a decision or async boundary.",
+        "Advance packet gates, or synchronize provider deltas without START using mode=sync_only.",
     ),
     ToolDescriptor(
         "fow_packet_inspect",
@@ -1413,7 +1413,14 @@ _PACKET_ADVANCE = {
         "fow_packet_advance",
         "advance",
         ("project_id", "packet_id", "actor", "request_id"),
-        ("expected_spec_revision", "expected_plan_revision"),
+        ("expected_spec_revision", "expected_plan_revision", "mode"),
+        enums={"mode": ("advance", "sync_only")},
+        guidance={
+            "mode": "Default advance preserves ordinary lifecycle advancement. Per-call sync_only delivers admitted provider ADD/EDIT/REMOVE and stops before START; it performs no lifecycle repair, plan acceptance or ordinary evidence advancement.",
+            "sync_boundary": "provider_synchronized means current authoring deltas are synchronized, not that execution has never started or been accepted. Review and explicitly call mode=advance to start. Continued synchronization next actions retain mode=sync_only.",
+            "controls": "Pending, delivering, unknown or explicitly retried rejected START/STOP are held unchanged as provider_control_pending with exact pending_control identity. Inspect gates; sync_only never claims, retries, supersedes or delivers controls. Conflicting control/semantic decisions are rejected before effects.",
+            "authority": "Existing selection, negotiation, PVP, currentness, generation and exact ACK/recovery guards still apply. Unknown delta delivery never falls through to START. Mode is not persisted and changes no provider wire or acceptance authority.",
+        },
     ),
     "accept_work_plan": _c(
         "fow_packet_advance",

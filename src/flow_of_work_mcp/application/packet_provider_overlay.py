@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from flow_of_work_mcp.core.domain.packet_advancement import (
+    PacketAdvanceMode, validate_advancement_mode,
+)
+
 from hashlib import sha256
 import json
 from typing import Mapping, Protocol, Sequence
@@ -392,8 +396,17 @@ class PacketProviderOverlayService:
         actor: str,
         request_id: str,
         decision: Mapping[str, object] | None = None,
+        mode: str = "advance",
     ) -> Mapping[str, object]:
         """Advance mechanical work and stop at at most one engineering question."""
+
+        mode = validate_advancement_mode(mode, decision)
+
+        def advancement_result(projection, history, *, boundary=None):
+            result = dict(_advancement_result(projection, history, boundary=boundary))
+            if mode == PacketAdvanceMode.SYNC_ONLY:
+                result["mode"] = mode.value
+            return result
 
         if self._context_only_remediation(project_id, change_id, packet_id):
             raise ChangeControlBlockedError("context_only_provider_execution_prohibited")
@@ -401,6 +414,16 @@ class PacketProviderOverlayService:
             raise ChangeControlBlockedError("external_agent_mode_provider_execution_prohibited")
 
         decision = dict(decision or {})
+        if mode == PacketAdvanceMode.SYNC_ONLY:
+            pending = self._sync_only_control_entry(
+                project_id, change_id, packet_id, packet=packet,
+                work_plan=work_plan, decision=decision,
+            )
+            if pending is not None:
+                return _sync_only_boundary(
+                    self.projection(project_id, change_id, packet_id,
+                                    packet=packet, work_plan=work_plan), [], pending=pending,
+                )
         forced_operation = ""
         refresh_before_forced_start = False
         retry_authorized = False
@@ -439,11 +462,25 @@ class PacketProviderOverlayService:
                 packet=packet,
                 work_plan=work_plan,
             )
+            if mode == PacketAdvanceMode.SYNC_ONLY:
+                pending = self._sync_only_control_entry(
+                    project_id, change_id, packet_id, packet=packet,
+                    work_plan=work_plan, decision=decision if retry_authorized else {},
+                )
+                if pending is not None:
+                    return _sync_only_boundary(current, history, pending=pending)
             operation = forced_operation or str(current["next_operation"])
+            if mode == PacketAdvanceMode.SYNC_ONLY and operation == "start_provider_packet":
+                # A previous generation may be absent from the current overlay,
+                # but its FIFO head still owns unresolved delivery authority.
+                if self._repository.packet_provider_recoverable_commands(
+                    project_id, change_id=change_id, packet_id=packet_id, limit=1,
+                ):
+                    operation = "deliver_provider_command"
             forced_operation = ""
             upstream = (current.get('validation_admission') or {}).get('upstream_gate')
             if upstream and operation == upstream['next_operation']:
-                return _advancement_result(current, history)
+                return advancement_result(current, history)
             if operation == "provider_failed" and not terminal_status_observed:
                 binding = self._binding(project_id, change_id, packet_id)
                 if binding is not None:
@@ -458,8 +495,8 @@ class PacketProviderOverlayService:
                     terminal_status_observed = True
                     history.append(_history("observe_provider_packet", observed))
                     if str(observed.get("state") or "") != "provider_observed":
-                        return _advancement_result(current, history)
-                    return _advancement_result(
+                        return advancement_result(current, history)
+                    return advancement_result(
                         self.projection(
                             project_id,
                             change_id,
@@ -480,11 +517,11 @@ class PacketProviderOverlayService:
                 "provider_validation",
                 "packet_inactive",
             }:
-                return _advancement_result(current, history)
+                return advancement_result(current, history)
 
             if operation == "retry_provider_rejection":
                 if not retry_authorized:
-                    return _advancement_result(current, history)
+                    return advancement_result(current, history)
                 rationale = required_text(decision.get("rationale"), "rationale")
                 unit_state = _current_unit_state(current)
                 rejected = self._current_rejected_entry(
@@ -493,6 +530,8 @@ class PacketProviderOverlayService:
                     packet_id,
                     unit_state=unit_state,
                 )
+                if mode == PacketAdvanceMode.SYNC_ONLY and _control_entry(rejected):
+                    return _sync_only_boundary(current, history, pending=rejected)
                 if self._requires_rejected_unit_rehydration(
                     project_id,
                     change_id,
@@ -528,7 +567,7 @@ class PacketProviderOverlayService:
                             boundary = _retry_target_question_boundary(
                                 boundary or _target_question_boundary([])
                             )
-                        return _advancement_result(
+                        return advancement_result(
                             current,
                             history,
                             boundary=boundary,
@@ -570,11 +609,14 @@ class PacketProviderOverlayService:
                     project_id,
                     change_id=change_id,
                     packet_id=packet_id,
-                    flow_binding_generation=self._recovery_generation(project_id, change_id, packet_id, binding),
+                    flow_binding_generation=(None if mode == PacketAdvanceMode.SYNC_ONLY else
+                                             self._recovery_generation(project_id, change_id, packet_id, binding)),
                     limit=1,
                 )
                 if not pending:
                     continue
+                if mode == PacketAdvanceMode.SYNC_ONLY and _control_entry(pending[0]):
+                    return _sync_only_boundary(current, history, pending=pending[0])
                 if not self._recoverable_command_is_current(pending[0], work_plan):
                     superseded = self._repository.reject_packet_provider_command(
                         project_id,
@@ -592,7 +634,7 @@ class PacketProviderOverlayService:
                 history.append(_history(operation, delivered))
                 boundary = self._decision_boundary(delivered)
                 if boundary is not None:
-                    return _advancement_result(current, history, boundary=boundary)
+                    return advancement_result(current, history, boundary=boundary)
                 continue
 
             if operation == "ensure_provider_draft":
@@ -606,13 +648,19 @@ class PacketProviderOverlayService:
                 )
                 history.append(_history(operation, observed))
                 boundary = self._decision_boundary(observed)
+                if (mode == PacketAdvanceMode.SYNC_ONLY
+                        and observed.get("state") in {"provider_unknown", "provider_rejected", "provider_unavailable"}):
+                    return advancement_result(current, history, boundary=boundary or {
+                        "state": "provider_unavailable", "reason": str(observed.get("reason") or "provider_unavailable"),
+                        "next_operation": "ensure_provider_draft",
+                    })
                 current_unit = _current_unit_state(current)
                 if (
                     boundary is not None
                     and current_unit is not None
                     and str(current_unit.get("phase") or "") == "target_required"
                 ):
-                    return _advancement_result(current, history, boundary=boundary)
+                    return advancement_result(current, history, boundary=boundary)
                 continue
 
             unit_state = _current_unit_state(current)
@@ -631,7 +679,7 @@ class PacketProviderOverlayService:
                         request_id=f"{request_id}:target-preview",
                     )
                     history.append(_history("preview_provider_targets", preview))
-                    return _advancement_result(
+                    return advancement_result(
                         current,
                         history,
                         boundary=self._decision_boundary(preview)
@@ -696,6 +744,10 @@ class PacketProviderOverlayService:
                 continue
 
             if operation in {"start_provider_packet", "stop_provider_packet"}:
+                if mode == PacketAdvanceMode.SYNC_ONLY:
+                    if operation == "stop_provider_packet":
+                        raise ChangeControlBlockedError("sync_only_control_decision_prohibited")
+                    return _sync_only_boundary(current, history)
                 if operation == "start_provider_packet" and refresh_before_forced_start:
                     binding_before_preflight = self._binding(
                         project_id, change_id, packet_id
@@ -720,7 +772,7 @@ class PacketProviderOverlayService:
                         work_plan=work_plan,
                     )
                     if str(observed.get("state") or "") != "provider_observed":
-                        return _advancement_result(refreshed, history)
+                        return advancement_result(refreshed, history)
                     binding_after_preflight = self._binding(
                         project_id, change_id, packet_id
                     )
@@ -732,7 +784,7 @@ class PacketProviderOverlayService:
                         "provider_failed",
                         "start_provider_packet",
                     }:
-                        return _advancement_result(refreshed, history)
+                        return advancement_result(refreshed, history)
                 binding = self._require_binding(project_id, change_id, packet_id)
                 command_operation = (
                     "start" if operation == "start_provider_packet" else "stop"
@@ -762,7 +814,7 @@ class PacketProviderOverlayService:
                 )
                 history.append(_history(operation, outcome))
                 if command_operation == "stop":
-                    return _advancement_result(
+                    return advancement_result(
                         self.projection(
                             project_id,
                             change_id,
@@ -784,22 +836,40 @@ class PacketProviderOverlayService:
                     request_id=f"{request_id}:status",
                 )
                 history.append(_history(operation, observed))
-                return _advancement_result(
-                    self.projection(
-                        project_id,
-                        change_id,
-                        packet_id,
-                        packet=packet,
-                        work_plan=work_plan,
-                    ),
-                    history,
+                updated = self.projection(
+                    project_id, change_id, packet_id, packet=packet, work_plan=work_plan,
                 )
+                if mode == PacketAdvanceMode.SYNC_ONLY and updated["next_operation"] == "start_provider_packet":
+                    # Re-enter the FIFO guard before declaring synchronization:
+                    # STATUS may have settled a run while older work is hidden
+                    # from the current-generation provider projection.
+                    continue
+                return advancement_result(updated, history)
             raise RuntimeError(
                 f"unknown packet provider overlay operation: {operation}"
             )
         raise RuntimeError(
             "packet provider overlay exceeded its bounded advancement loop"
         )
+
+    def _sync_only_control_entry(
+        self, project_id, change_id, packet_id, *, packet, work_plan, decision,
+    ):
+        """Read the FIFO head; synchronization never claims or rewrites controls."""
+        pending = self._repository.packet_provider_recoverable_commands(
+            project_id, change_id=change_id, packet_id=packet_id, limit=1,
+        )
+        if pending and _control_entry(pending[0]):
+            return pending[0]
+        if str(decision.get("operation") or "") == "retry_provider_rejection":
+            current = self.projection(project_id, change_id, packet_id,
+                                      packet=packet, work_plan=work_plan)
+            rejected = self._current_rejected_entry(
+                project_id, change_id, packet_id, unit_state=_current_unit_state(current),
+            )
+            if _control_entry(rejected):
+                return rejected
+        return None
 
     def _technical_state(
         self,
@@ -842,7 +912,6 @@ class PacketProviderOverlayService:
             )
         provider_state = str(binding.get("provider_state") or "draft")
         run_phase = str(binding.get("run_phase") or "idle")
-        provider_job_ref = str(binding.get("provider_job_ref") or "")
         if run_phase in _COMPLETE_PROVIDER_RUN_PHASES or provider_state in {
             "completed",
             "partial",
@@ -1791,6 +1860,24 @@ def _retry_preview_failure_boundary(
         ],
         "candidates": [],
     }
+
+
+def _control_entry(entry: Mapping[str, object]) -> bool:
+    return (entry.get("command") or {}).get("operation") in {"start", "stop"}
+
+
+def _sync_only_boundary(projection, history, *, pending=None):
+    result = dict(_advancement_result(projection, history))
+    result.update(mode="sync_only", state="provider_synchronized", reason="sync_only_start_boundary")
+    if pending is not None:
+        result.update(state="provider_control_pending", reason="sync_only_control_pending")
+        result["pending_control"] = {
+            **{key: pending[key] for key in (
+                "outbox_id", "state", "delivery_fingerprint", "attempts", "last_error",
+            )},
+            "operation": pending["command"]["operation"],
+        }
+    return result
 
 
 def _advancement_result(

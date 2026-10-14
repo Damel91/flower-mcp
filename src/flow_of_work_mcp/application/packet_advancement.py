@@ -14,6 +14,9 @@ from flow_of_work_mcp.application.packet_next_action import (
 )
 from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
 from flow_of_work_mcp.core.domain.identifiers import required_text
+from flow_of_work_mcp.core.domain.packet_advancement import (
+    PacketAdvanceMode, validate_advancement_mode,
+)
 from flow_of_work_mcp.core.domain.packet_construction import (
     PacketConstructionAuditDraft,
 )
@@ -63,6 +66,35 @@ _MECHANICAL_OPERATIONS = frozenset(
 )
 
 
+def sync_only_next_action(action: Mapping[str, object], result: Mapping[str, object]) -> dict[str, object]:
+    """Project request-scoped continuation without changing the lifecycle guard."""
+    action = dict(action)
+    arguments = dict(action.get("arguments") or {})
+    boundary = result.get("decision") or {}
+    required = boundary.get("required_inputs") if isinstance(boundary, Mapping) else None
+    if isinstance(required, list):
+        action["required_inputs"] = list(dict.fromkeys([*action.get("required_inputs", []), *required]))
+    if result.get("state") == "provider_control_pending":
+        action.update(
+            state="provider_control_pending", tool="fow_packet_inspect", operation="gates",
+            decision_class="inspection", continuation_policy="return_to_model",
+            reason="sync_only_control_pending", required_inputs=[], alternatives=[],
+            arguments={**{key: arguments[key] for key in ("project_id", "packet_id") if key in arguments},
+                       "view": "gates"},
+        )
+    elif action.get("tool") == "fow_packet_advance":
+        provider_step = action.get("lifecycle_operation") in _PACKET_PROVIDER_OPERATIONS
+        start_boundary = result.get("state") == "provider_synchronized"
+        control_step = action.get("lifecycle_operation") in {"start_provider_packet", "stop_provider_packet"}
+        arguments["mode"] = "advance" if start_boundary or control_step or not provider_step else "sync_only"
+        action["arguments"] = arguments
+        if arguments["mode"] == "advance":
+            action.update(decision_class="semantic", continuation_policy="return_to_model")
+        if start_boundary:
+            action["reason"] = "sync_only_start_boundary"
+    return action
+
+
 class PacketAdvancementCoordinator:
     def __init__(
         self,
@@ -104,7 +136,9 @@ class PacketAdvancementCoordinator:
         decision: Mapping[str, object] | None = None,
         expected_spec_revision: int | None = None,
         expected_plan_revision: int | None = None,
+        mode: str = "advance",
     ) -> Mapping[str, object]:
+        mode = validate_advancement_mode(mode, decision)
         actor = required_text(actor, "actor")
         request_id = required_text(request_id, "request_id")
         decision = dict(decision or {})
@@ -117,6 +151,22 @@ class PacketAdvancementCoordinator:
             expected_spec_revision=expected_spec_revision,
             expected_plan_revision=expected_plan_revision,
         )
+        if mode == PacketAdvanceMode.SYNC_ONLY:
+            guard = self._guards.evaluate(project_id, change_id, packet_id)
+            if guard.next_operation in _PACKET_PROVIDER_OPERATIONS:
+                result = self._advance_packet_provider(
+                    project_id, change_id, packet_id, actor=actor,
+                    request_id=request_id, decision=decision, mode=mode,
+                )
+            else:
+                result = self._result(
+                    project_id, change_id, packet_id, guard, [], decision_consumed=False,
+                )
+            with self._ledger.consistent_read():
+                current_guard = self._guards.evaluate(project_id, change_id, packet_id)
+                next_action = self._next_action(project_id, change_id, packet_id, current_guard)
+            return {**result, "mode": mode.value,
+                    "next_action": sync_only_next_action(next_action, result)}
         if decision:
             guard = self._guards.evaluate(project_id, change_id, packet_id)
             if self._provider_decision_applies(guard, decision):
@@ -410,6 +460,7 @@ class PacketAdvancementCoordinator:
         actor: str,
         request_id: str,
         decision: Mapping[str, object],
+        mode: str = "advance",
     ) -> Mapping[str, object]:
         change = self._ledger.change_state(project_id, change_id)
         packet = next(
@@ -438,6 +489,7 @@ class PacketAdvancementCoordinator:
             actor=actor,
             request_id=request_id,
             decision=requested,
+            mode=mode,
         )
 
     def _provider_boundary(

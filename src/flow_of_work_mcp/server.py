@@ -33,6 +33,9 @@ from flow_of_work_mcp.application.lifecycle_recipes import (
     recipe_names,
 )
 from flow_of_work_mcp.config import FlowConfigError, load_config
+from flow_of_work_mcp.core.domain.packet_advancement import (
+    PacketAdvanceMode, validate_advancement_mode,
+)
 from flow_of_work_mcp.core.domain import (
     BehavioralExpectationDraft,
     BehavioralOracleDraft,
@@ -1598,20 +1601,20 @@ def handle_packet_advance(
     decision: Mapping[str, object] | None = None,
     expected_spec_revision: int | None = None,
     expected_plan_revision: int | None = None,
+    mode: str = "advance",
 ) -> dict[str, object]:
+    mode = validate_advancement_mode(mode, decision)
     project_id, change_id, packet_id = _resolve_packet_address(
         runtime,
         project_id=project_id,
         change_id=change_id,
         packet_id=packet_id,
     )
-    runtime.packet_factory.ensure_packet_lifecycle(
-        project_id,
-        change_id,
-        packet_id,
-        actor=actor,
-        request_id=f"{request_id}:repair",
-    )
+    if mode == PacketAdvanceMode.ADVANCE:
+        runtime.packet_factory.ensure_packet_lifecycle(
+            project_id, change_id, packet_id, actor=actor,
+            request_id=f"{request_id}:repair",
+        )
     result = runtime.packet_advancement.advance(
         project_id,
         change_id,
@@ -1621,17 +1624,23 @@ def handle_packet_advance(
         decision=decision,
         expected_spec_revision=expected_spec_revision,
         expected_plan_revision=expected_plan_revision,
+        mode=mode,
     )
     lifecycle = runtime.packet_lifecycle.get_packet(
         project_id, change_id, packet_id, view="gates"
     )
+    next_action = dict(lifecycle.get("next_action") or {})
+    if mode == PacketAdvanceMode.SYNC_ONLY:
+        from flow_of_work_mcp.application.packet_advancement import sync_only_next_action
+        next_action = sync_only_next_action(next_action, result)
+        result = {**result, "next_action": next_action}
     return envelope(
         tool="fow_packet_advance",
         status="success",
         result={
             "advancement": dict(result),
             "gate": dict(lifecycle.get("gate") or {}),
-            "next_action": dict(lifecycle.get("next_action") or {}),
+            "next_action": next_action,
         },
         audit_reference={"change_id": change_id, "packet_id": packet_id},
     )
@@ -5356,18 +5365,16 @@ def create_app(
         decision: dict[str, object] | None = None,
         expected_spec_revision: int | None = None,
         expected_plan_revision: int | None = None,
+        mode: Literal["advance", "sync_only"] = "advance",
     ) -> dict[str, object]:
-        return handle_packet_advance(
-            runtime,
-            project_id=project_id,
-            change_id=change_id,
-            packet_id=packet_id,
-            actor=actor,
-            request_id=request_id,
-            decision=decision,
-            expected_spec_revision=expected_spec_revision,
-            expected_plan_revision=expected_plan_revision,
-        )
+        def advance() -> dict[str, object]:
+            return handle_packet_advance(
+                runtime, project_id=project_id, change_id=change_id, packet_id=packet_id,
+                actor=actor, request_id=request_id, decision=decision,
+                expected_spec_revision=expected_spec_revision,
+                expected_plan_revision=expected_plan_revision, mode=mode,
+            )
+        return _guard("fow_packet_advance", advance) if mode == "sync_only" else advance()
 
     def fow_packet_inspect(
         project_id: str,
