@@ -7,12 +7,26 @@ No provider Python package, database, runtime object or private API is imported.
 """
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
+import errno
+import json
+import math
+from pathlib import Path
 import re
-from threading import Thread
-from typing import Any, Protocol, TypeVar
+import subprocess
+import sys
+from threading import Event, Thread
+import time
+from typing import Protocol
+
+from .mcp_transport_worker import (
+    ERROR_REASONS,
+    PROTOCOL_VERSION,
+    TIMEOUT_REASON,
+    TRANSPORT_UNAVAILABLE_REASON,
+    strict_json_loads,
+)
 
 from flow_of_work_mcp.core.domain.grounding import (
     ImplementationAnchor,
@@ -41,7 +55,7 @@ from flow_of_work_mcp.core.errors import (
 )
 
 
-_Result = TypeVar("_Result")
+_TRANSPORT_WORKER = Path(__file__).with_name("mcp_transport_worker.py").resolve()
 _CONTRACT_VERSION = "implementation-graph-snapshot-v1"
 _BOOTSTRAP_CONTRACT_VERSION = "bootstrap-behavior-snapshot-v1"
 _PROVIDER_REASON_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
@@ -116,18 +130,16 @@ class StreamableHttpMcpClientConfig:
         endpoint = str(self.endpoint or "").strip()
         if not endpoint.startswith(("http://", "https://")):
             raise ValueError("implementation provider MCP endpoint must be an HTTP(S) URL")
-        if self.timeout_seconds <= 0:
-            raise ValueError("implementation provider MCP timeout_seconds must be positive")
+        if (isinstance(self.timeout_seconds, bool)
+                or not isinstance(self.timeout_seconds, (int, float))
+                or not math.isfinite(self.timeout_seconds)
+                or self.timeout_seconds <= 0):
+            raise ValueError("implementation provider MCP timeout_seconds must be finite and positive")
         object.__setattr__(self, "endpoint", endpoint)
 
 
 class StreamableHttpMcpClient:
-    """Synchronous facade over the MCP SDK's Streamable HTTP client.
-
-    Grounding runs inside Flow's durable worker. A short-lived external MCP
-    session prevents shared runtime/database handles while preserving one
-    provider call per durable grounding operation.
-    """
+    """One contained, network-only MCP process per synchronous provider RPC."""
 
     def __init__(self, config: StreamableHttpMcpClientConfig) -> None:
         self._config = config
@@ -139,52 +151,120 @@ class StreamableHttpMcpClient:
         *,
         meta: Mapping[str, object] | None = None,
     ) -> Mapping[str, object]:
-        return _run_async_sync(
-            self._call_tool(
-                tool_name,
-                dict(arguments),
-                meta=dict(meta) if meta is not None else None,
-            )
-        )
-
-    async def _call_tool(
-        self,
-        tool_name: str,
-        arguments: Mapping[str, object],
-        *,
-        meta: Mapping[str, object] | None,
-    ) -> Mapping[str, object]:
+        deadline = time.monotonic() + self._config.timeout_seconds
+        expired = Event()
         try:
-            from mcp import ClientSession
-            from mcp.client.streamable_http import streamablehttp_client
-        except ImportError as exc:  # pragma: no cover - packaging failure
+            payload = json.dumps({
+                "version": PROTOCOL_VERSION,
+                "endpoint": self._config.endpoint,
+                "timeout_seconds": self._config.timeout_seconds,
+                "deadline_monotonic": deadline,
+                "tool_name": tool_name,
+                "arguments": dict(arguments),
+                "meta": dict(meta) if meta is not None else None,
+            }, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            exit_code, output = _invoke_transport_worker(payload, deadline, expired)
+            if expired.is_set() or time.monotonic() >= deadline:
+                raise ImplementationProviderUnavailableError(TIMEOUT_REASON)
+            if exit_code != 0:
+                raise ImplementationProviderUnavailableError(TRANSPORT_UNAVAILABLE_REASON)
+            response = strict_json_loads(output)
+            if not isinstance(response, dict) or response.get("version") != PROTOCOL_VERSION:
+                raise ValueError("invalid private provider response")
+            status = response.get("status")
+            if status == "ok":
+                if set(response) != {"version", "status", "result"} or not isinstance(response["result"], dict):
+                    raise ValueError("invalid private provider result")
+                if time.monotonic() >= deadline:
+                    raise ImplementationProviderUnavailableError(TIMEOUT_REASON)
+                return response["result"]
+            if (set(response) != {"version", "status", "reason"}
+                    or not isinstance(status, str) or status not in ERROR_REASONS
+                    or response.get("reason") not in ERROR_REASONS[status]):
+                raise ValueError("invalid private provider error")
+            if time.monotonic() >= deadline:
+                raise ImplementationProviderUnavailableError(TIMEOUT_REASON)
+            if status == "contract":
+                raise ImplementationProviderContractError(response["reason"])
+            raise ImplementationProviderUnavailableError(response["reason"])
+        except subprocess.TimeoutExpired as exc:
+            raise ImplementationProviderUnavailableError(TIMEOUT_REASON) from exc
+        except (ImplementationProviderUnavailableError, ImplementationProviderContractError):
+            raise
+        except Exception as exc:  # noqa: BLE001 - never expose private process/SDK details
             raise ImplementationProviderUnavailableError(
-                "implementation_provider_transport_unavailable"
+                TIMEOUT_REASON if expired.is_set() or time.monotonic() >= deadline
+                else TRANSPORT_UNAVAILABLE_REASON
             ) from exc
 
-        try:
-            async with streamablehttp_client(
-                self._config.endpoint,
-                timeout=self._config.timeout_seconds,
-                sse_read_timeout=self._config.timeout_seconds,
-            ) as (read, write, _get_session_id):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    response = await session.call_tool(
-                        tool_name,
-                        arguments=dict(arguments),
-                        meta=dict(meta) if meta is not None else None,
-                    )
-        except Exception as exc:  # noqa: BLE001 - transport details must not cross Flow's boundary
-            raise ImplementationProviderUnavailableError(
-                "implementation_provider_transport_unavailable"
-            ) from exc
 
-        if bool(getattr(response, "isError", False)):
-            raise ImplementationProviderUnavailableError(
-                "implementation_snapshot_capability_unavailable"
-            )
-        return _decode_mcp_result(response)
+def _invoke_transport_worker(payload: bytes, deadline: float, expired: Event) -> tuple[int, bytes]:
+    command = [sys.executable]
+    if sys.flags.isolated:
+        command.append("-I")
+    command.extend(["-B", str(_TRANSPORT_WORKER)])
+    stop_watchdog = Event()
+    child = None
+    watchdog = None
+    communicated = False
+    caller_cancellation = None
+    try:
+        child = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, shell=False, close_fds=True)
+        def enforce_deadline() -> None:
+            # Windows can block inside communicate's stdin write, before its
+            # timeout applies. This owner only kills this RPC's child.
+            if not stop_watchdog.wait(max(0.0, deadline - time.monotonic())):
+                expired.set()
+                _kill_transport_child(child)
+
+        watchdog = Thread(target=enforce_deadline, name="fow-provider-deadline", daemon=False)
+        watchdog.start()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, 0)
+        output, _ = child.communicate(input=payload, timeout=remaining)
+        communicated = True
+    except BaseException as exc:
+        if not isinstance(exc, Exception):
+            caller_cancellation = exc
+        raise
+    finally:
+        try:
+            # Never expose a result/exception while owned I/O can continue.
+            if child is not None:
+                _kill_transport_child(child)
+                if not communicated:
+                    child.communicate()  # Drain/close pipes and join Windows reader threads.
+                child.wait()
+                # Retrying communicate(None) can leave a partially written
+                # stdin open after TimeoutExpired. The child is reaped now.
+                close_error = None
+                for pipe in (child.stdin, child.stdout, child.stderr):
+                    if pipe is not None:
+                        try:
+                            pipe.close()
+                        except OSError as exc:
+                            # Match subprocess's dead-reader handling on Windows.
+                            if exc.errno != errno.EPIPE and not (sys.platform == "win32" and exc.errno == errno.EINVAL):
+                                close_error = close_error or exc
+                if close_error is not None:
+                    if caller_cancellation is None:
+                        raise close_error
+                    caller_cancellation.add_note("Provider transport pipe cleanup failed after the owned child was reaped.")
+        finally:
+            stop_watchdog.set()
+            if watchdog is not None and watchdog.ident is not None:
+                watchdog.join()
+    return child.returncode, output
+
+
+def _kill_transport_child(child: subprocess.Popen) -> None:
+    if child.poll() is None:
+        try:
+            child.kill()
+        except ProcessLookupError:
+            pass  # The owned process exited between poll and kill.
 
 
 @dataclass(frozen=True)
@@ -862,41 +942,3 @@ def _bool_value(value: object, field: str) -> bool:
     if not isinstance(value, bool):
         raise ImplementationProviderContractError(f"{field} must be boolean")
     return value
-
-
-def _decode_mcp_result(response: object) -> Mapping[str, object]:
-    structured = getattr(response, "structuredContent", None)
-    if isinstance(structured, Mapping):
-        return dict(structured)
-    model_dump = getattr(structured, "model_dump", None)
-    if callable(model_dump):
-        value = model_dump()
-        if isinstance(value, Mapping):
-            return dict(value)
-    raise ImplementationProviderContractError(
-        "provider MCP response lacks structured content"
-    )
-
-
-def _run_async_sync(coroutine: Any) -> _Result:
-    """Run one coroutine without assuming the caller's event-loop ownership."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coroutine)
-
-    result: dict[str, _Result] = {}
-    failure: list[BaseException] = []
-
-    def runner() -> None:
-        try:
-            result["value"] = asyncio.run(coroutine)
-        except BaseException as exc:  # pragma: no cover - embedded async host only
-            failure.append(exc)
-
-    thread = Thread(target=runner, name="fow-implementation-provider-mcp", daemon=True)
-    thread.start()
-    thread.join()
-    if failure:
-        raise failure[0]
-    return result["value"]
