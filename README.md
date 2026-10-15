@@ -231,6 +231,13 @@ framework; Flower moves part of that discipline into a persistent server.
 Read the method in [English](docs/presentation/eng/method.md) or
 [Italiano](docs/presentation/ita/method.md).
 
+A real project managed with Flower is
+[llama-runtime](https://github.com/Damel91/llama-runtime). Its requirements,
+milestones, implementation packets, plan validation, verification evidence and
+handovers are maintained in Flower's persistent project ledger. Flower supports
+the library's development lifecycle; installing or using the library does not
+require Flower.
+
 ## Status and operating limits
 
 Flower `0.4.1` is in testing. The [release notes](docs/RELEASE-NOTES-0.4.1.md) and
