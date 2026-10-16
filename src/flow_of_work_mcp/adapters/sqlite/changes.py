@@ -150,18 +150,22 @@ class ChangeStoreMixin:
             return self._change_value(connection, project_id, change_id)
 
     def change_state(self, project_id: str, change_id: str) -> Mapping[str, Any]:
-        with self._read_connection() as connection:
-            return self._change_value(connection, project_id, change_id)
+        def read():
+            with self._read_connection() as connection:
+                return self._change_value(connection, project_id, change_id)
+        return self.read_projection("change_state", (project_id, change_id), read)
 
     def list_changes(self, project_id: str) -> list[Mapping[str, Any]]:
         project_id = validate_project_id(project_id)
-        with self._read_connection() as connection:
-            self._ensure_project(connection, project_id)
-            rows = connection.execute(
-                "SELECT change_id FROM change_units WHERE project_id = ? ORDER BY ordinal",
-                (project_id,),
-            ).fetchall()
-            return [self._change_value(connection, project_id, str(row["change_id"])) for row in rows]
+        def read():
+            with self._read_connection() as connection:
+                self._ensure_project(connection, project_id)
+                rows = connection.execute(
+                    "SELECT change_id FROM change_units WHERE project_id = ? ORDER BY ordinal",
+                    (project_id,),
+                ).fetchall()
+                return [self._change_value(connection, project_id, str(row["change_id"])) for row in rows]
+        return self.read_projection("list_changes", (project_id,), read)
 
     def packet_change_id(self, project_id: str, packet_id: str) -> str:
         project_id = validate_project_id(project_id)

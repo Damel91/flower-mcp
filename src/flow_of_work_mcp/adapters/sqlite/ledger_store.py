@@ -8,9 +8,13 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
 from pathlib import Path
 import sqlite3
-from typing import Iterator
+from typing import Callable, Iterator, TypeVar
+
+
+_T = TypeVar("_T")
 
 from flow_of_work_mcp.adapters.sqlite.artifacts import ArtifactStoreMixin
 from flow_of_work_mcp.adapters.sqlite.associations import AssociationStoreMixin
@@ -86,6 +90,9 @@ class SQLiteRequirementLedger(
         self._transaction_connection: ContextVar[sqlite3.Connection | None] = ContextVar(
             f"flow_ledger_transaction_{id(self)}", default=None
         )
+        self._read_projection_memo: ContextVar[dict | None] = ContextVar(
+            f"flow_ledger_read_projection_{id(self)}", default=None
+        )
         self._migrate()
         self.migrate_associations()
         self.migrate_external_work()
@@ -138,14 +145,34 @@ class SQLiteRequirementLedger(
             return
         connection = self._connect()
         token = self._transaction_connection.set(connection)
+        memo_token = None
         try:
             connection.execute("PRAGMA query_only = ON")
             connection.execute("BEGIN")
+            memo_token = self._read_projection_memo.set({})
             yield connection
         finally:
-            connection.rollback()
-            self._transaction_connection.reset(token)
-            connection.close()
+            try:
+                connection.rollback()
+            finally:
+                if memo_token is not None:
+                    self._read_projection_memo.reset(memo_token)
+                self._transaction_connection.reset(token)
+                connection.close()
+
+    def read_projection(
+        self, namespace: str, key: tuple[str, ...], producer: Callable[[], _T]
+    ) -> _T:
+        """Reuse successful derived values only in the current query-only scope."""
+        memo = self._read_projection_memo.get()
+        if memo is None:
+            return producer()
+        identity = (namespace, key)
+        if identity in memo:
+            return deepcopy(memo[identity])
+        result = producer()
+        memo[identity] = deepcopy(result)
+        return result
 
     @contextmanager
     def _read_connection(self) -> Iterator[sqlite3.Connection]:

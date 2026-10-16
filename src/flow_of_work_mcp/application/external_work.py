@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from copy import deepcopy
 from typing import Callable, Mapping
 
 from flow_of_work_mcp.application.change_control import ChangeControlService
 from flow_of_work_mcp.application.external_plan_markdown import render_plan
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
-from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES
+from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
+from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.core.domain.external_work import (canonical_json, fields, fingerprint, number, objects, strings, text)
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
 from flow_of_work_mcp.core.errors import (
@@ -55,10 +57,22 @@ class ExternalWorkService:
 
     def mode_for_packet(self, project_id: str, packet_id: str) -> str:
         with self._ledger.consistent_read():
-            for change in self._ledger.list_changes(project_id):
-                if any(p['packet_id'] == packet_id for p in change.get('packets', [])):
-                    return str(self._ledger.external_work_state(project_id, change['change_id'], packet_id)['consumption_mode'])
-        raise ChangeControlBlockedError('packet_not_found')
+            normalized_project = validate_project_id(project_id)
+            try:
+                normalized_packet = validate_packet_id(packet_id)
+            except ValueError:
+                # Preserve the original project-before-packet error precedence
+                # without hydrating the project's changes or event history.
+                self._ledger.ledger_version(normalized_project)
+                raise ChangeControlBlockedError('packet_not_found') from None
+            if normalized_packet != packet_id:
+                self._ledger.ledger_version(normalized_project)
+                raise ChangeControlBlockedError('packet_not_found')
+            try:
+                change_id = self._ledger.packet_change_id(normalized_project, packet_id)
+            except ValueError:
+                raise ChangeControlBlockedError('packet_not_found') from None
+            return str(self._ledger.external_work_state(project_id, change_id, packet_id)['consumption_mode'])
 
     def executor_state(self, project_id: str, change_id: str, packet_id: str):
         return self._packet_executor.inspect(project_id, change_id, packet_id) if self._packet_executor else None
@@ -186,13 +200,13 @@ class ExternalWorkService:
                                                       actor=actor, operation=operation)
             return result
 
-    def _snapshot(self, project_id: str, change_id: str, packet_id: str, *, _cache=None, _path=()) -> dict[str, object]:
+    def _snapshot(self, project_id: str, change_id: str, packet_id: str, *, _cache=None, _path=(), _change=None) -> dict[str, object]:
         if packet_id in _path:
             raise ChangeControlBlockedError('packet_dependency_cycle', details={'packet_ids': [*_path, packet_id]})
         cache = {} if _cache is None else _cache
         if packet_id in cache:
             return cache[packet_id]
-        change = self._ledger.change_state(project_id, change_id)
+        change = self._ledger.change_state(project_id, change_id) if _change is None else _change
         packet = next((p for p in change['packets'] if p['packet_id'] == packet_id), None)
         if packet is None:
             raise ChangeControlBlockedError('packet_not_found')
@@ -204,7 +218,7 @@ class ExternalWorkService:
             if linked is not None:
                 milestone = {k: linked.get(k) for k in ('milestone_id', 'name', 'requirement_ids',
                     'dependency_closure_ids', 'entry_policy', 'exit_policy', 'risk_disposition')}
-        predecessors = [self._snapshot(project_id, change_id, identity, _cache=cache, _path=(*_path, packet_id))
+        predecessors = [self._snapshot(project_id, change_id, identity, _cache=cache, _path=(*_path, packet_id), _change=change)
                         for identity in packet.get('dependency_packet_ids', [])]
         plan = self._ledger.packet_work_plan_state(project_id, change_id, packet_id)
         external = self._ledger.external_work_state(project_id, change_id, packet_id)
@@ -301,7 +315,7 @@ class ExternalWorkService:
         if remediation and remediation.get('predecessor_dependency_policy') == 'context_only':
             identity = remediation.get('predecessor_packet_id')
             snapshot['contextual_predecessor'] = self._snapshot(project_id, change_id, identity,
-                _cache=cache, _path=(*_path, packet_id))
+                _cache=cache, _path=(*_path, packet_id), _change=change)
             authority_basis['contextual_predecessor_authority'] = fingerprint(snapshot['contextual_predecessor']['authority_basis'])
         cache[packet_id] = snapshot
         return snapshot
@@ -334,7 +348,13 @@ class ExternalWorkService:
                     'packet_dependencies': dependencies}
 
     @staticmethod
-    def _projection(snapshot, *, consumer_scope='external_agent') -> dict[str, object]:
+    def _projection(snapshot, *, consumer_scope='external_agent', _cache=None) -> dict[str, object]:
+        # Snapshot identity and consumer are local to this invocation. Never
+        # attach validation results to snapshots also used by mutation flows.
+        cache = {} if _cache is None else _cache
+        identity = (id(snapshot), consumer_scope)
+        if identity in cache:
+            return deepcopy(cache[identity])
         projection = derive_packet_validation(snapshot, consumer_scope=consumer_scope)
         architecture = snapshot.get('architecture')
         if architecture:
@@ -355,7 +375,7 @@ class ExternalWorkService:
         if pressure and pressure['residual_risks'] and not pressure['accepted_risk_refs']:
             projection['gaps'].append({'code': 'residual_risk_authority_missing', 'risks': pressure['residual_risks']})
         for predecessor in (snapshot.get('predecessor_packets', []) if consumer_scope == 'external_agent' else []):
-            predecessor_projection = ExternalWorkService._projection(predecessor)
+            predecessor_projection = ExternalWorkService._projection(predecessor, _cache=cache)
             if predecessor_projection['status'] != 'closed' or predecessor['external']['consumption_mode'] != 'external_agent':
                 projection['gaps'].append({'code': 'packet_dependency_plan_not_executable', 'packet_id': predecessor['packet_id'],
                     'validation_status': predecessor_projection['status'], 'consumption_mode': predecessor['external']['consumption_mode'],
@@ -363,7 +383,8 @@ class ExternalWorkService:
         if projection['gaps'] and projection['status'] == 'closed':
             projection['status'] = 'open'
         projection['next_gap'] = projection['gaps'][0] if projection['gaps'] else None
-        return projection
+        cache[identity] = deepcopy(projection)
+        return deepcopy(projection)
 
     def provider_validation(self, project_id: str, change_id: str, packet_id: str) -> dict[str, object]:
         """One pure semantic snapshot; provider target/materialization truth stays separate."""

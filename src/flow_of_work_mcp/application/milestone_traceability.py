@@ -1,6 +1,7 @@
 """Derived milestone-scoped traceability projections."""
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Mapping
 
 from flow_of_work_mcp.core.ports import (
@@ -160,6 +161,10 @@ class MilestoneTraceabilityProjectionService:
         return result
 
     def projection(self, project_id: str, *, milestone_id: str = "") -> Mapping[str, object]:
+        with self._requirements.consistent_read():
+            return self._projection(project_id, milestone_id=milestone_id)
+
+    def _projection(self, project_id: str, *, milestone_id: str = "") -> Mapping[str, object]:
         requirements = self._requirements.traceability_matrix(project_id)
         grounding_audits = self._grounding_audits.grounding_audits(project_id)
         requirements_by_id = {str(item["requirement_id"]): item for item in requirements}
@@ -176,6 +181,7 @@ class MilestoneTraceabilityProjectionService:
         changes = self._changes.list_changes(project_id)
         navigation_blocks = self._navigation.list_navigation_audits(project_id)
         rows: list[Mapping[str, object]] = []
+        packet_summaries: dict[tuple[str, str], Mapping[str, object]] = {}
         scoped_requirement_ids: set[str] = set()
         for milestone in milestones:
             for requirement_id in milestone.get("requirement_ids", []):
@@ -189,6 +195,7 @@ class MilestoneTraceabilityProjectionService:
                         changes=changes,
                         navigation_blocks=navigation_blocks,
                         grounding_audits=grounding_audits,
+                        packet_summaries=packet_summaries,
                     )
                 )
 
@@ -205,6 +212,7 @@ class MilestoneTraceabilityProjectionService:
                         changes=changes,
                         navigation_blocks=navigation_blocks,
                         grounding_audits=grounding_audits,
+                        packet_summaries=packet_summaries,
                     )
                 )
 
@@ -238,6 +246,7 @@ class MilestoneTraceabilityProjectionService:
         changes: list[Mapping[str, object]],
         navigation_blocks: list[Mapping[str, object]],
         grounding_audits: list[Mapping[str, object]],
+        packet_summaries: dict[tuple[str, str], Mapping[str, object]],
     ) -> Mapping[str, object]:
         requirement_id = str(requirement["requirement_id"])
         milestone_id = "" if milestone is None else str(milestone["milestone_id"])
@@ -281,8 +290,13 @@ class MilestoneTraceabilityProjectionService:
             for block in navigation_blocks
             if str(block.get("packet_id") or "") in packet_ids
         ]
-        packet_summaries = [self._packet_summary(project_id, packet) for packet in packets]
-        external_packets = {summary['packet_id']: summary['external_work'] for summary in packet_summaries if 'external_work' in summary}
+        summaries = []
+        for packet in packets:
+            identity = (str(packet.get('change_id') or ''), str(packet['packet_id']))
+            if identity not in packet_summaries:
+                packet_summaries[identity] = self._packet_summary(project_id, packet)
+            summaries.append(deepcopy(packet_summaries[identity]))
+        external_packets = {summary['packet_id']: summary['external_work'] for summary in summaries if 'external_work' in summary}
         gaps = self._gaps(
             milestone=milestone,
             changes=linked_changes,
@@ -309,13 +323,13 @@ class MilestoneTraceabilityProjectionService:
             "covered_sequence_goal_node_ids": coverage["covered_sequence_goal_node_ids"],
             "milestone_id": milestone_id,
             "change_ids": [str(change["change_id"]) for change in linked_changes],
-            "packets": packet_summaries,
+            "packets": summaries,
             "navigation_audits": [_navigation_summary(block) for block in navs],
             "runs": [_run_summary(run) for run in packet_runs],
             "findings": [_finding_summary(finding) for finding in findings],
             "campaigns": [_campaign_summary(campaign) for campaign in campaigns],
             "acceptance_blockers": gaps,
-            "readiness_projection": _readiness_projection(packet_summaries, gaps),
+            "readiness_projection": _readiness_projection(summaries, gaps),
             "evidence": _evidence_refs(requirement, findings, campaigns),
         }
 

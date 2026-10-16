@@ -31,6 +31,12 @@ class EngineerGateService:
             return self._finding_context(project_id, finding)
 
     def _finding_context(self, project_id, finding):
+        return self._ledger.read_projection(
+            "engineer_finding_context", (project_id, finding['finding_id']),
+            lambda: self._derive_finding_context(project_id, finding),
+        )
+
+    def _derive_finding_context(self, project_id, finding):
         change = self._ledger.change_state(project_id, finding['change_id'])
         packet_id = finding.get('packet_id') or (finding['scope_ref'] if finding['scope_kind'] == 'packet' else '')
         packet = next((p for p in change.get('packets', []) if p['packet_id'] == packet_id), None)
@@ -156,64 +162,70 @@ class EngineerGateService:
 
     def projection(self, project_id: str, packet_id: str) -> Mapping[str, object]:
         with self._ledger.consistent_read():
-            changes = list(self._ledger.list_changes(project_id))
-            packets = {p['packet_id']: (c, p) for c in changes for p in c.get('packets', [])}
-            if packet_id not in packets:
-                raise ChangeControlBlockedError('packet_not_found')
-            graph = self._ledger.goal_graph(project_id)
-            packet_goals = {key: _goal_closure(set(c.get('goal_ids', [])) | set(p.get('goal_ids', [])), graph.get('edges', []))
-                            for key, (c, p) in packets.items()}
-            lineage = {key: self._ledger.remediation_context(project_id, c['change_id'], key) or {}
-                       for key, (c, _) in packets.items()}
-            blockers, relevant = [], []
-            for change in changes:
-                for finding in self._ledger.findings_for_change(project_id, change['change_id']):
-                    linked = next((link for link in finding.get('fixing_packets', []) if link['packet_id'] == packet_id), None)
-                    gating = _gating(finding)
-                    if not gating and linked is None:
-                        continue
-                    affected, scope_gaps = _affected(finding, packets, packet_goals, lineage)
-                    if packet_id not in affected and linked is None:
-                        continue
-                    context = self._finding_context(project_id, finding)
-                    classification = ((context.get('latest_intent_assessment') or {}).get('assessment') or {}).get('classification')
-                    reason = 'semantic_finding_unresolved'
-                    corrective = packets[packet_id][1].get('purpose') == 'remediation' and linked is not None
-                    admitted = not gating
-                    if corrective and gating:
-                        if not context['assessment_current']:
-                            reason = 'intent_reassessment_required' if not context.get('latest_intent_assessment') else 'intent_reassessment_stale'
-                        elif classification != 'correction_within_intent':
-                            reason = classification
-                        elif not self._regression_declared(project_id, packets[packet_id][0], packets[packet_id][1], linked):
-                            reason = 'corrective_regression_obligation_missing'
-                        elif not scope_gaps:
-                            admitted = True
-                    if scope_gaps and gating:
-                        reason = 'finding_scope_unresolved'
-                    item = {'finding_id': finding['finding_id'], 'finding_kind': finding.get('finding_kind', 'unspecified'),
-                            'title': finding['title'], 'rationale': finding['rationale'],
-                            'expected_correction': finding['expected_correction'],
-                            'latest_intent_assessment': context.get('latest_intent_assessment'),
-                            'gating': gating,
-                            'disposition': finding['disposition'], 'scope_kind': finding['scope_kind'], 'scope_ref': finding['scope_ref'],
-                            'assessment_current': context['assessment_current'], 'classification': classification,
-                            'intent_fingerprint': context['intent_fingerprint'], 'finding_fingerprint': context['finding_fingerprint'],
-                            'corrective_admitted': corrective and admitted, 'scope_gaps': scope_gaps,
-                            'required_regression_evidence': linked.get('required_regression_evidence') if linked else None}
-                    relevant.append(item)
-                    if not admitted:
-                        blockers.append({**item, 'reason': reason})
-            gate = None
-            if blockers:
-                first = blockers[0]
-                gate = {'tool': 'fow_assurance', 'operation': 'get_finding',
-                        'arguments': {'project_id': project_id, 'finding_id': first['finding_id'], 'operation': 'get_finding'},
-                        'required_inputs': ['actor'],
-                        'reason': first['reason'], 'obligation': 'Read current canonical intent, reassess it explicitly, and prepare ordinary in-scope corrective work or resolve the finding through its governed disposition.'}
-            return {'status': 'blocked' if blockers else 'success', 'execution_allowed': not blockers,
-                    'blockers': blockers, 'relevant_findings': relevant, 'next_gate': gate,
-                    'provenance': 'host_declared', 'semantic_truth_verified': False, 'acceptance_inferred': False}
+            return self._ledger.read_projection(
+                "engineer_projection", (project_id, packet_id),
+                lambda: self._projection(project_id, packet_id),
+            )
+
+    def _projection(self, project_id: str, packet_id: str) -> Mapping[str, object]:
+        changes = list(self._ledger.list_changes(project_id))
+        packets = {p['packet_id']: (c, p) for c in changes for p in c.get('packets', [])}
+        if packet_id not in packets:
+            raise ChangeControlBlockedError('packet_not_found')
+        graph = self._ledger.goal_graph(project_id)
+        packet_goals = {key: _goal_closure(set(c.get('goal_ids', [])) | set(p.get('goal_ids', [])), graph.get('edges', []))
+                        for key, (c, p) in packets.items()}
+        lineage = {key: self._ledger.remediation_context(project_id, c['change_id'], key) or {}
+                   for key, (c, _) in packets.items()}
+        blockers, relevant = [], []
+        for change in changes:
+            for finding in self._ledger.findings_for_change(project_id, change['change_id']):
+                linked = next((link for link in finding.get('fixing_packets', []) if link['packet_id'] == packet_id), None)
+                gating = _gating(finding)
+                if not gating and linked is None:
+                    continue
+                affected, scope_gaps = _affected(finding, packets, packet_goals, lineage)
+                if packet_id not in affected and linked is None:
+                    continue
+                context = self._finding_context(project_id, finding)
+                classification = ((context.get('latest_intent_assessment') or {}).get('assessment') or {}).get('classification')
+                reason = 'semantic_finding_unresolved'
+                corrective = packets[packet_id][1].get('purpose') == 'remediation' and linked is not None
+                admitted = not gating
+                if corrective and gating:
+                    if not context['assessment_current']:
+                        reason = 'intent_reassessment_required' if not context.get('latest_intent_assessment') else 'intent_reassessment_stale'
+                    elif classification != 'correction_within_intent':
+                        reason = classification
+                    elif not self._regression_declared(project_id, packets[packet_id][0], packets[packet_id][1], linked):
+                        reason = 'corrective_regression_obligation_missing'
+                    elif not scope_gaps:
+                        admitted = True
+                if scope_gaps and gating:
+                    reason = 'finding_scope_unresolved'
+                item = {'finding_id': finding['finding_id'], 'finding_kind': finding.get('finding_kind', 'unspecified'),
+                        'title': finding['title'], 'rationale': finding['rationale'],
+                        'expected_correction': finding['expected_correction'],
+                        'latest_intent_assessment': context.get('latest_intent_assessment'),
+                        'gating': gating,
+                        'disposition': finding['disposition'], 'scope_kind': finding['scope_kind'], 'scope_ref': finding['scope_ref'],
+                        'assessment_current': context['assessment_current'], 'classification': classification,
+                        'intent_fingerprint': context['intent_fingerprint'], 'finding_fingerprint': context['finding_fingerprint'],
+                        'corrective_admitted': corrective and admitted, 'scope_gaps': scope_gaps,
+                        'required_regression_evidence': linked.get('required_regression_evidence') if linked else None}
+                relevant.append(item)
+                if not admitted:
+                    blockers.append({**item, 'reason': reason})
+        gate = None
+        if blockers:
+            first = blockers[0]
+            gate = {'tool': 'fow_assurance', 'operation': 'get_finding',
+                    'arguments': {'project_id': project_id, 'finding_id': first['finding_id'], 'operation': 'get_finding'},
+                    'required_inputs': ['actor'],
+                    'reason': first['reason'], 'obligation': 'Read current canonical intent, reassess it explicitly, and prepare ordinary in-scope corrective work or resolve the finding through its governed disposition.'}
+        return {'status': 'blocked' if blockers else 'success', 'execution_allowed': not blockers,
+                'blockers': blockers, 'relevant_findings': relevant, 'next_gate': gate,
+                'provenance': 'host_declared', 'semantic_truth_verified': False, 'acceptance_inferred': False}
 
     def _regression_declared(self, project_id, change, packet, link):
         statement = link.get('required_regression_evidence')
