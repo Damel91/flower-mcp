@@ -155,6 +155,9 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.assertNotIn("UNRELEASED", text)
         self.assertNotIn("has not been published", text)
         self.assertIn("immutable published Flower 0.4.1", text)
+        self.assertIn("Compared with published Flower 0.5.0", text)
+        self.assertIn(f"published 0.5.0 to this {self.project['version']} build requires no new SQLite migration", text)
+        self.assertIn(f"docs/RELEASE-NOTES-{self.project['version']}.md", text)
         self.assertNotIn("verify the optional runtime wheel against SHA256SUMS", text)
         self.assertIn(f"releases/download/v{self.project['version']}/install.ps1", text)
         self.assertIn(

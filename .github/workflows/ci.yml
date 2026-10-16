@@ -61,6 +61,7 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_pvp_capability_discovery.py" "$GITHUB_WORKSPACE/tests/test_pvp_temporal_authoring.py" "$GITHUB_WORKSPACE/tests/test_packet_provider_port.py" "$GITHUB_WORKSPACE/tests/test_test_provider_port.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_author_receipts.py" "$GITHUB_WORKSPACE/tests/test_external_work_recovery.py" "$GITHUB_WORKSPACE/tests/test_flower_portability.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_provider_sync_only.py"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_tool_definitions.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_mcp_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_packet_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_mfpr_structured_provider.py"
           export FLOWER_HOME="$RUNNER_TEMP/bootstrap-no-profile"
           test ! -e "$FLOWER_HOME"
@@ -232,6 +233,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Installed Google registration and generated MCP smoke failed.' }
             & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_safe_upgrade.py')
             if ($LASTEXITCODE -ne 0) { throw 'Installed native Windows upgrade regressions failed.' }
+            & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_tool_definitions.py')
+            if ($LASTEXITCODE -ne 0) { throw 'Installed tool definition and input-compatibility regressions failed.' }
             & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_mcp_provider_deadline.py') (Join-Path $env:GITHUB_WORKSPACE 'tests\test_packet_provider_deadline.py') (Join-Path $env:GITHUB_WORKSPACE 'tests\test_mfpr_structured_provider.py')
             if ($LASTEXITCODE -ne 0) { throw 'Installed provider deadline and process-cleanup regression checks failed.' }
           }
