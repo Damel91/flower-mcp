@@ -18,8 +18,10 @@ Una capacità del motore CodingCastle non viene attribuita a Flower.
 
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, versione dichiarata `0.4.1`.
-Implementazione e guide di installazione condividono questo checkpoint sorgente
-del candidato non pubblicato; la versione dichiarata di Flower non cambia.
+Questi riferimenti di implementazione e installazione conservano quel checkpoint
+sorgente storico. Il sorgente corrente prepara un candidato distinto 0.5.0; la
+[guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
+segue il ramo mutabile e non pretende di esistere già al pin congelato.
 I download Flower puntano alla distinta release pubblicata immutabile `0.4.1`,
 incluso il suo runtime storico `0.4.0`. Questa fotografia editoriale non qualifica
 i binari. Le release pubblicate `0.3.1`, `0.4.0` e `0.4.1` rimangono immutabili.
@@ -116,7 +118,7 @@ la [release v0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) e
 la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
 Gli otto asset storici della release pubblicata includono il launcher PowerShell, gli installer
 Bash e Python, wheel Flower, sorgente, bootstrap, wheel opzionale runtime-llama
-`0.4.0` e checksum. Le build del candidato corrente non pubblicato contengono
+`0.4.0` e checksum. Le build del candidato 0.5.0 corrente non pubblicato contengono
 sette asset Flower, senza un wheel runtime copiato. I download Flower restano
 fissati alla release; le guide di installazione e i sorgenti runtime di Flower
 mantengono il checkpoint completo identificato sopra.
@@ -128,9 +130,11 @@ indipendente, con [wheel upstream](https://github.com/Damel91/llama-runtime/rele
 SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
 Non è un asset Flower. Il wheel include `LICENSE`/`NOTICE` Apache-2.0 e
 l'attribuzione MIT di llamatelemetry incorporato. La
-[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
-descrive l'extra esplicito da sorgente/candidato corrente, l'acquisizione offline
-verificata e l'aggiornamento del runtime opzionale. Il vecchio extra Flower
+[guida storica all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
+registra il checkpoint precedente. Usa la
+[guida corrente all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md), esplicitamente
+mutabile, per l'extra del candidato 0.5.0, i vincoli del build posseduto,
+l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
 pubblicato seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.
 

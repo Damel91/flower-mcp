@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: a9d622690b6e2eaf43c90494d5fa45889404585059aa247007212d452b9bd153. -->
+<!-- Generated from linked Markdown. Source digest: 1a911a782171dbc0c4f33b1c5e060322f423aca460ccceb888c14cf58eb8908c. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -554,7 +554,7 @@ Il nome della distribuzione Python resta <code>flow-of-work-mcp</code>; il coman
 installazione al checkpoint sorgente corrente documentato. Esegui i comandi solo quando i corrispondenti asset sono pubblicati.
 Il README corrente segue invece gli aggiornamenti della repository.</p>
 <h2 id="doc-d92560641e4a--sorgente-corrente-e-runtime-opzionale">Sorgente corrente e runtime opzionale</h2>
-<p>Il sorgente corrente mantiene la versione Flower <code>0.4.1</code> come <strong>candidato non
+<p>Il sorgente corrente prepara la versione Flower <code>0.5.0</code> come <strong>candidato non
 pubblicato</strong>. Le sue build contengono sette asset Flower: wheel, archivio sorgente,
 tre installer, <code>BOOTSTRAP.md</code> e <code>SHA256SUMS</code>. Non copiano più un wheel runtime.
 Questo non sostituisce né rinomina gli otto asset Flower pubblicati sopra.</p>
@@ -565,20 +565,28 @@ Il suo SHA256 è
 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
 Il wheel upstream include <code>LICENSE</code>/<code>NOTICE</code> Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.</p>
-<p>Dal sorgente corrente selezionato, usa l'ambiente dedicato di Flower:</p>
+<p>Usa il sorgente corrente selezionato soltanto in un ambiente Flower nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
 <p>Per un wheel candidato corrente verificato, usa invece
-<code>'./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]'</code>.
+<code>'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'</code>.
 Windows usa <code>&amp; .\.venv\Scripts\python.exe</code> con gli stessi argomenti pip.
 La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
 Flower pubblicato per questo nuovo runtime. Consulta la
-<a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>
-per il percorso completo da sorgente/wheel, la verifica indipendente del checksum
-e l'acquisizione del wheelhouse offline. Conserva commit sorgente e inventario
-checksum del candidato: nome del file e versione coincidono con il wheel Flower
-storico. Gli installer core restano core-only e non configurano provider impliciti.</p>
+<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>
+per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
+verifica indipendente del checksum e l'acquisizione offline. Questo link operativo
+segue il ramo mutabile <code>main</code>; i riferimenti congelati restano storici. Conserva commit sorgente e inventario checksum del candidato. Il nome del file
+0.5.0 è distinto dal wheel 0.4.1 pubblicato immutabile. Gli installer core restano core-only e non configurano provider impliciti.</p>
+<p>La <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">guida corrente alla configurazione avanzata</a>
+spiega ruoli LLM, YAML, contratti dei provider esterni e receipt di associazione.
+Questo link segue il ramo mutabile <code>main</code>; i riferimenti sorgente runtime nelle
+altre pagine conservano il checkpoint storico congelato. Il candidato 0.5.0
+include le correzioni completate di ricevute/recupero, sync-only e timeout del
+provider; il witness resta differito. I suoi asset richiedono qualificazione
+separata e approvazione umana alla pubblicazione. I comandi sotto installano
+ancora la release pubblicata 0.4.1.</p>
 <h2 id="doc-d92560641e4a--prima-di-installare">Prima di installare</h2>
 <table>
 <thead>
@@ -609,7 +617,7 @@ storico. Gli installer core restano core-only e non configurano provider implici
 <p><strong>Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.</strong>
 L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
-configurato; vedi la <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>.
+configurato; vedi la <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>.
 Il reader è consultabile offline, mentre una nuova installazione scarica pacchetti e dipendenze.</p>
 <h2 id="doc-d92560641e4a--usi-già-flower-conserva-il-ledger">Usi già Flower? Conserva il ledger</h2>
 <p>Segui il <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/UPGRADING.md" rel="noopener noreferrer">piano di aggiornamento sicuro</a>
@@ -627,7 +635,7 @@ e <code>--profile-root</code>; Windows usa <code>-Venv</code>, <code>-Profile</c
 piano, poi ripeti senza <code>--dry-run</code> / <code>-DryRun</code>. L'aggiornamento salva un backup
 del ledger SQLite selezionato e dello YAML esatto prima di pip, conserva la
 registrazione del client e non aggiunge migrazioni da 0.4.0 a 0.4.1: lo schema
-resta 55. Un'installazione più vecchia 0.3.1/schema52 usa ancora le migrazioni
+resta 55. Un'installazione più vecchia 0.3.1/schema 52 usa ancora le migrazioni
 additive esistenti da 52 a 55 al successivo avvio del server. Conserva i percorsi
 dei backup restituiti. L'aggiornamento non resetta il ledger e non ripristina
 automaticamente un backup; un errore di pip può modificare parzialmente l'ambiente.
@@ -637,8 +645,13 @@ sostitutivo per recuperare lo stato.</p>
 <p>Questo aggiornamento di core/profilo non richiede l'extra inference e non cambia
 le impostazioni del modello. Aggiornare il runtime opzionale è un'operazione
 esplicita separata dal sorgente/candidato corrente selezionato; segui la guida
-all'inferenza prima di sostituire pacchetti Flower della stessa versione.
-Conserva endpoint e profilo originali.</p>
+all'inferenza prima di modificare i pacchetti Flower. Il core di un'installazione
+posseduta dall'installer deve prima completare il normale upgrade; poi l'extra
+deve usare lo stesso wheel/build verificato di Flower registrato nella receipt,
+con versione e SHA256 corrispondenti. Non sostituirlo con una build da sorgente
+della stessa versione o con il candidato solo tramite pip.
+Prima della pubblicazione del candidato, usa un ambiente manuale separato per
+la prova. Conserva endpoint e profilo originali.</p>
 <h2 id="doc-d92560641e4a--scegli-una-strada">Scegli una strada</h2>
 <h3 id="doc-d92560641e4a--macos-e-linux">macOS e Linux</h3>
 <p>Dopo aver controllato i prerequisiti, il comando pubblico avvia l'installer
@@ -936,7 +949,7 @@ prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operati
 </tr>
 <tr>
 <td><code>fow_packet_advance</code></td>
-<td>Avanzare i gate deterministici fino a una decisione o a un confine asincrono. Nel sorgente non ancora rilasciato, <code>mode=&quot;sync_only&quot;</code> consegna le delta al provider e si ferma prima di START; <code>mode=&quot;advance&quot;</code> resta il comportamento predefinito.</td>
+<td>Avanzare i gate deterministici fino a una decisione o a un confine asincrono. Nel candidato 0.5.0 non ancora rilasciato, <code>mode=&quot;sync_only&quot;</code> consegna le delta al provider e si ferma prima di START; <code>mode=&quot;advance&quot;</code> resta il comportamento predefinito.</td>
 </tr>
 <tr>
 <td><code>fow_packet_inspect</code></td>
@@ -1180,7 +1193,15 @@ senza confonderne le responsabilità.</strong></p>
 agent riceve un piano o una TODO, lavora attraverso il proprio host e dichiara
 gli esiti. Il percorso integrato aggiunge scambi diretti con servizi compatibili.
 CodingCastle è il provider tecnico per cui il sorgente pubblico contiene gli
-adapter di packet e test; non è una dipendenza del core Flower.
+adapter di packet e test; non è una dipendenza del core Flower.</p>
+<p>Per la configurazione operativa usa la <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">guida corrente alla configurazione avanzata</a>.
+Segue il ramo mutabile <code>main</code>, distinto dai pin sorgente runtime storici sotto.
+Scegli esplicitamente incarichi semantici host supportati, inferenza interna
+llama.cpp o un provider compatibile con il contratto. L'incarico host per derivare
+il comportamento osservato non è supportato; un servizio MCP qualunque non è un
+adapter di esecuzione packet/test. Modificare il trasporto YAML richiede il
+riavvio di Flower; importare receipt nel ledger no. Il writer witness resta
+fuori dal candidato 0.5.0.
 <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/runtime_factory.py" rel="noopener noreferrer">Factory dei provider</a>.</p>
 <h2 id="doc-f5ec36cbd880--chi-possiede-che-cosa">Chi possiede che cosa</h2>
 <table>
@@ -1264,7 +1285,7 @@ il consumatore deve dichiarare capacità compatibili e confermare il contesto
 esatto prima dell'esecuzione. Questo non trasferisce lavoro già ammesso a un
 altro esecutore e non qualifica un consumatore reale. Vedi la
 <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md" rel="noopener noreferrer">guida all'integrazione</a>.</p>
-<p>Il sorgente non ancora rilasciato aggiunge <code>mode=&quot;sync_only&quot;</code> a
+<p>Il candidato 0.5.0 non ancora rilasciato aggiunge <code>mode=&quot;sync_only&quot;</code> a
 <code>fow_packet_advance</code>: consegna ADD/EDIT/REMOVE ammessi e si ferma al confine
 <code>provider_synchronized</code>, senza inviare START/STOP. Le chiamate successive di
 sincronizzazione mantengono quella modalità; l'avvio richiede una chiamata
@@ -1273,7 +1294,7 @@ e blocca le delta successive: il prossimo passo è leggere i gate. Il risultato
 conserva lo stato reale del provider e non afferma che una run precedente non
 sia mai iniziata. I gate PVP e gli ACK restano invariati; la qualificazione paired
 reale è distinta dalle verifiche con provider sintetici.</p>
-<p>Il sorgente non ancora rilasciato applica anche un timeout cumulativo a ogni RPC
+<p>Il candidato 0.5.0 applica anche un timeout cumulativo a ogni RPC
 del provider, dall'avvio alla gestione della richiesta e alla chiusura; un
 avanzamento del packet può effettuare più RPC. La scadenza restituisce
 <code>implementation_provider_timeout</code>. Una possibile scrittura viene registrata UNKNOWN con
@@ -1522,8 +1543,10 @@ soltanto ritagli degli elenchi documentali, selezionati dall'autore.
 Una capacità del motore CodingCastle non viene attribuita a Flower.</p>
 <p>Le fonti pubbliche di Flower sotto sono fissate al sorgente
 <code>d82eb9f15f5a77961d06012fc25ecde3c5c8f18a</code>, versione dichiarata <code>0.4.1</code>.
-Implementazione e guide di installazione condividono questo checkpoint sorgente
-del candidato non pubblicato; la versione dichiarata di Flower non cambia.
+Questi riferimenti di implementazione e installazione conservano quel checkpoint
+sorgente storico. Il sorgente corrente prepara un candidato distinto 0.5.0; la
+<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">guida avanzata corrente</a>
+segue il ramo mutabile e non pretende di esistere già al pin congelato.
 I download Flower puntano alla distinta release pubblicata immutabile <code>0.4.1</code>,
 incluso il suo runtime storico <code>0.4.0</code>. Questa fotografia editoriale non qualifica
 i binari. Le release pubblicate <code>0.3.1</code>, <code>0.4.0</code> e <code>0.4.1</code> rimangono immutabili.
@@ -1608,7 +1631,7 @@ la <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1" rel="noop
 la <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md" rel="noopener noreferrer">guida di installazione al checkpoint sorgente</a>.
 Gli otto asset storici della release pubblicata includono il launcher PowerShell, gli installer
 Bash e Python, wheel Flower, sorgente, bootstrap, wheel opzionale runtime-llama
-<code>0.4.0</code> e checksum. Le build del candidato corrente non pubblicato contengono
+<code>0.4.0</code> e checksum. Le build del candidato 0.5.0 corrente non pubblicato contengono
 sette asset Flower, senza un wheel runtime copiato. I download Flower restano
 fissati alla release; le guide di installazione e i sorgenti runtime di Flower
 mantengono il checkpoint completo identificato sopra.
@@ -1619,9 +1642,11 @@ indipendente, con <a href="https://github.com/Damel91/llama-runtime/releases/dow
 SHA256 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
 Non è un asset Flower. Il wheel include <code>LICENSE</code>/<code>NOTICE</code> Apache-2.0 e
 l'attribuzione MIT di llamatelemetry incorporato. La
-<a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>
-descrive l'extra esplicito da sorgente/candidato corrente, l'acquisizione offline
-verificata e l'aggiornamento del runtime opzionale. Il vecchio extra Flower
+<a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">guida storica all'inferenza</a>
+registra il checkpoint precedente. Usa la
+<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida corrente all'inferenza</a>, esplicitamente
+mutabile, per l'extra del candidato 0.5.0, i vincoli del build posseduto,
+l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
 pubblicato seleziona ancora <code>0.4.0</code>; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.</p>
 <p>Disponibilità dei collegamenti, test del pacchetto installato e qualificazione

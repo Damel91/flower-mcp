@@ -8,9 +8,11 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; current source retains `0.4.1` as an unreleased candidate.
+`MAJOR.MINOR.PATCH`; current source prepares `0.5.0` as an unreleased candidate.
 Published `v0.4.1` and its eight historical assets remain immutable. A new release
-requires a new user-selected version; do not republish this candidate as `v0.4.1`.
+requires explicit human publication approval; do not republish this candidate as
+`v0.4.1`. The candidate uses a minor increment because `sync_only` is an additive
+public argument, while the 37 tool names and schema 55 remain unchanged.
 Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
@@ -37,13 +39,13 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify the current `0.4.1` checkout locally, use Python 3.11 or newer in an
+To qualify the current `0.5.0` checkout locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.4.1 --output dist
+python tools/build_release.py --version 0.5.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -53,7 +55,7 @@ Flower assets or either package. Stale or unexpected files in the output directo
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.4.1 --output dist --verify-only
+python tools/build_release.py --version 0.5.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -124,10 +126,12 @@ supplied target and uploads assets before publication; see [the release command]
 
 ## Install the release
 
-The primary installer uses a version-pinned URL:
+Current stable installation examples in README and INSTALLATION.md remain on
+published 0.4.1 until the next release exists. The following **prepared 0.5.0
+command must not be run before publication**. The installer uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
@@ -150,12 +154,18 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. The 0.4.1 patch adds no SQLite migration:
-an existing 0.4.0/schema55 ledger stays at 55. The existing 0.3.1/schema52 route
+client usability as separate evidence. Candidate 0.5.0 adds no SQLite migration:
+an existing 0.4.0 or 0.4.1/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
 still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
 current source uses the independently published runtime `0.4.1` through its
 explicit inference extra. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from exact published 0.4.0→0.4.1 qualification.
+wheel/backend; that path is distinct from exact published 0.4.1→candidate 0.5.0 qualification.
 Retain earlier release qualification as historical evidence.
+
+Review [candidate notes](RELEASE-NOTES-0.5.0.md) and
+[advanced configuration](ADVANCED-CONFIGURATION.md) with the exact release commit.
+The suspended writer witness is excluded. Candidate builds, native CI, live
+qualification and human publication approval are separate checkpoints; no tag
+or Release dispatch is part of preparation.

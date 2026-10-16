@@ -11,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Source version: `0.4.1` · **Unreleased candidate; in testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Source version: `0.5.0` · **Unreleased candidate; in testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -45,7 +45,8 @@ You do not need to define the architecture up front.
 
 The core works without CodingCastle or an internal model. Optional
 providers can connect lifecycle records to technical evidence and execution;
-see [integration boundaries](docs/presentation/eng/advanced.md).
+see [integration boundaries](docs/presentation/eng/advanced.md) and the
+[advanced configuration guide](docs/ADVANCED-CONFIGURATION.md).
 
 ### Implemented ≠ verified ≠ accepted
 
@@ -86,6 +87,9 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
+These download commands still select published **0.4.1**. The **0.5.0 candidate**
+is being prepared separately; use the reviewed source or candidate artifacts
+until a new release is approved and published.
 
 ### macOS / Linux
 
@@ -129,7 +133,7 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Current source is an unreleased `0.4.1` candidate. Its `inference` extra uses
+Current source is an unreleased `0.5.0` candidate. Its `inference` extra uses
 the independently published `runtime-llama` `0.4.1` wheel from
 [llama-runtime](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
 pinned by URL and SHA256. Install that extra from the selected current source
@@ -140,6 +144,8 @@ Core installers remain core-only. See [inference setup and migration](docs/INFER
 for verified downloads, offline installation and explicit optional-runtime upgrades.
 An operator-managed llama.cpp endpoint is required only for internal inference.
 Host-produced semantic results continue to work without a model.
+See [advanced configuration](docs/ADVANCED-CONFIGURATION.md) for role selection,
+operator YAML, provider contracts, portable associations and explicit execution.
 
 ### Glama and containers
 
@@ -187,9 +193,10 @@ Already installed? Follow the [SQLite-preserving upgrade plan](docs/UPGRADING.md
 Stop clients sharing the Flower environment, preview with the new installer's
 `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then upgrade with the same
 environment/profile paths. Flower backs up SQLite and YAML before package
-changes. Updating 0.4.0 to 0.4.1 keeps schema 55 unchanged; older 0.3.1/schema52
-installations use the existing additive migrations to 55. Resume the existing
-project and verify another restart.
+changes. Updating an existing schema 55 installation to candidate 0.5.0 keeps
+schema 55 unchanged; older 0.3.1/schema 52 installations use the existing additive
+migrations to 55. Candidate upgrade instructions are explicitly marked in the
+guide. Resume the existing project and verify another restart.
 
 ## Documentation
 
@@ -203,6 +210,11 @@ project and verify another restart.
 | Sources, provenance and limits | [Sources](docs/presentation/eng/sources.md) | [Fonti](docs/presentation/ita/sources.md) |
 
 The [presentation index](docs/presentation/README.md) also links the offline readers.
+
+[Advanced configuration](docs/ADVANCED-CONFIGURATION.md) explains internal LLM
+setup, supported host semantic roles and external technical providers. The
+[0.5.0 candidate notes](docs/RELEASE-NOTES-0.5.0.md) describe the completed
+corrections selected for the next release and the qualification still required.
 
 Release 0.4.1 retains [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
 frozen handovers, current authority, original evidence, offline outcomes and the
@@ -240,10 +252,16 @@ require Flower.
 
 ## Status and operating limits
 
-Flower `0.4.1` is in testing. The [release notes](docs/RELEASE-NOTES-0.4.1.md) and
+Flower `0.5.0` is an unreleased candidate in testing. Its
+[candidate notes](docs/RELEASE-NOTES-0.5.0.md), the historical
+[0.4.1 release notes](docs/RELEASE-NOTES-0.4.1.md) and
 [installation status](docs/INSTALLATION.md#testing-status-and-release-access)
 distinguish installed-package and CI checks from end-to-end installer and
 target-client qualification.
+The candidate includes receipt/error-recovery corrections, explicit sync-only
+provider delivery and bounded provider RPCs. It retains 37 public tools and
+schema 55. The writer witness remains deferred; this candidate does not claim
+its integration or cross-server acceptance.
 
 Flower's gates govern its server operations, not every action available to the
 agent's host. Host-declared evidence is not an independent source audit;

@@ -11,6 +11,15 @@ agent riceve un piano o una TODO, lavora attraverso il proprio host e dichiara
 gli esiti. Il percorso integrato aggiunge scambi diretti con servizi compatibili.
 CodingCastle è il provider tecnico per cui il sorgente pubblico contiene gli
 adapter di packet e test; non è una dipendenza del core Flower.
+
+Per la configurazione operativa usa la [guida corrente alla configurazione avanzata](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md).
+Segue il ramo mutabile `main`, distinto dai pin sorgente runtime storici sotto.
+Scegli esplicitamente incarichi semantici host supportati, inferenza interna
+llama.cpp o un provider compatibile con il contratto. L'incarico host per derivare
+il comportamento osservato non è supportato; un servizio MCP qualunque non è un
+adapter di esecuzione packet/test. Modificare il trasporto YAML richiede il
+riavvio di Flower; importare receipt nel ledger no. Il writer witness resta
+fuori dal candidato 0.5.0.
 [Factory dei provider](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/runtime_factory.py).
 
 ## Chi possiede che cosa
@@ -91,7 +100,7 @@ esatto prima dell'esecuzione. Questo non trasferisce lavoro già ammesso a un
 altro esecutore e non qualifica un consumatore reale. Vedi la
 [guida all'integrazione](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md).
 
-Il sorgente non ancora rilasciato aggiunge `mode="sync_only"` a
+Il candidato 0.5.0 non ancora rilasciato aggiunge `mode="sync_only"` a
 `fow_packet_advance`: consegna ADD/EDIT/REMOVE ammessi e si ferma al confine
 `provider_synchronized`, senza inviare START/STOP. Le chiamate successive di
 sincronizzazione mantengono quella modalità; l'avvio richiede una chiamata
@@ -101,7 +110,7 @@ conserva lo stato reale del provider e non afferma che una run precedente non
 sia mai iniziata. I gate PVP e gli ACK restano invariati; la qualificazione paired
 reale è distinta dalle verifiche con provider sintetici.
 
-Il sorgente non ancora rilasciato applica anche un timeout cumulativo a ogni RPC
+Il candidato 0.5.0 applica anche un timeout cumulativo a ogni RPC
 del provider, dall'avvio alla gestione della richiesta e alla chiusura; un
 avanzamento del packet può effettuare più RPC. La scadenza restituisce
 `implementation_provider_timeout`. Una possibile scrittura viene registrata UNKNOWN con

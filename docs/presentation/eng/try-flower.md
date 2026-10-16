@@ -37,7 +37,7 @@ published. The current README follows repository updates instead.
 
 ## Current source and optional runtime
 
-Current source retains Flower version `0.4.1` as an **unreleased candidate**.
+Current source prepares Flower version `0.5.0` as an **unreleased candidate**.
 Its builds contain seven Flower assets: wheel, source archive, three installers,
 `BOOTSTRAP.md` and `SHA256SUMS`. They no longer copy a runtime wheel. This does
 not replace or relabel the eight published Flower assets above.
@@ -50,7 +50,7 @@ Its SHA256 is
 The upstream wheel includes Apache-2.0 `LICENSE`/`NOTICE` and vendored
 llamatelemetry MIT attribution.
 
-From that selected current source, use the dedicated Flower environment:
+Use the selected current source only in a fresh/manual Flower environment:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
@@ -58,15 +58,24 @@ From that selected current source, use the dedicated Flower environment:
 ```
 
 For a verified current candidate wheel, use
-`'./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]'` instead.
+`'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'` instead.
 Windows uses `& .\.venv\Scripts\python.exe` with the same pip arguments.
 The dependency pins the upstream URL and SHA256. Do not use the published
 Flower wheel's old extra for this new runtime. See the
-[inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
-for the complete source/wheel route, independent checksum verification and
-offline wheelhouse acquisition. Keep the candidate's source commit and checksum
-inventory: its filename and version match the historical Flower wheel.
+[inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
+for the current source/wheel route, exact owned-build rules, independent checksum
+verification and offline acquisition. This operational link follows mutable
+`main`; frozen source references remain historical. Keep the candidate's source commit and checksum inventory. Its 0.5.0 filename
+is distinct from the immutable published 0.4.1 wheel.
 Core installers remain core-only and configure no implicit provider.
+
+The [current advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
+explains LLM roles, YAML, external provider contracts and association receipts.
+This link follows mutable `main`; the runtime source references elsewhere retain
+their historical frozen checkpoint. Candidate 0.5.0 includes the completed
+receipt/recovery, sync-only and provider-timeout corrections, while the writer
+witness remains deferred. Its assets require separate qualification and human
+publication approval; the download commands below still install published 0.4.1.
 
 ## Before installing
 
@@ -80,7 +89,7 @@ Core installers remain core-only and configure no implicit provider.
 **The core requires no LM Studio, internal model, CodingCastle or VPN.** Inference
 normally remains with your chosen coding agent. Optional Flower internal inference
 requires an explicitly installed runtime and configured endpoint; see the
-[inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md).
+[inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md).
 The reader works offline, while a fresh installation downloads packages and dependencies.
 
 ## Already using Flower? Keep your ledger
@@ -106,7 +115,7 @@ paths; Windows uses `-Venv`, `-Profile` and `-ProfileRoot`. Inspect the plan, th
 repeat without `--dry-run` / `-DryRun`. The upgrade backs up the selected SQLite
 ledger and exact YAML before pip, preserves client registration and applies
 no new migration when upgrading 0.4.0 to 0.4.1: schema 55 stays unchanged.
-An older 0.3.1/schema52 installation still uses the existing additive migrations
+An older 0.3.1/schema 52 installation still uses the existing additive migrations
 52 to 55 at the next server start. Keep the reported backup paths. The upgrade
 never resets the ledger or automatically restores a backup; a failed pip operation
 can partly change the environment. Manual pip installations use the
@@ -115,8 +124,12 @@ project; do not create a replacement project to recover its state.
 
 This core/profile upgrade does not request the inference extra or change model
 settings. Upgrading the optional runtime is an explicit separate operation from
-the selected current source/candidate; follow the inference guide before replacing
-same-version Flower packages. Preserve the original endpoint and profile.
+the selected current source/candidate; follow the inference guide before changing
+Flower packages. An installer-owned core must first complete its normal owned
+upgrade; then its extra must use the exact verified Flower wheel/build recorded
+in its receipt, matching version and SHA256. Do not install a source rebuild or
+a candidate over it through pip alone. Before candidate publication, use a separate manual trial
+environment. Preserve the original endpoint and profile.
 
 ## Choose a route
 

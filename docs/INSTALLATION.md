@@ -1,6 +1,6 @@
 # Flower MCP installation
 
-Flower MCP `0.4.1` requires Python 3.11 or newer and is licensed under
+Flower MCP source candidate `0.5.0` requires Python 3.11 or newer and is licensed under
 [Apache-2.0](../LICENSE), with attribution in [NOTICE](../NOTICE).
 The distribution is `flow-of-work-mcp`; the primary command is `flower-mcp`.
 Core runs without a model, CodingCastle or a private network.
@@ -9,7 +9,9 @@ Core runs without a model, CodingCastle or a private network.
 
 Flower is in testing. Release installer and release-wheel commands below target
 the immutable published `v0.4.1` assets. Source commands install the selected
-checkout, currently an unreleased candidate with the same `0.4.1` metadata.
+checkout, currently an unreleased `0.5.0` candidate. The new candidate has no
+published download assets yet; [candidate notes](RELEASE-NOTES-0.5.0.md) state
+its changes and qualification boundaries.
 Source changes on `main` do not publish a release.
 The published release has eight assets, including its historical optional
 `runtime_llama-0.4.0-py3-none-any.whl`. Current candidate builds have seven:
@@ -220,7 +222,7 @@ checkout, invoke it in a dedicated process; no activation or global execution
 policy change is needed:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install.ps1 -Platform codex
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install.ps1 -Version 0.4.1 -Platform codex
 ```
 
 The launcher is available as a version-pinned release asset. Download it, then run it in
@@ -249,7 +251,9 @@ Options are PowerShell named parameters:
 
 - Fresh installation requires exactly one of `-Platform codex|claude-code|cursor|antigravity|gemini-cli` or `-NoRegister`.
 - Upgrade implies no registration; omit `-Platform` and `-ClientConfig`.
-- `-Version 0.4.1` selects the stable release; this is the current default.
+- The downloaded published 0.4.1 launcher defaults to that stable release.
+  Current source/candidate launchers default to 0.5.0, whose assets must exist
+  before installation. Use `-Version 0.4.1` explicitly for the published release.
 - `-Venv 'C:\Users\tester\Flower test\venv'` selects an installation location.
 - `-Upgrade` explicitly upgrades an environment already owned by the backend.
 - `-DryRun` previews an upgrade without package or lifecycle data changes;
@@ -260,7 +264,7 @@ Options are PowerShell named parameters:
 For installation without client registration:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -NoRegister
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.4.1 -NoRegister
 ```
 
 The user/client controls connection and trust. Neither installation nor doctor
@@ -309,9 +313,9 @@ Have Git and Python 3.11+ available, then clone with authorized access if privat
 These examples install the checked-out source revision. To use the exact
 published `v0.4.1` bytes, select the release wheel route instead.
 No checkout configuration file needs to be copied.
-Record the selected commit with `git rev-parse HEAD`; the candidate and published
-wheel share a filename/version, so retain the candidate's build provenance and
-`SHA256SUMS` rather than identifying it by its filename alone.
+Record the selected commit with `git rev-parse HEAD` and retain the candidate's
+build provenance and `SHA256SUMS`. A source clone installs candidate 0.5.0; the
+published wheel route below installs historical 0.4.1.
 
 **macOS/Linux:**
 
@@ -502,7 +506,9 @@ Do not delete lock files to bypass an active owner.
 ## Upgrades and removal
 
 Use the [complete safe upgrade plan](UPGRADING.md) before updating an existing
-installation. Stop **all Flower processes and coding clients sharing the
+installation. That guide prepares the 0.5.0 candidate; the commands in this
+installation section still select published 0.4.1 and cannot deliver new fixes
+until the candidate is published. Stop **all Flower processes and coding clients sharing the
 installation environment**; the installer does not stop services. Keep the same
 environment, profile name and profile root. For an installer-owned environment:
 
@@ -534,7 +540,7 @@ Repeat without `-DryRun` to execute; preserve custom `-Venv`, `-Profile` and
 Manual pip environments use the [manual backup and wheel upgrade
 procedure](UPGRADING.md#manual-pip-installations); they are not silently adopted
 by the release installer. Upgrading 0.4.0 to 0.4.1 leaves schema 55 unchanged;
-this patch adds no migration. An older 0.3.1/schema52 ledger uses the existing
+this patch adds no migration. An older 0.3.1/schema 52 ledger uses the existing
 additive migrations to schema 55 on first server start. Diagnosis alone does not
 start Flower or verify migration.
 Keep the backup and verify the same project after startup and another restart.
@@ -600,3 +606,7 @@ Operator YAML controls optional provider transport routes. Project associations
 are managed with `fow_bindings`; receipts cannot inject transport URLs,
 credentials or commands. Inference configuration does not migrate lifecycle
 projects or accepted authority.
+
+See [advanced configuration](ADVANCED-CONFIGURATION.md) for supported model roles,
+operator route setup, project association receipts and explicit semantic execution.
+It does not require a provider for standalone plans or qualify a running pairing.

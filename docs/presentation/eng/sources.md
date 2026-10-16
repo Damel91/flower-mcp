@@ -17,8 +17,10 @@ A CodingCastle engine capability is not attributed to Flower.
 
 The public Flower sources below are pinned to
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, declared version `0.4.1`.
-The implementation and installation guides share this unreleased candidate
-source checkpoint; Flower's declared version has not changed. Flower download
+These implementation and installation references retain that historical source
+checkpoint. Current source prepares a distinct0.5.0 candidate; its mutable
+[advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
+is operational documentation, not a claim that it existed at the frozen pin. Flower download
 links target the separate immutable published release `0.4.1`, including its
 historical runtime `0.4.0`. This editorial snapshot does not qualify binaries.
 Published `0.3.1`, `0.4.0` and `0.4.1` remain immutable.
@@ -115,7 +117,7 @@ the [v0.4.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) 
 the [installation guide at the source checkpoint](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
 The eight historical published release assets include the PowerShell launcher, Bash and Python
 installers, Flower wheel, source, bootstrap, optional runtime-llama `0.4.0` wheel
-and checksums. Current unreleased candidate builds contain seven Flower assets,
+and checksums. Current unreleased 0.5.0 candidate builds contain seven Flower assets,
 without a copied runtime wheel. Flower download links remain release pinned;
 installation guides and Flower runtime sources retain the complete source
 checkpoint identified above.
@@ -127,9 +129,10 @@ with [upstream wheel](https://github.com/Damel91/llama-runtime/releases/download
 SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
 It is not a Flower asset. Its wheel includes Apache-2.0 `LICENSE`/`NOTICE` and
 vendored llamatelemetry MIT attribution. The
-[inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
-describes the explicit current source/candidate extra, verified offline acquisition
-and optional-runtime upgrade. The old published Flower extra still selects `0.4.0`;
+[historical inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
+records the earlier source checkpoint. Use the explicitly mutable
+[current inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md) for the 0.5.0
+source/candidate extra, exact owned-build rules, offline acquisition and runtime upgrade. The old published Flower extra still selects `0.4.0`;
 a core/profile upgrade does not request the new runtime or configure a provider.
 
 Link availability, installed-package tests and client qualification are separate

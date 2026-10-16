@@ -37,7 +37,7 @@ Il README corrente segue invece gli aggiornamenti della repository.
 
 ## Sorgente corrente e runtime opzionale
 
-Il sorgente corrente mantiene la versione Flower `0.4.1` come **candidato non
+Il sorgente corrente prepara la versione Flower `0.5.0` come **candidato non
 pubblicato**. Le sue build contengono sette asset Flower: wheel, archivio sorgente,
 tre installer, `BOOTSTRAP.md` e `SHA256SUMS`. Non copiano più un wheel runtime.
 Questo non sostituisce né rinomina gli otto asset Flower pubblicati sopra.
@@ -50,7 +50,7 @@ Il suo SHA256 è
 Il wheel upstream include `LICENSE`/`NOTICE` Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.
 
-Dal sorgente corrente selezionato, usa l'ambiente dedicato di Flower:
+Usa il sorgente corrente selezionato soltanto in un ambiente Flower nuovo/manuale:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
@@ -58,15 +58,24 @@ Dal sorgente corrente selezionato, usa l'ambiente dedicato di Flower:
 ```
 
 Per un wheel candidato corrente verificato, usa invece
-`'./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]'`.
+`'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'`.
 Windows usa `& .\.venv\Scripts\python.exe` con gli stessi argomenti pip.
 La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
 Flower pubblicato per questo nuovo runtime. Consulta la
-[guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
-per il percorso completo da sorgente/wheel, la verifica indipendente del checksum
-e l'acquisizione del wheelhouse offline. Conserva commit sorgente e inventario
-checksum del candidato: nome del file e versione coincidono con il wheel Flower
-storico. Gli installer core restano core-only e non configurano provider impliciti.
+[guida all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
+per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
+verifica indipendente del checksum e l'acquisizione offline. Questo link operativo
+segue il ramo mutabile `main`; i riferimenti congelati restano storici. Conserva commit sorgente e inventario checksum del candidato. Il nome del file
+0.5.0 è distinto dal wheel 0.4.1 pubblicato immutabile. Gli installer core restano core-only e non configurano provider impliciti.
+
+La [guida corrente alla configurazione avanzata](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
+spiega ruoli LLM, YAML, contratti dei provider esterni e receipt di associazione.
+Questo link segue il ramo mutabile `main`; i riferimenti sorgente runtime nelle
+altre pagine conservano il checkpoint storico congelato. Il candidato 0.5.0
+include le correzioni completate di ricevute/recupero, sync-only e timeout del
+provider; il witness resta differito. I suoi asset richiedono qualificazione
+separata e approvazione umana alla pubblicazione. I comandi sotto installano
+ancora la release pubblicata 0.4.1.
 
 ## Prima di installare
 
@@ -80,7 +89,7 @@ storico. Gli installer core restano core-only e non configurano provider implici
 **Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.**
 L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
-configurato; vedi la [guida all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md).
+configurato; vedi la [guida all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md).
 Il reader è consultabile offline, mentre una nuova installazione scarica pacchetti e dipendenze.
 
 ## Usi già Flower? Conserva il ledger
@@ -106,7 +115,7 @@ e `--profile-root`; Windows usa `-Venv`, `-Profile` e `-ProfileRoot`. Controlla 
 piano, poi ripeti senza `--dry-run` / `-DryRun`. L'aggiornamento salva un backup
 del ledger SQLite selezionato e dello YAML esatto prima di pip, conserva la
 registrazione del client e non aggiunge migrazioni da 0.4.0 a 0.4.1: lo schema
-resta 55. Un'installazione più vecchia 0.3.1/schema52 usa ancora le migrazioni
+resta 55. Un'installazione più vecchia 0.3.1/schema 52 usa ancora le migrazioni
 additive esistenti da 52 a 55 al successivo avvio del server. Conserva i percorsi
 dei backup restituiti. L'aggiornamento non resetta il ledger e non ripristina
 automaticamente un backup; un errore di pip può modificare parzialmente l'ambiente.
@@ -117,8 +126,13 @@ sostitutivo per recuperare lo stato.
 Questo aggiornamento di core/profilo non richiede l'extra inference e non cambia
 le impostazioni del modello. Aggiornare il runtime opzionale è un'operazione
 esplicita separata dal sorgente/candidato corrente selezionato; segui la guida
-all'inferenza prima di sostituire pacchetti Flower della stessa versione.
-Conserva endpoint e profilo originali.
+all'inferenza prima di modificare i pacchetti Flower. Il core di un'installazione
+posseduta dall'installer deve prima completare il normale upgrade; poi l'extra
+deve usare lo stesso wheel/build verificato di Flower registrato nella receipt,
+con versione e SHA256 corrispondenti. Non sostituirlo con una build da sorgente
+della stessa versione o con il candidato solo tramite pip.
+Prima della pubblicazione del candidato, usa un ambiente manuale separato per
+la prova. Conserva endpoint e profilo originali.
 
 ## Scegli una strada
 
