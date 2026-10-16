@@ -7,9 +7,8 @@ execute returned tool calls or provide an embedding/retrieval consumer.
 
 ## Install the optional runtime
 
-Published Flower **`0.5.0`** and the current **`0.5.1` candidate source** provide
-an `inference` extra. The candidate is being prepared; it is not a published
-release or a replacement for the download links below. The extra selects the
+Published Flower **`0.5.1`** and the selected current source provide an
+`inference` extra. Earlier `0.5.0` assets remain immutable. The extra selects the
 independently published `runtime-llama` `0.4.1` distribution,
 imported as `runtime_llama`. Its exact dependency is:
 
@@ -26,7 +25,7 @@ runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.4.
 The immutable published [Flower `v0.4.1` release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1)
 still has eight historical assets, including runtime `0.4.0`; its Flower wheel's
 extra still requires that older runtime. Its [release notes](RELEASE-NOTES-0.4.1.md)
-describe those historical bytes. Flower version `0.5.0` contains seven assets and
+describe those historical bytes. Flower version `0.5.1` contains seven assets and
 carry no runtime wheel or vendored runtime payload. Retain the selected source
 commit and `SHA256SUMS`; a later source build is not the immutable published wheel.
 
@@ -44,12 +43,12 @@ SHA256 with the receipt's `sha256` field as well as its version and release
 or a rebuilt same-version wheel into an owned environment, and do not edit its
 receipt to make a mismatch disappear.
 
-Do not pip-install 0.5.0 over an owned 0.4.1 environment: that skips the
-installer's backup/lease/version receipt workflow. Use the published 0.5.0
+Do not pip-install 0.5.1 over an owned 0.4.1 or 0.5.0 environment: that skips the
+installer's backup/lease/version receipt workflow. Use the published 0.5.1
 installer for that core upgrade. Use a separate disposable manual environment
 for source/candidate trials.
 
-From the selected `0.5.1` candidate source checkout or its extracted source,
+From the selected `0.5.1` release source checkout or its extracted source,
 inside that fresh/manual environment:
 
 ```sh
@@ -57,18 +56,18 @@ inside that fresh/manual environment:
 .venv/bin/python -m pip check
 ```
 
-Alternatively, in a fresh/manual environment, verify the local `0.5.1`
-candidate wheel against its own build's `SHA256SUMS`:
+Alternatively, in a fresh/manual environment, verify the published `0.5.1`
+wheel against its release's `SHA256SUMS`:
 
 ```sh
 .venv/bin/python -m pip install './dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'
 .venv/bin/python -m pip check
 ```
 
-This candidate filename is not a published download. Do not apply it over an
-installer-owned `0.5.0` environment. That environment must retain the exact
-already-owned `0.5.0` wheel/build and receipt; its optional-runtime procedure
-appears under [Upgrading the optional runtime](#upgrading-the-optional-runtime).
+For an installer-owned environment, complete the ordinary core upgrade first.
+Then use only the exact `0.5.1` wheel/build already named by its receipt, matching
+version and SHA256. A later source build with the same version is a different
+artifact. Follow [Upgrading the optional runtime](#upgrading-the-optional-runtime).
 
 Windows uses the source command only in a fresh/manual environment:
 
@@ -77,7 +76,7 @@ Windows uses the source command only in a fresh/manual environment:
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-For the Windows candidate-wheel alternative replace `'.[inference]'` with
+For the Windows release-wheel alternative replace `'.[inference]'` with
 `'./dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'`.
 These routes fetch the exact upstream URL and check its SHA256, then resolve
 normal dependencies such as `requests`. They do not use a Flower-owned runtime
@@ -88,7 +87,7 @@ nothing.
 ### Verified download and offline installation
 
 On a connected machine, download the upstream wheel directly, or acquire the
-complete dependency set from the selected candidate wheel into a new dedicated
+complete dependency set from the selected verified wheel into a new dedicated
 directory. This example uses that machine's chosen Python interpreter:
 
 ```sh
@@ -96,8 +95,8 @@ python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_wor
 ```
 
 Use a machine with the target Python version, operating system and architecture,
-or select compatible target wheels explicitly. Verify the Flower candidate
-against its build's `SHA256SUMS` and verify the upstream runtime independently:
+or select compatible target wheels explicitly. Verify the Flower wheel
+against its release/build's `SHA256SUMS` and verify the upstream runtime independently:
 
 ```sh
 sha256sum wheelhouse/runtime_llama-0.4.1-py3-none-any.whl
@@ -114,7 +113,7 @@ Get-FileHash .\wheelhouse\runtime_llama-0.4.1-py3-none-any.whl -Algorithm SHA256
 The runtime digest must equal
 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`;
 stop on mismatch. Retain a checksum inventory for the entire wheelhouse and
-verify it after transfer. Copy only that reviewed candidate and its complete
+verify it after transfer. Copy only that reviewed wheel and its complete
 dependency set to the offline machine; do not mix historical release wheels
 or unrelated packages into the directory.
 
@@ -160,19 +159,19 @@ receipt, or the reviewed wheel for a manual environment. Do not substitute a
 source rebuild with the same version. The old published Flower wheel
 still requires runtime `0.4.0`; installing runtime `0.4.1` beside that old
 extra is not the supported new route. The commands below use the published
-`0.5.0` route and assume the core is
-already at `0.5.0` and, for an owned environment, the selected wheel's SHA256
+`0.5.1` route and assume the core is
+already at `0.5.1` and, for an owned environment, the selected wheel's SHA256
 exactly matches its receipt. Preview the package change with
 `--dry-run`, inspect it, then repeat without `--dry-run`:
 
 ```sh
-.venv/bin/python -m pip install --dry-run --upgrade './dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install --dry-run --upgrade './dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'
 ```
 
 After approving that plan locally, apply it and check the resulting environment:
 
 ```sh
-.venv/bin/python -m pip install --upgrade './dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install --upgrade './dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'
 .venv/bin/python -m pip check
 ```
 

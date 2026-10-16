@@ -8,11 +8,14 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; `v0.5.0` is published at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`.
-Its seven assets and historical `v0.4.1`/eight assets remain immutable. A new
+`MAJOR.MINOR.PATCH`; `v0.5.1` is published at `a87a52f87f16d48a609e304f85b53cc6b221fe66`.
+Its seven assets, `v0.5.0` at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`,
+and historical `v0.4.1`/eight assets remain immutable. A new
 release requires a new version and explicit human publication approval; do not
-republish a later `main` build under an existing tag. Version 0.5.0 uses a minor increment because `sync_only` is an additive
-public argument, while the 37 tool names and schema 55 remain unchanged.
+republish a later `main` build under an existing tag. Version 0.5.1 is a patch
+for tool-definition help and examples, with unchanged callable input contracts
+and schema 55. Version 0.5.0 used a minor increment because `sync_only` added a
+public argument; the 37 tool names remain unchanged.
 Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
@@ -39,13 +42,13 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify the current `0.5.0` checkout locally, use Python 3.11 or newer in an
+To qualify a `0.5.1` source build locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.5.0 --output dist
+python tools/build_release.py --version 0.5.1 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -55,7 +58,7 @@ Flower assets or either package. Stale or unexpected files in the output directo
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.5.0 --output dist --verify-only
+python tools/build_release.py --version 0.5.1 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -127,10 +130,10 @@ supplied target and uploads assets before publication; see [the release command]
 ## Install the release
 
 Current installation examples in README and INSTALLATION.md select published
-0.5.0. The installer uses a version-pinned URL:
+0.5.1. The installer uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
@@ -153,17 +156,18 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. Release 0.5.0 adds no SQLite migration:
-an existing 0.4.0 or 0.4.1/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
+client usability as separate evidence. Release 0.5.1 adds no SQLite migration:
+an existing 0.4.0, 0.4.1 or 0.5.0/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
 still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
 current source uses the independently published runtime `0.4.1` through its
 explicit inference extra. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from exact published 0.4.1→0.5.0 qualification.
-Retain earlier release qualification as historical evidence.
+wheel/backend; that path is distinct from the actual anonymous published
+0.5.0→0.5.1 populated-schema55 qualification on macOS. Retain the earlier
+0.4.1→0.5.0 qualification as historical evidence.
 
-Review [release notes](RELEASE-NOTES-0.5.0.md) and
+Review [release notes](RELEASE-NOTES-0.5.1.md) and
 [advanced configuration](ADVANCED-CONFIGURATION.md) with the exact release commit.
 The suspended writer witness is excluded. Candidate builds, native CI, live
 qualification and human publication approval are separate checkpoints; no tag

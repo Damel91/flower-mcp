@@ -3,8 +3,9 @@
 This patch improves the public MCP tool definitions. It keeps the same lifecycle
 operations, callable input types, defaults, validation, response envelopes and
 SQLite schema as published 0.5.0. The managed-writer witness remains deferred.
-Flower remains in testing; this document is version-pinned release guidance,
-not a claim that an external build, installation or evaluation has passed.
+Flower remains in testing. The qualification section records the exact observed
+release and upgrade checks; other installations and platform evaluations require
+their own evidence.
 
 ## Tool definition improvements
 
@@ -35,9 +36,10 @@ published 0.4.1, with its existing URL/SHA256 pin; it is not a Flower release as
 
 ## Upgrade while preserving SQLite
 
-The version-pinned download commands require actual published 0.5.1 assets.
-During release preparation, use only the verified candidate assets in a new
-isolated test environment. Published 0.5.0 and all its assets remain immutable.
+The version-pinned download commands select the published 0.5.1 assets.
+Source commit: `a87a52f87f16d48a609e304f85b53cc6b221fe66`.
+Published 0.5.0 and all its assets remain immutable. A later source build is
+distinct from this release's wheel and checksum inventory.
 
 For an existing installer-owned installation, keep its existing environment,
 profile, profile root, SQLite/YAML and client configuration paths. Stop only
@@ -90,9 +92,38 @@ Glama platform-release labels are distinct from Flower's distribution version.
 
 ## Qualification boundaries
 
+On 2026-10-16, [Release run 38918117008](https://github.com/Damel91/flower-mcp/actions/runs/38918117008)
+completed all eight jobs. All seven published assets were acquired anonymously
+over HTTPS and verified against `SHA256SUMS`; the delivered wheel SHA256 is
+`fea2961ce525dc77117d3f89cd7e3406d4655e70450c1ad65f44c6977e29ddaa`.
+Its 184 product files match the exact release source, all 191 wheel RECORD
+entries verify, and the source archive contains 287 inspected regular files.
+
+A dedicated populated macOS installation was upgraded from the actual published
+0.5.0 assets to those actual 0.5.1 assets. The test retained schema 55, all 349
+schema objects, 130 tables and 140 existing rows, including receipts, revisions,
+evidence and handover payloads. It verified a consistent backup before pip,
+read-only preview, active-owner refusal, unchanged profile/database/YAML/client
+paths and public MCP recovery after restart through 49 calls. Native Linux and
+Windows CI's older 0.3.1/schema52→55 route is separate evidence. No real user's
+installation was updated by these checks.
+
 Source/installed compatibility, real public MCP responses, same-schema55
-preservation, native CI, anonymous delivery and Glama account builds are recorded
-separately in current guidance after their actual verification. Full local schema 55
+preservation, native CI, anonymous delivery and Glama account builds remain
+separate checkpoints. Glama's explicit full-pin build test
+`01a14537-a825-7393-abe4-757980005ef6` passed on the complete release SHA,
+including initialization and catalog-request mechanics. Its logs are truncated;
+full parameter coverage comes from the separate source/installed qualification.
+On 2026-10-16, Glama's authenticated TDQS page with `v0.5.1 (latest)` selected
+displayed **4.0/5 across 37 evaluated tools**. The earlier **2.3/5** was recorded
+for the separate Glama `v0.1.0` evaluation baseline. Current feedback still
+identifies route/clearing-effect refinements for `fow_interaction` (3.1/5), while
+recognizing help for all 16 of its schema fields. These definition-quality
+ratings do not certify software behavior, hosted persistence or acceptance;
+see the current [Glama guide](GLAMA.md).
+
+No Glama platform release was created by these build actions, and no
+hosted-persistence acceptance is inferred. Full local schema 55
 preservation on one host does not certify another OS. Hosted storage, live LLM/
 physical provider execution, witness/U6, agent usability and human acceptance
 remain distinct. No user's installation is changed by the release tests.

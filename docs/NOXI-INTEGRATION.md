@@ -3,7 +3,10 @@
 Flower MCP 0.4.0 introduced durable project architecture and an optional,
 explicitly negotiated provider handoff; 0.4.1 retains them. The discovery and
 deferred-only authoring correction, sync-only mode and provider deadline
-correction described below are included in published 0.5.0.
+correction described below were introduced in published 0.5.0 and are retained
+in 0.5.1. The 0.5.1 patch documents all 37 tool purposes and 445 inputs, publishes
+conservative effect annotations and corrects canonical operation examples;
+callable contracts, gates and provider payloads are unchanged.
 Flower does not install a Noxi agent loop or alter historical release assets.
 Actual paired consumer qualification is recorded separately from Flow protocol
 tests; check the installed server's capabilities before using optional delivery.
@@ -274,7 +277,9 @@ copy. Normal startup performs the additive migration transaction. A package
 version rollback alone does not roll back a migrated ledger; restore the
 matching saved database/profile only through an explicit recovery procedure.
 Published 0.3.1 remains its separately qualified schema 52 release. Published
-0.4.0, 0.4.1 and 0.5.0 use schema55; the 0.5.0 corrections add no migration.
+0.4.0, 0.4.1, 0.5.0 and 0.5.1 use schema55; neither the 0.5.0 corrections nor
+the 0.5.1 metadata patch adds a migration. A client-side timeout and actual
+paired-provider readiness remain separate from package upgrade preservation.
 
 ## Continue while Flower is offline
 

@@ -15,7 +15,7 @@ and publishing a Glama release are separate account actions.
 2. Connect `Damel91/flower-mcp` using Glama's GitHub integration and select its
    root [Dockerfile](../Dockerfile). The image installs the source's current
    `flow-of-work-mcp` package with its core dependencies. Select a source revision
-   deliberately; published GitHub `v0.5.0` includes these container files, while the
+   deliberately; published GitHub `v0.5.1` includes these container files, while the
    historical `v0.1.1` tag predates them.
 3. If the dashboard asks for the startup command, use these executable arguments:
 
@@ -48,11 +48,14 @@ Dockerfile. A maintainer-supplied build report from 2026-10-13, using source
 requirement was unavailable in the package registry. uv resolves optional
 requirements while locking even when it installs only core. Current source uses
 an independently published, SHA-256-pinned runtime URL. Published Flower 0.5.0
-includes this correction; historical Flower 0.4.1 remains unchanged.
+introduced this correction; 0.5.1 retains it. Historical Flower 0.4.1 remains unchanged.
 
 For the generated-build route, use the [example build spec](glama-build-spec.example.json)
-and select the source revision whose CI passed. Replace its `pinnedCommit: null`
-with that full commit SHA in the dashboard before building. The example retains
+and select the exact published source revision whose CI passed. Its full
+0.5.1 release commit is `a87a52f87f16d48a609e304f85b53cc6b221fe66`. The portable
+example leaves `pinnedCommit` null; paste the complete SHA into the dashboard's
+**Pinned commit SHA** field before building. A shortened identifier or a guessed
+JSON import shape does not establish the same pin. The example retains
 Glama's Debian/Python 3.14/Node 24 environment and `mcp-proxy` wrapper. Its build
 step is:
 
@@ -162,6 +165,41 @@ Dependencies follow the core package's version constraints; this does not promis
 byte-identical rebuilds against changing package indexes.
 
 ## Verification status
+
+Glama's tool-definition feedback helped identify missing parameter help, vague
+purposes and unclear routing/effects. Flower 0.5.1 addresses those findings with
+37 complete tool descriptions, 445 input descriptions, conservative annotations
+and structurally valid examples for 181 operations. Code review, unchanged
+input-schema comparison and public MCP verification supplied the engineering
+evidence. This acknowledgment does not claim platform endorsement.
+
+GitHub 0.5.1 is published at the full release commit above. Glama repository
+synchronization now identifies that same commit. The separately requested,
+explicitly full-pinned generated build test
+`01a14537-a825-7393-abe4-757980005ef6` succeeded on 2026-10-16 in 9.2 seconds.
+Its spec uses Debian trixie, Python 3.14, Node 24, `uv sync --no-dev --no-editable`
+and the `mcp-proxy`/uv arguments above. The build log records checkout of the
+complete release SHA, core synchronization, an MCP proxy listening on port 8080
+with SSE, initialization and a processed `ListToolsRequest`. Updated purpose
+and parameter help are visible in the truncated logs. Full 37-tool/445-input
+coverage was qualified separately against source and the installed/released
+package; truncated platform logs do not establish that complete inventory.
+The initialization version `1.30.0` is the MCP SDK version, distinct from
+Flower's distribution version reported by `fow_capabilities`.
+
+An earlier automatic synchronization build's success remains a separate
+observation. No Glama platform release was created through these build actions.
+Paid hosting, hosted persistence and functional acceptance remain separate from
+this exact-pin build and catalog-handshake checkpoint.
+
+On 2026-10-16, Glama's authenticated Tool Definition Quality Score page, with
+`v0.5.1 (latest)` selected, displayed **4.0/5 across 37 evaluated tools**. The
+previously recorded **2.3/5** belongs to the separate Glama `v0.1.0` evaluation
+baseline. The lowest current tool rating was `fow_interaction` at 3.1/5; its
+expanded feedback recognized descriptions for all 16 schema fields while
+retaining suggestions about route distinctions and destructive clearing effects.
+These are observed definition-quality evaluations of their selected releases;
+they do not establish functional correctness, hosted persistence or acceptance.
 
 The [CI workflow](https://github.com/Damel91/flower-mcp/actions/workflows/ci.yml)
 builds the actual image from the current source archive. Its container job checks

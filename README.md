@@ -11,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Release: [0.5.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Release: [0.5.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.1) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -87,16 +87,16 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
-These download commands select published **0.5.0**. Use the existing environment
+These download commands select published **0.5.1**. Use the existing environment
 and profile when upgrading, so the SQLite ledger and client registration stay in place.
 
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -108,7 +108,7 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -132,13 +132,13 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Flower `0.5.0` is published. Its `inference` extra uses
+Flower `0.5.1` is published. Its `inference` extra uses
 the independently published `runtime-llama` `0.4.1` wheel from
 [llama-runtime](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
 pinned by URL and SHA256. Install that extra from the selected current source
 or verified release wheel; the immutable historical Flower `v0.4.1` wheel still
 requires runtime `0.4.0` and its eight historical assets remain unchanged.
-Release 0.5.0 contains seven Flower assets and no runtime wheel.
+Release 0.5.1 contains seven Flower assets and no runtime wheel.
 Core installers remain core-only. See [inference setup and migration](docs/INFERENCE.md)
 for verified downloads, offline installation and explicit optional-runtime upgrades.
 An operator-managed llama.cpp endpoint is required only for internal inference.
@@ -152,7 +152,12 @@ The repository includes maintainer metadata and a core-only Dockerfile for
 Glama's build workflow. See the [Glama and container guide](docs/GLAMA.md) for
 startup arguments, persistent SQLite storage and client setup. Glama account
 claim, hosted deployment and platform release are separate steps; the
-GitHub `v0.5.0` release includes these container files.
+GitHub `v0.5.1` release includes these container files.
+
+[Glama](https://glama.ai/mcp/servers/Damel91/flower-mcp)'s tool-definition
+feedback helped identify the discovery gaps addressed in 0.5.1. The changes
+were verified against Flower's code and public operation contracts. Platform
+evaluation, hosted deployment and functional acceptance remain separate.
 
 ### Connect an agent and start a project
 
@@ -192,7 +197,7 @@ Already installed? Follow the [SQLite-preserving upgrade plan](docs/UPGRADING.md
 Stop clients sharing the Flower environment, preview with the new installer's
 `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then upgrade with the same
 environment/profile paths. Flower backs up SQLite and YAML before package
-changes. Updating an existing schema 55 installation to 0.5.0 keeps
+changes. Updating an existing schema 55 installation to 0.5.1 keeps
 schema 55 unchanged; older 0.3.1/schema 52 installations use the existing additive
 migrations to 55. Resume the existing project and verify another restart.
 
@@ -211,7 +216,7 @@ The [presentation index](docs/presentation/README.md) also links the offline rea
 
 [Advanced configuration](docs/ADVANCED-CONFIGURATION.md) explains internal LLM
 setup, supported host semantic roles and external technical providers. The
-[0.5.0 release notes](docs/RELEASE-NOTES-0.5.0.md) describe the included
+[0.5.1 release notes](docs/RELEASE-NOTES-0.5.1.md) describe the included
 corrections and the boundaries of the recorded qualification.
 
 Release 0.4.1 retains [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
@@ -250,15 +255,16 @@ require Flower.
 
 ## Status and operating limits
 
-Flower `0.5.0` is published and remains in testing. Its
-[release notes](docs/RELEASE-NOTES-0.5.0.md), the historical
+Flower `0.5.1` is published and remains in testing. Its
+[release notes](docs/RELEASE-NOTES-0.5.1.md), the historical
 [0.4.1 release notes](docs/RELEASE-NOTES-0.4.1.md) and
 [installation status](docs/INSTALLATION.md#testing-status-and-release-access)
 distinguish installed-package and CI checks from end-to-end installer and
 target-client qualification.
-The release includes receipt/error-recovery corrections, explicit sync-only
-provider delivery and bounded provider RPCs. It retains 37 public tools and
-schema 55. The writer witness remains deferred; this release does not claim
+The patch documents all 37 tool purposes and 445 input parameters, adds
+conservative MCP annotations and corrects canonical examples. It retains the
+0.5.0 receipt/error-recovery corrections, explicit sync-only provider delivery
+and bounded provider RPCs, with the same callable contracts and schema 55. The writer witness remains deferred; this release does not claim
 its integration or cross-server acceptance.
 The immutable release archive retains its preparation-era documentation; these
 current guides on `main` align installation instructions with the published assets.

@@ -18,12 +18,14 @@ A CodingCastle engine capability is not attributed to Flower.
 The public Flower sources below are pinned to
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, declared version `0.4.1`.
 These implementation and installation references retain that historical source
-checkpoint. Flower 0.5.0 is published at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`; its mutable
+checkpoint. Current Flower 0.5.1 is published at
+`a87a52f87f16d48a609e304f85b53cc6b221fe66`. Earlier 0.5.0 at
+`a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c` remains immutable. The mutable
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target immutable published `0.5.0`. Historical `0.4.1` retains runtime
+links target immutable published `0.5.1`. Historical `0.4.1` retains runtime
 `0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
-`0.4.0`, `0.4.1` and `0.5.0` remain immutable.
+`0.4.0`, `0.4.1`, `0.5.0` and `0.5.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.
 
@@ -113,9 +115,9 @@ pair. References remain pinned to the Flower source identified above.
 ## Installation and downloads
 
 The closing [Now try Flower](try-flower.md) page uses the [public repository](https://github.com/Damel91/flower-mcp),
-the [v0.5.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0) and
+the [v0.5.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.1) and
 the [installation guide at the source checkpoint](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
-Published 0.5.0 contains seven Flower assets: wheel, source, three installers,
+Published 0.5.1 contains seven Flower assets: wheel, source, three installers,
 bootstrap and checksums, without a copied runtime wheel. Historical
 [0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) retains eight assets,
 including runtime-llama `0.4.0`. Flower download links remain release pinned.
@@ -131,7 +133,7 @@ It is not a Flower asset. Its wheel includes Apache-2.0 `LICENSE`/`NOTICE` and
 vendored llamatelemetry MIT attribution. The
 [historical inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 records the earlier source checkpoint. Use the explicitly mutable
-[current inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md) for the 0.5.0
+[current inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md) for the 0.5.1
 extra, exact owned-build rules, offline acquisition and runtime upgrade. The historical 0.4.1 Flower extra still selects `0.4.0`;
 a core/profile upgrade does not request the new runtime or configure a provider.
 

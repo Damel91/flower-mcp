@@ -19,7 +19,7 @@ llama.cpp o un provider compatibile con il contratto. L'incarico host per deriva
 il comportamento osservato non è supportato; un servizio MCP qualunque non è un
 adapter di esecuzione packet/test. Modificare il trasporto YAML richiede il
 riavvio di Flower; importare receipt nel ledger no. Il writer witness resta
-fuori dalla release 0.5.0.
+fuori dalla release 0.5.1.
 [Factory dei provider](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/runtime_factory.py).
 
 ## Chi possiede che cosa

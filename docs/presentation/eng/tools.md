@@ -3,10 +3,16 @@
 [Index](README.md) · [Concepts](concepts.md) · [Sources](sources.md#catalog)
 
 Names retain the technical `fow_` prefix. A client may add its own prefix. This
-map describes the **37 tools in Flower MCP 0.5.0** (36 in historical release
+map describes the **37 tools in Flower MCP 0.5.1** (36 in historical release
 0.3.1); it is not a list of payloads to copy. A multiplexed tool offers several
 operations with different
 prerequisites. The current server catalog remains the operational authority.
+
+Version 0.5.1 describes all 445 top-level inputs and the purpose, routing and
+effects of every tool. Its 181 operation examples have checked input shapes;
+placeholder identities still require actual project authority. MCP effect hints
+are advisory. Ask `fow_capabilities` for exact operation help before calling a
+route whose payload or gate you do not yet understand.
 
 ## Orientation and bootstrap
 

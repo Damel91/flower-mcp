@@ -19,12 +19,14 @@ Una capacità del motore CodingCastle non viene attribuita a Flower.
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, versione dichiarata `0.4.1`.
 Questi riferimenti di implementazione e installazione conservano quel checkpoint
-sorgente storico. Flower 0.5.0 è pubblicato al commit `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`; la
+sorgente storico. Flower 0.5.1 corrente è pubblicato al commit
+`a87a52f87f16d48a609e304f85b53cc6b221fe66`. La precedente 0.5.0 al commit
+`a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c` resta immutabile. La
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
-I download Flower puntano alla release pubblicata immutabile `0.5.0`. La storica
+I download Flower puntano alla release pubblicata immutabile `0.5.1`. La storica
 `0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
-binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1` e `0.5.0` rimangono immutabili.
+binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1`, `0.5.0` e `0.5.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
 
@@ -114,9 +116,9 @@ runtime. I riferimenti restano fissati al sorgente Flower dichiarato sopra.
 ## Installazione e download
 
 La conclusione [Ora prova Flower](try-flower.md) usa la [repository pubblica](https://github.com/Damel91/flower-mcp),
-la [release v0.5.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0) e
+la [release v0.5.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.1) e
 la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
-La release 0.5.0 contiene sette asset Flower: wheel, sorgente, tre installer,
+La release 0.5.1 contiene sette asset Flower: wheel, sorgente, tre installer,
 bootstrap e checksum, senza un wheel runtime copiato. La storica
 [0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) conserva otto asset,
 incluso runtime-llama `0.4.0`. I download Flower restano fissati alla release.
@@ -133,7 +135,7 @@ l'attribuzione MIT di llamatelemetry incorporato. La
 [guida storica all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 registra il checkpoint precedente. Usa la
 [guida corrente all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md), esplicitamente
-mutabile, per l'extra 0.5.0, i vincoli del build posseduto,
+mutabile, per l'extra 0.5.1, i vincoli del build posseduto,
 l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
 storico 0.4.1 seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.
