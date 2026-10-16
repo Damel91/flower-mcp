@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # not change when the current source dependency or Flower version changes.
 PUBLISHED_FLOWER_VERSION = "0.4.1"
 PUBLISHED_FLOWER_RUNTIME = "0.4.0"
+CURRENT_PUBLISHED_FLOWER_VERSION = "0.5.0"
 UPSTREAM_RUNTIME_URL = (
     "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
     "runtime_llama-0.4.1-py3-none-any.whl"
@@ -218,13 +219,12 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(set(re.findall(r"https?://[^)\s]+", editions[0])), set(re.findall(r"https?://[^)\s]+", editions[1])))
                 self.assertEqual(len(re.findall(r"^#{1,6} ", editions[0], re.MULTILINE)), len(re.findall(r"^#{1,6} ", editions[1], re.MULTILINE)))
 
-    def test_installation_closes_the_story_with_historical_flower_release_assets(self):
-        version = PUBLISHED_FLOWER_VERSION
+    def test_installation_closes_the_story_with_current_published_flower_release_assets(self):
+        version = CURRENT_PUBLISHED_FLOWER_VERSION
         expected_assets = {
             "install.sh", "install.ps1", "install_flower.py",
             f"flow_of_work_mcp-{version}-py3-none-any.whl",
             f"flow_of_work_mcp-{version}.tar.gz", "SHA256SUMS", "BOOTSTRAP.md",
-            f"runtime_llama-{PUBLISHED_FLOWER_RUNTIME}-py3-none-any.whl",
         }
         for folder in reader.LANGUAGES:
             with self.subTest(folder=folder):
@@ -241,6 +241,8 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(downloads, {(version, name) for name in expected_assets})
                 historical_inventory = {"eng": "eight historical assets", "ita": "otto asset storici"}
                 self.assertIn(historical_inventory[folder], " ".join(source.split()))
+                self.assertIn(f"/releases/tag/v{PUBLISHED_FLOWER_VERSION}", source)
+                self.assertIn(f"`{PUBLISHED_FLOWER_RUNTIME}`", source)
                 self.assertIn(f"/blob/{manifest['product_revision']}/docs/UPGRADING.md", source)
                 self.assertIn("--upgrade --dry-run", source)
                 self.assertIn(f"-Version '{version}' -Upgrade -DryRun", source)
