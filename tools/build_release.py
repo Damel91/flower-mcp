@@ -25,9 +25,9 @@ BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
 CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
 RUNTIME_URL = (
-    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
-    "runtime_llama-0.4.1-py3-none-any.whl#sha256="
-    "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/"
+    "runtime_llama-0.5.0-py3-none-any.whl#sha256="
+    "dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13"
 )
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
                  "install_flower.py": "tools/install_flower.py",
@@ -233,7 +233,7 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
             "The immutable published Flower 0.4.1 release and its eight historical assets, including runtime 0.4.0, remain unchanged. "
             f"This build uses version {project['version']} and does not replace those historical assets. "
-            "Its inference extra instead acquires the independently released public runtime-llama 0.4.1 wheel. "
+            "Its inference extra instead acquires the independently released public runtime-llama 0.5.0 wheel. "
             "The Flower build and core installers do not download inference.\n\n"
             "Compared with published Flower 0.5.1, this patch corrects repeated authority hydration and "
             "shared-predecessor PVP computation in complete project recovery. "

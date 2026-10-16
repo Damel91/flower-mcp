@@ -97,13 +97,13 @@ jobs:
           from pathlib import Path
           import flow_of_work_mcp, runtime_llama
           runtime = distribution('runtime-llama')
-          assert runtime.version == runtime_llama.__version__ == '0.4.1'
+          assert runtime.version == runtime_llama.__version__ == '0.5.0'
           assert Path(runtime_llama.__file__).is_relative_to(Path(sys.prefix))
           assert Path(flow_of_work_mcp.__file__).is_relative_to(Path(sys.prefix))
           assert 'lmstudio' not in sys.modules and 'openai' not in sys.modules
           direct = json.loads(runtime.read_text('direct_url.json'))
-          assert direct['url'] == 'https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl'
-          assert direct['archive_info']['hashes']['sha256'] == '8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa'
+          assert direct['url'] == 'https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl'
+          assert direct['archive_info']['hashes']['sha256'] == 'dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
           assert runtime.metadata['License-Expression'] == 'Apache-2.0'
           attribution = {
               'LICENSE': 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30',

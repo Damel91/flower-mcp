@@ -21,9 +21,9 @@ spec.loader.exec_module(release)
 
 # Independently lock the upstream identity; these tests must detect builder drift.
 RUNTIME_URL = (
-    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
-    "runtime_llama-0.4.1-py3-none-any.whl#sha256="
-    "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/"
+    "runtime_llama-0.5.0-py3-none-any.whl#sha256="
+    "dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13"
 )
 RUNTIME_REQUIREMENT = f"runtime-llama @ {RUNTIME_URL}"
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
@@ -207,8 +207,8 @@ class ReleaseAssetsTests(unittest.TestCase):
                                path.read_text(encoding="utf-8"), flags=re.MULTILINE), encoding="utf-8")
 
     def test_project_rejects_wrong_public_identity_and_duplicate_dependency(self):
-        for requirement in ("runtime-llama==0.4.1", RUNTIME_REQUIREMENT.replace("0.4.1", "0.4.0"),
-                            RUNTIME_REQUIREMENT.replace("8c512", "0c512"),
+        for requirement in ("runtime-llama==0.4.1", RUNTIME_REQUIREMENT.replace("0.5.0", "0.4.1"),
+                            RUNTIME_REQUIREMENT.replace("dc7c2", "0c7c2"),
                             RUNTIME_REQUIREMENT.split("#", 1)[0],
                             RUNTIME_REQUIREMENT + "; python_version >= '3.11'"):
             with self.subTest(requirement=requirement):
@@ -243,7 +243,7 @@ class ReleaseAssetsTests(unittest.TestCase):
         correct = f'{RUNTIME_REQUIREMENT}; extra == "inference"'
         for requirements in ([RUNTIME_REQUIREMENT], [correct, correct],
                              [correct, "Runtime.Llama==0.4.1"], ["runtime-llama==0.4.0; extra == 'inference'"],
-                             [correct.replace("8c512", "0c512")],
+                             [correct.replace("dc7c2", "0c7c2")],
                              [correct.replace('; extra == "inference"', '')],
                              [correct + ' or python_version >= "3.11"'],
                              [correct + ' and python_version >= "3.11"'],
@@ -272,7 +272,7 @@ class ReleaseAssetsTests(unittest.TestCase):
                     release.prepare(self.root, self.dist)
 
     def test_both_archives_reject_runtime_wheels_packages_and_vendor_payload(self):
-        for path in ("runtime_llama-0.4.1-py3-none-any.whl", "third_party/runtime-llama/LICENSE",
+        for path in ("runtime_llama-0.5.0-py3-none-any.whl", "third_party/runtime-llama/LICENSE",
                      "src/runtime_llama/__init__.py", "runtime_llama/__init__.py",
                      "runtime_llama-0.4.1.dist-info/METADATA", "src/flow_of_work_mcp/_vendor/llamatelemetry.py"):
             for package in ("wheel_members", "sdist_members"):
@@ -282,7 +282,7 @@ class ReleaseAssetsTests(unittest.TestCase):
                         release.prepare(self.root, self.dist)
 
     def test_runtime_and_other_unexpected_release_assets_block_inventory(self):
-        for name in ("runtime_llama-0.4.1-py3-none-any.whl", "unexpected.txt"):
+        for name in ("runtime_llama-0.5.0-py3-none-any.whl", "unexpected.txt"):
             with self.subTest(name=name):
                 path = self.dist / name
                 path.write_bytes(b"unexpected")
@@ -293,7 +293,7 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_extra_checksum_member_is_rejected(self):
         release.prepare(self.root, self.dist)
         with (self.dist / "SHA256SUMS").open("a", encoding="utf-8") as stream:
-            stream.write("0" * 64 + "  runtime_llama-0.4.1-py3-none-any.whl\n")
+            stream.write("0" * 64 + "  runtime_llama-0.5.0-py3-none-any.whl\n")
         with self.assertRaisesRegex(ValueError, "SHA256SUMS does not match"):
             release.prepare(self.root, self.dist, verify_checksums=True)
 
