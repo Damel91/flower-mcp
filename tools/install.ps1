@@ -20,7 +20,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 param(
     [ValidateSet('codex', 'claude-code', 'cursor', 'antigravity', 'gemini-cli')][string]$Platform,
     [switch]$NoRegister,
-    [string]$Version = '0.5.1',
+    [string]$Version = '0.5.2',
     [string]$Venv,
     [switch]$Upgrade,
     [switch]$DryRun,
