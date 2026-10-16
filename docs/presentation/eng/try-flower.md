@@ -49,23 +49,28 @@ Its SHA256 is
 The upstream wheel includes Apache-2.0 `LICENSE`/`NOTICE` and vendored
 llamatelemetry MIT attribution.
 
-Use the selected current source only in a fresh/manual Flower environment:
+Current source is preparing candidate `0.5.1`; it is not a published release.
+Use that selected source only in a fresh/manual Flower environment:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 ```
 
-For a verified 0.5.0 release wheel, use
-`'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'` instead.
+For a locally verified `0.5.1` candidate wheel from that source, use
+`'./dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'` instead.
+This command is for fresh/manual environments. An installer-owned environment
+must use its exact already-owned wheel/build and receipt after its ordinary
+core upgrade; do not pip-install the candidate over owned `0.5.0`.
 Windows uses `& .\.venv\Scripts\python.exe` with the same pip arguments.
 The dependency pins the upstream URL and SHA256. Do not use the historical
 0.4.1 Flower wheel's old extra for this new runtime. See the
 [inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
 for the current source/wheel route, exact owned-build rules, independent checksum
 verification and offline acquisition. This operational link follows mutable
-`main`; frozen source references remain historical. Keep the selected source commit and checksum inventory. The 0.5.0 filename
-is distinct from the immutable published 0.4.1 wheel.
+`main`; frozen source references remain historical. Keep the selected source
+commit and checksum inventory. The `0.5.1` candidate filename does not replace
+the published `0.5.0` downloads or the immutable historical `0.4.1` wheel.
 Core installers remain core-only and configure no implicit provider.
 
 The [current advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)

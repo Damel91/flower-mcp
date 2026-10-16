@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 3c0cd5c6ca6094627f5fea9a58657435745685792213aaf6e007fa2de383bacd. -->
+<!-- Generated from linked Markdown. Source digest: ca57461d724773ff84d7ef19ce04d183926a00d6f1e9dc7bcfe80a7e26b94854. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -561,20 +561,26 @@ Il suo SHA256 è
 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
 Il wheel upstream include <code>LICENSE</code>/<code>NOTICE</code> Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.</p>
-<p>Usa il sorgente corrente selezionato soltanto in un ambiente Flower nuovo/manuale:</p>
+<p>Il sorgente corrente prepara il candidato <code>0.5.1</code>; non è una release pubblicata.
+Usa quel sorgente selezionato soltanto in un ambiente Flower nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>Per un wheel verificato della release 0.5.0, usa invece
-<code>'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'</code>.
+<p>Per un wheel candidato <code>0.5.1</code> verificato localmente da quel sorgente, usa invece
+<code>'./dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'</code>.
+Questo comando è per ambienti nuovi/manuali. Un ambiente creato dall'installer
+deve usare il wheel/build esatto già registrato nella propria receipt dopo il
+normale upgrade core; non installare il candidato con pip sopra <code>0.5.0</code> posseduto.
 Windows usa <code>&amp; .\.venv\Scripts\python.exe</code> con gli stessi argomenti pip.
 La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
 Flower storico 0.4.1 per questo nuovo runtime. Consulta la
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>
 per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
 verifica indipendente del checksum e l'acquisizione offline. Questo link operativo
-segue il ramo mutabile <code>main</code>; i riferimenti congelati restano storici. Conserva commit sorgente e inventario checksum selezionati. Il nome del file
-0.5.0 è distinto dal wheel 0.4.1 pubblicato immutabile. Gli installer core restano core-only e non configurano provider impliciti.</p>
+segue il ramo mutabile <code>main</code>; i riferimenti congelati restano storici. Conserva
+commit sorgente e inventario checksum selezionati. Il nome del candidato <code>0.5.1</code>
+non sostituisce i download pubblicati <code>0.5.0</code> né il wheel storico immutabile
+<code>0.4.1</code>. Gli installer core restano core-only e non configurano provider impliciti.</p>
 <p>La <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">guida corrente alla configurazione avanzata</a>
 spiega ruoli LLM, YAML, contratti dei provider esterni e receipt di associazione.
 Questo link segue il ramo mutabile <code>main</code>; i riferimenti sorgente runtime nelle

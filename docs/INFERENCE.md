@@ -7,8 +7,10 @@ execute returned tool calls or provide an embedding/retrieval consumer.
 
 ## Install the optional runtime
 
-Published Flower **`0.5.0`** and the selected current source provide an `inference`
-extra. It selects the independently published `runtime-llama` `0.4.1` distribution,
+Published Flower **`0.5.0`** and the current **`0.5.1` candidate source** provide
+an `inference` extra. The candidate is being prepared; it is not a published
+release or a replacement for the download links below. The extra selects the
+independently published `runtime-llama` `0.4.1` distribution,
 imported as `runtime_llama`. Its exact dependency is:
 
 ```text
@@ -47,7 +49,7 @@ installer's backup/lease/version receipt workflow. Use the published 0.5.0
 installer for that core upgrade. Use a separate disposable manual environment
 for source/candidate trials.
 
-From the selected current source checkout or its extracted candidate source,
+From the selected `0.5.1` candidate source checkout or its extracted source,
 inside that fresh/manual environment:
 
 ```sh
@@ -55,14 +57,18 @@ inside that fresh/manual environment:
 .venv/bin/python -m pip check
 ```
 
-Alternatively, verify the selected Flower wheel against its own build's
-`SHA256SUMS`. In an owned environment it must also be the exact wheel/build
-already named by that environment's receipt, as described above:
+Alternatively, in a fresh/manual environment, verify the local `0.5.1`
+candidate wheel against its own build's `SHA256SUMS`:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'
 .venv/bin/python -m pip check
 ```
+
+This candidate filename is not a published download. Do not apply it over an
+installer-owned `0.5.0` environment. That environment must retain the exact
+already-owned `0.5.0` wheel/build and receipt; its optional-runtime procedure
+appears under [Upgrading the optional runtime](#upgrading-the-optional-runtime).
 
 Windows uses the source command only in a fresh/manual environment:
 
@@ -72,7 +78,7 @@ Windows uses the source command only in a fresh/manual environment:
 ```
 
 For the Windows candidate-wheel alternative replace `'.[inference]'` with
-`'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'`.
+`'./dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'`.
 These routes fetch the exact upstream URL and check its SHA256, then resolve
 normal dependencies such as `requests`. They do not use a Flower-owned runtime
 asset or require an upstream PyPI publication. Core installers intentionally
@@ -86,7 +92,7 @@ complete dependency set from the selected candidate wheel into a new dedicated
 directory. This example uses that machine's chosen Python interpreter:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'
 ```
 
 Use a machine with the target Python version, operating system and architecture,
@@ -153,7 +159,8 @@ select the exact verified installed Flower wheel/build recorded by the owned
 receipt, or the reviewed wheel for a manual environment. Do not substitute a
 source rebuild with the same version. The old published Flower wheel
 still requires runtime `0.4.0`; installing runtime `0.4.1` beside that old
-extra is not the supported new route. The commands below assume the core is
+extra is not the supported new route. The commands below use the published
+`0.5.0` route and assume the core is
 already at `0.5.0` and, for an owned environment, the selected wheel's SHA256
 exactly matches its receipt. Preview the package change with
 `--dry-run`, inspect it, then repeat without `--dry-run`:

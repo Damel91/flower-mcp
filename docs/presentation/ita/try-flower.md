@@ -49,23 +49,29 @@ Il suo SHA256 è
 Il wheel upstream include `LICENSE`/`NOTICE` Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.
 
-Usa il sorgente corrente selezionato soltanto in un ambiente Flower nuovo/manuale:
+Il sorgente corrente prepara il candidato `0.5.1`; non è una release pubblicata.
+Usa quel sorgente selezionato soltanto in un ambiente Flower nuovo/manuale:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 ```
 
-Per un wheel verificato della release 0.5.0, usa invece
-`'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'`.
+Per un wheel candidato `0.5.1` verificato localmente da quel sorgente, usa invece
+`'./dist/flow_of_work_mcp-0.5.1-py3-none-any.whl[inference]'`.
+Questo comando è per ambienti nuovi/manuali. Un ambiente creato dall'installer
+deve usare il wheel/build esatto già registrato nella propria receipt dopo il
+normale upgrade core; non installare il candidato con pip sopra `0.5.0` posseduto.
 Windows usa `& .\.venv\Scripts\python.exe` con gli stessi argomenti pip.
 La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
 Flower storico 0.4.1 per questo nuovo runtime. Consulta la
 [guida all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
 per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
 verifica indipendente del checksum e l'acquisizione offline. Questo link operativo
-segue il ramo mutabile `main`; i riferimenti congelati restano storici. Conserva commit sorgente e inventario checksum selezionati. Il nome del file
-0.5.0 è distinto dal wheel 0.4.1 pubblicato immutabile. Gli installer core restano core-only e non configurano provider impliciti.
+segue il ramo mutabile `main`; i riferimenti congelati restano storici. Conserva
+commit sorgente e inventario checksum selezionati. Il nome del candidato `0.5.1`
+non sostituisce i download pubblicati `0.5.0` né il wheel storico immutabile
+`0.4.1`. Gli installer core restano core-only e non configurano provider impliciti.
 
 La [guida corrente alla configurazione avanzata](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 spiega ruoli LLM, YAML, contratti dei provider esterni e receipt di associazione.
