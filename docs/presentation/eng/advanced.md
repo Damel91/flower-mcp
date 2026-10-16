@@ -18,7 +18,7 @@ Choose supported host semantic assignments, internal llama.cpp inference or a
 contract-compatible provider explicitly. A host observed-behavior assignment is
 unsupported, and an arbitrary MCP service is not a packet/test execution adapter.
 YAML transport changes need a Flower restart; ledger receipt imports do not.
-The writer witness remains outside candidate 0.5.0.
+The writer witness remains outside release 0.5.0.
 [Provider factory](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/runtime_factory.py).
 
 ## Who owns what
@@ -99,7 +99,7 @@ capabilities and acknowledge the exact context before execution can start.
 This does not transfer admitted work to another executor or qualify a real
 consumer. See the [integration guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md).
 
-The unreleased 0.5.0 candidate adds `mode="sync_only"` to `fow_packet_advance`: it delivers
+Published 0.5.0 adds `mode="sync_only"` to `fow_packet_advance`: it delivers
 admitted ADD/EDIT/REMOVE and stops at `provider_synchronized` without sending
 START/STOP. Subsequent synchronization calls retain that mode; starting requires
 an explicit `mode="advance"` call. A pending or UNKNOWN control remains unchanged
@@ -108,7 +108,7 @@ preserves actual provider state and does not assert that an earlier run never
 started. PVP gates and ACKs remain unchanged; real paired qualification is
 separate from synthetic-provider checks.
 
-The 0.5.0 candidate also applies one cumulative timeout to each provider RPC,
+Flower 0.5.0 also applies one cumulative timeout to each provider RPC,
 from startup through request processing and cleanup; one packet advancement may
 make several RPCs. Expiry reports `implementation_provider_timeout`. A possible
 write settles as UNKNOWN with its original command, context and fingerprint: inspect and reconcile

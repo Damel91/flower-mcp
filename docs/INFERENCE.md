@@ -7,8 +7,8 @@ execute returned tool calls or provide an embedding/retrieval consumer.
 
 ## Install the optional runtime
 
-Current Flower source is an **unreleased `0.5.0` candidate**. Its `inference`
-extra selects the independently published `runtime-llama` `0.4.1` distribution,
+Published Flower **`0.5.0`** and the selected current source provide an `inference`
+extra. It selects the independently published `runtime-llama` `0.4.1` distribution,
 imported as `runtime_llama`. Its exact dependency is:
 
 ```text
@@ -24,9 +24,9 @@ runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.4.
 The immutable published [Flower `v0.4.1` release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1)
 still has eight historical assets, including runtime `0.4.0`; its Flower wheel's
 extra still requires that older runtime. Its [release notes](RELEASE-NOTES-0.4.1.md)
-describe those published bytes. Current candidate builds use Flower version `0.5.0`, contain seven assets and
+describe those historical bytes. Flower version `0.5.0` contains seven assets and
 carry no runtime wheel or vendored runtime payload. Retain the selected source
-commit and candidate `SHA256SUMS`; preparing a candidate does not publish it.
+commit and `SHA256SUMS`; a later source build is not the immutable published wheel.
 
 ### Install from current source or a candidate wheel
 
@@ -42,10 +42,10 @@ SHA256 with the receipt's `sha256` field as well as its version and release
 or a rebuilt same-version wheel into an owned environment, and do not edit its
 receipt to make a mismatch disappear.
 
-Do not pip-install a 0.5.0 candidate over an owned 0.4.1 environment: that skips
-the installer's backup/lease/version receipt workflow. Before publication the
-release installer cannot download 0.5.0 assets. Use a separate disposable manual
-environment for candidate trials.
+Do not pip-install 0.5.0 over an owned 0.4.1 environment: that skips the
+installer's backup/lease/version receipt workflow. Use the published 0.5.0
+installer for that core upgrade. Use a separate disposable manual environment
+for source/candidate trials.
 
 From the selected current source checkout or its extracted candidate source,
 inside that fresh/manual environment:

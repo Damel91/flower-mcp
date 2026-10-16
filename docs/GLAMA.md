@@ -15,7 +15,7 @@ and publishing a Glama release are separate account actions.
 2. Connect `Damel91/flower-mcp` using Glama's GitHub integration and select its
    root [Dockerfile](../Dockerfile). The image installs the source's current
    `flow-of-work-mcp` package with its core dependencies. Select a source revision
-   deliberately; GitHub `v0.4.1` includes these container files, while the
+   deliberately; published GitHub `v0.5.0` includes these container files, while the
    historical `v0.1.1` tag predates them.
 3. If the dashboard asks for the startup command, use these executable arguments:
 
@@ -47,8 +47,8 @@ Dockerfile. A maintainer-supplied build report from 2026-10-13, using source
 `6af3912`, failed during `uv sync`: the old optional `runtime-llama==0.4.0`
 requirement was unavailable in the package registry. uv resolves optional
 requirements while locking even when it installs only core. Current source uses
-an independently published, SHA-256-pinned runtime URL; this change is not yet
-part of the immutable published Flower 0.4.1 release.
+an independently published, SHA-256-pinned runtime URL. Published Flower 0.5.0
+includes this correction; historical Flower 0.4.1 remains unchanged.
 
 For the generated-build route, use the [example build spec](glama-build-spec.example.json)
 and select the source revision whose CI passed. Replace its `pinnedCommit: null`

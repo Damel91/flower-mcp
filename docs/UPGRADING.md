@@ -1,17 +1,14 @@
 # Upgrade Flower without losing project data
 
-The **unreleased Flower MCP 0.5.0 candidate** updates code in place and retains
-the existing SQLite ledger. The release download commands below are a prepared
-upgrade procedure: run them only after matching 0.5.0 assets are published. Until
-then, current published downloads and their commands remain in the historical
-[0.4.1 release notes](RELEASE-NOTES-0.4.1.md) and
-[installation guide](INSTALLATION.md). A reviewed local candidate wheel can use
-the manual pip procedure below in a manual environment; release-installer
-execution needs published assets. Do not bypass an owned installer's receipt by
+Published **Flower MCP 0.5.0** updates code in place and retains the existing
+SQLite ledger. The commands below select its immutable release assets; see the
+[release notes](RELEASE-NOTES-0.5.0.md) and [installation guide](INSTALLATION.md).
+A reviewed wheel can use the manual pip procedure below in a manual environment.
+Do not bypass an owned installer's receipt by
 updating its Flower version through pip. The Python environment owns code; the
 persistent profile owns
 `flower.yaml`, lifecycle data, bindings, imports, logs and evidence. Keep their
-paths unchanged. The candidate adds no database migration. Existing receipts,
+paths unchanged. This release adds no database migration. Existing receipts,
 revisions, evidence and handovers stay in the same profile.
 
 | Existing version | Database behavior on the first 0.5.0 server start |
@@ -24,9 +21,9 @@ same database. The installer backs it up before changing packages. `doctor`
 reads configuration; it does not start Flower or verify database migration.
 After starting Flower, verify the same project through public MCP and restart.
 A package downgrade does not reverse a migrated database. Source on `main` is
-not a release. The candidate retains 37 tools; its additive
+not a release. Version 0.5.0 retains 37 tools; its additive
 `fow_packet_advance(mode="sync_only")` argument is documented in the
-[candidate notes](RELEASE-NOTES-0.5.0.md). It excludes the suspended writer witness.
+[release notes](RELEASE-NOTES-0.5.0.md). It excludes the suspended writer witness.
 
 The safe release upgrade is for environments created by the Flower release
 installer. A manual pip environment uses the [manual procedure below](#manual-pip-installations).
@@ -107,9 +104,9 @@ python3 -I ./install_flower.py --version 0.5.0 --upgrade --dry-run --venv '/abso
 ```
 
 Here `install_flower.py` is the selected new backend, checked against its own
-`SHA256SUMS`. Before publication, the locally built candidate backend supports
-this read-only preview with an existing Python interpreter; execution still
-needs the matching release downloads. The launchers perform that backend checksum check.
+`SHA256SUMS`. This backend supports the read-only preview with an existing Python
+interpreter. Execution downloads the matching release wheel. The launchers
+perform the backend checksum check.
 On Windows, the corresponding PowerShell options are `-Venv`, `-Profile` and
 `-ProfileRoot`; the Python backend uses the same long flags on every OS.
 

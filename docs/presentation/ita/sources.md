@@ -19,12 +19,12 @@ Una capacità del motore CodingCastle non viene attribuita a Flower.
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, versione dichiarata `0.4.1`.
 Questi riferimenti di implementazione e installazione conservano quel checkpoint
-sorgente storico. Il sorgente corrente prepara un candidato distinto 0.5.0; la
+sorgente storico. Flower 0.5.0 è pubblicato al commit `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`; la
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
-I download Flower puntano alla distinta release pubblicata immutabile `0.4.1`,
-incluso il suo runtime storico `0.4.0`. Questa fotografia editoriale non qualifica
-i binari. Le release pubblicate `0.3.1`, `0.4.0` e `0.4.1` rimangono immutabili.
+I download Flower puntano alla release pubblicata immutabile `0.5.0`. La storica
+`0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
+binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1` e `0.5.0` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
 
@@ -109,19 +109,19 @@ runtime. I riferimenti restano fissati al sorgente Flower dichiarato sopra.
 - [Snapshot MCP](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py): evidenza e canale strutturato.
 - [Adapter packet](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py) e [adapter test](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py): integrazione CodingCastle presente nel sorgente.
 - [Recipe di ciclo di vita](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/application/lifecycle_recipes.py): ownership, review, campagne e PVP cross-server differita.
-- [Scadenze del provider e recupero esatto](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md#provider-timeouts-and-exact-recovery-unreleased): budget per RPC non ancora rilasciato e riconciliazione del comando UNKNOWN originale; la qualificazione del pacchetto installato e quella accoppiata reale restano separate.
+- [Scadenze del provider e recupero esatto](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md#provider-timeouts-and-exact-recovery-unreleased): l'etichetta storica non ancora rilasciato descrive il budget per RPC ora incluso in 0.5.0 e la riconciliazione del comando UNKNOWN originale; la qualificazione del pacchetto installato e quella accoppiata reale restano separate.
 
 ## Installazione e download
 
 La conclusione [Ora prova Flower](try-flower.md) usa la [repository pubblica](https://github.com/Damel91/flower-mcp),
-la [release v0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) e
+la [release v0.5.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0) e
 la [guida di installazione al checkpoint sorgente](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
-Gli otto asset storici della release pubblicata includono il launcher PowerShell, gli installer
-Bash e Python, wheel Flower, sorgente, bootstrap, wheel opzionale runtime-llama
-`0.4.0` e checksum. Le build del candidato 0.5.0 corrente non pubblicato contengono
-sette asset Flower, senza un wheel runtime copiato. I download Flower restano
-fissati alla release; le guide di installazione e i sorgenti runtime di Flower
-mantengono il checkpoint completo identificato sopra.
+La release 0.5.0 contiene sette asset Flower: wheel, sorgente, tre installer,
+bootstrap e checksum, senza un wheel runtime copiato. La storica
+[0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) conserva otto asset,
+incluso runtime-llama `0.4.0`. I download Flower restano fissati alla release.
+Le guide operative correnti seguono `main`; documentazione storica e citazioni
+sorgente runtime mantengono il checkpoint congelato completo identificato sopra.
 I comandi della release richiedono i corrispondenti asset pubblicati.
 
 La nuova dipendenza opzionale appartiene alla
@@ -133,9 +133,9 @@ l'attribuzione MIT di llamatelemetry incorporato. La
 [guida storica all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 registra il checkpoint precedente. Usa la
 [guida corrente all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md), esplicitamente
-mutabile, per l'extra del candidato 0.5.0, i vincoli del build posseduto,
+mutabile, per l'extra 0.5.0, i vincoli del build posseduto,
 l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
-pubblicato seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
+storico 0.4.1 seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.
 
 Disponibilità dei collegamenti, test del pacchetto installato e qualificazione

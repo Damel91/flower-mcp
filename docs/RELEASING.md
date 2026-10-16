@@ -8,10 +8,10 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; current source prepares `0.5.0` as an unreleased candidate.
-Published `v0.4.1` and its eight historical assets remain immutable. A new release
-requires explicit human publication approval; do not republish this candidate as
-`v0.4.1`. The candidate uses a minor increment because `sync_only` is an additive
+`MAJOR.MINOR.PATCH`; `v0.5.0` is published at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`.
+Its seven assets and historical `v0.4.1`/eight assets remain immutable. A new
+release requires a new version and explicit human publication approval; do not
+republish a later `main` build under an existing tag. Version 0.5.0 uses a minor increment because `sync_only` is an additive
 public argument, while the 37 tool names and schema 55 remain unchanged.
 Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
@@ -126,9 +126,8 @@ supplied target and uploads assets before publication; see [the release command]
 
 ## Install the release
 
-Current stable installation examples in README and INSTALLATION.md remain on
-published 0.4.1 until the next release exists. The following **prepared 0.5.0
-command must not be run before publication**. The installer uses a version-pinned URL:
+Current installation examples in README and INSTALLATION.md select published
+0.5.0. The installer uses a version-pinned URL:
 
 ```sh
 curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash
@@ -154,17 +153,17 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. Candidate 0.5.0 adds no SQLite migration:
+client usability as separate evidence. Release 0.5.0 adds no SQLite migration:
 an existing 0.4.0 or 0.4.1/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
 still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
 current source uses the independently published runtime `0.4.1` through its
 explicit inference extra. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from exact published 0.4.1→candidate 0.5.0 qualification.
+wheel/backend; that path is distinct from exact published 0.4.1→0.5.0 qualification.
 Retain earlier release qualification as historical evidence.
 
-Review [candidate notes](RELEASE-NOTES-0.5.0.md) and
+Review [release notes](RELEASE-NOTES-0.5.0.md) and
 [advanced configuration](ADVANCED-CONFIGURATION.md) with the exact release commit.
 The suspended writer witness is excluded. Candidate builds, native CI, live
 qualification and human publication approval are separate checkpoints; no tag

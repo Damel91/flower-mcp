@@ -2,8 +2,8 @@
 
 Flower MCP 0.4.0 introduced durable project architecture and an optional,
 explicitly negotiated provider handoff; 0.4.1 retains them. The discovery and
-deferred-only authoring correction and sync-only mode described below are newer
-unreleased source.
+deferred-only authoring correction, sync-only mode and provider deadline
+correction described below are included in published 0.5.0.
 Flower does not install a Noxi agent loop or alter historical release assets.
 Actual paired consumer qualification is recorded separately from Flow protocol
 tests; check the installed server's capabilities before using optional delivery.
@@ -186,7 +186,7 @@ cross-server PVP draft and CodingCastle IMPL-67 remain deferred; this bounded
 Flow bridge does not establish their acceptance. Consumer implementation and real
 paired qualification must be coordinated separately.
 
-## Synchronize deltas before execution (unreleased)
+## Synchronize deltas before execution (Flower 0.5.0)
 
 Use `fow_packet_advance` with top-level `mode="sync_only"` to deliver admitted
 ADD/EDIT/REMOVE without starting execution. Discover the installed operation
@@ -235,7 +235,7 @@ Source/installed public-MCP checks with a synthetic provider and real paired
 Noxi pre-first-START qualification are recorded separately. The mode does not
 qualify a consumer or complete the deferred full cross-server PVP contract.
 
-## Provider timeouts and exact recovery (unreleased)
+## Provider timeouts and exact recovery (Flower 0.5.0)
 
 The configured `timeout_seconds` is one total budget per provider RPC, including
 startup, request processing, implicit tool discovery and session cleanup.
@@ -256,11 +256,11 @@ that ACK idempotently when the original command returns.
 ordinary recovery route remains a separate explicit decision. The timeout
 correction changes no provider wire/context/ACK or SQLite schema. Its source,
 installed-package and actual Noxi consumer qualification are recorded separately;
-historical published 0.4.1 does not contain this unreleased correction.
+historical published 0.4.1 does not contain this 0.5.0 correction.
 
 ## Upgrade and persistence boundary
 
-This development increment adds SQLite migrations 53–55 for immutable
+Historical release 0.4.0 introduced SQLite migrations 53–55 for immutable
 architecture revisions/adoptions, packet architecture references, executor
 selection/capability receipts and captured transport admissions. Existing
 project rows, historical evidence and frozen handovers are preserved; no
@@ -274,7 +274,7 @@ copy. Normal startup performs the additive migration transaction. A package
 version rollback alone does not roll back a migrated ledger; restore the
 matching saved database/profile only through an explicit recovery procedure.
 Published 0.3.1 remains its separately qualified schema 52 release. Published
-0.4.0 and 0.4.1 use schema55; this discovery/authoring correction adds no migration.
+0.4.0, 0.4.1 and 0.5.0 use schema55; the 0.5.0 corrections add no migration.
 
 ## Continue while Flower is offline
 

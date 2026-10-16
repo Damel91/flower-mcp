@@ -10,39 +10,38 @@ server, the public name of Flow of Work MCP.
 ## Public repository and downloads
 
 - [GitHub repository](https://github.com/Damel91/flower-mcp): code, README and current documentation.
-- [Published Flower MCP 0.4.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1): immutable historical packages and version notes.
-- [Installation guide at the source checkpoint](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md): full procedures, configuration and removal.
-- [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
+- [Published Flower MCP 0.5.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0): seven immutable release assets.
+- [Current installation guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md): procedures, configuration and removal.
+- [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
 
 | File | Purpose |
 | --- | --- |
-| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh) | Guided installation on macOS and Linux. |
-| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.ps1) | Windows PowerShell launcher from the same release. |
-| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install_flower.py) | Release Python installer; requires Python 3.11+. |
-| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/flow_of_work_mcp-0.4.1-py3-none-any.whl) | Manual installation of the Python package. |
-| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/flow_of_work_mcp-0.4.1.tar.gz) | Packaged release source. |
-| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/SHA256SUMS) | Checksums for release-file verification. |
-| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
-| [Historical optional runtime wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/runtime_llama-0.4.0-py3-none-any.whl) | Runtime `0.4.0` retained in the immutable published release; core installation excludes it. |
+| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh) | Guided installation on macOS and Linux. |
+| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.ps1) | Windows PowerShell launcher from the same release. |
+| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install_flower.py) | Release Python installer; requires Python 3.11+. |
+| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/flow_of_work_mcp-0.5.0-py3-none-any.whl) | Manual installation of the Python package. |
+| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/flow_of_work_mcp-0.5.0.tar.gz) | Packaged release source. |
+| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/SHA256SUMS) | Checksums for release-file verification. |
+| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
 
-The published `v0.4.1` release inventory has eight historical assets, including
-`install.ps1` and the optional runtime-llama `0.4.0` wheel. Its Flower wheel's
-extra still requires that older runtime. Verify these downloads against the
-published `SHA256SUMS`.
-The Windows launcher installs the `0.4.1` wheel.
-The Python distribution remains `flow-of-work-mcp`; the command is `flower-mcp`.
-Download links pin this historical release; the installation guide pins the
-current documented source checkpoint. Run release commands only when their matching assets are
-published. The current README follows repository updates instead.
+The published `v0.5.0` release contains seven Flower assets and no runtime wheel.
+Verify downloads against its `SHA256SUMS`. The Windows launcher installs 0.5.0.
+Historical [0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) retains eight historical assets,
+including optional runtime-llama `0.4.0`; that old Flower extra remains unchanged.
+The Python distribution is `flow-of-work-mcp`; the command is `flower-mcp`.
+Current operational guide links follow mutable `main`. The
+[historical installation guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md) and
+[historical prerequisites](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#prerequisites)
+retain their frozen source checkpoint. The immutable 0.5.0 archive keeps its
+preparation-era guides; later current documentation does not replace those bytes.
 
 ## Current source and optional runtime
 
-Current source prepares Flower version `0.5.0` as an **unreleased candidate**.
-Its builds contain seven Flower assets: wheel, source archive, three installers,
-`BOOTSTRAP.md` and `SHA256SUMS`. They no longer copy a runtime wheel. This does
-not replace or relabel the eight published Flower assets above.
+Published Flower `0.5.0` contains seven Flower assets: wheel, source archive,
+three installers, `BOOTSTRAP.md` and `SHA256SUMS`. It does not bundle a runtime
+wheel or replace the historical 0.4.1 assets.
 
-The current source/candidate `inference` extra selects the independently
+The 0.5.0 `inference` extra selects the independently
 published [llama-runtime `0.4.1` release](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1)
 and its [upstream wheel](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl).
 Its SHA256 is
@@ -57,25 +56,25 @@ Use the selected current source only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
-For a verified current candidate wheel, use
+For a verified 0.5.0 release wheel, use
 `'./dist/flow_of_work_mcp-0.5.0-py3-none-any.whl[inference]'` instead.
 Windows uses `& .\.venv\Scripts\python.exe` with the same pip arguments.
-The dependency pins the upstream URL and SHA256. Do not use the published
-Flower wheel's old extra for this new runtime. See the
+The dependency pins the upstream URL and SHA256. Do not use the historical
+0.4.1 Flower wheel's old extra for this new runtime. See the
 [inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
 for the current source/wheel route, exact owned-build rules, independent checksum
 verification and offline acquisition. This operational link follows mutable
-`main`; frozen source references remain historical. Keep the candidate's source commit and checksum inventory. Its 0.5.0 filename
+`main`; frozen source references remain historical. Keep the selected source commit and checksum inventory. The 0.5.0 filename
 is distinct from the immutable published 0.4.1 wheel.
 Core installers remain core-only and configure no implicit provider.
 
 The [current advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 explains LLM roles, YAML, external provider contracts and association receipts.
 This link follows mutable `main`; the runtime source references elsewhere retain
-their historical frozen checkpoint. Candidate 0.5.0 includes the completed
+their historical frozen checkpoint. Published 0.5.0 includes the completed
 receipt/recovery, sync-only and provider-timeout corrections, while the writer
-witness remains deferred. Its assets require separate qualification and human
-publication approval; the download commands below still install published 0.4.1.
+witness remains deferred. The commands below install published 0.5.0;
+installation mechanics and provider/client usability remain separate evidence.
 
 ## Before installing
 
@@ -94,27 +93,28 @@ The reader works offline, while a fresh installation downloads packages and depe
 
 ## Already using Flower? Keep your ledger
 
-Follow the [safe upgrade plan](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/UPGRADING.md)
+Follow the [current safe upgrade plan](https://github.com/Damel91/flower-mcp/tree/main/docs/UPGRADING.md)
+(the [historical guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/UPGRADING.md) retains its source checkpoint)
 using the original environment, profile and profile root. Stop all Flower processes
 and coding clients sharing that environment. For an installer-owned installation,
 preview the upgrade before changing packages:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 On Windows download the new `install.ps1` shown below, then preview without a
 client-registration option:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.1' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.0' -Upgrade -DryRun
 ```
 
 Add your original `--venv`, `--profile` and `--profile-root` options for custom
 paths; Windows uses `-Venv`, `-Profile` and `-ProfileRoot`. Inspect the plan, then
 repeat without `--dry-run` / `-DryRun`. The upgrade backs up the selected SQLite
 ledger and exact YAML before pip, preserves client registration and applies
-no new migration when upgrading 0.4.0 to 0.4.1: schema 55 stays unchanged.
+no new migration when upgrading a schema 55 profile to 0.5.0.
 An older 0.3.1/schema 52 installation still uses the existing additive migrations
 52 to 55 at the next server start. Keep the reported backup paths. The upgrade
 never resets the ledger or automatically restores a backup; a failed pip operation
@@ -128,8 +128,8 @@ the selected current source/candidate; follow the inference guide before changin
 Flower packages. An installer-owned core must first complete its normal owned
 upgrade; then its extra must use the exact verified Flower wheel/build recorded
 in its receipt, matching version and SHA256. Do not install a source rebuild or
-a candidate over it through pip alone. Before candidate publication, use a separate manual trial
-environment. Preserve the original endpoint and profile.
+a different build over it through pip alone. Use a separate manual environment
+for source/candidate trials. Preserve the original endpoint and profile.
 
 ## Choose a route
 
@@ -139,11 +139,11 @@ After checking prerequisites, the public command starts the guided installer
 and lets you choose a client or installation only:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash
 ```
 
 The script prepares an isolated Python environment and verifies backend and
-wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh)
+wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh)
 before running it. Options and manual procedures are in the complete guide.
 
 ### Windows
@@ -152,8 +152,8 @@ In a writable directory, download the public launcher and choose a client.
 This example uses Codex:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.ps1" -OutFile ".\install.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.4.1' -Platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.ps1" -OutFile ".\install.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.0' -Platform codex
 ```
 
 Run the commands separately and stop if the download fails. You can inspect the
@@ -162,7 +162,8 @@ script before starting it. `-Platform claude-code`, `-Platform cursor`,
 `-NoRegister` installs without registering one. The execution
 policy option applies only to that PowerShell process.
 
-For manual installation, follow [the wheel and checksum procedure](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+For manual installation, follow [the current wheel and checksum procedure](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#manual-installation-from-a-release-wheel).
+The [historical procedure](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#manual-installation-from-a-release-wheel) remains a source reference.
 
 ## From installation to the first requirement
 
@@ -185,7 +186,7 @@ and retrieve a snapshot.
 
 If you encounter an issue, report it in the [repository issues](https://github.com/Damel91/flower-mcp/issues)
 with your operating system, version, client, operation and error, without
-credentials or personal data. Flower `0.4.1` remains in testing. Installation
+credentials or personal data. Flower `0.5.0` remains in testing. Installation
 mechanics and the coding client's actual usability are separate checks.
 
 [Back to Require](01-require.md) · [GitHub repository](https://github.com/Damel91/flower-mcp) · [Index](README.md)

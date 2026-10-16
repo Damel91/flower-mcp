@@ -18,12 +18,12 @@ A CodingCastle engine capability is not attributed to Flower.
 The public Flower sources below are pinned to
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, declared version `0.4.1`.
 These implementation and installation references retain that historical source
-checkpoint. Current source prepares a distinct0.5.0 candidate; its mutable
+checkpoint. Flower 0.5.0 is published at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`; its mutable
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target the separate immutable published release `0.4.1`, including its
-historical runtime `0.4.0`. This editorial snapshot does not qualify binaries.
-Published `0.3.1`, `0.4.0` and `0.4.1` remain immutable.
+links target immutable published `0.5.0`. Historical `0.4.1` retains runtime
+`0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
+`0.4.0`, `0.4.1` and `0.5.0` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.
 
@@ -108,19 +108,19 @@ pair. References remain pinned to the Flower source identified above.
 - [MCP snapshots](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/mcp_provider.py): evidence and structured channel.
 - [Packet adapter](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/packet_provider.py) and [test adapter](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/adapters/implementation_intelligence/test_provider.py): CodingCastle integration present in source.
 - [Lifecycle recipes](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/application/lifecycle_recipes.py): ownership, review, campaigns and deferred cross-server PVP.
-- [Provider deadlines and exact recovery](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md#provider-timeouts-and-exact-recovery-unreleased): unreleased per-RPC budget and reconciliation of the original UNKNOWN command; installed-package and actual paired qualification remain separate.
+- [Provider deadlines and exact recovery](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/NOXI-INTEGRATION.md#provider-timeouts-and-exact-recovery-unreleased): the source-era unreleased label describes the per-RPC budget now released in 0.5.0 and reconciliation of the original UNKNOWN command; installed-package and actual paired qualification remain separate.
 
 ## Installation and downloads
 
 The closing [Now try Flower](try-flower.md) page uses the [public repository](https://github.com/Damel91/flower-mcp),
-the [v0.4.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) and
+the [v0.5.0 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0) and
 the [installation guide at the source checkpoint](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md).
-The eight historical published release assets include the PowerShell launcher, Bash and Python
-installers, Flower wheel, source, bootstrap, optional runtime-llama `0.4.0` wheel
-and checksums. Current unreleased 0.5.0 candidate builds contain seven Flower assets,
-without a copied runtime wheel. Flower download links remain release pinned;
-installation guides and Flower runtime sources retain the complete source
-checkpoint identified above.
+Published 0.5.0 contains seven Flower assets: wheel, source, three installers,
+bootstrap and checksums, without a copied runtime wheel. Historical
+[0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) retains eight assets,
+including runtime-llama `0.4.0`. Flower download links remain release pinned.
+Current operational guides follow `main`; historical documentation and runtime
+source citations retain the complete frozen checkpoint identified above.
 Release commands require the matching published assets.
 
 The new optional dependency belongs to the independent
@@ -132,7 +132,7 @@ vendored llamatelemetry MIT attribution. The
 [historical inference guide](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 records the earlier source checkpoint. Use the explicitly mutable
 [current inference guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md) for the 0.5.0
-source/candidate extra, exact owned-build rules, offline acquisition and runtime upgrade. The old published Flower extra still selects `0.4.0`;
+extra, exact owned-build rules, offline acquisition and runtime upgrade. The historical 0.4.1 Flower extra still selects `0.4.0`;
 a core/profile upgrade does not request the new runtime or configure a provider.
 
 Link availability, installed-package tests and client qualification are separate

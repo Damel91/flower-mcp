@@ -18,14 +18,14 @@ release assets and Python dependencies.
 Select either client with the release installer:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.4.1/install.sh | bash -s -- --platform antigravity
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash -s -- --platform antigravity
 # For Gemini CLI, replace antigravity with gemini-cli.
 ```
 
 On Windows, download and inspect install.ps1 as described in the main guide:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform antigravity
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.5.0 -Platform antigravity
 # For Gemini CLI, use -Platform gemini-cli.
 ```
 

@@ -1,8 +1,9 @@
 # Flower MCP 0.5.0
 
-**Preparation checkpoint, 2026-10-16: unreleased candidate; publication requires
-a separate human decision.** This status records preparation, not the result
-of a future publishing workflow. This
+**Published 2026-10-16** at source `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`:
+[release and seven assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.0).
+The human-approved [publishing run](https://github.com/Damel91/flower-mcp/actions/runs/38898054599)
+completed all eight jobs successfully. This
 version gathers completed corrections already present in the public source and
 adds their installation and advanced configuration guidance. It excludes the
 suspended managed-writer witness. Published 0.4.1 and all historical assets remain
@@ -33,7 +34,7 @@ immutable.
   its original command and fingerprint. Recovery observes/reconciles that same
   command instead of inventing a replacement or duplicate job.
 - The optional inference extra uses the independently published, URL/SHA256-pinned
-  `runtime-llama` 0.4.1 wheel. Candidate assets and source packages contain no
+  `runtime-llama` 0.4.1 wheel. Release assets and source packages contain no
   copied runtime wheel or vendor payload. Core remains independent of inference.
 - [Advanced configuration](ADVANCED-CONFIGURATION.md) now explains internal LLM
   setup, supported host semantic assignments, compatible external provider
@@ -43,7 +44,7 @@ immutable.
 
 The 37 public tool names remain. The additive `sync_only` parameter and its
 outcomes change the packet-advancement schema relative to published 0.4.1;
-this candidate therefore uses a minor version increment. Existing calls retain
+this release therefore uses a minor version increment. Existing calls retain
 the `advance` default. There is no database migration, new semantic role,
 automatic updater or new provider implementation.
 
@@ -66,8 +67,7 @@ Follow [UPGRADING.md](UPGRADING.md) with the existing environment, profile and
 profile-root paths. Stop all Flower processes and coding clients sharing the
 environment; the installer never stops them. Preview first with the new
 installer's `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then remove only
-the preview flag to execute. These prepared download commands work **only after
-matching 0.5.0 release assets are published**:
+the preview flag to execute. These commands select the published 0.5.0 assets:
 
 ```sh
 curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.0/install.sh | bash -s -- --upgrade --dry-run
@@ -105,16 +105,25 @@ An optional runtime upgrade is a separate explicit package change, described in
 
 ## Assets and qualification
 
-Candidate builds contain seven assets: Flower wheel, source archive, Bash,
+The release contains seven assets: Flower wheel, source archive, Bash,
 PowerShell and Python installers, `BOOTSTRAP.md`, and `SHA256SUMS`. The independent
 runtime wheel is not an eighth Flower asset. No PyPI publication is assumed.
 
-Prior focused source, installed-package and public-workflow evidence supports
-the selected corrections. Preparing version 0.5.0 requires a new exact-commit
-campaign: packaged-content inspection, core installation without inference,
-public MCP on the installed candidate, populated 0.4.1/schema 55 upgrade and
-restart, the separate predecessor52→55 route, and current native CI.
-Those candidate checkpoints must be reported from their actual results; earlier
-passes do not qualify the new artifacts automatically. Live optional inference,
+Exact-commit source/installed-package/public MCP checks qualified the selected
+corrections and core installation without inference. Anonymous downloads of all
+seven assets matched the published checksums and source pin. A populated owned
+0.4.1/schema 55 installation was upgraded through the unpatched downloaded
+installer, with a consistent backup, original database/profile/client paths,
+full schema/row/evidence/handover preservation and public recovery after restart.
+That complete same-schema upgrade is local macOS evidence. The separate existing
+0.3.1/schema 52→55 route and installed regressions passed native Linux/Windows
+CI; they do not establish the complete same-schema55 oracle on Windows.
+Live optional inference,
 actual provider pairing, hosted Glama deployment, target-client usability and
 human acceptance remain separate. Publication is not triggered by a source push.
+
+The dated 2026-10-16 preparation checkpoint required human approval and new
+artifact qualification; it remains part of the immutable tagged source.
+These later current guides on `main` report publication and usable release
+commands. They do not replace the tag or the release archive's preparation-era
+documentation.

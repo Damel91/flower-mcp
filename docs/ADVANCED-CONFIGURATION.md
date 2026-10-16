@@ -2,7 +2,7 @@
 
 Flower works with an external coding agent and a persistent SQLite ledger without
 an internal model or technical provider. Add an integration only for the operation
-you need. This guide describes the **0.5.0 source candidate**, not an additional
+you need. This guide describes **Flower 0.5.0**, not an additional
 service bundled with Flower. Published 0.4.1 remains a separate, immutable release.
 
 ## Choose the required integration
@@ -22,7 +22,7 @@ A provider is compatible only when it implements the specific versioned
 contract. An arbitrary MCP server, an OpenAI-compatible chat API or a repository
 graph is not automatically interchangeable with these adapters. The coding agent
 still owns repository investigation, implementation and checks in the standalone
-path. The suspended writer witness is not part of this candidate.
+path. The suspended writer witness is not part of this release.
 
 ## Preserve the existing profile
 
@@ -50,7 +50,7 @@ route or change an endpoint.
 ## Enable internal inference explicitly
 
 For a manual environment, install the selected Flower source or reviewed 0.5.0
-candidate wheel with its `inference` extra. An installer-owned environment must
+release wheel with its `inference` extra. An installer-owned environment must
 first complete its normal core upgrade, preserving its installation receipt;
 then add inference from the exact verified Flower wheel/build recorded in its
 installation receipt, matching both version and SHA256. A source or rebuilt
