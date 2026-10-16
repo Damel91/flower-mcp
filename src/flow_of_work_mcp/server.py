@@ -8,6 +8,7 @@ from dataclasses import asdict
 from typing import Annotated, Any, Callable, Literal, Mapping
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import WithJsonSchema
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
 
@@ -24,6 +25,7 @@ from flow_of_work_mcp.application.operation_contracts import (
     public_tool_names,
     registry_version,
     render_tool_reference,
+    tool_annotations,
     work_area_catalog,
 )
 from flow_of_work_mcp.application.lifecycle_recipes import (
@@ -5555,6 +5557,7 @@ def create_app(
             model_facing_tool(tools_by_name[name], tool_name=name),
             name=name,
             description=str(descriptor["description"]),
+            annotations=ToolAnnotations(**tool_annotations(name)),
         )
     return mcp
 

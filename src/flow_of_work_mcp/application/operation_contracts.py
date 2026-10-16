@@ -42,7 +42,10 @@ from flow_of_work_mcp.core.domain.provider_surfaces import (
 )
 from flow_of_work_mcp.core.domain.bootstrap import BootstrapPath
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
-from flow_of_work_mcp.core.domain.enums import VerificationKind, VerificationOutcome
+from flow_of_work_mcp.core.domain.enums import LifecycleStatus, VerificationKind, VerificationOutcome
+from flow_of_work_mcp.application.tool_help import (
+    FIELD_HELP, FIELD_OVERRIDES, TOOL_EFFECTS, TOOL_GUIDANCE,
+)
 
 
 class ContinuationPolicy(str, Enum):
@@ -109,6 +112,12 @@ class OperationContract:
                 field: list(values) for field, values in self.enums.items()
             },
             "example": _example(self),
+            "field_descriptions": {
+                name: parameter_help(self.tool, name)["description"]
+                for name in dict.fromkeys(
+                    path.split(".", 1)[0] for path in (*self.required, *self.optional)
+                )
+            },
             **({"owner": self.owner} if self.owner else {}),
             "area": self.area,
             "risk": self.risk.value,
@@ -353,176 +362,176 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
 _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         "fow_architecture", "project_bootstrap",
-        "Inspect immutable project components, interfaces and technical decisions, propose a complete revision or explicitly adopt it. Adoption records engineering authority; it does not prove implementation or human acceptance. Reads never invoke a model or provider.",
+        'Define and select the project technical architecture: components, interfaces and engineering decisions. Inspect current authority, propose a complete revision, then explicitly adopt it.',
     ),
     ToolDescriptor(
         "fow_external_work", "packet_lifecycle",
-        "Inspect standalone or provider-scoped validation, explicitly select one executor for new work, negotiate optional provider support, export complete Markdown, read TODOs and reconcile host outcomes. Reads never execute code or probe providers; selection does not transfer an admitted run.",
+        'Hand a complete revision-bound packet to an external coding agent, export its executable Markdown plan, derive dependency-ordered TODOs and reconcile declared outcomes. Optional provider execution is a separate explicitly selected route.',
     ),
     ToolDescriptor(
         "fow_bindings", "project_bootstrap",
-        "Inspect, export or explicitly import versioned host/provider association receipts. Receipts cannot configure endpoints, credentials or executable commands; replacement requires a reason.",
+        'Associate an existing lifecycle project with a coding host or optional configured provider through portable versioned JSON receipts. Inspect/export current associations or explicitly import and replace one.',
     ),
     ToolDescriptor(
         "fow_semantic", "requirements",
-        "Inventory optional semantic roles and prepare, inspect, submit, validate, adopt or explicitly execute bounded SRS/grounding assignments. Host execution needs no internal model; unsupported roles disclose prerequisites.",
+        'Prepare bounded semantic assignments for an external host or configured internal model, validate their submitted results and separately adopt their audit evidence. Supported roles are SRS semantic validation and intention grounding.',
     ),
     ToolDescriptor(
         "fow_capabilities",
         "project_bootstrap",
-        "Discover a bounded workflow summary, one named recipe, or the full diagnostic catalog.",
+        'Discover what Flower can do and how to call it: bounded tool summary, progressive workflow recipes, exact operation inputs/examples or the diagnostic catalog.',
     ),
     ToolDescriptor(
         "fow_create_project",
         "project_bootstrap",
-        "Create an isolated canonical lifecycle project.",
+        'Register a uniquely identified local lifecycle project before recording its requirements, goals and implementation work. This creates lifecycle authority rather than repository scaffolding.',
     ),
     ToolDescriptor(
         "fow_interaction",
         "project_bootstrap",
-        "Select a durable Project Context and discover the current bounded work surface.",
+        'Connect this conversation to its durable lifecycle project, discover available work and select one bounded work surface using the issued choices and frame.',
     ),
     ToolDescriptor(
         "fow_register_requirement",
         "requirements",
-        "Register one canonical requirement.",
+        'Record one observable software requirement and its source in the selected lifecycle project. Use the returned requirement ID for goals, milestone scope and verification.',
     ),
     ToolDescriptor(
         "fow_get_requirement",
         "requirements",
-        "Read one canonical requirement and immutable history.",
+        'Retrieve one existing requirement, its current canonical state and retained revision history.',
     ),
     ToolDescriptor(
         "fow_revise_requirement",
         "requirements",
-        "Append one immutable canonical requirement revision.",
+        'Change the statement or classification of an existing requirement by appending a canonical revision. Keep intent changes explicit so downstream evidence can be reconciled.',
     ),
     ToolDescriptor(
         "fow_set_requirement_lifecycle",
         "requirements",
-        "Apply one policy-checked requirement lifecycle transition.",
+        'Move an existing requirement to a policy-permitted lifecycle state with its reason and any required approval reference.',
     ),
     ToolDescriptor(
         "fow_record_verification",
         "assurance",
-        "Append declared deterministic/live evidence.",
+        'Record evidence actually obtained for a requirement, including verification method, outcome, reference and declared metadata. This records a result rather than running a test.',
     ),
     ToolDescriptor(
         "fow_traceability",
         "assurance",
-        "Read a bounded, paginated project traceability projection.",
+        'Inspect how current requirements, milestone scope and recorded verification evidence correspond. Read bounded pages or retrieve one original evidence body with audit detail.',
     ),
     ToolDescriptor(
         "fow_goal",
         "goal_graph",
-        "Author and inspect use cases, sequences and expectations.",
+        'Describe intended software behavior as use cases, ordered sequences and behavioral expectations, then link and inspect those goal nodes or derive requirement candidates.',
     ),
     ToolDescriptor(
         "fow_validate_srs",
         "requirements",
-        "Start durable structural validation; use fow_semantic for semantics.",
+        'Check a local Markdown software-requirements document structurally against a supported profile in a durable job. Semantic assignment validation is exposed separately by fow_semantic.',
     ),
     ToolDescriptor(
         "fow_import_srs",
         "requirements",
-        "Validate and atomically import one accepted initial SRS baseline.",
+        'Import an eligible local Markdown SRS as the initial canonical requirement baseline, preserving validated source provenance. Existing baseline changes use fow_revise_srs_baseline.',
     ),
     ToolDescriptor(
         "fow_revise_srs_baseline",
         "requirements",
-        "Classify and append one source-proven SRS baseline revision.",
+        'Apply a source-proven revision to the current SRS baseline, classifying changes and retaining approval requirements and immutable history.',
     ),
     ToolDescriptor(
         "fow_promote_milestone",
         "milestones",
-        "Plan milestone scope; acceptance_evidence is reserved for acceptance.",
+        'Create planned milestone scope from canonical requirements, dependencies and entry/exit/risk policies. Actual result acceptance uses fow_accept_milestone.',
     ),
     ToolDescriptor(
         "fow_accept_milestone",
         "milestones",
-        "Append governed acceptance evidence after validation/campaign acceptance.",
+        'Record governed acceptance of an eligible milestone using actual acceptance evidence after its required verification and campaign gates.',
     ),
     ToolDescriptor(
         "fow_audit_phase",
         "assurance",
-        "Start a durable phase-audit job for a named scope.",
+        'Compare current requirement traceability with the previous snapshot of a named scope and retain the resulting phase audit as a durable local job.',
     ),
     ToolDescriptor(
         "fow_what_next",
         "changes",
-        "Derive bounded, paginated next work from durable project state.",
+        'Find the next bounded lifecycle action from current packet gates, dependencies, requirements and evidence. Reading this projection does not execute the suggested work.',
     ),
     ToolDescriptor(
         "fow_generate_artifacts",
         "handover",
-        "Start durable profile-based artifact generation.",
+        'Render and retain project lifecycle documents using an existing artifact profile in a durable local job. The host publishes or saves returned artifacts separately.',
     ),
     ToolDescriptor(
         "fow_get_artifacts",
         "handover",
-        "Read stored artifact metadata/content.",
+        'Retrieve retained artifact generations and optionally their document contents, filtered by generation or artifact kind.',
     ),
     ToolDescriptor(
         "fow_ground_intent",
         "changes",
-        "Ground intent internally; requires model and source provider.",
+        'Run the configured internal intention-grounding workflow to compare selected goals with implementation evidence. For an external host assignment use fow_semantic.',
     ),
-    ToolDescriptor("fow_get_job", "handover", "Read one durable job state."),
-    ToolDescriptor("fow_list_jobs", "handover", "List durable jobs for a project."),
+    ToolDescriptor("fow_get_job", "handover", 'Retrieve the status, result or failure of one previously scheduled durable job without starting or retrying it.'),
+    ToolDescriptor("fow_list_jobs", "handover", 'List the durable jobs already recorded for one lifecycle project without scheduling additional work.'),
     ToolDescriptor(
         "fow_bootstrap",
         "project_bootstrap",
-        "Guide intent, confirm scope and close bootstrap.",
+        'Turn stakeholder scenarios into recorded lifecycle intent and an explicitly confirmed roadmap, then track correspondence, progress choices and completion of that bootstrap cycle.',
     ),
     ToolDescriptor(
         "fow_change",
         "changes",
-        "Govern changes and evidence; author work with fow_packet_*.",
+        'Record a governed change and manage its packet readiness, engineering questions, evidence reconciliation, dependencies and risk dispositions. Author the executable packet plan with fow_packet_author.',
     ),
     ToolDescriptor(
         "fow_assurance",
         "assurance",
-        "Record findings, reassess intent, link fixes and govern acceptance.",
+        'Record and inspect software assurance findings, reassess them against current intent, associate corrective packets and request guarded change acceptance using actual evidence.',
     ),
     ToolDescriptor(
         "fow_run",
         "changes",
-        "Manage implementation runs, run steps and derived task views.",
+        'Track who performs the implementation work: record a run, ordered dependent steps and their started/completed/blocked/cancelled states. The coding agent performs those actions outside Flower.',
     ),
     ToolDescriptor(
         "fow_handover",
         "handover",
-        "Read coherent state and bounded history; create durable handover.",
+        'Read coherent project progress and lifecycle context or retain a durable handover snapshot that another agent can inspect and resume.',
     ),
     ToolDescriptor(
         "fow_packet_author",
         "packet_lifecycle",
-        "Author canonical packets and plans using stable lifecycle identities.",
+        'Define the bounded implementation work in a packet: complete instructions, stable plan units, dependencies, producer/consumer contracts and checks. Resolve engineering questions through ordinary authoring before execution.',
     ),
     ToolDescriptor(
         "fow_packet_advance",
         "packet_lifecycle",
-        "Advance packet gates, or synchronize provider deltas without START using mode=sync_only.",
+        'Move an existing packet through its ordinary lifecycle gates and admitted provider delivery, or only synchronize authoring deltas without starting execution. Semantic decisions answer the exact current gate.',
     ),
     ToolDescriptor(
         "fow_packet_inspect",
         "packet_lifecycle",
-        "Read bounded packet scope, units, gates or history.",
+        'Inspect a packet scope, executable units, current gates, requirements, working sheet or retained history without advancing or executing it.',
     ),
     ToolDescriptor(
         "fow_campaign_author",
         "campaigns",
-        "Create or incrementally revise one qualified campaign, obligation, oracle or materialization authority.",
+        'Define and revise a verification campaign: scope, cases, obligations, behavioral Oracles, source attestations and explicit materialization or promotion authority.',
     ),
     ToolDescriptor(
         "fow_campaign_advance",
         "campaigns",
-        "Perform deterministic campaign work until one semantic, provider or evidence boundary.",
+        'Perform bounded deterministic progression of an existing verification campaign until the next semantic, evidence or provider boundary requires attention.',
     ),
     ToolDescriptor(
         "fow_campaign_inspect",
         "campaigns",
-        "Inspect one bounded campaign summary, working sheet, semantic component or history page.",
+        'Inspect one campaign scope, cases, obligations, Oracle contracts, attestations, evidence, residuals or history without progressing it.',
     ),
 )
 
@@ -680,10 +689,14 @@ _CHANGE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         (
             "target_policy",
             "target_state",
+            "active_provider",
+            "navigation_audit_id",
             "navigation_audit_ids",
             "target_binding_ids",
             "candidate_set_ids",
+            "candidate_set_id",
             "context_snapshot_ids",
+            "context_snapshot_id",
             "blocking_reasons",
             "request_id",
         ),
@@ -745,6 +758,7 @@ _CHANGE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ),
         (
             "workspace_revision",
+            "provider",
             "surfaces",
             "contract_version",
             "truncated",
@@ -801,10 +815,14 @@ _CHANGE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "completion_criteria",
             "target_policy",
             "target_state",
+            "active_provider",
+            "navigation_audit_id",
             "navigation_audit_ids",
             "target_binding_ids",
             "candidate_set_ids",
+            "candidate_set_id",
             "context_snapshot_ids",
+            "context_snapshot_id",
             "blocking_reasons",
             "request_id",
         ),
@@ -1048,6 +1066,7 @@ _GOAL = {
             "observable_outcome",
         ),
         ("source_anchor", "request_id"),
+        enums={"category": ("functional", "non_functional")},
     ),
     "link": _c(
         "fow_goal",
@@ -1413,7 +1432,7 @@ _PACKET_ADVANCE = {
         "fow_packet_advance",
         "advance",
         ("project_id", "packet_id", "actor", "request_id"),
-        ("expected_spec_revision", "expected_plan_revision", "mode"),
+        ("change_id", "expected_spec_revision", "expected_plan_revision", "mode"),
         enums={"mode": ("advance", "sync_only")},
         guidance={
             "mode": "Default advance preserves ordinary lifecycle advancement. Per-call sync_only delivers admitted provider ADD/EDIT/REMOVE and stops before START; it performs no lifecycle repair, plan acceptance or ordinary evidence advancement.",
@@ -1433,7 +1452,7 @@ _PACKET_ADVANCE = {
             "actor",
             "request_id",
         ),
-        ("expected_spec_revision", "expected_plan_revision"),
+        ("change_id", "expected_spec_revision", "expected_plan_revision"),
     ),
     "reject_work_plan": _c(
         "fow_packet_advance",
@@ -1446,7 +1465,7 @@ _PACKET_ADVANCE = {
             "actor",
             "request_id",
         ),
-        ("expected_spec_revision", "expected_plan_revision"),
+        ("change_id", "expected_spec_revision", "expected_plan_revision"),
     ),
     "accept_residual_risk": _c(
         "fow_packet_advance",
@@ -1459,7 +1478,7 @@ _PACKET_ADVANCE = {
             "actor",
             "request_id",
         ),
-        ("expected_spec_revision", "expected_plan_revision"),
+        ("change_id", "expected_spec_revision", "expected_plan_revision"),
     ),
     "retry_provider_rejection": _c(
         "fow_packet_advance",
@@ -1472,7 +1491,7 @@ _PACKET_ADVANCE = {
             "actor",
             "request_id",
         ),
-        ("expected_spec_revision", "expected_plan_revision"),
+        ("change_id", "expected_spec_revision", "expected_plan_revision"),
     ),
     "record_workspace_review": _c(
         "fow_packet_advance",
@@ -1493,6 +1512,7 @@ _PACKET_ADVANCE = {
             "request_id",
         ),
         (
+            "change_id",
             "decision.review.findings",
             "decision.review.existing_finding_ids",
             "expected_spec_revision",
@@ -1523,7 +1543,7 @@ _PACKET_ADVANCE = {
             "actor",
             "request_id",
         ),
-        ("decision.policy_ref", "expected_spec_revision", "expected_plan_revision"),
+        ("change_id", "decision.policy_ref", "expected_spec_revision", "expected_plan_revision"),
         enums={
             "decision.disposition": (
                 "accepted",
@@ -1541,7 +1561,7 @@ _PACKET_INSPECT = {
         "fow_packet_inspect",
         view,
         ("project_id", "packet_id", "view"),
-        ("detail_level", "offset", "limit"),
+        ("change_id", "detail_level", "offset", "limit"),
         enums={"detail_level": ("standard", "audit")},
     )
     for view in (
@@ -1917,6 +1937,11 @@ _SIMPLE_ENUMS: Mapping[str, Mapping[str, tuple[str, ...]]] = MappingProxyType(
                 "outcome": tuple(item.value for item in VerificationOutcome),
             }
         ),
+        "fow_set_requirement_lifecycle": MappingProxyType({
+            "lifecycle_status": tuple(item.value for item in LifecycleStatus),
+        }),
+        "fow_what_next": MappingProxyType({"detail_level": ("standard", "audit")}),
+        "fow_traceability": MappingProxyType({"detail_level": ("standard", "audit")}),
     }
 )
 
@@ -1936,6 +1961,7 @@ _SIMPLE = {
 }
 _SIMPLE["fow_traceability"] = _c(
     "fow_traceability", "call", *_SIMPLE_FIELDS["fow_traceability"],
+    enums=_SIMPLE_ENUMS["fow_traceability"],
     guidance={"evidence_read": "evidence_id defaults to 0 for ordinary traceability. A positive evidence_id requires detail_level=audit, offset=0, limit=10 and no milestone_id. It returns one original project-scoped verification evidence body with full metadata/provenance. Unknown and foreign IDs return the same rejection; no artifact or evidence is created."},
 )
 
@@ -1995,6 +2021,7 @@ _INTERACTION = {
         optional,
         enums={
             "operation": (operation,),
+            **({"page_action": ("more", "refine", "stop")} if operation == "discover" else {}),
             **(
                 {
                     "trigger": (
@@ -2158,7 +2185,7 @@ _EXTERNAL_WORK = {
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
 }
 _BINDINGS = {
-    op: _c("fow_bindings", op, required, optional, guidance={
+    op: _c("fow_bindings", op, (*required, "operation"), optional, guidance={
         "receipt": {"contract": "flow.project-association.v1", "project_id": "selected lifecycle project", "association": {"kind": "host", "host_id": "host identity", "repository_locator": "deployment path, not audited source identity"}},
         "provider_association": {"kind": "implementation_provider", "provider_kind": "implementation_graph|bootstrap_behavior|packet_evidence|packet_execution|test_execution", "route_id": "configured-mcp/{provider_kind}", "scope_id": "authorized scope", "provider_context_id": "provider context", "surfaces": ["repo"], "repository": None},
         "authority": "Only already configured routes may bind. Unknown receipt fields are rejected. Changed association requires replacement_reason; exact replay creates no duplicate event.",
@@ -2169,7 +2196,7 @@ _BINDINGS = {
     )
 }
 _SEMANTIC = {
-    op: _c("fow_semantic", op, required, optional,
+    op: _c("fow_semantic", op, (*required, "operation"), optional,
            enums={"execution_mode": ("host", "internal"), "role": ("srs_semantic_validation", "intention_grounding")} if op == "prepare" else {}, guidance={
         "role": "SRS and intention_grounding support host/internal using shared contracts. SRS requires source_path/standard_profile. Grounding requires goal_node_ids and host mode requires the exact flower-host-grounding-evidence-v1 receipt. Host observed-behavior drafting remains unsupported.",
         "result_schema": {"findings": [{"code": "string", "severity": "error|warning|info", "section_id": "prepared allowed section", "entity_id": "prepared allowed entity", "message": "string, max 1000 characters"}]},
@@ -2261,7 +2288,10 @@ def public_tool_names() -> tuple[str, ...]:
 
 
 def public_tool_descriptors() -> tuple[ToolDescriptor, ...]:
-    return _PUBLIC_TOOLS
+    return tuple(
+        ToolDescriptor(item.name, item.area, tool_description(item.name), item.owner)
+        for item in _PUBLIC_TOOLS
+    )
 
 
 def public_tool_catalog() -> tuple[Mapping[str, str], ...]:
@@ -2270,7 +2300,7 @@ def public_tool_catalog() -> tuple[Mapping[str, str], ...]:
             "name": item.name,
             "area": item.area,
             "owner": item.owner,
-            "description": item.description,
+            "description": tool_description(item.name),
         }
         for item in _PUBLIC_TOOLS
     )
@@ -2280,7 +2310,93 @@ def tool_description(name: str) -> str:
     descriptor = _PUBLIC_TOOL_BY_NAME.get(str(name or "").strip())
     if descriptor is None:
         raise KeyError(name)
-    return descriptor.description
+    name = descriptor.name
+    prerequisite, effects = TOOL_GUIDANCE[name]
+    routes = operation_names(name)
+    if name == "fow_capabilities":
+        routing = "Route with view=summary|recipe|operation|docs|full; recipe needs recipe_name, operation needs operation_tool and operation_name."
+    elif name in {"fow_packet_inspect", "fow_campaign_inspect"}:
+        routing = "Route with view: " + ", ".join(routes) + "."
+    elif name == "fow_packet_advance":
+        routing = "Route ordinary progression with mode=advance (default) or sync_only. Gate responses use decision.operation: " + ", ".join(route for route in routes if route != "advance") + "."
+    elif name == "fow_campaign_advance":
+        routing = "Implicit advance operation; transition_budget bounds the call."
+    elif routes == ("call",):
+        routing = "Single operation; call directly without an operation argument."
+    else:
+        routing = "Route with operation: " + ", ".join(routes) + "."
+    example_route = routes[0]
+    help_call = {
+        "view": "operation", "operation_tool": name,
+        "operation_name": example_route,
+    }
+    return (
+        descriptor.description + "\n" + routing
+        + "\nPrerequisites: " + prerequisite
+        + "\nEffects: " + effects
+        + "\nExact help (replace operation_name with the selected route): fow_capabilities("
+        + json.dumps(help_call, ensure_ascii=False, separators=(",", ":")) + ")."
+    )
+
+
+def tool_annotations(name: str) -> Mapping[str, bool]:
+    """Conservative tool-wide hints, including effects of mixed routes."""
+
+    values = TOOL_EFFECTS[name]
+    return dict(zip(
+        ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"),
+        values, strict=True,
+    ))
+
+
+def parameter_help(tool: str, name: str) -> Mapping[str, object]:
+    """Publish semantic help without adding constraints to accepted inputs.
+
+    Every semantic meaning is explicit. Only route applicability, selector
+    values and representative examples are derived from canonical contracts.
+    """
+
+    if tool not in _BY_TOOL:
+        raise KeyError(f"missing_tool_help:{tool}")
+    description = FIELD_OVERRIDES.get((tool, name), FIELD_HELP[name])
+    contracts = tuple(_BY_TOOL[tool].values())
+    required = tuple(c.operation for c in contracts if any(
+        path.split(".", 1)[0] == name for path in c.required
+    ))
+    applicable = tuple(c.operation for c in contracts if any(
+        path.split(".", 1)[0] == name for path in (*c.required, *c.optional)
+    ))
+    if name == "operation":
+        description += " Canonical values: " + ", ".join(operation_names(tool)) + "."
+    elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
+        description += " Canonical values: " + ", ".join(operation_names(tool)) + "."
+    elif len(contracts) > 1 and name not in {"actor", "request_id", "project_id", "change_id", "packet_id"}:
+        if applicable and len(applicable) != len(contracts):
+            description += " Applies to: " + ", ".join(applicable) + "."
+        if required and len(required) != len(contracts):
+            description += " Required by: " + ", ".join(required) + "."
+    values = tuple(dict.fromkeys(
+        value for c in contracts for value in c.enums.get(name, ())
+    ))
+    if values and name != "operation":
+        description += " Canonical values: " + ", ".join(values) + "."
+    if name in {"payload", "decision", "unit", "unit_patch", "work_plan", "answer", "answers", "response", "case", "scope", "oracle", "harness", "assessment", "correspondence", "intake", "contradiction", "host_evidence", "result", "association_receipt"}:
+        description += " Exact required/optional dotted fields and guidance: fow_capabilities(view=operation, operation_tool=" + tool + ", operation_name=<selected route>)."
+    metadata: dict[str, object] = {"description": description}
+    if name in {"operation", "view", "mode", "payload", "decision", "association_receipt", "result", "answer", "correspondence", "unit"}:
+        if name == "operation":
+            metadata["examples"] = [operation_names(tool)[0]]
+        elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
+            metadata["examples"] = [operation_names(tool)[0]]
+        elif values:
+            metadata["examples"] = [values[0]]
+        else:
+            for contract in contracts:
+                example = _example(contract)
+                if name in example and example[name] not in (None, {}, ""):
+                    metadata["examples"] = [example[name]]
+                    break
+    return metadata
 
 
 def work_area_catalog() -> tuple[Mapping[str, str], ...]:
@@ -2309,6 +2425,12 @@ def registry_version() -> str:
         # input shape, accepted values, guidance, or examples must invalidate a
         # host-side registry cache even when its route classifiers are unchanged.
         "operations": operation_contract_catalog(),
+        "field_help": dict(FIELD_HELP),
+        "field_overrides": [
+            [tool, name, help_text]
+            for (tool, name), help_text in sorted(FIELD_OVERRIDES.items())
+        ],
+        "annotations": {name: tool_annotations(name) for name in public_tool_names()},
     }
     encoded = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
@@ -2322,7 +2444,7 @@ def render_tool_reference() -> str:
         "Request exact operation help for input shape; the current interaction frame owns executable next actions.",
         "",
     ]
-    for descriptor in _PUBLIC_TOOLS:
+    for descriptor in public_tool_descriptors():
         operations = ", ".join(operation_names(descriptor.name))
         lines.append(
             f"- {descriptor.name} [{descriptor.area}]: "
@@ -2421,6 +2543,8 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
             result.update(role="srs_semantic_validation", execution_mode="host", source_path="example-srs.md", standard_profile="fow-srs-markdown-v1")
         elif contract.operation == "submit":
             result["result"] = {"findings": []}
+    if contract.tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
+        result["view"] = contract.operation
     if contract.tool == "fow_assurance" and contract.operation == "reassess_intent":
         result["assessment"] = {"expected_intent_fingerprint": "from get_finding", "expected_finding_fingerprint": "from get_finding", "classification": "correction_within_intent", "rationale": "Correct implementation within the current recorded behavior.", "technical_decisions": ["Reuse the existing canonical service."], "evidence_refs": ["host-source-review:001"]}
     if contract.tool == "fow_external_work":
@@ -2452,9 +2576,38 @@ def _sample_value(
         return accepted_values[0]
     if leaf == "operation":
         return operation
+    if leaf == "answers":
+        return [{
+            "question_id": "replace-with-current-audit-question-id",
+            "answer_summary": "Replace with the investigated resolution of this question.",
+            "evidence_refs": ["replace-with-actual-investigation-evidence"],
+        }]
+    if leaf == "response":
+        return {
+            "disposition": "answered",
+            "answer_summary": "Replace with the investigated answer and question-specific fields from the current gate.",
+            "evidence_refs": ["replace-with-actual-investigation-evidence"],
+        }
+    if leaf == "claims":
+        return [{
+            "claim_type": PacketEvidenceClaimType.TARGET.value,
+            "claim_key": "replace-with-source-claim-key",
+            "subject_ref": "replace-with-source-subject",
+            "predicate": "replace-with-observed-relation",
+            "object_ref": "replace-with-source-object",
+            "evidence_refs": ["replace-with-actual-provider-evidence"],
+        }]
+    if leaf == "entry_policy":
+        return {"requires_milestone": ["replace-with-existing-prerequisite-milestone-id"]}
+    if leaf == "exit_policy":
+        return {"verification": "Replace with the declared exit checks and acceptance evidence for this milestone."}
     if leaf.endswith("_ids") or leaf in {
         "surfaces",
-        "answers",
+        "acceptance_evidence",
+        "evidence_gaps",
+        "participants",
+        "normal_steps",
+        "expected_effects",
         "depends_on",
         "evidence_refs",
         "completion_criteria",
@@ -2476,7 +2629,6 @@ def _sample_value(
         "contradiction",
         "provider_result",
         "completeness",
-        "claims",
         "assertion",
         "case",
         "answer",
@@ -2503,6 +2655,8 @@ def _sample_value(
         "limit",
         "transition_budget",
         "number",
+        "area",
+        "selection",
     }:
         return 1
     if leaf == "disposition" and field == "decision.review.disposition":

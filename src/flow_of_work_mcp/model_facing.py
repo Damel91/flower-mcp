@@ -6,12 +6,14 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 import inspect
-from typing import Any, TypeVar, cast, get_type_hints
+from typing import Annotated, Any, TypeVar, cast, get_type_hints
 
 from mcp.types import CallToolResult, TextContent
+from pydantic import Field
 
 from flow_of_work_mcp.application.operation_contracts import (
     operation_names,
+    parameter_help,
     public_tool_names,
 )
 from flow_of_work_mcp.application.external_plan_markdown import render_assurance_result, render_external_result
@@ -188,7 +190,7 @@ def model_facing_tool(
     tool_name: str | None = None,
     output_budget: int = _DEFAULT_OUTPUT_BUDGET,
 ) -> F:
-    """Wrap one public handler without changing its FastMCP input schema."""
+    """Project responses and describe inputs without changing input validation."""
 
     name = str(tool_name or getattr(fn, "__name__", "")).strip()
     if name not in _SPECS:
@@ -202,7 +204,10 @@ def model_facing_tool(
     signature = raw_signature.replace(
         parameters=[
             parameter.replace(
-                annotation=resolved_hints.get(parameter.name, parameter.annotation)
+                annotation=Annotated[
+                    resolved_hints.get(parameter.name, parameter.annotation),
+                    Field(**parameter_help(name, parameter.name)),
+                ]
             )
             for parameter in raw_signature.parameters.values()
         ],
@@ -237,7 +242,10 @@ def model_facing_tool(
             isError=False,
         )
 
-    wrapped.__annotations__ = resolved_hints
+    wrapped.__annotations__ = {
+        **resolved_hints,
+        **{parameter.name: parameter.annotation for parameter in signature.parameters.values()},
+    }
     wrapped.__signature__ = signature  # type: ignore[attr-defined]
     return cast(F, wrapped)
 
