@@ -9,7 +9,7 @@ and publishing a Glama release are separate account actions.
 Flower 0.5.2 retains this core configuration. The pinned 0.5.1 build and score
 reported below are historical observations; this patch does not claim a new
 Glama account build, score or hosted deployment. Select the exact 0.5.2 release
-commit when preparing a new build.
+commit when preparing a new build: `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30`.
 
 ## Configure Glama
 

@@ -1,8 +1,5 @@
 # Flower MCP
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 <p align="center">
   <img src="assets/flower-mcp-logo.png" alt="Flower MCP: Require, Plan, Build, Verify, Deploy, Operate" width="380">
 </p>
@@ -14,7 +11,7 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Release candidate: [0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Release: [0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
@@ -90,7 +87,7 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
-These download commands target **0.5.2**, after publication. Use the existing environment
+These download commands select published **0.5.2**. Use the existing environment
 and profile when upgrading, so the SQLite ledger and client registration stay in place.
 
 ### macOS / Linux
@@ -135,7 +132,7 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Flower `0.5.2` is prepared for release. Its `inference` extra uses
+Flower `0.5.2` is published. Its `inference` extra uses
 the independently published `runtime-llama` `0.4.1` wheel from
 [llama-runtime](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
 pinned by URL and SHA256. Install that extra from the selected current source
@@ -258,7 +255,7 @@ require Flower.
 
 ## Status and operating limits
 
-Flower `0.5.2` is a release candidate and remains in testing. Its
+Flower `0.5.2` is published and remains in testing. Its
 [release notes](docs/RELEASE-NOTES-0.5.2.md), the historical
 [0.4.1 release notes](docs/RELEASE-NOTES-0.4.1.md) and
 [installation status](docs/INSTALLATION.md#testing-status-and-release-access)

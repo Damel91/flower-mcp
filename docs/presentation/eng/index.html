@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 3681280f2c8ad1b7893a6ed9a21e308975cb259902785f7c11f928d52cc2d3b8. -->
+<!-- Generated from linked Markdown. Source digest: c1a34a5b003079ae52e8e4857ce4c01237c16cd5ca2c19b9dac7192559047c69. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -485,10 +485,6 @@ unfulfilled promise or design a new one?</p>
 <p>The presentation now moves from the story to your project: <a href="#page=try-flower.md" data-page="try-flower.md">install and try Flower</a>.</p>
 <p><a href="#page=05-deploy.md" data-page="05-deploy.md">Previous: Deploy</a> · <a href="#page=try-flower.md" data-page="try-flower.md">Next: try Flower</a> · <a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=01-require.md" data-page="01-require.md">Back to Require</a></p>
 </article><article class="markdown-body" data-document="try-flower.md" data-title="Now try Flower MCP" data-prefix="doc-d92560641e4a" hidden><h1 id="doc-d92560641e4a--now-try-flower-mcp">Now try Flower MCP</h1>
-<blockquote>
-<p>Release preparation: 0.5.2 downloads and versioned commands require its
-published assets. Until publication, the available release is 0.5.1.</p>
-</blockquote>
 <p><a href="#page=06-operate.md" data-page="06-operate.md">Previous: Operate</a> · <a href="#page=README.md" data-page="README.md">Index</a></p>
 <p>We followed Spazio Comune from requirements to change. The last step brings
 that method into your project: <strong>install Flower and connect your coding agent</strong>.
@@ -539,7 +535,7 @@ server, the public name of Flow of Work MCP.</p>
 </tr>
 </tbody>
 </table>
-<p>Once published, <code>v0.5.2</code> contains seven Flower assets and no runtime wheel.
+<p>The published <code>v0.5.2</code> release contains seven Flower assets and no runtime wheel.
 Verify downloads against its <code>SHA256SUMS</code>. The Windows launcher installs 0.5.2.
 Historical <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1" rel="noopener noreferrer">0.4.1</a> retains eight historical assets,
 including optional runtime-llama <code>0.4.0</code>; that old Flower extra remains unchanged.
@@ -560,7 +556,7 @@ Its SHA256 is
 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
 The upstream wheel includes Apache-2.0 <code>LICENSE</code>/<code>NOTICE</code> and vendored
 llamatelemetry MIT attribution.</p>
-<p>Flower <code>0.5.2</code> is prepared for release. Use the selected release/source checkout only in
+<p>Flower <code>0.5.2</code> is published. Use the selected release/source checkout only in
 a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
@@ -1526,10 +1522,6 @@ the presentation or distributed package. The crops illustrate the method;
 they do not replace an audit of the private history.</p>
 <p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=02-plan.md" data-page="02-plan.md">How this method becomes Plan</a></p>
 </article><article class="markdown-body" data-document="sources.md" data-title="Sources, provenance and limits" data-prefix="doc-9f8babe31a3f" hidden><h1 id="doc-9f8babe31a3f--sources-provenance-and-limits">Sources, provenance and limits</h1>
-<blockquote>
-<p>Release preparation: 0.5.2 downloads and versioned commands require its
-published assets. Until publication, the available release is 0.5.1.</p>
-</blockquote>
 <p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=tools.md" data-page="tools.md">Tools</a> · <a href="#page=talk.md" data-page="talk.md">Talk outline</a></p>
 <h2 id="doc-9f8babe31a3f--what-you-are-reading">What you are reading</h2>
 <p>This is an editorial presentation, not a new server specification. Spazio Comune,
@@ -1544,13 +1536,13 @@ A CodingCastle engine capability is not attributed to Flower.</p>
 <p>The public Flower sources below are pinned to
 <code>d82eb9f15f5a77961d06012fc25ecde3c5c8f18a</code>, declared version <code>0.4.1</code>.
 These implementation and installation references retain that historical source
-checkpoint. The <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2" rel="noopener noreferrer">planned 0.5.2 release</a>
-corrects complete recovery cost. Earlier 0.5.1 at
+checkpoint. The <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2" rel="noopener noreferrer">current 0.5.2 release</a>
+at <code>73cb74497e4ae65c509eb4ac8acf1026cbb0fd30</code> corrects complete recovery cost. Earlier 0.5.1 at
 <code>a87a52f87f16d48a609e304f85b53cc6b221fe66</code> remains immutable. Earlier 0.5.0 at
 <code>a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c</code> remains immutable. The mutable
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">advanced configuration guide</a>
 is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target <code>0.5.2</code> after publication. Historical <code>0.4.1</code> retains runtime
+links target immutable published <code>0.5.2</code>. Historical <code>0.4.1</code> retains runtime
 <code>0.4.0</code>; this editorial snapshot does not qualify binaries. Published <code>0.3.1</code>,
 <code>0.4.0</code>, <code>0.4.1</code>, <code>0.5.0</code> and <code>0.5.1</code> remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when

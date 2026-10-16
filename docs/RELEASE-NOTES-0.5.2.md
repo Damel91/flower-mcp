@@ -54,7 +54,7 @@ optional `-BackupRoot`, then remove only `-DryRun`. Do not pass fresh-install
 registration flags during an owned upgrade. Manual pip installations use the
 separate checked-wheel/backup procedure in the upgrade guide.
 
-After restart, discover `fow_capabilities`: it must identify distribution0.5.2.
+After restart, discover `fow_capabilities`: it must identify distribution 0.5.2.
 Select the same existing lifecycle project and inspect its complete recovery,
 receipts, evidence and handovers; restart again before resuming mutations.
 
@@ -62,26 +62,49 @@ receipts, evidence and handovers; restart again before resuming mutations.
 
 Before packaging, the exact correction passed deterministic scope/currentness,
 mutable-copy, dependency/semantic-gate and reference-projection tests. Actual
-public source and isolated core-only installed qualification each used18packets,
-33dependency edges and3requirements. Complete recovery changed from20.9seconds
-(source comparison) to1.75–1.76seconds, and from20.25seconds to1.66–1.68seconds
-(installed comparison), under the original10-second test deadline. Old timeout
+public source and isolated core-only installed qualification each used 18 packets,
+33 dependency edges and 3 requirements. Complete recovery changed from 20.9 seconds
+(source comparison) to 1.75–1.76 seconds, and from 20.25 seconds to 1.66–1.68 seconds
+(installed comparison), under the original 10-second test deadline. Old timeout
 failures are retained. Complete old/new/restart snapshots match except generated
-timestamps; read-purity checks cover all130tables. These are declared fixture
+timestamps; read-purity checks cover all 130 tables. These are declared fixture
 measurements, not a universal speed or production acceptance guarantee.
 
-Noxi independently qualified the complete snapshot adapter route, with all31
-engineering routes exposed in its catalog, on a coherent owned copy: reads1.985–2.114seconds before/after restart, original10seconds
+Noxi independently qualified the complete snapshot adapter route, with all 31
+engineering routes exposed in its catalog, on a coherent owned copy: reads 1.985–2.114 seconds before/after restart, original 10 seconds
 unchanged. State/currentness is owner-reported; two contexts/two events are
 explicit setup additions. No copied management database was inspected by the
 Flow implementation agent. This isolated result does not itself update or
 accept a user's installation or close a runtime finding.
 
-The release workflow gates publication on the exact commit's LinuxPython
+The release workflow gates publication on the exact commit's Linux Python
 3.11–3.14 installed-wheel checks, Windows launcher/installed upgrade and Linux
 container/public MCP. Seven assets are built: wheel, source archive, three
 installers, BOOTSTRAP.md and SHA256SUMS. No runtime wheel is embedded. Anonymous
-released-asset inspection and same-schema published051→052 upgrade are separate
+released-asset inspection and same-schema published 0.5.1→0.5.2 upgrade are separate
 post-publication checkpoints; source tests alone do not establish delivery.
 Native client workflows, physical/provider acceptance and unknown target OS
 remain separate. Flower remains in testing.
+
+## Publication checkpoint
+
+[Flower MCP 0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) is published
+at `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30`. The exact source CI passed all six
+jobs; [Release run 38948057867](https://github.com/Damel91/flower-mcp/actions/runs/38948057867)
+passed all eight. The official wheel SHA256 is
+`cadd427cd4342a23f8f2d23f074f2fb9cab931c3ba5f170323dd16020e570cff`.
+Its digest is distinct from the locally built candidate archive; installed source
+identity must match the tag. Existing 0.5.0 and 0.5.1 assets remain immutable.
+The immutable 0.5.2 source archive retains preparation-era availability wording;
+these later current guides record actual publication without replacing that tag.
+
+All seven official assets were then downloaded anonymously and checked against
+GitHub's digests, SHA256SUMS and the exact tagged source. The wheel's 184 product
+files match the source and the installed package. A separate populated macOS
+test installation upgraded from the actual published 0.5.1 assets to these
+actual 0.5.2 assets through the unmodified downloaded installer. Forty-nine public
+MCP calls covered the original state, upgrade and restart. All 349 schema objects,
+130 tables, 140 rows and counters, original paths, YAML/client bytes, receipts,
+evidence and handovers were preserved; a consistent backup was observed before
+pip. This owned-fixture result is distinct from another user's installation,
+the unchanged 10-second adapter qualification and human acceptance.

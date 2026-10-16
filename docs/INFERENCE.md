@@ -1,8 +1,5 @@
 # Optional internal inference
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 Flower core and host-executed semantic assignments run without a model or
 inference dependency. Only an explicitly requested internal semantic execution
 uses this integration. Flower generates bounded semantic output; it does not

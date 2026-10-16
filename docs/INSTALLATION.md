@@ -1,8 +1,5 @@
 # Flower MCP installation
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 Flower MCP `0.5.2` requires Python 3.11 or newer and is licensed under
 [Apache-2.0](../LICENSE), with attribution in [NOTICE](../NOTICE).
 The distribution is `flow-of-work-mcp`; the primary command is `flower-mcp`.

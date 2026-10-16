@@ -1,8 +1,5 @@
 # Upgrade Flower without losing project data
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 Flower MCP **0.5.2** updates code in place and retains the existing
 SQLite ledger. The commands below select its immutable release assets; see the
 [release notes](RELEASE-NOTES-0.5.2.md) and [installation guide](INSTALLATION.md).

@@ -1,8 +1,5 @@
 # Sources, provenance and limits
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 [Index](README.md) · [Tools](tools.md) · [Talk outline](talk.md)
 
 ## What you are reading
@@ -21,13 +18,13 @@ A CodingCastle engine capability is not attributed to Flower.
 The public Flower sources below are pinned to
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, declared version `0.4.1`.
 These implementation and installation references retain that historical source
-checkpoint. The [planned 0.5.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
-corrects complete recovery cost. Earlier 0.5.1 at
+checkpoint. The [current 0.5.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
+at `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corrects complete recovery cost. Earlier 0.5.1 at
 `a87a52f87f16d48a609e304f85b53cc6b221fe66` remains immutable. Earlier 0.5.0 at
 `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c` remains immutable. The mutable
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target `0.5.2` after publication. Historical `0.4.1` retains runtime
+links target immutable published `0.5.2`. Historical `0.4.1` retains runtime
 `0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
 `0.4.0`, `0.4.1`, `0.5.0` and `0.5.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when

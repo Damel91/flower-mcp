@@ -1,8 +1,5 @@
 # Now try Flower MCP
 
-> Release preparation: 0.5.2 downloads and versioned commands require its
-> published assets. Until publication, the available release is 0.5.1.
-
 [Previous: Operate](06-operate.md) · [Index](README.md)
 
 We followed Spazio Comune from requirements to change. The last step brings
@@ -27,7 +24,7 @@ server, the public name of Flow of Work MCP.
 | [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/SHA256SUMS) | Checksums for release-file verification. |
 | [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
 
-Once published, `v0.5.2` contains seven Flower assets and no runtime wheel.
+The published `v0.5.2` release contains seven Flower assets and no runtime wheel.
 Verify downloads against its `SHA256SUMS`. The Windows launcher installs 0.5.2.
 Historical [0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) retains eight historical assets,
 including optional runtime-llama `0.4.0`; that old Flower extra remains unchanged.
@@ -52,7 +49,7 @@ Its SHA256 is
 The upstream wheel includes Apache-2.0 `LICENSE`/`NOTICE` and vendored
 llamatelemetry MIT attribution.
 
-Flower `0.5.2` is prepared for release. Use the selected release/source checkout only in
+Flower `0.5.2` is published. Use the selected release/source checkout only in
 a fresh/manual Flower environment:
 
 ```sh
