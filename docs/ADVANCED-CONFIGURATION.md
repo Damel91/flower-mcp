@@ -60,8 +60,11 @@ an owned 0.4.1 or 0.5.0 installation with a 0.5.2 wheel through pip alone. Follo
 offline acquisition and an explicit optional-runtime upgrade. Core installers
 omit this extra. Enabling YAML does not install it.
 
-Flower currently uses the independently published `runtime-llama` 0.4.1 library
-with backend `llamacpp`. The operator supplies the already running llama.cpp
+Current source selects the independently published `runtime-llama` 0.5.0 library
+with backend `llamacpp`; immutable Flower 0.5.2 still pins runtime 0.4.1. A targeted
+SDK-only update preserves its Flower artifact and receipt; re-requesting the old
+extra does not select 0.5.0. See the explicit upgrade procedure linked above.
+Flower does not expose the SDK model catalog. The operator supplies the already running llama.cpp
 endpoint, loads the model and configures its context, slots and hardware.
 Flower does not download or launch models.
 

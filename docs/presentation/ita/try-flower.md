@@ -41,16 +41,17 @@ Flower `0.5.2` contiene sette asset Flower: wheel, archivio sorgente,
 tre installer, `BOOTSTRAP.md` e `SHA256SUMS`. Non incorpora un wheel runtime
 né sostituisce gli asset storici 0.4.1.
 
-L'extra `inference` di 0.5.2 seleziona la
-[release llama-runtime `0.4.1`](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1)
-pubblicata indipendentemente e il suo [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl).
+L'extra `inference` del sorgente corrente seleziona la
+[release llama-runtime `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0)
+pubblicata indipendentemente e il suo [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl).
 Il suo SHA256 è
-`8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
+`dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13`.
 Il wheel upstream include `LICENSE`/`NOTICE` Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.
 
-Flower `0.5.2` è pubblicato. Usa il checkout selezionato della release o del
-sorgente soltanto in un ambiente Flower nuovo/manuale:
+Flower `0.5.2` pubblicato seleziona ancora runtime `0.4.1`; i suoi asset sono
+immutabili. Il sorgente corrente seleziona runtime `0.5.0`, senza pubblicare una
+nuova release Flower. Usa questo comando solo in un ambiente nuovo/manuale:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
@@ -58,14 +59,16 @@ sorgente soltanto in un ambiente Flower nuovo/manuale:
 ```
 
 Per il wheel pubblicato `0.5.2` verificato, usa invece
-`'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'`.
+`'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'`: seleziona runtime
+`0.4.1`, non il nuovo pin del sorgente corrente.
 Questo comando è per ambienti nuovi/manuali. Un ambiente creato dall'installer
 deve usare il wheel/build esatto già registrato nella propria receipt dopo il
 normale upgrade core; un build sorgente successivo con la stessa versione non
 è l'artefatto di quella receipt.
 Windows usa `& .\.venv\Scripts\python.exe` con gli stessi argomenti pip.
-La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
-Flower storico 0.4.1 per questo nuovo runtime. Consulta la
+Per adottare runtime `0.5.0` in una installazione opzionale esistente, aggiorna
+solo lo SDK tramite URL/hash verificati, conservando wheel e receipt Flower.
+Reinstallare il vecchio extra può selezionare di nuovo il vecchio SDK. Consulta la
 [guida all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md)
 per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
 verifica indipendente del checksum e l'acquisizione offline. Questo link operativo

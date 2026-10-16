@@ -127,17 +127,18 @@ Le guide operative correnti seguono `main`; documentazione storica e citazioni
 sorgente runtime mantengono il checkpoint congelato completo identificato sopra.
 I comandi della release richiedono i corrispondenti asset pubblicati.
 
-La nuova dipendenza opzionale appartiene alla
-[release llama-runtime `0.4.1`](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1)
-indipendente, con [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl)
-SHA256 `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
+La dipendenza opzionale del sorgente corrente appartiene alla
+[release llama-runtime `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0)
+indipendente, con [wheel upstream](https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl)
+SHA256 `dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13`.
 Non è un asset Flower. Il wheel include `LICENSE`/`NOTICE` Apache-2.0 e
 l'attribuzione MIT di llamatelemetry incorporato. La
 [guida storica all'inferenza](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md)
 registra il checkpoint precedente. Usa la
 [guida corrente all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md), esplicitamente
-mutabile, per l'extra 0.5.2, i vincoli del build posseduto,
-l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
+mutabile, per runtime 0.5.0 nel sorgente corrente, Flower 0.5.2/runtime 0.4.1
+pubblicati immutabili, i vincoli del build posseduto, l'acquisizione offline e
+l'aggiornamento della sola libreria SDK. Il vecchio extra Flower
 storico 0.4.1 seleziona ancora `0.4.0`; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.
 

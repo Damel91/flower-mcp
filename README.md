@@ -132,15 +132,17 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Flower `0.5.2` is published. Its `inference` extra uses
-the independently published `runtime-llama` `0.4.1` wheel from
-[llama-runtime](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1),
-pinned by URL and SHA256. Install that extra from the selected current source
-or verified release wheel; the immutable historical Flower `v0.4.1` wheel still
-requires runtime `0.4.0` and its eight historical assets remain unchanged.
-Release 0.5.2 contains seven Flower assets and no runtime wheel.
+Flower `0.5.2` is published; its immutable `inference` extra selects runtime
+`0.4.1`. Current source prepares the independently published
+[runtime-llama `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0),
+pinned by URL and SHA256. This source update does not publish a new Flower
+release or replace the 0.5.2 assets. Existing optional installations can update
+only the SDK while retaining the installed Flower artifact, receipt and profile;
+reinstalling its old extra can select the old SDK again. Historical Flower
+`v0.4.1` still requires runtime `0.4.0` and retains its eight assets.
 Core installers remain core-only. See [inference setup and migration](docs/INFERENCE.md)
-for verified downloads, offline installation and explicit optional-runtime upgrades.
+for current-source installation, verified offline downloads and the targeted
+SDK-only update.
 An operator-managed llama.cpp endpoint is required only for internal inference.
 Host-produced semantic results continue to work without a model.
 See [advanced configuration](docs/ADVANCED-CONFIGURATION.md) for role selection,

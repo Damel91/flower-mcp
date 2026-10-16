@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: c1a34a5b003079ae52e8e4857ce4c01237c16cd5ca2c19b9dac7192559047c69. -->
+<!-- Generated from linked Markdown. Source digest: bfe370852acfad1b9b3f118c9d4ecd02437e00f78bd827a5320ad411abf47f51. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -549,26 +549,29 @@ preparation-era guides; later current documentation does not replace those bytes
 <p>Flower <code>0.5.2</code> contains seven Flower assets: wheel, source archive,
 three installers, <code>BOOTSTRAP.md</code> and <code>SHA256SUMS</code>. It does not bundle a runtime
 wheel or replace the historical 0.4.1 assets.</p>
-<p>The 0.5.2 <code>inference</code> extra selects the independently
-published <a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1" rel="noopener noreferrer">llama-runtime <code>0.4.1</code> release</a>
-and its <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl" rel="noopener noreferrer">upstream wheel</a>.
+<p>The current-source <code>inference</code> extra selects the independently
+published <a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0" rel="noopener noreferrer">llama-runtime <code>0.5.0</code> release</a>
+and its <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl" rel="noopener noreferrer">upstream wheel</a>.
 Its SHA256 is
-<code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
+<code>dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13</code>.
 The upstream wheel includes Apache-2.0 <code>LICENSE</code>/<code>NOTICE</code> and vendored
 llamatelemetry MIT attribution.</p>
-<p>Flower <code>0.5.2</code> is published. Use the selected release/source checkout only in
-a fresh/manual Flower environment:</p>
+<p>Published Flower <code>0.5.2</code> still selects runtime <code>0.4.1</code>; its assets are immutable.
+Current source selects runtime <code>0.5.0</code> without publishing a new Flower release.
+Use this source command only in a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
 <p>For the verified published <code>0.5.2</code> wheel, use
-<code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code> instead.
+<code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code> instead; it selects
+runtime <code>0.4.1</code>, not the new current-source pin.
 This command is for fresh/manual environments. An installer-owned environment
 must use its exact already-owned wheel/build and receipt after its ordinary
 core upgrade; a later source build with the same version is not that receipt's artifact.
 Windows uses <code>&amp; .\.venv\Scripts\python.exe</code> with the same pip arguments.
-The dependency pins the upstream URL and SHA256. Do not use the historical
-0.4.1 Flower wheel's old extra for this new runtime. See the
+For runtime <code>0.5.0</code> in an existing optional installation, update only the SDK
+through its verified URL/hash and preserve the installed Flower wheel/receipt.
+Reinstalling its old extra can select the old SDK again. See the
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">inference guide</a>
 for the current source/wheel route, exact owned-build rules, independent checksum
 verification and offline acquisition. This operational link follows mutable
@@ -1631,16 +1634,16 @@ including runtime-llama <code>0.4.0</code>. Flower download links remain release
 Current operational guides follow <code>main</code>; historical documentation and runtime
 source citations retain the complete frozen checkpoint identified above.
 Release commands require the matching published assets.</p>
-<p>The new optional dependency belongs to the independent
-<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1" rel="noopener noreferrer">llama-runtime <code>0.4.1</code> release</a>,
-with <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl" rel="noopener noreferrer">upstream wheel</a>
-SHA256 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
+<p>The current-source optional dependency belongs to the independent
+<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0" rel="noopener noreferrer">llama-runtime <code>0.5.0</code> release</a>,
+with <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl" rel="noopener noreferrer">upstream wheel</a>
+SHA256 <code>dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13</code>.
 It is not a Flower asset. Its wheel includes Apache-2.0 <code>LICENSE</code>/<code>NOTICE</code> and
 vendored llamatelemetry MIT attribution. The
 <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">historical inference guide</a>
 records the earlier source checkpoint. Use the explicitly mutable
-<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">current inference guide</a> for the 0.5.2
-extra, exact owned-build rules, offline acquisition and runtime upgrade. The historical 0.4.1 Flower extra still selects <code>0.4.0</code>;
+<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">current inference guide</a> for current-source 0.5.0, immutable published Flower 0.5.2/runtime 0.4.1,
+exact owned-build rules, offline acquisition and targeted SDK-only upgrade. The historical 0.4.1 Flower extra still selects <code>0.4.0</code>;
 a core/profile upgrade does not request the new runtime or configure a provider.</p>
 <p>Link availability, installed-package tests and client qualification are separate
 checks. The reader does not certify a new installation or native Windows/Linux

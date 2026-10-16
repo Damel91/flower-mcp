@@ -14,8 +14,8 @@ The [release notes](RELEASE-NOTES-0.5.2.md) state changes and qualification boun
 Source changes on `main` do not publish a release.
 Release 0.5.2 has seven assets:
 the Flower wheel, source archive, three installers, `BOOTSTRAP.md` and
-`SHA256SUMS`. The new optional runtime `0.4.1` comes from the independent
-[llama-runtime release](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1);
+`SHA256SUMS`. The published wheel extra pins independent runtime `0.4.1`. Current source
+selects [llama-runtime 0.5.0](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0);
 it is not a Flower release asset or embedded package payload.
 Historical 0.4.1 retains eight immutable assets, including its optional
 `runtime_llama-0.4.0-py3-none-any.whl`; those assets are unchanged.
@@ -590,9 +590,12 @@ snapshot instead of replaying an uncertain mutation.
 
 Core installers do not install inference or configure a provider. Current
 source/candidate internal semantic execution uses the optional public
-`runtime-llama` `0.4.1` wheel through an exact upstream URL/SHA256 dependency and
-an operator-managed llama.cpp endpoint. Install the extra from that selected
-verified 0.5.2 wheel, not the historical 0.4.1 Flower wheel. The runtime
+`runtime-llama` `0.5.0` wheel through an exact upstream URL/SHA256 dependency and
+an operator-managed llama.cpp endpoint. Published Flower 0.5.2 still selects
+runtime 0.4.1; current source and a rebuilt same-version wheel are different
+artifacts. Use a fresh/manual environment for current-source extra installation,
+or the targeted SDK-only procedure to preserve an installed Flower artifact and
+receipt. Core-only environments need no SDK. The runtime
 remains independently distributed; Flower does not copy it into release
 assets or source archives.
 

@@ -1,125 +1,99 @@
 # Optional internal inference
 
 Flower core and host-executed semantic assignments run without a model or
-inference dependency. Only an explicitly requested internal semantic execution
-uses this integration. Flower generates bounded semantic output; it does not
-execute returned tool calls or provide an embedding/retrieval consumer.
+inference dependency. Only explicit internal semantic execution uses this
+integration. Returned tool calls remain data; Flower has no embedding or model
+catalog consumer.
 
 ## Install the optional runtime
 
-Flower **`0.5.2`** and the selected current source provide an
-`inference` extra. Earlier `0.5.0` assets remain immutable. The extra selects the
-independently published `runtime-llama` `0.4.1` distribution,
-imported as `runtime_llama`. Its exact dependency is:
+Select the Flower artifact and the optional SDK separately:
+
+| Flower source/build | Its `inference` extra selects |
+| --- | --- |
+| Current source after the runtime 0.5.0 update | Independently published `runtime-llama` `0.5.0` |
+| Immutable published Flower `0.5.0`, `0.5.1` and `0.5.2` wheels | `runtime-llama` `0.4.1` |
+| Historical published Flower `0.4.1` wheel | `runtime-llama` `0.4.0` |
+
+The current source dependency is:
 
 ```text
-runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl#sha256=8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa
+runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13
 ```
 
-- [Upstream release](https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1).
-- [Upstream wheel](https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl).
-- SHA256: `8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`.
-- The upstream wheel includes its Apache-2.0 `LICENSE`/`NOTICE` and the vendored
-  llamatelemetry MIT attribution. Flower does not replace these with its own notices.
+- [Upstream release](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0).
+- [Upstream wheel](https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl).
+- SHA256: `dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13`.
+- Python 3.11+ and `requests>=2.31,<3`; Apache-2.0 `LICENSE`/`NOTICE` and the
+  retained llamatelemetry MIT attribution remain in the upstream wheel.
 
-The immutable published [Flower `v0.4.1` release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1)
-still has eight historical assets, including runtime `0.4.0`; its Flower wheel's
-extra still requires that older runtime. Its [release notes](RELEASE-NOTES-0.4.1.md)
-describe those historical bytes. Flower version `0.5.2` contains seven assets and
-carry no runtime wheel or vendored runtime payload. Retain the selected source
-commit and `SHA256SUMS`; a later source build is not the immutable published wheel.
+This source update does not replace the [published Flower 0.5.2
+assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) or publish a new
+Flower release. A source build can still carry version `0.5.2` while containing a
+different optional pin: retain its exact commit and SHA256. Same version does
+not make it the released wheel or an installer receipt's artifact.
+Flower releases contain seven Flower assets and no runtime wheel; historical
+Flower 0.4.1 retains its eight immutable assets and older runtime.
 
-### Install from current source or a candidate wheel
+### Fresh source or candidate installation
 
-Use the dedicated Flower environment while all Flower processes and coding
-clients sharing it are stopped. The `.venv` paths below refer to the
-[manual source installation](INSTALLATION.md#manual-installation-from-source).
-The source command below is for **fresh or manual environments only**. For an
-installer-owned environment, first upgrade the core through its owned installer.
-Then use the exact verified Flower wheel/build already recorded in that
-installation's private `.flower-release-install.json`: compare the wheel's
-SHA256 with the receipt's `sha256` field as well as its version and release
-`SHA256SUMS`. Same version alone is insufficient. Do not install a source checkout
-or a rebuilt same-version wheel into an owned environment, and do not edit its
-receipt to make a mismatch disappear.
-
-Do not pip-install 0.5.2 over an owned 0.4.1 or 0.5.0 environment: that skips the
-installer's backup/lease/version receipt workflow. Use the published 0.5.2
-installer for that core upgrade. Use a separate disposable manual environment
-for source/candidate trials.
-
-From the selected `0.5.2` release source checkout or its extracted source,
-inside that fresh/manual environment:
+Use a separate fresh/manual environment and the selected current source:
 
 ```sh
 .venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 ```
 
-Alternatively, in a fresh/manual environment, verify the published `0.5.2`
-wheel against its release's `SHA256SUMS`:
-
-```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'
-.venv/bin/python -m pip check
-```
-
-For an installer-owned environment, complete the ordinary core upgrade first.
-Then use only the exact `0.5.2` wheel/build already named by its receipt, matching
-version and SHA256. A later source build with the same version is a different
-artifact. Follow [Upgrading the optional runtime](#upgrading-the-optional-runtime).
-
-Windows uses the source command only in a fresh/manual environment:
+Windows:
 
 ```powershell
 & .\.venv\Scripts\python.exe -m pip install '.[inference]'
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-For the Windows release-wheel alternative replace `'.[inference]'` with
-`'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'`.
-These routes fetch the exact upstream URL and check its SHA256, then resolve
-normal dependencies such as `requests`. They do not use a Flower-owned runtime
-asset or require an upstream PyPI publication. Core installers intentionally
-omit the extra and never configure a provider. Enabling YAML alone installs
-nothing.
+A verified candidate wheel built from that source can replace `'.[inference]'`
+with `'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'` in a fresh/manual
+environment. Verify the candidate's own source commit and `SHA256SUMS` first.
+The **published** wheel with that filename still selects runtime `0.4.1`.
+The extra fetches the exact upstream URL/hash and its normal dependency closure;
+it requires no Flower-bundled runtime or upstream PyPI publication.
+
+For an installer-owned environment, preserve the Flower wheel/build named in
+its private `.flower-release-install.json`, including its recorded `sha256`.
+Never replace it through pip with a rebuilt same-version Flower wheel, install
+an editable checkout over it, or edit its receipt to hide a mismatch. Use the
+[owned core upgrade](UPGRADING.md) when changing Flower itself. To change only an
+already installed SDK, use the targeted procedure below. Core installers omit
+inference; enabling YAML does not install the SDK.
 
 ### Verified download and offline installation
 
-On a connected machine, download the upstream wheel directly, or acquire the
-complete dependency set from the selected verified wheel into a new dedicated
-directory. This example uses that machine's chosen Python interpreter:
+Acquire a complete compatible wheelhouse on a connected machine. Use the target
+Python/OS/architecture, or select compatible target wheels explicitly. This
+example downloads the selected local Flower wheel's core dependency closure and
+explicitly selects the independent runtime 0.5.0:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'
-```
-
-Use a machine with the target Python version, operating system and architecture,
-or select compatible target wheels explicitly. Verify the Flower wheel
-against its release/build's `SHA256SUMS` and verify the upstream runtime independently:
-
-```sh
-sha256sum wheelhouse/runtime_llama-0.4.1-py3-none-any.whl
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.5.2-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
+sha256sum wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 # macOS alternative:
-shasum -a 256 wheelhouse/runtime_llama-0.4.1-py3-none-any.whl
+shasum -a 256 wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 ```
 
-Windows:
+Windows checksum:
 
 ```powershell
-Get-FileHash .\wheelhouse\runtime_llama-0.4.1-py3-none-any.whl -Algorithm SHA256
+Get-FileHash .\wheelhouse\runtime_llama-0.5.0-py3-none-any.whl -Algorithm SHA256
 ```
 
 The runtime digest must equal
-`8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa`;
-stop on mismatch. Retain a checksum inventory for the entire wheelhouse and
-verify it after transfer. Copy only that reviewed wheel and its complete
-dependency set to the offline machine; do not mix historical release wheels
-or unrelated packages into the directory.
+`dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13`.
+Verify the Flower wheel against its selected release/build's checksums. Retain
+and verify a checksum inventory for the entire wheelhouse before and after
+transfer. Do not mix several Flower or runtime versions in that directory.
 
-Save this as `install_offline.py` beside `wheelhouse` and run it with the offline
-Flower environment's Python (`.venv/bin/python install_offline.py`, or
-`& .\.venv\Scripts\python.exe .\install_offline.py` in PowerShell):
+For a fresh/manual offline environment, save this beside `wheelhouse` and run it
+with that environment's Python:
 
 ```python
 from pathlib import Path
@@ -136,50 +110,53 @@ subprocess.run(
 subprocess.run([sys.executable, "-m", "pip", "check"], check=True)
 ```
 
-This installs the local Flower package, explicitly selected runtime and local
-dependency closure together. It deliberately does not request the extra again:
-the extra contains an HTTPS direct reference, which can require network access
-even with a wheelhouse. The offline reader or an exported work plan alone does
-not provide an offline package installation. Use this script for a fresh/manual
-environment. For an installer-owned environment the Flower wheel must match
-the exact existing receipt's version and `sha256`, not just its version number.
-It is not an offline replacement for the owned core upgrade and its receipt.
+Do not request the extra again offline: its direct HTTPS reference can require
+network access. An installer-owned Flower wheel must still match its existing
+receipt, not just its version. This is not an offline replacement for the owned
+core upgrade, backup and lease workflow. Exported plans/readers do not contain
+package dependencies.
 
 ### Upgrading the optional runtime
 
-First follow [safe upgrades](UPGRADING.md) to preserve the same environment,
-profile, exact YAML and SQLite ledger. A core/profile upgrade does not request
-the inference extra, migrate model settings or change its endpoint; it is not
-an optional-runtime upgrade. An already installed runtime can remain unchanged.
+A [core/profile upgrade](UPGRADING.md) does not request inference or change the
+model endpoint. For an **existing optional SDK installation**, runtime 0.5.0 can
+be adopted independently while preserving the installed Flower package,
+installation receipt, profile, SQLite ledger, YAML and client registration.
+Do not add inference to a core-only environment merely to update Flower.
 
-To move an existing installation to the new runtime, first complete the core
-upgrade through the appropriate [owned or manual procedure](UPGRADING.md), then
-select the exact verified installed Flower wheel/build recorded by the owned
-receipt, or the reviewed wheel for a manual environment. Do not substitute a
-source rebuild with the same version. The old published Flower wheel
-still requires runtime `0.4.0`; installing runtime `0.4.1` beside that old
-extra is not the supported new route. The commands below use the published
-`0.5.2` route and assume the core is
-already at `0.5.2` and, for an owned environment, the selected wheel's SHA256
-exactly matches its receipt. Preview the package change with
-`--dry-run`, inspect it, then repeat without `--dry-run`:
+Stop every service/client sharing the selected interpreter before pip changes
+its SDK files. Preserve a private backup of the previous SDK and package
+inventory; retain the original Flower/profile paths. The existing SDK already
+requires `requests>=2.31,<3`: verify its dependencies with `pip check` first.
+Use the Python from the original registration, replacing `.venv/bin/python`
+below when necessary. Preview this **SDK-only** change:
 
 ```sh
-.venv/bin/python -m pip install --dry-run --upgrade './dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'
+.venv/bin/python -m pip check
+.venv/bin/python -m pip install --dry-run --no-deps --upgrade 'https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 ```
 
-After approving that plan locally, apply it and check the resulting environment:
+Inspect the plan, then apply that exact SDK-only update:
 
 ```sh
-.venv/bin/python -m pip install --upgrade './dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install --no-deps --upgrade 'https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 .venv/bin/python -m pip check
+.venv/bin/python -c 'from importlib.metadata import version; import runtime_llama; print(version("runtime-llama"), runtime_llama.__version__)'
 ```
 
 Windows uses the same arguments with `& .\.venv\Scripts\python.exe`.
-Record the installed Flower source/build and runtime versions, retain upstream
-attribution, then restart only the owned Flower instance with the original
-profile. Package and mocked-gateway checks do not establish model readiness,
-live inference or hosted deployment.
+Both versions must report `0.5.0`; retain direct-URL/digest provenance and upstream
+attribution. Keep the original Flower package and its receipt unchanged. This
+operation does not back up or migrate SQLite and is not an atomic rollback
+mechanism. If Flower core also needs an update, use its owned upgrade procedure
+separately before changing the SDK.
+
+Reinstalling an immutable older Flower wheel's `[inference]` extra can select its
+older runtime again; it is not the SDK-only 0.5.0 update. Restart only each
+owner's stopped services with their original profiles and verify public MCP
+state. Gateway/package tests and connection-refusal recovery do not establish
+successful model generation, model readiness or hosted deployment. Flower does
+not expose the SDK's new model-discovery API.
 
 ## Operator configuration and migration
 

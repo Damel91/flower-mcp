@@ -18,10 +18,10 @@ PUBLISHED_FLOWER_VERSION = "0.4.1"
 PUBLISHED_FLOWER_RUNTIME = "0.4.0"
 CURRENT_PUBLISHED_FLOWER_VERSION = "0.5.2"
 UPSTREAM_RUNTIME_URL = (
-    "https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/"
-    "runtime_llama-0.4.1-py3-none-any.whl"
+    "https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/"
+    "runtime_llama-0.5.0-py3-none-any.whl"
 )
-UPSTREAM_RUNTIME_SHA256 = "8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa"
+UPSTREAM_RUNTIME_SHA256 = "dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13"
 SPEC = importlib.util.spec_from_file_location("flower_presentation_reader", ROOT / "build_reader.py")
 reader = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reader)

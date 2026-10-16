@@ -96,7 +96,7 @@ the requested new version tag at the full tested SHA and publishes:
 
 `VERSION` is the requested version declared in `pyproject.toml`.
 The builder verifies that both package metadata files confine the exact public
-runtime-llama `0.4.1` URL/SHA256 to the inference extra. It rejects copied runtime
+runtime-llama `0.5.0` URL/SHA256 to the inference extra. It rejects copied runtime
 wheels, vendor payloads and runtime core-dependency leakage. Building Flower does
 not fetch inference. The optional CI lane installs the candidate wheel's extra,
 checks the upstream artifact provenance/attribution and runs gateway regressions;
@@ -160,8 +160,11 @@ client usability as separate evidence. Release 0.5.1 adds no SQLite migration:
 an existing 0.4.0, 0.4.1 or 0.5.0/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
 still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
-current source uses the independently published runtime `0.4.1` through its
-explicit inference extra. Updating core/profile state does not request that
+published Flower 0.5.2 uses runtime `0.4.1`, while current source selects the
+independently published runtime `0.5.0` through its explicit inference extra.
+This source change is not a new Flower release and does not replace 0.5.2 assets.
+SDK-only adoption preserves the installed Flower artifact/receipt; rerunning its
+old extra can select the old SDK again. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
 wheel/backend; that path is distinct from the actual anonymous published
 0.5.0→0.5.1 populated-schema55 qualification on macOS. Retain the earlier

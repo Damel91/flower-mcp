@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 240c9ec99e3921bc592d8004fb5fdad0c363b5a6e3eeeee2400cbefbcca92640. -->
+<!-- Generated from linked Markdown. Source digest: 87b9d611da1eaf1f89d8c2f30f557d38cafff45fa093b9012e2e919bc60b0120. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -554,27 +554,30 @@ le guide di preparazione; la documentazione corrente successiva non sostituisce 
 <p>Flower <code>0.5.2</code> contiene sette asset Flower: wheel, archivio sorgente,
 tre installer, <code>BOOTSTRAP.md</code> e <code>SHA256SUMS</code>. Non incorpora un wheel runtime
 né sostituisce gli asset storici 0.4.1.</p>
-<p>L'extra <code>inference</code> di 0.5.2 seleziona la
-<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1" rel="noopener noreferrer">release llama-runtime <code>0.4.1</code></a>
-pubblicata indipendentemente e il suo <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl" rel="noopener noreferrer">wheel upstream</a>.
+<p>L'extra <code>inference</code> del sorgente corrente seleziona la
+<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0" rel="noopener noreferrer">release llama-runtime <code>0.5.0</code></a>
+pubblicata indipendentemente e il suo <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl" rel="noopener noreferrer">wheel upstream</a>.
 Il suo SHA256 è
-<code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
+<code>dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13</code>.
 Il wheel upstream include <code>LICENSE</code>/<code>NOTICE</code> Apache-2.0 e l'attribuzione MIT
 di llamatelemetry incorporato.</p>
-<p>Flower <code>0.5.2</code> è pubblicato. Usa il checkout selezionato della release o del
-sorgente soltanto in un ambiente Flower nuovo/manuale:</p>
+<p>Flower <code>0.5.2</code> pubblicato seleziona ancora runtime <code>0.4.1</code>; i suoi asset sono
+immutabili. Il sorgente corrente seleziona runtime <code>0.5.0</code>, senza pubblicare una
+nuova release Flower. Usa questo comando solo in un ambiente nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
 <p>Per il wheel pubblicato <code>0.5.2</code> verificato, usa invece
-<code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code>.
+<code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code>: seleziona runtime
+<code>0.4.1</code>, non il nuovo pin del sorgente corrente.
 Questo comando è per ambienti nuovi/manuali. Un ambiente creato dall'installer
 deve usare il wheel/build esatto già registrato nella propria receipt dopo il
 normale upgrade core; un build sorgente successivo con la stessa versione non
 è l'artefatto di quella receipt.
 Windows usa <code>&amp; .\.venv\Scripts\python.exe</code> con gli stessi argomenti pip.
-La dipendenza fissa URL e SHA256 upstream. Non usare il vecchio extra del wheel
-Flower storico 0.4.1 per questo nuovo runtime. Consulta la
+Per adottare runtime <code>0.5.0</code> in una installazione opzionale esistente, aggiorna
+solo lo SDK tramite URL/hash verificati, conservando wheel e receipt Flower.
+Reinstallare il vecchio extra può selezionare di nuovo il vecchio SDK. Consulta la
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>
 per il percorso corrente da sorgente/wheel, i vincoli del build posseduto, la
 verifica indipendente del checksum e l'acquisizione offline. Questo link operativo
@@ -1648,17 +1651,18 @@ incluso runtime-llama <code>0.4.0</code>. I download Flower restano fissati alla
 Le guide operative correnti seguono <code>main</code>; documentazione storica e citazioni
 sorgente runtime mantengono il checkpoint congelato completo identificato sopra.
 I comandi della release richiedono i corrispondenti asset pubblicati.</p>
-<p>La nuova dipendenza opzionale appartiene alla
-<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.4.1" rel="noopener noreferrer">release llama-runtime <code>0.4.1</code></a>
-indipendente, con <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.4.1/runtime_llama-0.4.1-py3-none-any.whl" rel="noopener noreferrer">wheel upstream</a>
-SHA256 <code>8c512eb79b00ac3fdf761036fa0c8d74c24c3581651332736f6a95e6e38ae0aa</code>.
+<p>La dipendenza opzionale del sorgente corrente appartiene alla
+<a href="https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0" rel="noopener noreferrer">release llama-runtime <code>0.5.0</code></a>
+indipendente, con <a href="https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl" rel="noopener noreferrer">wheel upstream</a>
+SHA256 <code>dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13</code>.
 Non è un asset Flower. Il wheel include <code>LICENSE</code>/<code>NOTICE</code> Apache-2.0 e
 l'attribuzione MIT di llamatelemetry incorporato. La
 <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INFERENCE.md" rel="noopener noreferrer">guida storica all'inferenza</a>
 registra il checkpoint precedente. Usa la
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida corrente all'inferenza</a>, esplicitamente
-mutabile, per l'extra 0.5.2, i vincoli del build posseduto,
-l'acquisizione offline e l'aggiornamento del runtime. Il vecchio extra Flower
+mutabile, per runtime 0.5.0 nel sorgente corrente, Flower 0.5.2/runtime 0.4.1
+pubblicati immutabili, i vincoli del build posseduto, l'acquisizione offline e
+l'aggiornamento della sola libreria SDK. Il vecchio extra Flower
 storico 0.4.1 seleziona ancora <code>0.4.0</code>; un aggiornamento di core/profilo non richiede
 il nuovo runtime e non configura un provider.</p>
 <p>Disponibilità dei collegamenti, test del pacchetto installato e qualificazione
