@@ -18,7 +18,7 @@ Choose supported host semantic assignments, internal llama.cpp inference or a
 contract-compatible provider explicitly. A host observed-behavior assignment is
 unsupported, and an arbitrary MCP service is not a packet/test execution adapter.
 YAML transport changes need a Flower restart; ledger receipt imports do not.
-The writer witness remains outside release 0.5.1.
+The writer witness remains outside release 0.5.2.
 [Provider factory](https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/src/flow_of_work_mcp/runtime_factory.py).
 
 ## Who owns what

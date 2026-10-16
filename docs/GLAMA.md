@@ -6,6 +6,11 @@ It needs no API key, internal model or CodingCastle service.
 This prepares the source for Glama's build process; claiming a listing, deploying
 and publishing a Glama release are separate account actions.
 
+Flower 0.5.2 retains this core configuration. The pinned 0.5.1 build and score
+reported below are historical observations; this patch does not claim a new
+Glama account build, score or hosted deployment. Select the exact 0.5.2 release
+commit when preparing a new build.
+
 ## Configure Glama
 
 1. Sign in to Glama with the GitHub account authorized to maintain this repository.

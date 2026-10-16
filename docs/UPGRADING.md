@@ -1,8 +1,11 @@
 # Upgrade Flower without losing project data
 
-Published **Flower MCP 0.5.1** updates code in place and retains the existing
+> Release preparation: 0.5.2 downloads and versioned commands require its
+> published assets. Until publication, the available release is 0.5.1.
+
+Flower MCP **0.5.2** updates code in place and retains the existing
 SQLite ledger. The commands below select its immutable release assets; see the
-[release notes](RELEASE-NOTES-0.5.1.md) and [installation guide](INSTALLATION.md).
+[release notes](RELEASE-NOTES-0.5.2.md) and [installation guide](INSTALLATION.md).
 A reviewed wheel can use the manual pip procedure below in a manual environment.
 Do not bypass an owned installer's receipt by
 updating its Flower version through pip. The Python environment owns code; the
@@ -11,9 +14,9 @@ persistent profile owns
 paths unchanged. This release adds no database migration. Existing receipts,
 revisions, evidence and handovers stay in the same profile.
 
-| Existing version | Database behavior on the first 0.5.1 server start |
+| Existing version | Database behavior on the first 0.5.2 server start |
 | --- | --- |
-| 0.4.0, 0.4.1 or 0.5.0, schema 55 | Schema stays at 55; no new migration. |
+| 0.4.0, 0.4.1, 0.5.0 or 0.5.1, schema 55 | Schema stays at 55; no new migration. |
 | 0.3.1, schema 52 | Existing additive migrations 53–55 create seven tables and two packet columns. |
 
 Existing projects, authority revisions, evidence and handovers remain in the
@@ -21,9 +24,10 @@ same database. The installer backs it up before changing packages. `doctor`
 reads configuration; it does not start Flower or verify database migration.
 After starting Flower, verify the same project through public MCP and restart.
 A package downgrade does not reverse a migrated database. Source on `main` is
-not a release. Version 0.5.1 retains 37 tools and the callable lifecycle
-contracts. It improves purpose/routing help, all 445 input descriptions and
-conservative MCP annotations; see its [release notes](RELEASE-NOTES-0.5.1.md).
+not a release. Version 0.5.2 retains 37 tools and the callable lifecycle
+contracts. It corrects repeated work in complete recovery without changing the
+existing deadlines, authority or gates. It retains 0.5.1's purpose/routing help,
+445 input descriptions and conservative annotations; see its [release notes](RELEASE-NOTES-0.5.2.md).
 The additive `fow_packet_advance(mode="sync_only")` argument was introduced in
 [0.5.0](RELEASE-NOTES-0.5.0.md) and remains available. The suspended writer witness
 is excluded.
@@ -86,24 +90,24 @@ Prerequisites remain those in [INSTALLATION.md](INSTALLATION.md#prerequisites).
 macOS/Linux, with default installation paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Windows, run the download separately and inspect the script before execution:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.ps1' -OutFile '.\install.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/install.ps1' -OutFile '.\install.ps1'
 ```
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.1' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.2' -Upgrade -DryRun
 ```
 
 For a custom installation, add its original environment and data options to
 both preview and execution. For example, on macOS/Linux:
 
 ```sh
-python3 -I ./install_flower.py --version 0.5.1 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
+python3 -I ./install_flower.py --version 0.5.2 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
 ```
 
 Here `install_flower.py` is the selected new backend, checked against its own
@@ -117,7 +121,7 @@ For example, preview an existing custom Windows installation with its original
 values, replacing these example paths:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.1' -Upgrade -DryRun -Venv 'C:\absolute\flower-venv' -Profile 'default' -ProfileRoot 'C:\absolute\private\flower-state'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.2' -Upgrade -DryRun -Venv 'C:\absolute\flower-venv' -Profile 'default' -ProfileRoot 'C:\absolute\private\flower-state'
 ```
 
 The returned `flower.release-upgrade-plan.v1` identifies the previous/requested
@@ -143,13 +147,13 @@ After inspecting the plan and stopping clients, repeat the same command without
 `--dry-run` / `-DryRun`. For default macOS/Linux paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh | bash -s -- --upgrade
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/install.sh | bash -s -- --upgrade
 ```
 
 For Windows:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.1' -Upgrade
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.5.2' -Upgrade
 ```
 
 The backend verifies the release wheel, acquires the existing selected-ledger
@@ -169,7 +173,7 @@ of all imports or logs. The original imports, logs and registrations stay in pla
 On success, retain the returned old/new versions and backup paths. Run the
 same absolute Flower executable with `doctor` and the original profile options,
 then reconnect/reload your coding client. Ask the agent to check Flower's
-advertised installed distribution version is **0.5.1**, select the **known existing project**,
+advertised installed distribution version is **0.5.2**, select the **known existing project**,
 read its current snapshot and use `fow_handover` with `resume_context` when a
 handover is available. Get/replay preserves historical handover payloads; current
 resume compares authority instead of rewriting them. Verify another restart
@@ -200,7 +204,7 @@ separate private directory; preserve the original files.
 Manual environments have no release-installer ownership receipt. Do not create
 one by hand. Stop all clients sharing the environment, record the existing
 profile/config/database paths with `doctor`, and back up before pip mutation.
-Download the 0.5.1 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
+Download the 0.5.2 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
 SHA256 using the [manual installation checks](INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 For a consistent SQLite backup, save the following as `backup_flower.py` outside
@@ -245,7 +249,7 @@ print(destination)
 Use your existing environment's Python to run this script. For example:
 
 ```sh
-/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.5.1
+/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.5.2
 ```
 
 On Windows use `& 'C:\absolute\flower-venv\Scripts\python.exe'` and your actual
@@ -257,12 +261,12 @@ and its configuration.
 Upgrade the verified core wheel **in the same environment**, then check dependencies:
 
 ```sh
-.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.5.1-py3-none-any.whl
+.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.5.2-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.5.1-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.5.2-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 

@@ -3,12 +3,12 @@
 [Indice](README.md) · [Concetti](concepts.md) · [Fonti](sources.md#catalogo)
 
 I nomi conservano il prefisso tecnico `fow_`. Un client può aggiungere un proprio
-prefisso. Questa mappa descrive i **37 tool di Flower MCP 0.5.1**
+prefisso. Questa mappa descrive i **37 tool di Flower MCP 0.5.2**
 (36 nella release storica 0.3.1); non è un elenco di payload da copiare.
 Un tool multiplexato offre più operazioni con
 prerequisiti diversi. Il catalogo corrente del server rimane l'autorità operativa.
 
-La versione 0.5.1 descrive tutti i 445 input principali e scopo, selezione ed
+La versione 0.5.2 descrive tutti i 445 input principali e scopo, selezione ed
 effetti di ogni tool. I 181 esempi di operazione hanno forme di input verificate;
 le identità segnaposto richiedono comunque autorità reali del progetto. Gli hint
 MCP sugli effetti sono informativi. Chiedi a `fow_capabilities` l'aiuto esatto
