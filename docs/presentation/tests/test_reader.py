@@ -270,7 +270,7 @@ class ReaderChecks(unittest.TestCase):
                     self.assertNotIn("--with-inference", source)
             source = (root / "try-flower.md").read_text(encoding="utf-8")
             self.assertIn("pip install '.[inference]'", source)
-            self.assertIn("./dist/flow_of_work_mcp-0.4.1-py3-none-any.whl[inference]", source)
+            self.assertIn(f"./dist/flow_of_work_mcp-{project['version']}-py3-none-any.whl[inference]", source)
             candidate_inventory = {"eng": "seven Flower assets", "ita": "sette asset Flower"}
             self.assertIn(candidate_inventory[folder], " ".join(source.split()))
             self.assertIn("--upgrade --dry-run", source)
