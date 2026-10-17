@@ -97,7 +97,7 @@ async def qualify_sessions(session_factory: Callable[[], AsyncContextManager[Cli
         goal_id = goal["result"]["goal"]["goal_node_id"]
         milestone = await call(session, "fow_promote_milestone", {**address,
             "name": "Successor fixture", "requirement_ids": [requirement_id],
-            "dependency_closure_ids": [requirement_id], "entry_policy": {"scenario": "declared"},
+            "prerequisite_requirement_ids": [], "entry_policy": {"scenario": "declared"},
             "exit_policy": {"checks": "Local and deferred verification remain distinct."},
             "risk_disposition": "Synthetic scope; no external effects", "request_id": "milestone"})
         answer = deepcopy(contracts["record_answer"]["example"])

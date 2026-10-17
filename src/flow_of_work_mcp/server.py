@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 from dataclasses import asdict
 from typing import Annotated, Any, Callable, Literal, Mapping
@@ -90,6 +91,7 @@ from flow_of_work_mcp.core.errors import (
     ImplementationProviderUnavailableError,
     InputValidationError,
     LifecycleError,
+    MilestonePreEffectError,
     PacketValidationAlreadyUpgradedError,
     ProjectNotFoundError,
     RequirementConflictError,
@@ -97,6 +99,7 @@ from flow_of_work_mcp.core.errors import (
     RunControlBlockedError,
 )
 from flow_of_work_mcp.mcp_envelope import envelope
+from flow_of_work_mcp.core.domain.identifiers import required_text, validate_project_id
 from flow_of_work_mcp.logger import LoggerManager, get_logger, log_bootstrap_error
 from flow_of_work_mcp.mcp_runtime import McpRuntime
 from flow_of_work_mcp.model_facing import (
@@ -248,6 +251,37 @@ def _guard(
     *,
     recovery: Callable[[], Mapping[str, object]] | None = None,
 ) -> dict[str, object]:
+    response = _guard_operation(tool, operation, recovery=recovery)
+    if response.get("status") == "success":
+        return response
+    # This guard has no proof-bearing transaction boundary. Neither typed
+    # diagnostic details nor a recovery projection may certify no effects.
+    result = dict(response.get("result") or {})
+    diagnostics = result.get("diagnostics")
+    diagnostics = ([item for item in diagnostics if isinstance(item, Mapping)]
+                   if isinstance(diagnostics, (list, tuple)) else [])
+    if not diagnostics:
+        diagnostics = [{
+            "code": str(response.get("reason") or "operation_failed"),
+            "message": "The operation did not return a verified lifecycle result.",
+        }]
+    result["diagnostics"] = [_uncertain_diagnostic(item) for item in diagnostics]
+    result["operation_state"] = "unknown"
+    result["effect_state"] = "unknown"
+    result.pop("effect_receipt", None)
+    guidance = _uncertain_error_result(tool, {})
+    result["recovery_guidance"] = guidance["recovery_guidance"]
+    if not _read_only_recovery_call(result.get("next_tool_call")):
+        result["next_tool_call"] = guidance["next_tool_call"]
+    return {**response, "result": result}
+
+
+def _guard_operation(
+    tool: str,
+    operation: Callable[[], dict[str, object]],
+    *,
+    recovery: Callable[[], Mapping[str, object]] | None = None,
+) -> dict[str, object]:
     try:
         return operation()
     except ProjectNotFoundError:
@@ -358,10 +392,81 @@ def _guard(
             tool=tool,
             status="blocked",
             reason="lifecycle_state_error",
-            result=_recovery_result(recovery),
+            result=_recovery_result(recovery, {"diagnostics": [{
+                "code": "lifecycle_state_error",
+                "message": "The lifecycle operation could not return a verified result.",
+            }]}),
         )
     except Exception:
-        return envelope(tool=tool, status="failed", reason="internal_error")
+        return envelope(tool=tool, status="failed", reason="internal_error",
+                        result=_uncertain_error_result(tool, {
+                            "code": "internal_error",
+                            "message": "The operation failed without a verified effect receipt.",
+                        }))
+
+
+def _uncertain_error_result(
+    tool: str, diagnostic: Mapping[str, object], *,
+    project_id: str = "", request_id: str = "", operation: str = "",
+) -> dict[str, object]:
+    """Offer inspection without turning an exception into an effect proof."""
+    detail = _uncertain_diagnostic(diagnostic)
+    if project_id:
+        next_call = {"tool": "fow_handover", "arguments": {
+            "project_id": project_id, "operation": "project_state_snapshot",
+        }}
+    elif operation_names(tool) == ("call",):
+        next_call = {"tool": "fow_capabilities", "arguments": {
+            "view": "operation", "operation_tool": tool, "operation_name": "call",
+        }}
+    else:
+        next_call = {"tool": "fow_capabilities", "arguments": {"view": "summary"}}
+    result: dict[str, object] = {
+        "operation_state": "unknown", "effect_state": "unknown",
+        "diagnostics": [detail], "next_tool_call": next_call,
+        "recovery_guidance": {
+            "effect_state": "unknown", "resolution": detail["resolution"],
+        },
+    }
+    if project_id or request_id or operation:
+        result["original_request"] = {
+            "tool": tool, "operation": operation or "call",
+            "project_id": project_id, "request_id": request_id,
+        }
+    return result
+
+
+def _uncertain_diagnostic(diagnostic: Mapping[str, object]) -> dict[str, object]:
+    detail = dict(diagnostic)
+    detail["effect_state"] = "unknown"
+    if "operation_state" in detail:
+        detail["operation_state"] = "unknown"
+    detail.pop("effect_receipt", None)
+    if "received_value" in detail:
+        detail["received_value"] = _bounded_problem_value(detail["received_value"])
+    resolution = (
+        "Inspect current durable state using the original request reference before retrying. "
+        "Do not assume failure means that nothing changed."
+    )
+    input_guidance = detail.get("resolution")
+    if isinstance(input_guidance, str) and input_guidance and input_guidance != resolution:
+        detail["input_guidance"] = input_guidance[:1_000]
+        detail["input_guidance_is_effect_evidence"] = False
+    detail["resolution"] = resolution
+    return detail
+
+
+def _read_only_recovery_call(value: object) -> bool:
+    if not isinstance(value, Mapping) or not isinstance(value.get("arguments"), Mapping):
+        return False
+    tool = str(value.get("tool") or "")
+    arguments = value["arguments"]
+    operation = ("call" if operation_names(tool) == ("call",)
+                 else str(arguments.get("operation") or arguments.get("view") or ""))
+    try:
+        return operation_contract(tool, operation)["risk"] == "read"
+    except ValueError:
+        return False
 
 
 def _bootstrap_start_conflict_result(exc: BootstrapStartConflictError) -> dict[str, object]:
@@ -3947,13 +4052,103 @@ def handle_revise_srs_baseline(
     return _guard("fow_revise_srs_baseline", submit)
 
 
+def _milestone_pre_effect_rejection(
+    exc: MilestonePreEffectError, *, project_id: str, request_id: str,
+) -> dict[str, object]:
+    """Project only proof established before this milestone's first write."""
+    correlation = {
+        "tool": "fow_promote_milestone", "operation": "call",
+        "project_id": project_id, "request_id": request_id,
+    }
+    diagnostic = {
+        "code": "invalid_input", "message": str(exc)[:500],
+        "field": exc.field, **exc.details,
+        "effect_state": "none",
+    }
+    if exc.accepted_values:
+        diagnostic["accepted_values"] = list(exc.accepted_values)
+    diagnostic["received_value"] = _bounded_problem_value(exc.received_value)
+    next_call: dict[str, object] = {"tool": "fow_capabilities", "arguments": {
+        "view": "operation", "operation_tool": "fow_promote_milestone", "operation_name": "call",
+    }}
+    if exc.reason in {
+        "milestone_request_replay_unverifiable", "milestone_request_conflict", "milestone_name_conflict",
+    }:
+        next_call = {"tool": "fow_handover", "arguments": {
+            "project_id": project_id, "operation": "project_state_snapshot",
+        }}
+    return envelope(
+        tool="fow_promote_milestone", status="rejected",
+        reason=exc.reason,
+        result={
+            "operation_state": "rejected", "effect_state": "none",
+            "effect_receipt": {
+                "contract_version": "flow.operation-effect.v1", **correlation,
+                "basis": "pre_effect_validation", "mutation_started": False,
+            },
+            "diagnostics": [diagnostic],
+            "next_tool_call": next_call,
+        },
+        audit_reference=correlation,
+    )
+
+
+def _milestone_effect_unknown(*, project_id: str, request_id: str) -> dict[str, object]:
+    return envelope(
+        tool="fow_promote_milestone", status="failed", reason="operation_effect_unknown",
+        result=_uncertain_error_result("fow_promote_milestone", {
+            "code": "operation_effect_unknown",
+            "message": "The milestone operation failed after dispatch; its durable effect is not confirmed.",
+        }, project_id=project_id, request_id=request_id, operation="call"),
+        audit_reference={"tool": "fow_promote_milestone", "operation": "call",
+            "project_id": project_id, "request_id": request_id},
+    )
+
+
+def _bounded_problem_value(value: object, depth: int = 0) -> object:
+    """Report bounded invalid input without copying an arbitrary policy object."""
+    if isinstance(value, str):
+        return value if len(value) <= 160 else value[:157] + "..."
+    if isinstance(value, float) and not math.isfinite(value):
+        return {"type": "nonfinite_number"}
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, (tuple, list)):
+        if depth >= 2:
+            return {"type": "array", "count": len(value)}
+        return {"items": [_bounded_problem_value(item, depth + 1) for item in value[:10]],
+                "count": len(value), "truncated": len(value) > 10}
+    if isinstance(value, Mapping):
+        return {"type": "object", "field_count": len(value)}
+    return {"type": type(value).__name__}
+
+
+def _milestone_text(value: object, field: str, *, allow_empty: bool = False) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field} must be a string")
+    return value if allow_empty else required_text(value, field)
+
+
+def _milestone_input(
+    value: object, field: str, validator: Callable[[object], Any], rule: str,
+) -> Any:
+    try:
+        return validator(value)
+    except (ValueError, TypeError) as exc:
+        raise MilestonePreEffectError(
+            "milestone_input_invalid", f"The milestone input {field} is invalid.",
+            field=field, received_value=value, rule=rule,
+            resolution=f"Correct {field} according to the rule, then submit the intended milestone explicitly.",
+        ) from exc
+
+
 def handle_promote_milestone(
     runtime: McpRuntime,
     *,
     project_id: str,
     name: str,
     requirement_ids: list[str],
-    dependency_closure_ids: list[str],
+    prerequisite_requirement_ids: list[str],
     entry_policy: dict[str, object],
     exit_policy: dict[str, object],
     risk_disposition: str,
@@ -3961,35 +4156,70 @@ def handle_promote_milestone(
     acceptance_evidence: list[str] | None = None,
     request_id: str = "",
 ) -> dict[str, object]:
-    def operation() -> dict[str, object]:
-        milestone = runtime.lifecycle.promote_milestone(
-            project_id,
-            MilestoneDraft(
-                name=name,
-                requirement_ids=_require_string_list(
-                    requirement_ids, "requirement_ids"
-                ),
-                dependency_closure_ids=_require_string_list(
-                    dependency_closure_ids, "dependency_closure_ids"
-                ),
-                entry_policy=_require_mapping(entry_policy, "entry_policy"),
-                exit_policy=_require_mapping(exit_policy, "exit_policy"),
-                risk_disposition=risk_disposition,
-                acceptance_evidence=_require_string_list(
-                    acceptance_evidence or [], "acceptance_evidence"
-                ),
-            ),
-            actor=actor,
-            request_id=request_id,
+    # Draft/identity construction has no service calls. Only this audited phase
+    # and MilestonePreEffectError from the repository may certify no effect.
+    try:
+        normalized_project = _milestone_input(project_id, "project_id",
+            lambda value: validate_project_id(_milestone_text(value, "project_id")),
+            "Use the canonical lowercase project ID, at most 64 characters.")
+        normalized_actor = _milestone_input(actor, "actor", lambda value: _milestone_text(value, "actor"),
+            "actor must be a nonempty identity string.")
+        normalized_request = _milestone_input(request_id, "request_id",
+            lambda value: _milestone_text(value, "request_id", allow_empty=True),
+            "request_id must be a string; preserve the original ID when replaying.")
+        lists = {field: _milestone_input(value, field, lambda item, field=field: _require_string_list(item, field),
+            f"{field} must be an array of strings.") for field, value in (
+                ("requirement_ids", requirement_ids),
+                ("prerequisite_requirement_ids", prerequisite_requirement_ids),
+                ("acceptance_evidence", [] if acceptance_evidence is None else acceptance_evidence),
+            )}
+        policies = {field: _milestone_input(value, field, lambda item, field=field: _require_mapping(item, field),
+            f"{field} must be a JSON object.") for field, value in (
+                ("entry_policy", entry_policy), ("exit_policy", exit_policy),
+            )}
+        draft = MilestoneDraft(
+            name=name, requirement_ids=lists["requirement_ids"],
+            prerequisite_requirement_ids=lists["prerequisite_requirement_ids"],
+            entry_policy=policies["entry_policy"], exit_policy=policies["exit_policy"],
+            risk_disposition=risk_disposition, acceptance_evidence=lists["acceptance_evidence"],
         )
+    except MilestonePreEffectError as exc:
+        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+    except (ValueError, TypeError):
+        # A known construction failure still precedes all service dispatch.
+        exc = MilestonePreEffectError(
+            "milestone_input_invalid", "The milestone draft could not be validated.",
+            field="milestone", received_value=None,
+            rule="Milestone identity, requirement lists and planning policies must satisfy the public contract.",
+            resolution="Read the exact milestone operation contract and correct the draft before submitting it.",
+        )
+        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+
+    try:
+        milestone = runtime.lifecycle.promote_milestone(
+            normalized_project, draft, actor=normalized_actor, request_id=normalized_request,
+        )
+    except MilestonePreEffectError as exc:
+        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+    except Exception:
+        # An unexpected exception may follow commit or an external side effect.
+        # Never expose its raw text or certify a safe mutation retry.
+        return _milestone_effect_unknown(project_id=project_id, request_id=request_id)
+
+    try:
+        result = dict(milestone)
         return envelope(
             tool="fow_promote_milestone",
             status="success",
-            result=dict(milestone),
-            audit_reference={"milestone_id": milestone["milestone_id"]},
+            result=result,
+            audit_reference={"milestone_id": result["milestone_id"],
+                "tool": "fow_promote_milestone", "operation": "call",
+                "project_id": project_id, "request_id": request_id},
         )
-
-    return _guard("fow_promote_milestone", operation)
+    except Exception:
+        # Output construction is after the mutating call returned. Even a typed
+        # validation-shaped exception here cannot certify absence of effects.
+        return _milestone_effect_unknown(project_id=project_id, request_id=request_id)
 
 
 def handle_accept_milestone(
@@ -5157,7 +5387,7 @@ def create_app(
         project_id: str,
         name: str,
         requirement_ids: list[str],
-        dependency_closure_ids: list[str],
+        prerequisite_requirement_ids: list[str],
         entry_policy: dict[str, object],
         exit_policy: dict[str, object],
         risk_disposition: str,
@@ -5170,7 +5400,7 @@ def create_app(
             project_id=project_id,
             name=name,
             requirement_ids=requirement_ids,
-            dependency_closure_ids=dependency_closure_ids,
+            prerequisite_requirement_ids=prerequisite_requirement_ids,
             entry_policy=entry_policy,
             exit_policy=exit_policy,
             risk_disposition=risk_disposition,

@@ -194,7 +194,7 @@ class ArtifactGenerationService:
         lines = self._header("Milestone Audit", context)
         lines.extend(
             [
-                "| Milestone | Name | Status | Risk | Requirement Scope | Dependency Closure |",
+                "| Milestone | Name | Status | Risk | Realized Requirements | Prerequisite Requirements |",
                 "| --- | --- | --- | --- | --- | --- |",
             ]
         )
@@ -207,7 +207,7 @@ class ArtifactGenerationService:
                     status=self._cell(milestone["status"]),
                     risk=self._cell(milestone["risk_disposition"]),
                     requirements=self._cell(", ".join(milestone["requirement_ids"])),
-                    closure=self._cell(", ".join(milestone["dependency_closure_ids"])),
+                    closure=self._cell(", ".join(milestone["prerequisite_requirement_ids"])),
                 )
             )
             mappings.append(

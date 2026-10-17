@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+import json
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_requirement_id
 from flow_of_work_mcp.core.domain.srs import ValidationDisposition
+from flow_of_work_mcp.core.errors import MilestonePreEffectError
 
 
 class PhaseChangeType(StrEnum):
@@ -51,37 +53,72 @@ class ActionExecutionClass(StrEnum):
     GOVERNED_DECISION = "governed_decision"
 
 
+def milestone_prerequisite_gaps(milestone: Mapping[str, object] | None) -> list[Mapping[str, object]]:
+    """Consume the canonical read projection; never infer prerequisite authority."""
+    milestone = milestone or {}
+    return [*milestone.get("prerequisite_mapping_gaps", []),
+            *milestone.get("prerequisite_authority_gaps", [])]
+
+
 @dataclass(frozen=True)
 class MilestoneDraft:
     name: str
     requirement_ids: tuple[str, ...]
-    dependency_closure_ids: tuple[str, ...]
+    prerequisite_requirement_ids: tuple[str, ...]
     entry_policy: Mapping[str, object]
     exit_policy: Mapping[str, object]
     risk_disposition: str
     acceptance_evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "name", required_text(self.name, "name"))
-        object.__setattr__(
-            self,
-            "risk_disposition",
-            required_text(self.risk_disposition, "risk_disposition"),
-        )
+        def reject(code, field_name, value, rule, resolution):
+            raise MilestonePreEffectError(code, rule, field=field_name,
+                received_value=value, rule=rule, resolution=resolution)
+
+        for field_name in ("name", "risk_disposition"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                reject("milestone_input_invalid", field_name, value,
+                       f"{field_name} must be nonempty text.", "Supply the milestone's explicit planning value.")
+            object.__setattr__(self, field_name, value.strip())
         if not self.requirement_ids:
-            raise ValueError("milestone requires at least one requirement")
-        requirement_ids = tuple(validate_requirement_id(item) for item in self.requirement_ids)
-        closure_ids = tuple(validate_requirement_id(item) for item in self.dependency_closure_ids)
-        if len(set(requirement_ids)) != len(requirement_ids):
-            raise ValueError("milestone requirement IDs must be unique")
-        if len(set(closure_ids)) != len(closure_ids):
-            raise ValueError("milestone dependency closure IDs must be unique")
-        if not set(requirement_ids).issubset(set(closure_ids)):
-            raise ValueError("milestone dependency closure must include its requirement IDs")
-        if len(set(self.acceptance_evidence)) != len(self.acceptance_evidence):
-            raise ValueError("milestone acceptance evidence must be unique")
-        object.__setattr__(self, "requirement_ids", requirement_ids)
-        object.__setattr__(self, "dependency_closure_ids", closure_ids)
+            reject("milestone_requirements_empty", "requirement_ids", self.requirement_ids,
+                   "A milestone realizes at least one requirement.", "Select its canonical realized requirements.")
+        for field_name in ("requirement_ids", "prerequisite_requirement_ids", "acceptance_evidence"):
+            raw = getattr(self, field_name)
+            if not isinstance(raw, (list, tuple)):
+                reject("milestone_input_invalid", field_name, raw,
+                       f"{field_name} must be a list of strings.", "Supply an explicit list; use [] for no prerequisites.")
+            normalized = []
+            for item in raw:
+                try:
+                    if not isinstance(item, str):
+                        raise ValueError()
+                    normalized.append(required_text(item, field_name) if field_name == "acceptance_evidence"
+                                      else validate_requirement_id(item))
+                except ValueError:
+                    reject("milestone_input_invalid", field_name, item,
+                           "Evidence references must be nonempty text; requirement IDs must match REQ-000000.",
+                           "Use canonical IDs returned by requirement inspection and actual evidence references.")
+            if len(set(normalized)) != len(normalized):
+                reject("milestone_ids_duplicate", field_name, raw,
+                       f"{field_name} must contain unique values.", "Remove repeated values without copying realized requirements into prerequisites.")
+            object.__setattr__(self, field_name, tuple(normalized))
+        overlap = sorted(set(self.requirement_ids) & set(self.prerequisite_requirement_ids))
+        if overlap:
+            reject("milestone_requirements_overlap", "prerequisite_requirement_ids", overlap,
+                   "Realized and prerequisite requirement lists must be disjoint.",
+                   "Keep current work in requirement_ids; list only requirements of earlier milestones as prerequisites, or [].")
+        for field_name in ("entry_policy", "exit_policy"):
+            raw = getattr(self, field_name)
+            try:
+                if not isinstance(raw, Mapping):
+                    raise TypeError()
+                normalized = json.loads(json.dumps(dict(raw), allow_nan=False, sort_keys=True))
+            except (TypeError, ValueError):
+                reject("milestone_input_invalid", field_name, raw,
+                       f"{field_name} must be a JSON object.", "Supply the explicit milestone policy as a JSON object.")
+            object.__setattr__(self, field_name, normalized)
 
 
 @dataclass(frozen=True)

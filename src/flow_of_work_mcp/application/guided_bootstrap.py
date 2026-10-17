@@ -13,6 +13,7 @@ import json
 from typing import Mapping
 
 from flow_of_work_mcp.core.errors import BootstrapBlockedError, ChangeControlBlockedError
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 from flow_of_work_mcp.application.bootstrap_input_contracts import (
     ANSWER_SCHEMA, CORRESPONDENCE_SCHEMA, REFERENCES_SCHEMA,
 )
@@ -137,7 +138,8 @@ class GuidedBootstrapService:
             'requirement_id', 'title', 'statement', 'category', 'current_revision', 'source_anchor')}}
                         for r in self._ledger.traceability_matrix(project_id)}
         milestones = {m['milestone_id']: {k: m.get(k) for k in (
-            'milestone_id', 'name', 'requirement_ids', 'dependency_closure_ids',
+            'milestone_id', 'name', 'requirement_ids', 'prerequisite_requirement_ids',
+            'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
             'entry_policy', 'exit_policy', 'risk_disposition')}
                       for m in self._ledger.milestones(project_id)}
         graph = self._ledger.goal_graph(project_id)
@@ -262,10 +264,11 @@ class GuidedBootstrapService:
         if unknown:
             raise ValueError('unknown project milestones: ' + ', '.join(sorted(unknown)))
         milestones = [entities['milestone_ids'][m] for m in selected]
-        requirement_ids = {r for m in milestones for r in m['dependency_closure_ids']}
+        requirement_ids = {r for m in milestones for r in m['prerequisite_requirement_ids']}
         requirement_ids.update(r for m in milestones for r in m['requirement_ids'])
         gaps = []
         for m in milestones:
+            gaps.extend({'reason': gap['code'], **gap} for gap in milestone_prerequisite_gaps(m))
             if not m['requirement_ids'] or not m['entry_policy'] or not m['exit_policy']:
                 gaps.append({'reason':'milestone_definition_incomplete', 'milestone_id':m['milestone_id']})
         if not requirement_ids:
@@ -395,7 +398,7 @@ class GuidedBootstrapService:
                 raise ChangeControlBlockedError('guided_roadmap_confirmation_stale')
             change_id = self._ledger.packet_change_id(project_id, packet_id)
             change = self._ledger.change_state(project_id, change_id)
-            packet = next(p for p in change['packets'] if p['packet_id'] == packet_id)
+            next(p for p in change['packets'] if p['packet_id'] == packet_id)
             if change.get('milestone_id') not in confirmation['milestone_ids']:
                 raise ChangeControlBlockedError('packet_outside_confirmed_guided_scope')
 

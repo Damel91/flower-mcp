@@ -145,57 +145,89 @@ class ReleaseAssetsTests(unittest.TestCase):
         digest = hashlib.sha256((self.dist / "install.ps1").read_bytes()).hexdigest()
         self.assertIn(f"{digest}  install.ps1\n", (self.dist / "SHA256SUMS").read_text(encoding="utf-8"))
         self.assertEqual(release.prepare(self.root, self.dist, verify_checksums=True), result)
-        text = notes.read_text(encoding="utf-8")
-        self.assertIn("install.ps1", text)
-        self.assertIn("version-pinned Windows PowerShell launcher", text)
-        self.assertIn("runtime-llama", text)
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        self.assertEqual(notes.read_bytes(), release.release_notes(self.root, self.project))
+        self.assertIn(guide.read_text(encoding="utf-8").splitlines()[0], notes.read_text(encoding="utf-8"))
         self.assertFalse(any(path.name.startswith("runtime_llama") for path in self.dist.iterdir()))
-        self.assertIn(RUNTIME_URL, text)
-        self.assertTrue(text.startswith(f"Flower MCP {self.project['version']}\n\n"))
-        self.assertNotIn("UNRELEASED", text)
-        self.assertNotIn("has not been published", text)
-        self.assertIn("immutable published Flower 0.4.1", text)
-        self.assertIn("Compared with published Flower 0.5.1", text)
-        self.assertIn(f"published 0.5.1 to this {self.project['version']} build requires no new SQLite migration", text)
-        self.assertIn(f"docs/RELEASE-NOTES-{self.project['version']}.md", text)
-        self.assertNotIn("verify the optional runtime wheel against SHA256SUMS", text)
-        self.assertIn(f"releases/download/v{self.project['version']}/install.ps1", text)
-        self.assertIn(
-            "```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass "
-            f"-File .\\install.ps1 -Version '{self.project['version']}' -Platform codex\n```",
-            text,
+
+    def test_generated_notes_bind_relative_guides_to_exact_release_tag_without_rewriting_prose(self):
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        content = (f"# Flower MCP {self.project['version']}\n\n"
+                   "Keep **bounded** claims and multiline evidence.\n\n"
+                   "Read [upgrade](UPGRADING.md#preservation) and [external](https://example.invalid/notes.md).\n")
+        guide.write_text(content, encoding="utf-8")
+        source_sha256 = hashlib.sha256(guide.read_bytes()).hexdigest()
+        self.packages()
+        output = self.root / "generated-notes.md"
+        release.prepare(self.root, self.dist, notes=output)
+        expected = content.replace(
+            "](UPGRADING.md#preservation)",
+            f"](https://github.com/Damel91/flower-mcp/blob/v{self.project['version']}/docs/UPGRADING.md#preservation)",
         )
-        self.assertIn("-NoRegister", text)
-        self.assertNotIn("releases/download/v0.1.0/install.ps1", text)
-        self.assertIn("docs/presentation/index.html", text)
-        self.assertIn("continuous external-agent recovery", text)
-        self.assertIn("additive SQLite migrations 52 to 55", text)
-        self.assertIn("37 public MCP tool names are retained", text)
-        self.assertIn("schema adds optional mode=sync_only alongside the default mode=advance", text)
-        self.assertNotIn("their schemas are unchanged", text)
-        self.assertIn("coherent author receipts and immutable replay", text)
-        self.assertIn("provider delta synchronization without START", text)
-        self.assertIn("bounded provider RPC deadlines with exact UNKNOWN recovery", text)
-        self.assertIn("Managed-writer observation and its deferred U6 integration are excluded", text)
-        self.assertIn("complete SRS rejection diagnostics", text)
-        self.assertIn(f"published 0.4.1 to this {self.project['version']} build requires no new SQLite migration", text)
-        self.assertIn("schema 55 and the same local ledger are retained", text)
-        self.assertIn("commands below require the corresponding published assets", text)
-        self.assertIn("During release preparation, use the checked local wheel", text)
-        self.assertIn("https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1", text)
-        self.assertNotIn("commands select the immutable published release", text)
-        self.assertIn("docs/ADVANCED-CONFIGURATION.md", text)
-        self.assertIn("exact Flower wheel and SHA256 recorded by its installation receipt", text)
-        self.assertIn("same-version source checkout or rebuilt wheel is not a substitute", text)
-        self.assertNotIn("This release adds durable architecture", text)
-        self.assertNotIn("There is no SQLite schema migration", text)
-        self.assertIn("Real paired provider qualification", text)
-        self.assertIn("--upgrade --dry-run", text)
-        self.assertIn("-Upgrade -DryRun", text)
-        self.assertIn(f"blob/v{self.project['version']}/docs/UPGRADING.md", text)
-        self.assertIn("consistent SQLite backup", text)
-        self.assertIn("atomic pip rollback", text)
-        self.assertNotIn("This release adds Antigravity", text)
+        self.assertEqual(output.read_text(encoding="utf-8"), expected)
+        self.assertEqual(guide.read_text(encoding="utf-8"), content)
+        self.assertEqual(hashlib.sha256(guide.read_bytes()).hexdigest(), source_sha256)
+        self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), hashlib.sha256(expected.encode("utf-8")).hexdigest())
+        self.assertNotEqual(hashlib.sha256(output.read_bytes()).hexdigest(), source_sha256)
+
+    def test_generated_notes_reject_missing_relative_guide_before_asset_changes(self):
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        guide.write_text(f"# Flower MCP {self.project['version']}\n\nRead [missing](MISSING.md).\n", encoding="utf-8")
+        before = {path.name: path.read_bytes() for path in self.dist.iterdir()}
+        with self.assertRaisesRegex(ValueError, "missing regular guide"):
+            release.prepare(self.root, self.dist, notes=self.root / "generated-notes.md")
+        self.assertEqual({path.name: path.read_bytes() for path in self.dist.iterdir()}, before)
+
+    def test_generated_notes_preserve_reviewed_breaking_contract_and_upgrade_guidance(self):
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        content = (
+            f"# Flower MCP {self.project['version']}\n\n"
+            "Candidate: installed/CI/HTTPS qualification remains pending.\n\n"
+            "Breaking input: prerequisite_requirement_ids replaces dependency_closure_ids.\n"
+            "First milestone uses []; previous producers are distinct from current coding work.\n"
+            "Correlated flow.operation-effect.v1 rejects before effect; post-commit stays unknown.\n"
+            "Native project-purge is outside MCP; Windows durability is unqualified.\n"
+            "Same-schema55 upgrade preserves SQLite, receipts, evidence and YAML.\n"
+            "Use --upgrade --dry-run and --backup-root before pip; no atomic package rollback.\n"
+            "Supported schema52→55 migration is a separate checkpoint.\n"
+            "Optional runtime-llama0.5.0 is inference-only; core needs no endpoint.\n"
+        ).encode("utf-8")
+        guide.write_bytes(content)
+        self.packages()
+        output = self.root / "generated-notes.md"
+        release.prepare(self.root, self.dist, notes=output)
+        self.assertEqual(output.read_bytes(), content)
+        self.assertNotIn(b"retain their callable contracts", output.read_bytes())
+        release.prepare(self.root, self.dist, verify_checksums=True, notes=output)
+        self.assertEqual(output.read_bytes(), content)
+
+    def test_generated_notes_reject_wrong_version_or_empty_guidance_before_asset_changes(self):
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        output = self.root / "generated-notes.md"
+        original_assets = {path.name: path.read_bytes() for path in self.dist.iterdir()}
+        for content in ("# Flower MCP 99.0.0\n\nWrong version.\n",
+                        f"# Flower MCP {self.project['version']}\n\n", ""):
+            with self.subTest(content=content):
+                guide.write_text(content, encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "exact version"):
+                    release.prepare(self.root, self.dist, notes=output)
+                self.assertFalse(output.exists())
+                self.assertEqual({path.name: path.read_bytes() for path in self.dist.iterdir()}, original_assets)
+
+    def test_generated_notes_require_regular_versioned_authority(self):
+        guide = self.root / "docs" / f"RELEASE-NOTES-{self.project['version']}.md"
+        guide.unlink()
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            release.prepare(self.root, self.dist, notes=self.root / "generated-notes.md")
+        guide.mkdir()
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            release.release_notes(self.root, self.project)
+        guide.rmdir()
+        target = self.root / "other-notes.md"
+        target.write_text(f"# Flower MCP {self.project['version']}\n\nExternal notes.\n", encoding="utf-8")
+        guide.symlink_to(target)
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            release.release_notes(self.root, self.project)
 
     def test_project_dependency_accepts_normalized_name_and_spacing(self):
         self.change_inference(f" Runtime.Llama@  {RUNTIME_URL} ")
@@ -317,6 +349,14 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.packages(replace={"docs/UPGRADING.md": b"Unexpected stale upgrade instructions.\n"})
         with self.assertRaisesRegex(ValueError, "source distribution docs/UPGRADING.md differs"):
             release.prepare(self.root, self.dist)
+
+    def test_sdist_release_guide_drift_cannot_generate_release_notes(self):
+        path = f"docs/RELEASE-NOTES-{self.project['version']}.md"
+        self.packages(replace={path: b"Stale callable-contract or qualification claims.\n"})
+        output = self.root / "generated-notes.md"
+        with self.assertRaisesRegex(ValueError, f"source distribution {re.escape(path)} differs"):
+            release.prepare(self.root, self.dist, notes=output)
+        self.assertFalse(output.exists())
 
     def test_sdist_must_include_each_container_build_source(self):
         for source in sorted(release.CONTAINER_SOURCES):

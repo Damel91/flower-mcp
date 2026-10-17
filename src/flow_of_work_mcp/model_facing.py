@@ -271,7 +271,7 @@ def project_markdown(
         result_heading=spec.result_heading,
         artifact_keys=spec.artifact_keys,
         exact_call_keys=spec.exact_call_keys,
-        preserve_multiline=complete_evidence,
+        preserve_multiline=complete_evidence or payload.get("status") in {"rejected", "blocked", "failed"},
     )
     if complete_evidence:
         # A single explicitly requested evidence body is a complete reference,

@@ -64,6 +64,7 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_tool_definitions.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_snapshot_read_cost.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_mcp_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_packet_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_mfpr_structured_provider.py"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_milestone_prerequisites.py" "$GITHUB_WORKSPACE/tests/test_milestone_effect_receipts.py" "$GITHUB_WORKSPACE/tests/test_milestone_public_contract.py" "$GITHUB_WORKSPACE/tests/test_external_milestone_progress.py" "$GITHUB_WORKSPACE/tests/test_guided_bootstrap.py" "$GITHUB_WORKSPACE/tests/test_external_work.py"
           export FLOWER_HOME="$RUNNER_TEMP/bootstrap-no-profile"
           test ! -e "$FLOWER_HOME"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" bootstrap > "$RUNNER_TEMP/flower-bootstrap.md"
@@ -71,6 +72,12 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from pathlib import Path; from importlib.resources import files; import os; output = Path(os.environ["RUNNER_TEMP"]).joinpath("flower-bootstrap.md").read_bytes(); canonical = files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_bytes(); assert output == canonical, "Bootstrap command differs from its bundled instructions"; assert all(marker in output for marker in (b"fow_interaction", b"fow_capabilities", b"fow_handover", b"<!-- flower-mcp:begin -->", b"<!-- flower-mcp:end -->")), "Bootstrap command omits essential instructions"'
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_mcp.py" --command "$RUNNER_TEMP/flower-wheel/bin/flower-mcp" --output "$RUNNER_TEMP/flower-mcp-smoke.json"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" "$GITHUB_WORKSPACE/tools/smoke_client_registration.py" --python "$RUNNER_TEMP/flower-wheel/bin/python" --output "$RUNNER_TEMP/flower-google-client-smoke.json"
+      - name: Check installed native purge guards and recovery / Linux POSIX only
+        if: matrix.python == '3.11'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_native_project_purge.py"
       - name: Upgrade the published baseline while preserving public lifecycle state
         if: matrix.python == '3.11'
         run: python tools/smoke_upgrade.py --assets dist --root "$RUNNER_TEMP/flower-upgrade" --output "$RUNNER_TEMP/flower-upgrade-smoke.json"
@@ -246,6 +253,69 @@ jobs:
           }
           if ((Test-Path $profile) -or (Test-Path $env:FLOWER_HOME)) {
             throw 'Bootstrap created a lifecycle profile.'
+          }
+      - name: Check installed native prepare durability refusal / no Windows deletion acceptance
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = Join-Path $env:RUNNER_TEMP 'flower-installer-venv\Scripts\python.exe'
+          $nativeGuard = @'
+          from contextlib import closing
+          from importlib.resources import files
+          import json, os, sqlite3, subprocess, sys, tempfile
+          from pathlib import Path
+          from uuid import uuid4
+          import yaml
+          import flow_of_work_mcp
+          from flow_of_work_mcp import SQLiteRequirementLedger
+          assert os.name == 'nt', 'This checkpoint only checks native Windows refusal.'
+          assert Path(flow_of_work_mcp.__file__).is_relative_to(Path(sys.prefix))
+          def snapshot(database):
+              with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as connection:
+                  connection.execute('BEGIN')
+                  assert connection.execute('PRAGMA integrity_check').fetchall() == [('ok',)]
+                  assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
+                  return '\n'.join(connection.iterdump())
+          with tempfile.TemporaryDirectory(prefix='flower-native-windows-guard-', dir=os.environ['RUNNER_TEMP']) as directory:
+              root = Path(directory).resolve()
+              database = root / 'ledger.sqlite3'
+              config = root / 'flower.yaml'
+              # Synthetic owned fixture only; this is not a public-MCP purge qualification.
+              ledger = SQLiteRequirementLedger(database)
+              ledger.create_project('target', 'Owned native guard target', actor='ci-synthetic-fixture')
+              ledger.create_project('sentinel', 'Owned retained project', actor='ci-synthetic-fixture')
+              payload = yaml.safe_load(files('flow_of_work_mcp').joinpath('resources/standalone.yaml').read_text())
+              payload['runtime'].update(database_path=str(database), import_root=str(root / 'imports'))
+              payload['logging']['logs_path'] = str(root / 'logs')
+              config.write_text(yaml.safe_dump(payload), encoding='utf-8')
+              before, yaml_before = snapshot(database), config.read_bytes()
+              result = subprocess.run([sys.executable, '-m', 'flow_of_work_mcp.cli', 'project-purge', 'prepare',
+                  '--config', str(config), '--project-id', 'target', '--deletion-id', str(uuid4())],
+                  cwd=root, text=True, encoding='utf-8', capture_output=True, timeout=30)
+              assert result.returncode == 3, (result.returncode, result.stdout, result.stderr)
+              assert result.stderr == '' and len(result.stdout.splitlines()) == 1
+              response = json.loads(result.stdout)
+              assert response['status'] == 'blocked'
+              assert response['diagnostics'][0]['code'] == 'native_purge_durability_unavailable'
+              assert response['project_effect_state'] == 'none' and response['journal_changed'] is False
+              assert response['project_present'] is True
+              assert snapshot(database) == before and config.read_bytes() == yaml_before
+              assert not database.with_name(database.name + '.project-purge').exists()
+              print(json.dumps({'status': 'passed', 'scope': 'Windows prepare-only durability refusal',
+                  'deletion_executed': False, 'native_windows_deletion_qualified': False,
+                  'diagnostic': response['diagnostics'][0]['code']}))
+          '@
+          $savedPythonPath = $env:PYTHONPATH
+          Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+          Push-Location $env:RUNNER_TEMP
+          try {
+            & $python -c $nativeGuard
+            if ($LASTEXITCODE -ne 0) { throw 'Installed native Windows prepare-only durability guard failed.' }
+          }
+          finally {
+            Pop-Location
+            if ($null -eq $savedPythonPath) { Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
+            else { $env:PYTHONPATH = $savedPythonPath }
           }
       - name: Upgrade the published baseline on Windows with its SQLite state
         shell: powershell

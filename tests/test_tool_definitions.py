@@ -176,7 +176,8 @@ def test_all_181_canonical_examples_match_unchanged_sdk_input_shapes(tools):
     assert claim.claim_type.value == "target"
     assert claim.claim_key.startswith("replace-with-")
     milestone = registry.operation_contract("fow_promote_milestone", "call")["example"]
-    assert milestone["entry_policy"]["requires_milestone"][0].startswith("replace-with-")
+    assert milestone["entry_policy"]["requires_milestone"] == []
+    assert milestone["prerequisite_requirement_ids"] == []
     assert milestone["exit_policy"]["verification"].startswith("Replace with")
 
 

@@ -377,7 +377,7 @@ def governing_milestone(ledger, ids):
     requirement_id = ledger.change_state(*ids[:2])['requirement_ids'][0]
     milestone = ledger.promote_milestone(ids[0], MilestoneDraft(
         name='Offline producer and consumer delivery', requirement_ids=(requirement_id,),
-        dependency_closure_ids=(requirement_id,), entry_policy={'intent': 'Scenario scope is explicitly confirmed.'},
+        prerequisite_requirement_ids=(), entry_policy={'intent': 'Scenario scope is explicitly confirmed.'},
         exit_policy={'verification': 'An independent delivery campaign remains deferred.'},
         risk_disposition='Integer overflow compatibility remains an explicitly bounded delivery risk.'), actor='human')
     ChangeControlService(ledger).link_change_milestone(*ids[:2], milestone['milestone_id'], actor='human')
@@ -399,7 +399,7 @@ def test_export_resolves_governing_milestone_context_without_creating_unit_oblig
     context = exported['content'].split('### Governing milestone', 1)[1].split('### In scope', 1)[0]
     for essential in [milestone['milestone_id'], milestone['name'],
                       milestone['entry_policy']['intent'], milestone['exit_policy']['verification'],
-                      milestone['risk_disposition'], 'Requirement ids', 'Dependency closure ids',
+                      milestone['risk_disposition'], 'Requirement ids', 'Prerequisite requirement ids',
                       'milestone context and deferred lifecycle authority']:
         assert essential in context
     assert '**Status:**' not in context and 'Acceptance evidence' not in context and 'Created at' not in context
@@ -480,7 +480,7 @@ def test_unlinked_plan_ignores_unrelated_milestones_and_preserves_export_identit
     original = service.call(*ids, 'export_plan', actor='agent', request_id='unlinked-original', payload=revs)
     requirement_id = ledger.change_state(*ids[:2])['requirement_ids'][0]
     ledger.promote_milestone(ids[0], MilestoneDraft(name='Unrelated canonical milestone', requirement_ids=(requirement_id,),
-        dependency_closure_ids=(requirement_id,), entry_policy={'intent': 'Different delivery'},
+        prerequisite_requirement_ids=(), entry_policy={'intent': 'Different delivery'},
         exit_policy={'check': 'Different verification'}, risk_disposition='Unrelated risk'), actor='human')
     def forbidden(*_args, **_kwargs):
         raise AssertionError('Unlinked packet consulted unrelated milestones')

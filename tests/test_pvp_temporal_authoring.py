@@ -201,7 +201,7 @@ def test_deferred_only_export_frontier_report_restart_and_progress_stay_truthful
     revs, units = replace_with_deferred(ledger, ids)
     requirement_id = ledger.change_state(*ids[:2])["requirement_ids"][0]
     milestone = ledger.promote_milestone(ids[0], MilestoneDraft(name="Deferred verification boundary",
-        requirement_ids=(requirement_id,), dependency_closure_ids=(requirement_id,),
+        requirement_ids=(requirement_id,), prerequisite_requirement_ids=(),
         entry_policy={"scope": "declared"}, exit_policy={"acceptance": "human"}, risk_disposition="bounded"), actor="human")
     ChangeControlService(ledger).link_change_milestone(*ids[:2], milestone["milestone_id"], actor="human")
     exported = external.call(*ids, "export_plan", payload=revs, actor="agent", request_id="export-deferred")

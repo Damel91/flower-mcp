@@ -33,6 +33,16 @@ def build_cli_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8010)
     commands.add_parser("probe", add_help=False, help="inspect an explicit HTTP MCP endpoint; use probe --help")
+    purge = commands.add_parser("project-purge", help="native user control: prepare/inspect/delete/reconcile an owned project; never a model tool")
+    purge.add_argument("purge_operation", choices=("prepare", "inspect", "delete", "reconcile"))
+    _location_options(purge, config=True)
+    purge.add_argument("--project-id", required=True)
+    purge.add_argument("--deletion-id", required=True)
+    purge.add_argument("--expected-fingerprint", default="")
+    purge.add_argument("--confirm-project-id", default="")
+    purge.add_argument("--host-quiescence-ref", default="")
+    purge.add_argument("--host-stopped-run-id", action="append", default=[])
+    purge.add_argument("--acknowledge-host-cleanup", action="store_true")
     for operation in ("install", "doctor", "uninstall"):
         command = commands.add_parser(operation)
         _location_options(command)
@@ -56,6 +66,13 @@ def main(argv: list[str] | None = None) -> None:
         values.insert(0, "serve")
     parser = build_cli_parser()
     args = parser.parse_args(values)
+    if args.operation == "project-purge":
+        from flow_of_work_mcp.native_project_purge import run_project_purge
+        result, exit_code = run_project_purge(args)
+        print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+        if exit_code:
+            raise SystemExit(exit_code)
+        return
     try:
         if args.operation == "bootstrap":
             print(files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_text(encoding="utf-8"), end="")

@@ -21,6 +21,7 @@ from flow_of_work_mcp.application.grounding_readiness import (
 )
 from flow_of_work_mcp.core.domain import PACKET_INACTIVE_STATUS_VALUES, PacketStatus
 from flow_of_work_mcp.core.domain.external_work import fingerprint
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 
 
 REQUIREMENT_LEDGER_VERSION_NAMESPACE = "requirement_events.max_event_id.v1"
@@ -82,12 +83,14 @@ class MilestoneTraceabilityProjectionService:
         milestone_rows = []
         for identity in selected:
             milestone = milestones_by_id[identity]
-            requirement_ids = set(milestone.get('requirement_ids', [])) | set(milestone.get('dependency_closure_ids', []))
-            gaps = []
+            requirement_ids = set(milestone.get('requirement_ids', []))
+            context_requirement_ids = requirement_ids | set(milestone.get('prerequisite_requirement_ids', []))
+            gaps = milestone_prerequisite_gaps(milestone)
             milestone_basis.append({k: milestone.get(k) for k in ('milestone_id', 'name', 'requirement_ids',
-                'dependency_closure_ids', 'entry_policy', 'exit_policy', 'risk_disposition')})
+                'prerequisite_requirement_ids', 'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
+                'entry_policy', 'exit_policy', 'risk_disposition')})
             semantic_requirements = []
-            for requirement_id in sorted(requirement_ids):
+            for requirement_id in sorted(context_requirement_ids):
                 requirement = requirements.get(requirement_id)
                 if requirement is None:
                     gaps.append({'code': 'milestone_requirement_missing', 'requirement_id': requirement_id})
@@ -135,6 +138,9 @@ class MilestoneTraceabilityProjectionService:
             verification = _progress_counter(criteria, 'local_verification_state', 'passed', scope_complete)
             accepted = _milestone_acceptance_projection(milestone)
             milestone_rows.append({'milestone_id': identity, 'name': milestone['name'], 'status': milestone['status'],
+                'requirement_ids': list(milestone['requirement_ids']),
+                'prerequisite_requirement_ids': list(milestone['prerequisite_requirement_ids']),
+                'prerequisite_producers': milestone.get('prerequisite_producers', {}),
                 'acceptance': accepted, 'scope_complete': scope_complete, 'gaps': gaps,
                 'active_criteria': len(criteria), 'implementation': implementation, 'local_verification': verification,
                 'criteria': criteria, 'packets': packet_rows, 'deferred_obligations': deferred,
@@ -230,11 +236,17 @@ class MilestoneTraceabilityProjectionService:
                     "name": str(milestone["name"]),
                     "status": str(milestone["status"]),
                     "requirement_ids": [str(item) for item in milestone.get("requirement_ids", [])],
+                    "prerequisite_requirement_ids": list(milestone.get("prerequisite_requirement_ids", [])),
+                    "prerequisite_producers": milestone.get("prerequisite_producers", {}),
+                    "prerequisite_mapping_gaps": list(milestone.get("prerequisite_mapping_gaps", [])),
+                    "prerequisite_authority_gaps": list(milestone.get("prerequisite_authority_gaps", [])),
                 }
                 for milestone in milestones
             ],
             "rows": rows,
-            "gaps": _dedupe_gaps(row for row in rows),
+            "gaps": [*_dedupe_gaps(row for row in rows),
+                     *(dict(gap) for milestone in milestones
+                       for gap in milestone_prerequisite_gaps(milestone))],
         }
 
     def _row(

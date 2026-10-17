@@ -24,7 +24,7 @@ def _basic_project(runtime):
     requirement = requirements.register('alpha', RequirementDraft(title='Complete recovery',
         statement='The server shall expose complete current authority.', category='functional'), actor='fixture')
     milestone = runtime.lifecycle.promote_milestone('alpha', MilestoneDraft(name='Recovery',
-        requirement_ids=(requirement['requirement_id'],), dependency_closure_ids=(requirement['requirement_id'],),
+        requirement_ids=(requirement['requirement_id'],), prerequisite_requirement_ids=(),
         entry_policy={}, exit_policy={}, risk_disposition='none'), actor='fixture')
     return requirements, requirement, milestone
 

@@ -229,7 +229,13 @@ def test_unrelated_sensitive_conflict_remains_generic_in_both_public_channels(tm
         envelope = response.structuredContent["result"]
         assert envelope["status"] == "rejected"
         assert envelope["reason"] == "state_conflict"
-        assert envelope["result"] == {}
+        recovery = envelope["result"]
+        assert recovery["effect_state"] == "unknown"
+        assert recovery["operation_state"] == "unknown"
+        assert "effect_receipt" not in recovery
+        assert recovery["next_tool_call"]["tool"] == "fow_capabilities"
+        assert recovery["next_tool_call"]["arguments"]["view"] == "summary"
+        assert recovery["diagnostics"][0]["code"] == "state_conflict"
         assert secret not in json.dumps(response.structuredContent)
         assert secret not in response.content[0].text
         assert _rows(path) == before

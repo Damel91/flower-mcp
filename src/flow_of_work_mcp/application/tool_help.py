@@ -64,7 +64,7 @@ FIELD_HELP = MappingProxyType({
     "coverage_intent": "Explanation of the behavior or risk the selected campaign obligation is intended to cover.",
     "criterion_results": "Declared results for the packet's completion criteria; completion, verification and acceptance remain distinct.",
     "decision": "Structured gate decision; its shape depends on the tool and current returned gate.",
-    "dependency_closure_ids": "Requirement IDs included in the milestone's explicit dependency closure.",
+    "prerequisite_requirement_ids": "Existing requirements realized by earlier registered milestones in this same project, needed as prerequisites for the new milestone. Keep disjoint from requirement_ids. Use [] for the first or an independent milestone; do not copy its own requirements or infer transitive dependencies.",
     "depends_on": "Existing plan-unit identities this unit must consume before becoming executable.",
     "depends_on_packet_id": "Existing predecessor packet ID to link as a dependency of the selected packet.",
     "depends_on_step_id": "Existing predecessor run-step ID that must complete before the selected step can start.",
@@ -261,7 +261,8 @@ FIELD_OVERRIDES = MappingProxyType({
     ("fow_capabilities", "view"): "Progressive discovery: summary for the bounded catalog, recipe for one workflow, operation for one exact contract, docs for the tool reference, full for diagnostics.",
     ("fow_goal", "view"): "Goal-graph projection selected by operation=view; use the canonical views listed in exact operation help.",
     ("fow_semantic", "source_revision"): "Declared grounding/source revision. The assignment also retains a prepared authority snapshot; submitting a different revision does not make stale evidence current.",
-    ("fow_promote_milestone", "acceptance_evidence"): "Reserved compatibility input; milestone promotion plans scope and rejects nonempty acceptance evidence. Use fow_accept_milestone for actual governed acceptance.",
+    ("fow_promote_milestone", "acceptance_evidence"): "Optional evidence references attached to this planned milestone. Recording these references never accepts the result; actual governed acceptance uses fow_accept_milestone.",
+    ("fow_promote_milestone", "requirement_ids"): "Nonempty unique requirements realized by this milestone. These define its implementation and verification scope; previous-milestone prerequisites belong only in prerequisite_requirement_ids.",
 })
 
 
@@ -285,7 +286,7 @@ TOOL_GUIDANCE = MappingProxyType({
     "fow_validate_srs": ("Supply a readable local Markdown SRS and supported standard_profile.", "Schedules durable structural validation and reads the source. Semantic checks use fow_semantic; validation alone does not import or accept a baseline."),
     "fow_import_srs": ("Supply a structurally/semantically eligible initial local SRS under the selected profile.", "Validates source provenance and atomically imports the initial canonical baseline. Existing baseline replacement uses revise_srs_baseline; import is not stakeholder acceptance."),
     "fow_revise_srs_baseline": ("Use the exact current previous_baseline_id, changed local source and any required governed approval.", "Classifies source-proven changes and appends a baseline revision; impacted authority/evidence may require reconciliation. Does not silently accept drift."),
-    "fow_promote_milestone": ("Supply canonical requirements, dependency closure and planning entry/exit/risk policies.", "Records planned milestone scope. Nonempty acceptance_evidence is rejected; promotion does not accept the result."),
+    "fow_promote_milestone": ("Supply existing requirements realized by this milestone and separate disjoint prerequisite_requirement_ids from earlier milestones in the same project. First or independent milestone uses []. Declare entry/exit/risk policies.", "Records planned scope and prerequisite relationships. Earlier membership does not prove completion or acceptance. An audited pre-effect rejection returns a correlated no-effect receipt and correction; uncertain effects require inspection. Promotion never accepts the result."),
     "fow_accept_milestone": ("Use an existing eligible milestone and actual governed acceptance evidence after required verification/campaign closure.", "Appends explicit acceptance authority under policy guards; never substitutes agent completion for acceptance."),
     "fow_audit_phase": ("Use a defined requirement scope; retain the same requirement selection when reusing its scope_id.", "Schedules a durable local audit of traceability changes since the prior scope snapshot. No model/provider call or lifecycle transition; audit evidence is distinct from acceptance."),
     "fow_what_next": ("Select existing project/scope and optional milestone, then follow returned bounded pages.", "Read-only next-work projection from current authority/dependencies; no code execution or provider probes."),

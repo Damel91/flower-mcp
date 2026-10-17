@@ -115,8 +115,33 @@ def asset_names(project: dict) -> set[str]:
 
 
 def release_documentation(project: dict) -> set[str]:
-    return {"docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/glama-build-spec.example.json",
+    return {"docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/NATIVE-PROJECT-DELETION.md",
+            "docs/INFERENCE.md", "docs/ADVANCED-CONFIGURATION.md", "docs/glama-build-spec.example.json",
             f"docs/RELEASE-NOTES-{project['version']}.md"}
+
+
+def release_notes(root: Path, project: dict) -> bytes:
+    """Use the checked versioned guide as the sole release-note authority."""
+    source = root / "docs" / f"RELEASE-NOTES-{project['version']}.md"
+    if source.is_symlink() or not source.is_file():
+        raise ValueError("versioned release notes must be a regular file")
+    payload = source.read_bytes()
+    lines = payload.decode("utf-8").splitlines()
+    if not lines or lines[0] != f"# Flower MCP {project['version']}" or not any(
+        line.strip() for line in lines[1:]
+    ):
+        raise ValueError("versioned release notes must name the exact version and contain its reviewed guidance")
+    # A GitHub Release body has a different relative-link base from docs/. Keep
+    # reviewed prose intact while binding sibling guide links to this exact tag.
+    def guide_link(match: re.Match) -> str:
+        name, fragment = match.groups()
+        target = root / "docs" / name
+        if target.is_symlink() or not target.is_file():
+            raise ValueError("versioned release notes reference a missing regular guide")
+        return f"](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/{name}{fragment or ''})"
+
+    text = re.sub(r"\]\(([A-Za-z0-9][A-Za-z0-9_.-]*\.md)(#[^\s)]*)?\)", guide_link, payload.decode("utf-8"))
+    return text.encode("utf-8")
 
 
 def check_inventory(dist: Path, project: dict, *, require_copied_assets: bool = True) -> None:
@@ -206,6 +231,7 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
             *, verify_checksums: bool = False, notes: Path | None = None) -> dict:
     root, dist = root.resolve(), dist.resolve()
     project = validate_project(root, requested_version)
+    note_payload = release_notes(root, project)
     if not verify_checksums:
         check_inventory(dist, project, require_copied_assets=False)
         for source_path in ASSET_SOURCES.values():
@@ -225,94 +251,7 @@ def prepare(root: Path, dist: Path, requested_version: str | None = None,
         checksum_path.write_text(checksums, encoding="utf-8")
     if notes is not None:
         notes.parent.mkdir(parents=True, exist_ok=True)
-        notes.write_text(
-            f"Flower MCP {project['version']}\n\n"
-            "Python 3.11 or newer. Apache-2.0; LICENSE and NOTICE are included inside both packages.\n\n"
-            "Seven versioned assets: Flower Python wheel, source distribution, "
-            "install.sh, install.ps1, install_flower.py, BOOTSTRAP.md and SHA256SUMS.\n"
-            "The Python distribution remains flow-of-work-mcp; the primary command is flower-mcp.\n\n"
-            "The immutable published Flower 0.4.1 release and its eight historical assets, including runtime 0.4.0, remain unchanged. "
-            f"This build uses version {project['version']} and does not replace those historical assets. "
-            "Its inference extra instead acquires the independently released public runtime-llama 0.5.0 wheel. "
-            "The Flower build and core installers do not download inference.\n\n"
-            "Compared with published Flower 0.5.1, this patch corrects repeated authority hydration and "
-            "shared-predecessor PVP computation in complete project recovery. "
-            "Reuse is confined to one coherent read or projection invocation; writes and fresh requests receive fresh authority. "
-            "Complete snapshots, PVP fingerprints, gates, evidence provenance and the existing deadlines are retained. "
-            "On the declared isolated test fixture, complete public recovery took approximately 1.7 seconds; "
-            "the independent Noxi adapter took approximately 2 seconds with its original 10-second deadline. "
-            "These are bounded measurements, not a universal latency guarantee or a production deployment claim. "
-            "The same 37 tools and 445 input parameters retain their callable contracts. "
-            "The tool-definition improvements informed by Glama feedback remain from 0.5.1; "
-            "no new Glama score or account build is claimed for 0.5.2. "
-            "Published 0.5.0 and 0.5.1 assets remain immutable.\n\n"
-            f"Upgrading published 0.5.1 to this {project['version']} build requires no new SQLite migration: "
-            "schema 55 and the same local ledger are retained. "
-            f"For this version's complete upgrade commands, read [the versioned release guide](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/RELEASE-NOTES-{project['version']}.md).\n\n"
-            "This build includes explicit PVP capability discovery and deferred-only verification declarations, "
-            "canonical verbose provider receipts, coherent author receipts and immutable replay, "
-            "read-only external-work recovery, provider delta synchronization without START, "
-            "and bounded provider RPC deadlines with exact UNKNOWN recovery and cancellation cleanup. "
-            "Glama uv startup uses the core dependency path; hosted Glama qualification remains separate. "
-            "Managed-writer observation and its deferred U6 integration are excluded.\n\n"
-            "This build retains complete SRS rejection diagnostics for initial imports and baseline revisions when several findings share a code. "
-            "Rejected documents remain rejected; all detailed findings and anchors are retained, without materializing baseline authority. "
-            "It retains durable architecture authority, explicit executor selection, negotiated PVP handoff and continuous external-agent recovery from 0.4.0. "
-            "The existing 37 public MCP tool names are retained. "
-            "Relative to published 0.4.1, the fow_packet_advance schema adds optional mode=sync_only alongside the default mode=advance; "
-            "author receipts and recovery responses also expose the corrected current-authority and replay information. "
-            f"Upgrading published 0.4.1 to this {project['version']} build requires no new SQLite migration: "
-            "schema 55 and the same local ledger are retained. "
-            "Upgrading an older 0.3.1 installation still applies the existing additive SQLite migrations 52 to 55 on first server start. "
-            "Use the planned, backed-up upgrade route for installer-owned environments to retain the existing profile and client registration. "
-            "Optional runtime-llama is independently upgraded only when explicitly installed; core and host execution need no model endpoint. "
-            "Real paired provider qualification and human acceptance remain separate. Flower remains in testing.\n\n"
-            "Install the checked wheel in a new isolated environment. "
-            "For an existing installer-owned environment, use the reviewed upgrade route below so its ownership receipt remains coherent:\n\n"
-            f"```sh\npython -m pip install ./flow_of_work_mcp-{project['version']}-py3-none-any.whl\n```\n\n"
-            "For optional internal inference in that manual environment, install the extra from this same checked wheel, "
-            "then configure an authorized endpoint. In an installer-owned environment, complete the normal core upgrade first "
-            "and use the exact Flower wheel and SHA256 recorded by its installation receipt; "
-            "a same-version source checkout or rebuilt wheel is not a substitute:\n\n"
-            f"```sh\npython -m pip install './flow_of_work_mcp-{project['version']}-py3-none-any.whl[inference]'\n```\n\n"
-            f"Pinned upstream dependency: `runtime-llama @ {RUNTIME_URL}`. "
-            "Its SHA-256 belongs to llama-runtime's release, not Flower's SHA256SUMS. "
-            "For verified offline acquisition and explicit runtime upgrades, see docs/INFERENCE.md from this source. "
-            "See docs/ADVANCED-CONFIGURATION.md for supported semantic roles, authorized provider routes and portable association receipts.\n\n"
-            "The version-pinned commands below require the corresponding published assets. "
-            "During release preparation, use the checked local wheel in a new environment, or the "
-            "[immutable published v0.4.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1). "
-            "The installer chooses your coding client in the terminal:\n\n"
-            f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash\n```\n\n"
-            "The installer prepares the Python environment and checks downloaded backend and wheel hashes.\n"
-            "Already installed? Stop all Flower processes and clients sharing its environment before updating. "
-            "Use the same environment, profile and profile root. An owned upgrade defaults to no registration, "
-            "requires the existing profile, and creates a consistent SQLite backup plus the exact profile YAML before package changes.\n\n"
-            f"```sh\ncurl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.sh | bash -s -- --upgrade --dry-run\n```\n\n"
-            "Inspect the returned plan, then repeat without --dry-run to perform the upgrade. "
-            "Supply the original --venv, --profile and --profile-root options for a custom installation. "
-            "Do not pass --platform or --client-config during an upgrade. "
-            "The installer does not stop clients, restore data automatically or promise atomic pip rollback. "
-            f"See [safe upgrades and manual installations](https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/UPGRADING.md).\n\n"
-            "The ordinary installer installs only Flower core. Use the explicit wheel-extra command above "
-            "for optional inference; core and host execution need no model endpoint.\n\n"
-            "Windows: obtain the version-pinned Windows PowerShell launcher, install.ps1, from the matching version's published assets. "
-            "Run the download and execution commands separately, inspecting the script before execution:\n\n"
-            f"```powershell\nInvoke-WebRequest -UseBasicParsing -Uri \"https://github.com/Damel91/flower-mcp/releases/download/v{project['version']}/install.ps1\" -OutFile \".\\install.ps1\"\n```\n\n"
-            f"```powershell\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\install.ps1 -Version '{project['version']}' -Platform codex\n```\n\n"
-            "Use -Platform claude-code, -Platform cursor, -Platform antigravity, -Platform gemini-cli or -NoRegister instead. The execution-policy setting applies only to this process.\n"
-            "For an existing owned installation, use -Upgrade -DryRun without -Platform, inspect the plan, then repeat without -DryRun. "
-            "Keep the original -Venv, -Profile and -ProfileRoot values.\n"
-            "Windows requires PowerShell 5.1 or newer; see the installation guide for prerequisites. "
-            "Windows installation and coding-client usability require separate platform verification.\n"
-            f"Full version notes: https://github.com/Damel91/flower-mcp/blob/v{project['version']}/docs/RELEASE-NOTES-{project['version']}.md\n\n"
-            "Run `flower-mcp bootstrap` and give its output to your coding agent to start a Flower-guided project.\n"
-            "BOOTSTRAP.md is the same model instruction text bundled with the installed package.\n"
-            "The source archive includes the bilingual presentation and its offline HTML readers under docs/presentation; "
-            "extract the archive and open docs/presentation/index.html without starting a server.\n"
-            "See docs/INSTALLATION.md in this source for current manual installation and configuration.\n",
-            encoding="utf-8",
-        )
+        notes.write_bytes(note_payload)
     return {"version": project["version"], "assets": [path.name for path in files] + ["SHA256SUMS"]}
 
 

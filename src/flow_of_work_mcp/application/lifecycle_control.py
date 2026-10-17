@@ -23,6 +23,7 @@ from flow_of_work_mcp.core.domain import (
     ValidationDisposition,
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 from flow_of_work_mcp.core.ports import (
     AssuranceRepository,
@@ -98,7 +99,7 @@ class LifecycleControlService:
         return self._control.promote_milestone(
             project_id,
             draft,
-            actor=required_text(actor, "actor"),
+            actor=actor,
             request_id=str(request_id or ""),
         )
 
@@ -189,7 +190,10 @@ class LifecycleControlService:
         requirement_ids = tuple(
             str(item) for item in milestone.get("requirement_ids", [])
         )
-        blockers: list[Mapping[str, object]] = []
+        blockers: list[Mapping[str, object]] = [
+            {"reason": gap["code"], **dict(gap)}
+            for gap in milestone_prerequisite_gaps(milestone)
+        ]
         linked_changes: list[Mapping[str, object]] = []
         if self._change_control is None:
             blockers.append(
@@ -649,6 +653,13 @@ class LifecycleControlService:
         milestones: tuple[Mapping[str, object], ...],
     ) -> Mapping[str, object]:
         milestone_id = str(milestone.get("milestone_id") or "")
+        prerequisite_gaps = milestone_prerequisite_gaps(milestone)
+        if prerequisite_gaps:
+            return {"milestone_id": milestone_id, "state": "blocked",
+                    "code": prerequisite_gaps[0]['code'],
+                    "gaps": prerequisite_gaps,
+                    "required_milestone_ids": [], "blocked_milestone_ids": [],
+                    "unknown_milestone_ids": []}
         policy = milestone.get("entry_policy")
         if not isinstance(policy, Mapping):
             policy = {}
@@ -689,7 +700,11 @@ class LifecycleControlService:
 
     def _packet_actions(self, project_id: str) -> list[NextAction]:
         actions: list[NextAction] = []
+        invalid_milestones = {str(m["milestone_id"]) for m in self._control.milestones(project_id)
+                              if milestone_prerequisite_gaps(m)}
         for change in self._change_control.list_changes(project_id):
+            if str(change.get("milestone_id") or "") in invalid_milestones:
+                continue
             change_id = str(change["change_id"])
             packets = {
                 str(packet["packet_id"]): packet
@@ -778,7 +793,11 @@ class LifecycleControlService:
         actions: list[NextAction] = []
         if self._change_control is None:
             return actions
+        invalid_milestones = {str(m['milestone_id']) for m in self._control.milestones(project_id)
+                              if milestone_prerequisite_gaps(m)}
         for change in self._change_control.list_changes(project_id):
+            if str(change.get('milestone_id') or '') in invalid_milestones:
+                continue
             change_id = str(change["change_id"])
             runs = self._execution_runs.runs_for_change(project_id, change_id)
             runs_by_packet: dict[str, list[Mapping[str, object]]] = {}
@@ -886,6 +905,8 @@ class LifecycleControlService:
         actions: list[NextAction] = []
         if self._change_control is None:
             return actions
+        invalid_milestones = {str(m['milestone_id']) for m in self._control.milestones(project_id)
+                              if milestone_prerequisite_gaps(m)}
         for change in self._change_control.list_changes(project_id):
             change_id = str(change["change_id"])
             findings = self._assurance.findings_for_change(project_id, change_id)
@@ -921,6 +942,10 @@ class LifecycleControlService:
                             finding_ids=(finding_id,),
                         )
                     )
+            if str(change.get('milestone_id') or '') in invalid_milestones:
+                # Finding investigation remains available; current execution and
+                # acceptance recommendations require a defined governing scope.
+                continue
             qualified: list[Mapping[str, object]] = []
             for campaign in campaigns:
                 status = str(campaign["status"])

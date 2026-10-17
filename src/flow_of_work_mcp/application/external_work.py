@@ -10,7 +10,8 @@ from flow_of_work_mcp.application.external_plan_markdown import render_plan
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
-from flow_of_work_mcp.core.domain.external_work import (canonical_json, fields, fingerprint, number, objects, strings, text)
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
+from flow_of_work_mcp.core.domain.external_work import (fields, fingerprint, number, objects, strings, text)
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError, InputValidationError, PacketValidationAlreadyUpgradedError, RequirementConflictError,
@@ -50,6 +51,9 @@ class ExternalWorkService:
         self._packet_executor = packet_executor
 
     def _assert_execution_allowed(self, snapshot) -> None:
+        gaps = milestone_prerequisite_gaps(snapshot.get('milestone'))
+        if gaps:
+            raise ChangeControlBlockedError(gaps[0]['code'], details={'gaps': gaps})
         if snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES:
             raise ChangeControlBlockedError('external_packet_inactive', details={'packet_status': snapshot['packet']['status']})
         if self._execution_guard is not None:
@@ -217,17 +221,30 @@ class ExternalWorkService:
                            if m['milestone_id'] == milestone_id), None)
             if linked is not None:
                 milestone = {k: linked.get(k) for k in ('milestone_id', 'name', 'requirement_ids',
-                    'dependency_closure_ids', 'entry_policy', 'exit_policy', 'risk_disposition')}
+                    'prerequisite_requirement_ids', 'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
+                    'entry_policy', 'exit_policy', 'risk_disposition')}
         predecessors = [self._snapshot(project_id, change_id, identity, _cache=cache, _path=(*_path, packet_id), _change=change)
                         for identity in packet.get('dependency_packet_ids', [])]
         plan = self._ledger.packet_work_plan_state(project_id, change_id, packet_id)
         external = self._ledger.external_work_state(project_id, change_id, packet_id)
         requirement_ids = set(packet.get('requirement_ids') or change.get('requirement_ids', []))
-        requirements = [dict(r) for r in self._ledger.traceability_matrix(project_id) if r['requirement_id'] in requirement_ids]
+        requirement_matrix = self._ledger.traceability_matrix(project_id)
+        requirements = [dict(r) for r in requirement_matrix if r['requirement_id'] in requirement_ids]
         for requirement in requirements:
             history = self._ledger.requirement_history(project_id, requirement['requirement_id'])
             semantic_revision = next(r for r in history['revisions'] if r['revision'] == requirement['current_revision'])
             requirement['rationale'] = semantic_revision['rationale']
+        if milestone:
+            prerequisite_ids = set(milestone['prerequisite_requirement_ids'])
+            prerequisite_requirements = []
+            for row in requirement_matrix:
+                if row['requirement_id'] in prerequisite_ids:
+                    history = self._ledger.requirement_history(project_id, row['requirement_id'])
+                    semantic = next(r for r in history['revisions'] if r['revision'] == row['current_revision'])
+                    prerequisite_requirements.append({**{k: row.get(k) for k in
+                        ('requirement_id', 'current_revision', 'title', 'statement', 'category', 'source_anchor')},
+                        'rationale': semantic['rationale'], 'retired': row['lifecycle_status'] == 'removed'})
+            milestone['prerequisite_requirements'] = prerequisite_requirements
         graph = self._ledger.goal_graph(project_id)
         goal_ids = set(packet.get('goal_ids', [])) | set(change.get('goal_ids', []))
         # Resolve connected goal references into the artifact rather than leave
@@ -364,6 +381,7 @@ class ExternalWorkService:
         for kind in ('requirement', 'goal', 'milestone'):
             for identity in snapshot.get('missing_' + kind + '_ids', []):
                 projection['gaps'].append({'code': kind + '_authority_missing', 'reference': identity})
+        projection['gaps'].extend(milestone_prerequisite_gaps(snapshot.get('milestone')))
         for requirement in snapshot['requirements']:
             if requirement['lifecycle_status'] == 'removed':
                 projection['gaps'].append({'code': 'requirement_retired', 'reference': requirement['requirement_id']})
@@ -866,6 +884,9 @@ class ExternalWorkService:
     def _export(self, snapshot, payload, actor, request_id):
         fields(payload, {'expected_spec_revision', 'expected_plan_revision', 'allow_draft'}, 'export_plan')
         self._expect(snapshot, payload, plan_required=True)
+        prerequisite_gaps = milestone_prerequisite_gaps(snapshot.get('milestone'))
+        if prerequisite_gaps:
+            raise ChangeControlBlockedError(prerequisite_gaps[0]['code'], details={'gaps': prerequisite_gaps})
         allow_draft = payload.get('allow_draft', False)
         if not isinstance(allow_draft, bool):
             raise ValueError('allow_draft must be boolean')
@@ -881,6 +902,9 @@ class ExternalWorkService:
         content = render_plan(snapshot, projection, project_predecessor=self._projection)
         mappings = (ArtifactMapping('packet', snapshot['packet_id']),
                     *(ArtifactMapping('requirement', r['requirement_id']) for r in snapshot['requirements']),
+                    *(ArtifactMapping('requirement', r['requirement_id'])
+                      for r in (snapshot.get('milestone') or {}).get('prerequisite_requirements', [])
+                      if r['requirement_id'] not in {item['requirement_id'] for item in snapshot['requirements']}),
                     *(ArtifactMapping('goal', g['goal_node_id']) for g in snapshot['goals']))
         if snapshot['milestone']:
             mappings += (ArtifactMapping('milestone', snapshot['milestone']['milestone_id']),)

@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.external_work import fingerprint
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 
 
@@ -17,7 +18,8 @@ _PACKET_FIELDS = ('packet_id', 'title', 'objective', 'rationale', 'spec_revision
                   'completion_criteria', 'unresolved_questions')
 _CHANGE_FIELDS = ('change_id', 'title', 'rationale', 'requirement_ids', 'goal_ids',
                   'source_refs', 'baseline_refs', 'milestone_id')
-_MILESTONE_FIELDS = ('milestone_id', 'name', 'requirement_ids', 'dependency_closure_ids',
+_MILESTONE_FIELDS = ('milestone_id', 'name', 'requirement_ids', 'prerequisite_requirement_ids',
+                     'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
                      'entry_policy', 'exit_policy', 'risk_disposition')
 
 
@@ -84,7 +86,11 @@ class EngineerGateService:
 
     def _intent_context(self, project_id, change, packet, *, extra_requirements=(), extra_goals=(), milestone_id=None):
         gaps = []
+        milestone = next((m for m in self._ledger.milestones(project_id) if m['milestone_id'] == milestone_id), None)
+        if milestone:
+            gaps.extend({'reason': gap['code'], **gap} for gap in milestone_prerequisite_gaps(milestone))
         requirement_ids = set((packet or {}).get('requirement_ids') or change.get('requirement_ids', []))
+        requirement_ids.update((milestone or {}).get('prerequisite_requirement_ids', []))
         goal_ids = set(change.get('goal_ids', [])) | set((packet or {}).get('goal_ids', []))
         requirement_ids.update(extra_requirements)
         goal_ids.update(extra_goals)
@@ -114,7 +120,6 @@ class EngineerGateService:
         edges.sort(key=lambda e: (e['source_goal_id'], e['target_goal_id'], str(e.get('relation'))))
         for missing in sorted(goal_ids - {g['goal_node_id'] for g in goals}):
             gaps.append({'reason': 'intent_goal_authority_missing', 'goal_node_id': missing})
-        milestone = next((m for m in self._ledger.milestones(project_id) if m['milestone_id'] == milestone_id), None)
         if milestone_id and milestone is None:
             gaps.append({'reason': 'intent_milestone_authority_missing', 'milestone_id': milestone_id})
         answers = []

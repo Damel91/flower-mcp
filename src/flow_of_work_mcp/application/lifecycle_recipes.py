@@ -192,7 +192,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             "Freeze a planned milestone",
             area="milestones",
             intent=(
-                "Freeze one bounded requirement and dependency closure without "
+                "Freeze requirements realized by this milestone and separate earlier-milestone prerequisites without "
                 "claiming acceptance before governed evidence exists."
             ),
             authority_owner="Flower milestone lifecycle",
@@ -200,13 +200,13 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "Planning freezes scope; only governed evidence can accept the milestone."
             ),
             semantic_decisions=(
-                "Which current requirements and dependencies belong to this milestone?",
+                "Which current requirements will this milestone realize? Which disjoint requirements from earlier milestones does it need?",
                 "Are entry, exit, and risk policies explicit enough to freeze scope?",
                 "Does any evidence already qualify as governed acceptance evidence?",
             ),
             evidence=(
                 "current requirement revisions and source anchors",
-                "dependency closure",
+                "earlier-milestone prerequisite membership; [] when none",
                 "governed acceptance references when acceptance is requested",
             ),
             stop_conditions=(
@@ -218,7 +218,10 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "a requirement conflict or unresolved dependency changes milestone meaning",
             ),
             safety_notes=(
+                "requirement_ids are realized here; prerequisite_requirement_ids contain only disjoint requirements from lower-ordinal milestones in this project. First or independent milestone uses []. Never copy its realized requirements into prerequisites.",
+                "Planning predecessor membership is not completion or acceptance. Configure entry_policy.requires_milestone only for intended accepted-predecessor gates.",
                 "A source or specification reference does not by itself prove acceptance.",
+                "After a correlated pre-effect validation rejection, apply the reported correction. After an uncertain response, inspect existing milestone state before retrying. Legacy request replay without proof must not be guessed.",
             ),
         ),
         "packet-work-plan-v2": _recipe(

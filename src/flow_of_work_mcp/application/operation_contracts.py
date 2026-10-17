@@ -1893,7 +1893,7 @@ _SIMPLE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "project_id",
             "name",
             "requirement_ids",
-            "dependency_closure_ids",
+            "prerequisite_requirement_ids",
             "entry_policy",
             "exit_policy",
             "risk_disposition",
@@ -1959,6 +1959,25 @@ _SIMPLE = {
     )
     for tool, (required, optional) in _SIMPLE_FIELDS.items()
 }
+_SIMPLE["fow_promote_milestone"] = _c(
+    "fow_promote_milestone", "call", *_SIMPLE_FIELDS["fow_promote_milestone"],
+    guidance={
+        "scope": "requirement_ids are realized here. prerequisite_requirement_ids are disjoint requirements realized by lower-ordinal milestones in this project. First/independent milestone uses []; no inferred transitive closure.",
+        "predecessors": "Planning can refer to planned predecessors. Membership is not implementation, verification or acceptance. Explicit entry_policy.requires_milestone retains its accepted-predecessor gate; list only actual intended gates.",
+        "retry": "Replay every original normalized input and actor, including initial evidence, with the same request_id. Later acceptance does not change that immutable request identity. Historical requests without original proof reject as milestone_request_replay_unverifiable; inspect the existing milestone before proceeding.",
+        "effect_receipt": "Only a correlated flow.operation-effect.v1 pre_effect_validation receipt proves no mutation started. Check tool, operation=call, project_id and request_id in receipt and audit_reference. Generic rejection, timeout or lost response is not no-effect proof.",
+        "successor_example": {
+            "assumption": "REQ-000001 is already realized by MILE-000001; REQ-000002 is the new milestone scope. These are illustrative existing identities, not newly registered authority.",
+            "tool": "fow_promote_milestone",
+            "arguments": {"project_id": "example-project", "name": "Second milestone",
+                "requirement_ids": ["REQ-000002"], "prerequisite_requirement_ids": ["REQ-000001"],
+                "entry_policy": {"requires_milestone": []},
+                "exit_policy": {"verification": "Verify REQ-000002 at its declared boundaries."},
+                "risk_disposition": "Known risks reviewed", "actor": "coding-agent",
+                "request_id": "milestone-second-request"},
+        },
+    },
+)
 _SIMPLE["fow_traceability"] = _c(
     "fow_traceability", "call", *_SIMPLE_FIELDS["fow_traceability"],
     enums=_SIMPLE_ENUMS["fow_traceability"],
@@ -2510,6 +2529,11 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
             ],
             "unit_checks": ["The required public contract is exported."],
         }
+    if contract.tool == "fow_promote_milestone":
+        result.update(name="First milestone", requirement_ids=["REQ-000001"],
+            prerequisite_requirement_ids=[], entry_policy={"requires_milestone": []},
+            exit_policy={"verification": "Replace with declared checks for the requirement realized by this milestone."},
+            risk_disposition="Known risks reviewed")
     if contract.tool == "fow_architecture":
         if contract.operation == "inspect":
             result["payload"] = {"revision": 0, "kind": "all", "offset": 0, "limit": 20}
