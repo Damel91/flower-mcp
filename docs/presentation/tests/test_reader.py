@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # not change when the current source dependency or Flower version changes.
 PUBLISHED_FLOWER_VERSION = "0.4.1"
 PUBLISHED_FLOWER_RUNTIME = "0.4.0"
-CURRENT_PUBLISHED_FLOWER_VERSION = "0.5.2"
+CURRENT_PUBLISHED_FLOWER_VERSION = "0.6.0"
 UPSTREAM_RUNTIME_URL = (
     "https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/"
     "runtime_llama-0.5.0-py3-none-any.whl"
