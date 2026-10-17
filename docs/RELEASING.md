@@ -8,9 +8,9 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`. Current source prepares **0.6.0**, with an incompatible
-milestone input correction and unchanged schema 55. It is a candidate, not a
-published release. The latest published `v0.5.2` is
+`MAJOR.MINOR.PATCH`. Published **0.6.0** has an incompatible milestone input
+correction and unchanged schema 55. Published tag `v0.6.0` identifies commit `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7` ([release 416096822](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0)). [Candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39072677376) and [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39073239681) are separate from anonymous asset checks and the populated-profile HTTPS upgrade.
+Historical published `v0.5.2` is
 `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30`; `v0.5.1` is
 `a87a52f87f16d48a609e304f85b53cc6b221fe66`.
 Their seven assets, `v0.5.0` at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`,
@@ -91,10 +91,10 @@ Local checksum verification does not qualify a future published download.
 
 ## Publish explicitly
 
-Publication of this 0.6.0 candidate is human-authorized **after qualification and
-exact-commit CI**. That authorization does not approve future versions, another
-user's installation or project deletion. An owner performs its own update and
-verification after the official assets are available.
+Publication of 0.6.0 followed human authorization, qualification and exact-commit
+CI. Its tag and assets are immutable. That authorization does not approve future
+versions, another user's installation or project deletion. An owner performs its
+own update and verification against the official assets.
 
 After those gates, in GitHub select **Actions → Release → Run workflow**, choose `main`, and enter
 the new version declared in `pyproject.toml` (without `v`). An existing tag
@@ -157,11 +157,11 @@ supplied target and uploads assets before publication; see [the release command]
 ## Install the release
 
 Current release-download examples in README and INSTALLATION.md select published
-0.5.2. The local/source 0.6.0 candidate is a separate route. A published installer
+0.6.0. A source build is a separate artifact. A published installer
 uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.0/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
@@ -184,7 +184,7 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. Candidate 0.6.0 adds no SQLite migration:
+client usability as separate evidence. Flower 0.6.0 adds no SQLite migration:
 an existing supported schema-55 ledger, including published 0.5.2, stays at 55.
 The same-schema upgrade fixture must start from actual immutable 0.5.2 assets,
 not a source build relabelled with that version. The existing 0.3.1/schema 52 route
@@ -192,22 +192,22 @@ still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
 published Flower 0.5.2 uses runtime `0.4.1`, while current source selects the
 independently published runtime `0.5.0` through its explicit inference extra.
-The 0.6.0 candidate does not replace 0.5.2 assets.
+The 0.6.0 release does not replace 0.5.2 assets.
 SDK-only adoption preserves the installed Flower artifact/receipt; rerunning its
 old extra can select the old SDK again. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from candidate 0.5.2→0.6.0 same-schema55
-qualification and later official HTTPS delivery. Historical anonymous
+wheel/backend; that path is distinct from 0.5.2→0.6.0 same-schema55
+candidate qualification and official HTTPS delivery. Historical anonymous
 0.5.1→0.5.2 and 0.5.0→0.5.1 populated-schema55 qualifications remain historical.
 Retain the earlier
 0.4.1→0.5.0 qualification as historical evidence.
 
-Review [candidate release notes](RELEASE-NOTES-0.6.0.md),
+Review [release notes](RELEASE-NOTES-0.6.0.md),
 [native deletion limits](NATIVE-PROJECT-DELETION.md) and
 [advanced configuration](ADVANCED-CONFIGURATION.md) with the exact release commit.
 The suspended writer witness is excluded. Native deletion is a separate explicit
 host control, never an upgrade or model operation; Windows native purge durability
 is unqualified. Candidate builds, native CI, public workflows, whole-ledger
 preservation and official delivery are separate checkpoints. No tag or Release
-dispatch is part of preparation; the existing 0.6.0 publication authorization
-applies only after its qualification and exact CI pass.
+dispatch is part of preparation. The 0.6.0 authorization has been consumed by
+that release; a future release needs a new applicable human decision.

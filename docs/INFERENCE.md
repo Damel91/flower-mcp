@@ -11,7 +11,7 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Current Flower 0.6.0 source/candidate | Independently published `runtime-llama` `0.5.0` |
+| Published Flower 0.6.0 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Immutable published Flower `0.5.0`, `0.5.1` and `0.5.2` wheels | `runtime-llama` `0.4.1` |
 | Historical published Flower `0.4.1` wheel | `runtime-llama` `0.4.0` |
 
@@ -27,8 +27,9 @@ runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.
 - Python 3.11+ and `requests>=2.31,<3`; Apache-2.0 `LICENSE`/`NOTICE` and the
   retained llamatelemetry MIT attribution remain in the upstream wheel.
 
-The 0.6.0 candidate is not published yet and does not replace the
-[published Flower 0.5.2 assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2).
+[Flower 0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0) is published
+with this optional pin. Historical
+[Flower 0.5.2 assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) remain immutable.
 Earlier source builds could carry version `0.5.2` with this newer optional pin;
 those were distinct from the immutable released wheel. Retain the selected
 artifact's exact commit, version and SHA256. Matching a version alone does not
@@ -52,11 +53,11 @@ Windows:
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-A verified candidate wheel built from that source can replace `'.[inference]'`
-with `'./dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'` in a fresh/manual
-environment. Verify the candidate's own source commit and `SHA256SUMS` first.
-The published **0.5.2** wheel still selects runtime `0.4.1`; no 0.6.0 download
-is available until publication.
+The verified published wheel can replace `'.[inference]'` with
+`'./dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'` in a fresh/manual
+environment. Verify its exact release commit and `SHA256SUMS` first; a rebuilt
+same-version wheel is a different artifact. Historical **0.5.2** still selects
+runtime `0.4.1`. Core installers remain core-only.
 The extra fetches the exact upstream URL/hash and its normal dependency closure;
 it requires no Flower-bundled runtime or upstream PyPI publication.
 
