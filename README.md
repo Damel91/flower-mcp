@@ -11,9 +11,30 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Release: [0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Published release: [0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
+
+## 0.6.0 candidate
+
+Current source prepares **0.6.0**; its assets are not published yet. The
+[release notes](docs/RELEASE-NOTES-0.6.0.md) describe the compatibility change and
+pending delivery checks. The quick-start downloads below still select published
+0.5.2.
+
+- Milestones separate work realized now from requirements owned by earlier
+  milestones. `prerequisite_requirement_ids` replaces `dependency_closure_ids`;
+  use `[]` when there are no prerequisites, and refresh the host's tool schema.
+- Certified pre-write milestone rejections carry a correlated no-effect receipt.
+  Uncertain outcomes require durable inspection before retrying.
+- Native hosts can explicitly prepare, inspect, delete and reconcile project
+  data with `flower-mcp project-purge`. This is not an MCP tool. Follow the
+  [native deletion guide](docs/NATIVE-PROJECT-DELETION.md); Windows native purge
+  durability remains unqualified.
+
+Schema 55 and original lifecycle history stay in place. Follow the
+[0.6.0 upgrade guidance](docs/UPGRADING.md#preparing-a-060-upgrade) with the same
+SQLite profile; project deletion is never an upgrade step. Core remains model-free.
 
 ## Why Flower exists
 
@@ -133,7 +154,7 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 ### Optional internal inference
 
 Flower `0.5.2` is published; its immutable `inference` extra selects runtime
-`0.4.1`. Current source prepares the independently published
+`0.4.1`. The 0.6.0 candidate selects the independently published
 [runtime-llama `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0),
 pinned by URL and SHA256. This source update does not publish a new Flower
 release or replace the 0.5.2 assets. Existing optional installations can update
@@ -218,8 +239,10 @@ The [presentation index](docs/presentation/README.md) also links the offline rea
 
 [Advanced configuration](docs/ADVANCED-CONFIGURATION.md) explains internal LLM
 setup, supported host semantic roles and external technical providers. The
-[0.5.2 release notes](docs/RELEASE-NOTES-0.5.2.md) describe the included
-corrections and the boundaries of the recorded qualification.
+[0.5.2 release notes](docs/RELEASE-NOTES-0.5.2.md) record the published
+corrections. The [0.6.0 candidate notes](docs/RELEASE-NOTES-0.6.0.md) and
+[native project deletion guide](docs/NATIVE-PROJECT-DELETION.md) describe the new
+contracts and their qualification boundaries.
 
 Release 0.4.1 retains [continuous work and recovery](docs/CONTINUOUS-RECOVERY.md):
 frozen handovers, current authority, original evidence, offline outcomes and the
@@ -256,6 +279,11 @@ the library's development lifecycle; installing or using the library does not
 require Flower.
 
 ## Status and operating limits
+
+Flower `0.6.0` is a candidate pending installed/upgrade qualification, exact-commit
+CI and publication. The incompatible milestone input is documented above; a
+source build does not replace any existing release. The writer witness remains
+deferred.
 
 Flower `0.5.2` is published and remains in testing. Its
 [release notes](docs/RELEASE-NOTES-0.5.2.md), the historical

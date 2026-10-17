@@ -1,8 +1,11 @@
 # Upgrade Flower without losing project data
 
-Flower MCP **0.5.2** updates code in place and retains the existing
-SQLite ledger. The commands below select its immutable release assets; see the
-[release notes](RELEASE-NOTES-0.5.2.md) and [installation guide](INSTALLATION.md).
+Current source prepares **Flower MCP 0.6.0**. It is not published yet. Its
+[milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
+changes public inputs while preserving SQLite schema 55. The latest published
+release remains **0.5.2**. Existing release-download commands below select its
+immutable assets; see its [release notes](RELEASE-NOTES-0.5.2.md) and the
+[installation guide](INSTALLATION.md).
 A reviewed wheel can use the manual pip procedure below in a manual environment.
 Do not bypass an owned installer's receipt by
 updating its Flower version through pip. The Python environment owns code; the
@@ -32,6 +35,75 @@ is excluded.
 The safe release upgrade is for environments created by the Flower release
 installer. A manual pip environment uses the [manual procedure below](#manual-pip-installations).
 Containers retain their existing volume; see [Glama and containers](GLAMA.md).
+
+## Preparing a 0.6.0 upgrade
+
+Keep the same environment, `FLOWER_HOME`, profile, database, YAML and client
+registration. Project deletion, creating a replacement project and resetting
+bindings are never upgrade steps. All clients/processes sharing the environment
+must be stopped before executing an update.
+
+| Starting state | 0.6.0 database behavior |
+| --- | --- |
+| Published 0.5.2 or another supported schema-55 ledger | Schema stays at 55. Tables, rows, revisions, receipts, evidence and handovers are preserved. |
+| Published 0.3.1, schema 52 | Existing additive migrations 53–55 run on first startup. This separate route requires its own qualification. |
+
+For an installer-owned environment, a local reviewed 0.6.0 backend can preview
+its intended update without downloading the unpublished wheel. Check that backend
+against the candidate's own `SHA256SUMS`, use an already available Python and
+replace every path with the original owned installation values:
+
+```sh
+python3 -I ./install_flower.py --version 0.6.0 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state' --backup-root '/absolute/private/flower-backups'
+```
+
+Windows uses `py -3 -I` with the same Python-backend options and actual Windows
+paths. This preview is not an update. The ordinary installer execution needs the
+matching published HTTPS assets; until they exist, do not remove `--dry-run`.
+Maintainer qualification of local candidate assets uses an explicitly bounded
+acquisition step, with real package/lease/backup mechanics; it is not a supported
+flag for bypassing the release installer's checks or proof of official delivery.
+
+After publication, obtain the **0.6.0** installer and checksums, preview with the
+same original paths, then execute only the inspected plan. The backend refuses
+an active owner and makes a consistent SQLite backup plus exact YAML copy before
+pip. Keep the backup privately, inspect the known existing project through public
+MCP after startup, and repeat the read after another restart. Installer-owned
+receipts must name the actual installed Flower artifact; do not edit them or
+replace that package through pip.
+
+For a **manual pip environment**, apply the [manual backup procedure below](#manual-pip-installations)
+using a new private backup directory, then install the reviewed
+`flow_of_work_mcp-0.6.0-py3-none-any.whl` in its existing environment and run
+`pip check`. Check the wheel's exact SHA256 first. A fresh candidate environment
+and an existing manual upgrade are different operations. Neither a package
+downgrade nor pip failure automatically restores a database or environment.
+
+### Refresh the milestone contract and inspect historical state
+
+Reload/reconnect the host so it reads 0.6.0's current tool schemas and operation
+help. `fow_promote_milestone` uses a nonempty `requirement_ids` list for work
+realized by this milestone and a disjoint `prerequisite_requirement_ids` list for
+requirements owned by earlier milestones in the same project. Use `[]` when none
+apply. The old `dependency_closure_ids` input is rejected; there is no alias.
+
+The upgrade preserves historical rows and frozen exports. Derived reads can now
+show prerequisite mapping/current-authority gaps, stale plan fingerprints or an
+unverifiable legacy replay. These are lifecycle observations, not lost database
+rows. Inspect the original requirement/goal/milestone intent and resolve affected
+work through ordinary authorized mutations. Do not invent earlier producers or
+acceptance to clear a guard. A prerequisite is not new current work, and its
+membership is not completion evidence.
+
+A certified `flow.operation-effect.v1` rejection proves only the correlated
+pre-write invocation had no effect. For an uncertain result or legacy request
+without an original fingerprint, inspect durable state before retrying; a new
+request key is not a substitute for that inspection. Retain original evidence
+and handover payloads while assessing current authority.
+
+The remaining download commands document the **published 0.5.2** procedure.
+They do not download or qualify 0.6.0. See the [0.6.0 notes](RELEASE-NOTES-0.6.0.md)
+for candidate assets, conditional post-publication commands and current limits.
 
 ## Identify and stop the existing installation
 

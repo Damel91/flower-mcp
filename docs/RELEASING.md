@@ -8,14 +8,22 @@ material stay outside this repository and its source distribution.
 ## Version policy
 
 `pyproject.toml` is the version authority. Public versions use stable SemVer
-`MAJOR.MINOR.PATCH`; `v0.5.1` is published at `a87a52f87f16d48a609e304f85b53cc6b221fe66`.
-Its seven assets, `v0.5.0` at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`,
+`MAJOR.MINOR.PATCH`. Current source prepares **0.6.0**, with an incompatible
+milestone input correction and unchanged schema 55. It is a candidate, not a
+published release. The latest published `v0.5.2` is
+`73cb74497e4ae65c509eb4ac8acf1026cbb0fd30`; `v0.5.1` is
+`a87a52f87f16d48a609e304f85b53cc6b221fe66`.
+Their seven assets, `v0.5.0` at `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c`,
 and historical `v0.4.1`/eight assets remain immutable. A new
 release requires a new version and explicit human publication approval; do not
 republish a later `main` build under an existing tag. Version 0.5.1 is a patch
 for tool-definition help and examples, with unchanged callable input contracts
 and schema 55. Version 0.5.0 used a minor increment because `sync_only` added a
 public argument; the 37 tool names remain unchanged.
+Version 0.6.0 replaces `dependency_closure_ids` with
+`prerequisite_requirement_ids`; 37 tool names and 445 inputs do not imply unchanged
+callable schemas. Refresh host discovery and document the realized/prerequisite
+meaning, historical gap handling and replay/effect recovery before updating users.
 Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
@@ -31,24 +39,30 @@ distribution remains `flow-of-work-mcp`, the import package remains
 1. Update `pyproject.toml`, the version in README/installation examples and the
    default release version in `tools/install.sh`, `tools/install.ps1` and
    `tools/install_flower.py`
-   together. Update current download examples, release notes and
+   together. Label candidate instructions separately from available published
+   downloads; do not present unpublished URLs as working installation commands.
+   Update current download examples, release notes and
    [upgrade instructions](UPGRADING.md); retain historical release notes and tags.
    Document material compatibility changes.
 2. Preserve the official Apache-2.0 LICENSE and attribution in NOTICE.
-3. Commit the complete public source on `main` and push to the public repository.
-   Inspect the diff and CI results before publishing. CI builds on Python
+3. Prepare the complete source and selective guidance on an isolated candidate
+   branch/worktree. Preserve the public bootstrap/CLI, attribution, installer
+   safeguards and private-development boundary. Inspect the diff and qualify
+   actual source, installed package and populated upgrade fixtures, then require
+   CI on that exact candidate commit before moving public `main` for publication.
+   CI builds on Python
    3.11–3.14, checks version/license metadata and the packaged LICENSE/NOTICE,
    and runs an installed-wheel smoke check outside the checkout. The installed
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify a `0.5.1` source build locally, use Python 3.11 or newer in an
+To qualify a `0.6.0` candidate locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.5.1 --output dist
+python tools/build_release.py --version 0.6.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -58,7 +72,7 @@ Flower assets or either package. Stale or unexpected files in the output directo
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.5.1 --output dist --verify-only
+python tools/build_release.py --version 0.6.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -67,9 +81,22 @@ reader build/test helpers. Release verification checks those packaged bytes
 against the checkout. Extract the archive and open `docs/presentation/index.html`
 to read it offline. These documentation assets are not runtime wheel dependencies.
 
+Use the versioned `docs/RELEASE-NOTES-0.6.0.md` as the reviewed notes source;
+`--notes /absolute/private/candidate-notes.md` preserves its prose, Markdown and
+newlines while resolving relative guide links to the exact `v0.6.0` tag. The
+generated body therefore has its own digest. The source archive must contain
+the exact original guide bytes. Keep pending installed,
+upgrade, CI and anonymous HTTPS checkpoints explicit until they have actually run.
+Local checksum verification does not qualify a future published download.
+
 ## Publish explicitly
 
-In GitHub, select **Actions → Release → Run workflow**, choose `main`, and enter
+Publication of this 0.6.0 candidate is human-authorized **after qualification and
+exact-commit CI**. That authorization does not approve future versions, another
+user's installation or project deletion. An owner performs its own update and
+verification after the official assets are available.
+
+After those gates, in GitHub select **Actions → Release → Run workflow**, choose `main`, and enter
 the new version declared in `pyproject.toml` (without `v`). An existing tag
 cannot be reused. Dispatching the workflow authorizes
 publishing the selected commit. Ordinary pushes, pull requests and tags do not
@@ -129,11 +156,12 @@ supplied target and uploads assets before publication; see [the release command]
 
 ## Install the release
 
-Current installation examples in README and INSTALLATION.md select published
-0.5.1. The installer uses a version-pinned URL:
+Current release-download examples in README and INSTALLATION.md select published
+0.5.2. The local/source 0.6.0 candidate is a separate route. A published installer
+uses a version-pinned URL:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.5.2/install.sh | bash
 ```
 
 It prepares the local Python environment, prompts in the terminal for Codex,
@@ -156,22 +184,30 @@ a new project. Verify the actual previous published wheel to the new wheel with
 the same owned environment and populated profile: read-only plan, active-owner
 refusal, consistent backup, YAML/client preservation and public MCP recovery
 after restart. Keep source tests, native CI, actual downloaded asset checks and
-client usability as separate evidence. Release 0.5.1 adds no SQLite migration:
-an existing 0.4.0, 0.4.1 or 0.5.0/schema 55 ledger stays at 55. The existing 0.3.1/schema 52 route
+client usability as separate evidence. Candidate 0.6.0 adds no SQLite migration:
+an existing supported schema-55 ledger, including published 0.5.2, stays at 55.
+The same-schema upgrade fixture must start from actual immutable 0.5.2 assets,
+not a source build relabelled with that version. The existing 0.3.1/schema 52 route
 still applies additive migrations 52→55 on first server start. Optional
 runtime-llama `0.4.0` belongs to the immutable published Flower `0.4.1` release;
 published Flower 0.5.2 uses runtime `0.4.1`, while current source selects the
 independently published runtime `0.5.0` through its explicit inference extra.
-This source change is not a new Flower release and does not replace 0.5.2 assets.
+The 0.6.0 candidate does not replace 0.5.2 assets.
 SDK-only adoption preserves the installed Flower artifact/receipt; rerunning its
 old extra can select the old SDK again. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from the actual anonymous published
-0.5.0→0.5.1 populated-schema55 qualification on macOS. Retain the earlier
+wheel/backend; that path is distinct from candidate 0.5.2→0.6.0 same-schema55
+qualification and later official HTTPS delivery. Historical anonymous
+0.5.1→0.5.2 and 0.5.0→0.5.1 populated-schema55 qualifications remain historical.
+Retain the earlier
 0.4.1→0.5.0 qualification as historical evidence.
 
-Review [release notes](RELEASE-NOTES-0.5.1.md) and
+Review [candidate release notes](RELEASE-NOTES-0.6.0.md),
+[native deletion limits](NATIVE-PROJECT-DELETION.md) and
 [advanced configuration](ADVANCED-CONFIGURATION.md) with the exact release commit.
-The suspended writer witness is excluded. Candidate builds, native CI, live
-qualification and human publication approval are separate checkpoints; no tag
-or Release dispatch is part of preparation.
+The suspended writer witness is excluded. Native deletion is a separate explicit
+host control, never an upgrade or model operation; Windows native purge durability
+is unqualified. Candidate builds, native CI, public workflows, whole-ledger
+preservation and official delivery are separate checkpoints. No tag or Release
+dispatch is part of preparation; the existing 0.6.0 publication authorization
+applies only after its qualification and exact CI pass.

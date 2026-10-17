@@ -1,6 +1,6 @@
 # Flower MCP installation
 
-Flower MCP `0.5.2` requires Python 3.11 or newer and is licensed under
+Flower MCP requires Python 3.11 or newer and is licensed under
 [Apache-2.0](../LICENSE), with attribution in [NOTICE](../NOTICE).
 The distribution is `flow-of-work-mcp`; the primary command is `flower-mcp`.
 Core runs without a model, CodingCastle or a private network.
@@ -9,7 +9,9 @@ Core runs without a model, CodingCastle or a private network.
 
 Flower is in testing. Release installer and release-wheel commands below target
 the immutable published `v0.5.2` assets. Source commands install the selected
-checkout, which may contain later documentation changes; retain its exact commit.
+checkout. Current source prepares the 0.6.0 candidate, with a breaking milestone
+input change; retain its exact commit and read the
+[0.6.0 notes](RELEASE-NOTES-0.6.0.md). Candidate assets are not published yet.
 The [release notes](RELEASE-NOTES-0.5.2.md) state changes and qualification boundaries.
 Source changes on `main` do not publish a release.
 Release 0.5.2 has seven assets:
@@ -34,6 +36,52 @@ target workstation/client MCP workflows require their own qualification.
 The PowerShell launcher with managed Python preparation is included as `install.ps1` in release
 `v0.5.2`, with its checksum in `SHA256SUMS`. These instructions do not certify
 an untested OS or client.
+
+## Current source and the 0.6.0 candidate
+
+The source version and installer defaults prepare 0.6.0; changing them does not
+publish its assets. The release-download commands in this guide explicitly select
+published 0.5.2. Do not run a source launcher's default release download until
+matching 0.6.0 assets exist. Use `--version 0.5.2` / `-Version 0.5.2` explicitly
+when selecting the current published release.
+
+For a fresh test environment, use the [source route](#manual-installation-from-source)
+or a reviewed local candidate wheel. From the directory containing that wheel
+and its own `SHA256SUMS`, compare the exact wheel entry first:
+
+```sh
+sha256sum flow_of_work_mcp-0.6.0-py3-none-any.whl
+# macOS alternative: shasum -a 256 flow_of_work_mcp-0.6.0-py3-none-any.whl
+python3 -m venv .venv-flower-candidate
+.venv-flower-candidate/bin/python -m pip install ./flow_of_work_mcp-0.6.0-py3-none-any.whl
+.venv-flower-candidate/bin/python -m pip check
+.venv-flower-candidate/bin/flower-mcp bootstrap
+```
+
+Windows PowerShell, after the same checksum comparison:
+
+```powershell
+Get-FileHash .\flow_of_work_mcp-0.6.0-py3-none-any.whl -Algorithm SHA256
+py -3 -m venv .venv-flower-candidate
+& .\.venv-flower-candidate\Scripts\python.exe -m pip install .\flow_of_work_mcp-0.6.0-py3-none-any.whl
+& .\.venv-flower-candidate\Scripts\python.exe -m pip check
+& .\.venv-flower-candidate\Scripts\flower-mcp.exe bootstrap
+```
+
+Run commands separately and stop on a mismatch or failure. This is core-only;
+normal dependencies still need package access. Use a new test profile when
+qualifying a fresh candidate. An existing installation follows the
+[SQLite-preserving upgrade procedure](UPGRADING.md#preparing-a-060-upgrade)
+instead; do not recreate its environment/profile or pip-replace an installer-owned
+package. Local candidate verification does not establish official HTTPS delivery
+or an untested operating system.
+
+After updating a host, refresh Flower's tool schema: milestone promotion now uses
+`prerequisite_requirement_ids`, not `dependency_closure_ids`. Core plans and host
+semantic work still need no model. The optional runtime-llama 0.5.0 installation
+is a separate choice. Native project deletion is a distinct host control, never
+an installation or upgrade step; see [its guide](NATIVE-PROJECT-DELETION.md).
+Windows installation/stdio compatibility does not qualify native purge durability.
 
 ## Prerequisites
 
@@ -341,7 +389,7 @@ separately and stop on errors. Use the venv command paths in the following secti
 activation is optional and unnecessary for these examples.
 
 These commands install core only. For the current source/candidate optional
-runtime, use the explicit [inference-extra route](INFERENCE.md#install-from-current-source-or-a-candidate-wheel).
+runtime, use the explicit [inference-extra route](INFERENCE.md#fresh-source-or-candidate-installation).
 The historical 0.4.1 wheel's older extra constraint does not select the new
 upstream runtime.
 
@@ -592,8 +640,9 @@ Core installers do not install inference or configure a provider. Current
 source/candidate internal semantic execution uses the optional public
 `runtime-llama` `0.5.0` wheel through an exact upstream URL/SHA256 dependency and
 an operator-managed llama.cpp endpoint. Published Flower 0.5.2 still selects
-runtime 0.4.1; current source and a rebuilt same-version wheel are different
-artifacts. Use a fresh/manual environment for current-source extra installation,
+runtime 0.4.1; the 0.6.0 candidate is a separate artifact. Retain its exact
+commit, version and checksum; matching a version alone is not package identity.
+Use a fresh/manual environment for current-source extra installation,
 or the targeted SDK-only procedure to preserve an installed Flower artifact and
 receipt. Core-only environments need no SDK. The runtime
 remains independently distributed; Flower does not copy it into release

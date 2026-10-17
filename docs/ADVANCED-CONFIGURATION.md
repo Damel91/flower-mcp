@@ -2,8 +2,9 @@
 
 Flower works with an external coding agent and a persistent SQLite ledger without
 an internal model or technical provider. Add an integration only for the operation
-you need. This guide describes **Flower 0.5.2**, not an additional
-service bundled with Flower. Published 0.4.1 remains a separate, immutable release.
+you need. This guide describes the **Flower 0.6.0 source/candidate** and the
+retained integration boundaries. It is not published yet; published 0.5.2 and
+historical 0.4.1 remain separate, immutable releases.
 
 ## Choose the required integration
 
@@ -23,6 +24,14 @@ contract. An arbitrary MCP server, an OpenAI-compatible chat API or a repository
 graph is not automatically interchangeable with these adapters. The coding agent
 still owns repository investigation, implementation and checks in the standalone
 path. The suspended writer witness is not part of this release.
+
+The candidate's core milestone input changes to `prerequisite_requirement_ids`:
+current work belongs in `requirement_ids`, earlier-milestone prerequisites in the
+disjoint second list, or `[]`. Refresh host discovery after upgrading and read the
+[compatibility notes](RELEASE-NOTES-0.6.0.md). No model or provider is required to
+make that distinction, recover state or execute an exported standalone plan.
+Native `project-purge` is a separate user/host CLI, absent from MCP tool discovery;
+its [guard and platform limits](NATIVE-PROJECT-DELETION.md) remain explicit.
 
 ## Preserve the existing profile
 
@@ -49,18 +58,20 @@ route or change an endpoint.
 
 ## Enable internal inference explicitly
 
-For a manual environment, install the selected Flower source or reviewed 0.5.2
-release wheel with its `inference` extra. An installer-owned environment must
+For a fresh/manual environment, install the selected Flower source or reviewed
+0.6.0 candidate wheel with its `inference` extra. Published 0.5.2 remains an
+available separate artifact with its older optional pin. An installer-owned environment must
 first complete its normal core upgrade, preserving its installation receipt;
 then add inference from the exact verified Flower wheel/build recorded in its
 installation receipt, matching both version and SHA256. A source or rebuilt
 same-version wheel is not that receipt's artifact. Do not replace
-an owned 0.4.1 or 0.5.0 installation with a 0.5.2 wheel through pip alone. Follow
+an owned 0.4.1 or 0.5.0 installation with a 0.5.2 wheel, or an owned 0.5.2
+installation with a 0.6.0 candidate, through pip alone. Follow
 [INFERENCE.md](INFERENCE.md) for exact upstream URL/SHA256, Windows commands,
 offline acquisition and an explicit optional-runtime upgrade. Core installers
 omit this extra. Enabling YAML does not install it.
 
-Current source selects the independently published `runtime-llama` 0.5.0 library
+Current 0.6.0 source/candidate selects the independently published `runtime-llama` 0.5.0 library
 with backend `llamacpp`; immutable Flower 0.5.2 still pins runtime 0.4.1. A targeted
 SDK-only update preserves its Flower artifact and receipt; re-requesting the old
 extra does not select 0.5.0. See the explicit upgrade procedure linked above.
