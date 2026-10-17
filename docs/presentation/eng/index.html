@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: bfe370852acfad1b9b3f118c9d4ecd02437e00f78bd827a5320ad411abf47f51. -->
+<!-- Generated from linked Markdown. Source digest: cbd1820d0b0a258908049ce87171dc78d703a229e35f56cc556f8f5f838e410c. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -562,6 +562,12 @@ Use this source command only in a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
+<p>For a <strong>local 0.6.0 candidate wheel</strong>, verify its source commit and own
+checksums, then use a fresh/manual environment:</p>
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+</code></pre>
+<p>This candidate selects runtime <code>0.5.0</code>; it does not prove an official 0.6.0
+download or replace the earlier published assets.</p>
 <p>For the verified published <code>0.5.2</code> wheel, use
 <code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code> instead; it selects
 runtime <code>0.4.1</code>, not the new current-source pin.

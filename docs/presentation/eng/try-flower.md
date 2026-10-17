@@ -58,6 +58,16 @@ Use this source command only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
+For a **local 0.6.0 candidate wheel**, verify its source commit and own
+checksums, then use a fresh/manual environment:
+
+```sh
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+```
+
+This candidate selects runtime `0.5.0`; it does not prove an official 0.6.0
+download or replace the earlier published assets.
+
 For the verified published `0.5.2` wheel, use
 `'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'` instead; it selects
 runtime `0.4.1`, not the new current-source pin.

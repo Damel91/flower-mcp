@@ -58,6 +58,16 @@ nuova release Flower. Usa questo comando solo in un ambiente nuovo/manuale:
 .venv/bin/python -m pip check
 ```
 
+Per un wheel **candidato locale 0.6.0**, verifica il commit sorgente e i suoi
+checksum, poi usa in un ambiente nuovo/manuale:
+
+```sh
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+```
+
+Questo candidato seleziona runtime `0.5.0`; non prova la disponibilità di un
+download ufficiale 0.6.0 e non sostituisce gli asset pubblicati precedenti.
+
 Per il wheel pubblicato `0.5.2` verificato, usa invece
 `'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'`: seleziona runtime
 `0.4.1`, non il nuovo pin del sorgente corrente.

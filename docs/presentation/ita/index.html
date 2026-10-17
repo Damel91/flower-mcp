@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 87b9d611da1eaf1f89d8c2f30f557d38cafff45fa093b9012e2e919bc60b0120. -->
+<!-- Generated from linked Markdown. Source digest: defbe743d497d2983be1ddab3b0648a6b64285eda5bf3f2ed60a9388bb133511. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -567,6 +567,12 @@ nuova release Flower. Usa questo comando solo in un ambiente nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
+<p>Per un wheel <strong>candidato locale 0.6.0</strong>, verifica il commit sorgente e i suoi
+checksum, poi usa in un ambiente nuovo/manuale:</p>
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+</code></pre>
+<p>Questo candidato seleziona runtime <code>0.5.0</code>; non prova la disponibilità di un
+download ufficiale 0.6.0 e non sostituisce gli asset pubblicati precedenti.</p>
 <p>Per il wheel pubblicato <code>0.5.2</code> verificato, usa invece
 <code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code>: seleziona runtime
 <code>0.4.1</code>, non il nuovo pin del sorgente corrente.
