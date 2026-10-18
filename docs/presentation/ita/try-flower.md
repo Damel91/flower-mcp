@@ -62,7 +62,7 @@ Per il **wheel pubblicato 0.6.0**, verifica il commit esatto della release e il
 suo `SHA256SUMS`, poi usa un ambiente nuovo/manuale:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'
 ```
 
 L'extra della release seleziona runtime `0.5.0`. Un wheel ricostruito da sorgente

@@ -54,7 +54,7 @@ Windows:
 ```
 
 The verified published wheel can replace `'.[inference]'` with
-`'./dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'` in a fresh/manual
+`'./dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'` in a fresh/manual
 environment. Verify its exact release commit and `SHA256SUMS` first; a rebuilt
 same-version wheel is a different artifact. Historical **0.5.2** still selects
 runtime `0.4.1`. Core installers remain core-only.
@@ -77,7 +77,7 @@ example downloads the selected local Flower wheel's core dependency closure and
 explicitly selects the independent runtime 0.5.0:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 sha256sum wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 # macOS alternative:
 shasum -a 256 wheelhouse/runtime_llama-0.5.0-py3-none-any.whl

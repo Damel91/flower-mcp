@@ -62,7 +62,7 @@ For the **published 0.6.0 wheel**, verify its exact release commit and
 `SHA256SUMS`, then use a fresh/manual environment:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'
 ```
 
 This release extra selects runtime `0.5.0`. A rebuilt same-version source wheel
