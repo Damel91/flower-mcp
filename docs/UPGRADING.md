@@ -1,5 +1,30 @@
 # Upgrade Flower without losing project data
 
+## Preparing a 0.6.1 upgrade
+
+0.6.1 is the candidate for the read-only [lens catalog](LENS-CATALOG.md).
+Its release commands require the corresponding published assets. Official 0.6.0
+remains immutable; local source-test wheels with the same metadata are distinct.
+Keep the same venv, profile root, database, YAML and client registration. SQLite
+stays at schema 55, with the original authority/history/evidence/receipts/HAND.
+Stop owners using the environment; verify the backend's SHA256SUMS entry first.
+Preview with its existing safeguards and the original paths:
+
+```sh
+python3 -I ./install_flower.py --version 0.6.1 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state' --backup-root '/absolute/private/flower-backups'
+```
+
+Then execute the inspected command without `--dry-run`, retaining the consistent
+backup made before pip. Windows uses `py -3 -I` and its actual paths. The backend
+refuses active ownership. Do not delete/reset SQLite or replace project bindings
+as an upgrade step. Start the same profile, refresh schemas/registry, inspect
+current project state through public MCP, and restart to confirm continuity.
+Same-schema0.6.0 → 0.6.1 and predecessor 0.3.1/schema 52→55 checks are separate; no new
+migration or atomic package/database rollback is promised. Candidate/local
+verification, exact CI, official downloads and owner deployment remain distinct.
+
+The following sections preserve the already published 0.6.0 procedure/history.
+
 **Flower MCP 0.6.0 is published.** Its
 [milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
 changes public inputs while preserving SQLite schema 55. The commands below
@@ -57,8 +82,8 @@ python3 -I ./install_flower.py --version 0.6.0 --upgrade --dry-run --venv '/abso
 
 Windows uses `py -3 -I` with the same Python-backend options and actual Windows
 paths. This preview is not an update. Inspect it before execution.
-The official 0.5.2/schema55 → 0.6.0/schema55 HTTPS upgrade was checked on a fresh
-populated owned fixture. The separate 0.3.1/schema52 → schema55 check exercises
+The official 0.5.2/schema 55 → 0.6.0/schema 55 HTTPS upgrade was checked on a fresh
+populated owned fixture. The separate 0.3.1/schema 52 → schema 55 check exercises
 existing additive migrations; neither result certifies an unknown workstation.
 
 Use the verified **0.6.0** installer and checksums, preview with the

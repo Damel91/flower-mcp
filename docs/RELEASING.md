@@ -1,5 +1,21 @@
 # Flower MCP releases
 
+## 0.6.1 candidate delivery
+
+The current candidate adds the read-only [lens catalog](LENS-CATALOG.md) with
+37 tools, 445 fields and 182 routes and unchanged schema 55. Build with
+`python tools/build_release.py --version 0.6.1 --output dist`; the reviewed
+[0.6.1 notes](RELEASE-NOTES-0.6.1.md) are its release-note authority. Inspect final
+bytes/core dependencies, repeat public MCP, qualify a populated owned official
+0.6.0 → candidate upgrade with backup-before-pip and the separate 0.3.1 migration, then
+require CI on the exact commit before publishing under the specific applicable
+human authorization. Check anonymous release assets/HTTPS separately afterward;
+Noxi's owner alone updates its preview. Previous 0.6.0 authority is not reused.
+No Glama action or U6 work is part of this delivery. Preserve immutable old tags,
+resources, license and optional runtime 0.5.0; retain all failed attempts/limits.
+
+The following 0.6.0 paragraphs describe its completed historical release.
+
 The public repository is [Damel91/flower-mcp](https://github.com/Damel91/flower-mcp).
 It contains the source, essential documentation and release/install scripts.
 Private development documents, configuration, runtime data and qualification
@@ -196,9 +212,9 @@ The 0.6.0 release does not replace 0.5.2 assets.
 SDK-only adoption preserves the installed Flower artifact/receipt; rerunning its
 old extra can select the old SDK again. Updating core/profile state does not request that
 extra or migrate model settings. The CI upgrade fixture pins the published 0.3.1
-wheel/backend; that path is distinct from 0.5.2→0.6.0 same-schema55
+wheel/backend; that path is distinct from 0.5.2→0.6.0 same-schema 55
 candidate qualification and official HTTPS delivery. Historical anonymous
-0.5.1→0.5.2 and 0.5.0→0.5.1 populated-schema55 qualifications remain historical.
+0.5.1→0.5.2 and 0.5.0→0.5.1 populated-schema 55 qualifications remain historical.
 Retain the earlier
 0.4.1→0.5.0 qualification as historical evidence.
 

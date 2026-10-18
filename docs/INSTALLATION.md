@@ -1,5 +1,15 @@
 # Flower MCP installation
 
+## 0.6.1 candidate
+
+The [0.6.1 notes](RELEASE-NOTES-0.6.1.md) introduce complete read-only lens
+membership. Candidate installation commands require its published release
+assets; the existing 0.6.0 history below remains immutable. After publication,
+select `--version 0.6.1` / `-Version 0.6.1` and retain its checksums and receipt.
+For an existing profile follow the [0.6.1 upgrade](UPGRADING.md#preparing-a-061-upgrade):
+same SQLite schema 55 and paths, consistent backup before pip, no project reset.
+Prerequisites and manual/Windows/core procedures below continue to apply.
+
 Flower MCP requires Python 3.11 or newer and is licensed under
 [Apache-2.0](../LICENSE), with attribution in [NOTICE](../NOTICE).
 The distribution is `flow-of-work-mcp`; the primary command is `flower-mcp`.

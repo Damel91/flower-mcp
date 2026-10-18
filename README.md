@@ -15,11 +15,24 @@ Published release: [0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
-## Flower 0.6.0
+## Flower 0.6.1 candidate
+
+The [0.6.1 notes](docs/RELEASE-NOTES-0.6.1.md) and
+[lens catalog guide](docs/LENS-CATALOG.md) describe the new read-only
+`fow_interaction(operation="catalog")` route. Hosts can present relevant direct
+verbs from complete core/primary/companion membership. Flower keeps 37 tools and
+445 input fields; selection and execution gates remain explicit.
+
+Candidate qualification and publication are separate. The pinned commands below
+select 0.6.1 once its release assets are published; official 0.6.0 remains immutable.
+Use the [same-profile upgrade](docs/UPGRADING.md#preparing-a-061-upgrade), preserving
+SQLite schema 55, configuration, receipts, evidence and handovers.
+
+## Flower 0.6.0 history
 
 [Flower 0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0) is published.
 The [release notes](docs/RELEASE-NOTES-0.6.0.md) describe the compatibility change.
-The quick-start downloads below select its immutable assets.
+Its immutable assets and compatibility history remain available.
 
 - Milestones separate work realized now from requirements owned by earlier
   milestones. `prerequisite_requirement_ids` replaces `dependency_closure_ids`;
@@ -113,10 +126,10 @@ and profile when upgrading, so the SQLite ledger and client registration stay in
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.0/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -128,7 +141,7 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
