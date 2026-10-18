@@ -6,8 +6,11 @@ The Markdown channel presents the same supplied facts as sections, records, list
 and shallow tables. An executable tool call remains explicit JSON so a host can
 copy its arguments without guessing.
 
-The readable-reference correction is included in the 0.6.2 candidate after the
-immutable 0.6.1 release. Final versioned delivery has its own qualification.
+The readable-reference correction is included in published
+[Flower 0.6.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2), commit
+`12ad69317dab92bdba06ae113ac22d107d259236`. Its package, actual public workflows,
+rendered references and official HTTPS upgrade were qualified separately from
+the preserved 0.6.1 release. Actual host adoption remains a separate checkpoint.
 Previously released assets and generated artifacts remain unchanged; installing
 or updating the selected release is a separate explicit operation.
 

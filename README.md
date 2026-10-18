@@ -11,9 +11,27 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Published release: [0.6.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Published release: [0.6.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
+
+## Flower 0.6.2
+
+The [0.6.2 notes](docs/RELEASE-NOTES-0.6.2.md) and
+[readable lifecycle guide](docs/readable-lifecycle-example.md) describe the
+presentation correction. Lifecycle records, guided roadmaps and generated
+references now render as complete Markdown sections and lists, preserving
+multiline paragraphs and ordered steps. The complete roadmap appears once
+alongside its summary and gates; machine consumers retain the structured
+application envelope. Requirements, prerequisites, producer contracts and
+verification obligations remain explicit. Formatting does not resolve gaps,
+change authority or grant acceptance.
+
+Flower 0.6.2 is published. The commands below select its verified assets.
+Use the [SQLite-preserving upgrade](docs/UPGRADING.md#preparing-a-062-upgrade)
+with the original environment and profile. Schema 55, configuration, historical
+artifacts, receipts, evidence and handovers stay in place. The core remains
+model-free, with 37 tools, 445 input fields and 182 operation routes.
 
 ## Flower 0.6.1
 
@@ -23,9 +41,9 @@ The [0.6.1 notes](docs/RELEASE-NOTES-0.6.1.md) and
 verbs from complete core/primary/companion membership. Flower keeps 37 tools and
 445 input fields; selection and execution gates remain explicit.
 
-Flower 0.6.1 is published. The commands below select its verified release
-assets; earlier published releases remain unchanged. Source builds and
-installer-owned release artifacts remain distinct.
+Flower 0.6.1 remains a preserved historical release. Its catalog and verified
+assets remain available; current operational commands below select 0.6.2.
+Source builds and installer-owned release artifacts remain distinct.
 Use the [same-profile upgrade](docs/UPGRADING.md#preparing-a-061-upgrade), preserving
 SQLite schema 55, configuration, receipts, evidence and handovers.
 
@@ -121,16 +139,16 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
-These download commands select published **0.6.1**. Use the existing environment
+These download commands select published **0.6.2**. Use the existing environment
 and profile when upgrading, so the SQLite ledger and client registration stay in place.
 
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -142,7 +160,7 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -166,10 +184,10 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Flower `0.6.1` selects the independently published
+Flower `0.6.2` selects the independently published
 [runtime-llama `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0),
 pinned by URL and SHA256 through its optional `inference` extra.
-Flower `0.6.0` selected the same SDK. Historical Flower `0.5.2` still selects runtime `0.4.1`; its assets remain immutable. Existing optional installations can update
+Historical Flower `0.6.1` and `0.6.0` selected the same SDK. Historical Flower `0.5.2` still selects runtime `0.4.1`; its assets remain immutable. Existing optional installations can update
 only the SDK while retaining the installed Flower artifact, receipt and profile;
 reinstalling its old extra can select the old SDK again. Historical Flower
 `v0.4.1` still requires runtime `0.4.0` and retains its eight assets.
@@ -232,7 +250,7 @@ Already installed? Follow the [SQLite-preserving upgrade plan](docs/UPGRADING.md
 Stop clients sharing the Flower environment, preview with the new installer's
 `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then upgrade with the same
 environment/profile paths. Flower backs up SQLite and YAML before package
-changes. Updating an existing schema 55 installation to 0.6.1 keeps
+changes. Updating an existing schema 55 installation to 0.6.2 keeps
 schema 55 unchanged; older 0.3.1/schema 52 installations use the existing additive
 migrations to 55. Resume the existing project and verify another restart.
 
@@ -251,8 +269,10 @@ The [presentation index](docs/presentation/README.md) also links the offline rea
 
 [Advanced configuration](docs/ADVANCED-CONFIGURATION.md) explains internal LLM
 setup, supported host semantic roles and external technical providers. The
-[0.6.1 release notes](docs/RELEASE-NOTES-0.6.1.md) and
-[lens catalog guide](docs/LENS-CATALOG.md) describe current host discovery.
+[0.6.2 release notes](docs/RELEASE-NOTES-0.6.2.md) and
+[readable lifecycle guide](docs/readable-lifecycle-example.md) describe current
+references. The [0.6.1 notes](docs/RELEASE-NOTES-0.6.1.md) and
+[lens catalog guide](docs/LENS-CATALOG.md) retain the catalog introduction.
 The [0.5.2 release notes](docs/RELEASE-NOTES-0.5.2.md) record the published
 corrections. The [0.6.0 release notes](docs/RELEASE-NOTES-0.6.0.md) and
 [native project deletion guide](docs/NATIVE-PROJECT-DELETION.md) describe the new
@@ -294,6 +314,22 @@ require Flower.
 
 ## Status and operating limits
 
+Flower `0.6.2` is published and remains in testing. Tag `v0.6.2` identifies
+commit `12ad69317dab92bdba06ae113ac22d107d259236`
+([release 416738867](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2)).
+[Exact candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39168606257) passed six jobs;
+the [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39169849356) passed all eight.
+Seven anonymous official assets and a fresh owned macOS HTTPS 0.6.1 → 0.6.2
+upgrade were verified separately, preserving SQLite schema 55, existing history,
+configuration, client paths and restart continuity. New artifact generation was
+checked separately from pure preservation of the old records. These fixtures
+changed no real user installation. Noxi's actual adoption follows its owner's
+native updater and remains a separate deployment checkpoint; it is not inferred
+from package or CI checks. Unknown OS/client usability, model quality and human
+acceptance remain separate. The writer witness stays deferred.
+
+Historical release checkpoints follow.
+
 Flower `0.6.1` is published and remains in testing. Tag `v0.6.1` identifies
 commit `8de41beb1368ef772755b068b7404a91d3197f49`
 ([release 416461595](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1)).
@@ -307,8 +343,6 @@ assets are preserved by maintainer policy; GitHub does not enforce immutability
 for this release. Current guides on `main` do not replace its published bytes.
 These checks do not certify an unknown OS, model usability, a real client update
 or human acceptance. The witness remains deferred.
-
-Historical release checkpoints follow.
 
 Flower `0.6.0` is published and remains in testing. Published tag `v0.6.0` identifies commit `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7` ([release 416096822](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0)). [Candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39072677376) and [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39073239681) are separate from anonymous asset checks and the populated-profile HTTPS upgrade.
 The official assets and a fresh owned 0.5.2/schema55 → 0.6.0/schema55 HTTPS upgrade

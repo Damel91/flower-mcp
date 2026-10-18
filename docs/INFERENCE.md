@@ -11,7 +11,8 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Published Flower 0.6.1 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Published Flower 0.6.2 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Historical published Flower `0.6.1` wheel | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.0` wheel | Independently published `runtime-llama` `0.5.0` |
 | Immutable published Flower `0.5.0`, `0.5.1` and `0.5.2` wheels | `runtime-llama` `0.4.1` |
 | Historical published Flower `0.4.1` wheel | `runtime-llama` `0.4.0` |
@@ -28,8 +29,13 @@ runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.
 - Python 3.11+ and `requests>=2.31,<3`; Apache-2.0 `LICENSE`/`NOTICE` and the
   retained llamatelemetry MIT attribution remain in the upstream wheel.
 
-[Flower 0.6.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1) is published
+[Flower 0.6.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2) is published at commit
+`12ad69317dab92bdba06ae113ac22d107d259236` with the same optional pin. Its official
+wheel SHA256 is `0e2a37013bcfcce0476edf1324e6a660bd5ac3c8ea783d62cf7cf8a3148df182`.
+Historical [Flower 0.6.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1) remains published
 at commit `8de41beb1368ef772755b068b7404a91d3197f49` with this optional pin.
+Its historical wheel SHA256 is
+`7f510b27e63824d42c1644f4931dde404044229343ba0c1942043bca8d1ba982`.
 [Flower 0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0) used the
 same runtime 0.5.0 pin and remains a separate preserved release. Historical
 [Flower 0.5.2 assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) remain immutable.
@@ -59,10 +65,10 @@ Windows:
 For a reviewed local 0.6.2 source/candidate wheel, replace `'.[inference]'` with
 `'./dist/flow_of_work_mcp-0.6.2-py3-none-any.whl[inference]'` in a fresh/manual
 environment. This remains a local-build example, separate from the published
-0.6.1 artifact. For a fresh/manual official installation, acquire its wheel and
+0.6.2 artifact even when its version matches. For a fresh/manual official installation, acquire its wheel and
 `SHA256SUMS` through the [release-wheel procedure](INSTALLATION.md#manual-installation-from-a-release-wheel),
-then use that verified wheel path with `[inference]`. Its wheel SHA256 is
-`7f510b27e63824d42c1644f4931dde404044229343ba0c1942043bca8d1ba982`.
+then use that verified wheel path with `[inference]`. Its official 0.6.2 wheel
+SHA256 is `0e2a37013bcfcce0476edf1324e6a660bd5ac3c8ea783d62cf7cf8a3148df182`.
 A rebuilt same-version wheel remains a different artifact. Historical **0.5.2** still selects
 runtime `0.4.1`. Core installers remain core-only.
 The extra fetches the exact upstream URL/hash and its normal dependency closure;
@@ -84,7 +90,7 @@ example downloads the selected local Flower wheel's core dependency closure and
 explicitly selects the independent runtime 0.5.0:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.2-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 sha256sum wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 # macOS alternative:
 shasum -a 256 wheelhouse/runtime_llama-0.5.0-py3-none-any.whl

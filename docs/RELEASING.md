@@ -1,5 +1,43 @@
 # Flower MCP releases
 
+## Published 0.6.2 delivery
+
+[Release 416738867](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2) is published at tag `v0.6.2`,
+commit `12ad69317dab92bdba06ae113ac22d107d259236`. The
+[0.6.2 notes](RELEASE-NOTES-0.6.2.md) remain its reviewed note authority.
+It delivers [readable lifecycle references](readable-lifecycle-example.md),
+retaining 37 tools, 445 input fields, 182 routes, schema 55 and the runtime 0.5.0
+optional pin. Canonical authority and acceptance gates do not change.
+
+[Exact candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39168606257) passed six jobs.
+The unchanged [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39169849356) passed all eight
+jobs. Seven official assets were acquired anonymously, checking their exact
+inventory, digests, sizes and `SHA256SUMS`. All 194 wheel members, 187 source/
+resource files and 297 regular source-archive files were checked against the
+exact committed source and candidate member bytes, including licenses, RECORD,
+required guides and the bilingual reader corpus. A CI rebuild may have a
+different archive SHA256 while retaining identical member bytes. Official pins:
+
+- Flower wheel: `0e2a37013bcfcce0476edf1324e6a660bd5ac3c8ea783d62cf7cf8a3148df182`.
+- Python installer: `eb485f2e6e2899c45c370289e7965db454e081f48e3404b854a0b01db4063ab4`.
+- `SHA256SUMS` file: `b19223e7b036eb432996071698595e260bb336137badf6f0d3fa690dd039ae68`.
+
+The fresh owned macOS official HTTPS 0.6.1 → 0.6.2
+[upgrade checkpoint](UPGRADING.md#preparing-a-062-upgrade) separately preserved
+schema 55 and the populated ledger/configuration/history. Linux and Windows CI's
+published 0.3.1/schema 52 → 55 checks are a distinct migration route. Actual Noxi
+adoption follows its owner's native updater and separate preservation evidence;
+it is not inferred from these checks.
+
+The specific publication authorization is consumed by 0.6.2. Current-guide
+commits on `main` are separate documentation checkpoints: do not rerun Release,
+move the tag or replace assets for guide changes. The published note/archive
+keeps its preparation-era text. Preservation is maintainer policy, not
+GitHub-enforced immutability. No Glama build action, writer witness/U6, pipeline
+resumption, unknown OS/client certification, model quality or human acceptance
+is claimed. Current install/upgrade instructions select 0.6.2; the retained
+0.6.1 and 0.6.0 delivery sections below are historical.
+
 ## Published 0.6.1 delivery
 
 [Release 416461595](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1)
@@ -194,9 +232,9 @@ supplied target and uploads assets before publication; see [the release command]
 
 ## Install the release
 
-Current release-download examples in README and INSTALLATION.md select published
-0.6.0. A source build is a separate artifact. A published installer
-uses a version-pinned URL:
+The following retained 0.6.0 installer example belongs to that historical
+release. Current README and INSTALLATION.md examples select 0.6.2. A source build
+remains a separate artifact; a release installer uses a version-pinned URL:
 
 ```sh
 curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.0/install.sh | bash

@@ -10,22 +10,22 @@ server, the public name of Flow of Work MCP.
 ## Public repository and downloads
 
 - [GitHub repository](https://github.com/Damel91/flower-mcp): code, README and current documentation.
-- [Flower MCP 0.6.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1): seven published release assets.
+- [Flower MCP 0.6.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2): seven published release assets.
 - [Current installation guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md): procedures, configuration and removal.
 - [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
 
 | File | Purpose |
 | --- | --- |
-| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh) | Guided installation on macOS and Linux. |
-| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.ps1) | Windows PowerShell launcher from the same release. |
-| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install_flower.py) | Release Python installer; requires Python 3.11+. |
-| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/flow_of_work_mcp-0.6.1-py3-none-any.whl) | Manual installation of the Python package. |
-| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/flow_of_work_mcp-0.6.1.tar.gz) | Packaged release source. |
-| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/SHA256SUMS) | Checksums for release-file verification. |
-| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
+| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh) | Guided installation on macOS and Linux. |
+| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1) | Windows PowerShell launcher from the same release. |
+| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install_flower.py) | Release Python installer; requires Python 3.11+. |
+| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2-py3-none-any.whl) | Manual installation of the Python package. |
+| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2.tar.gz) | Packaged release source. |
+| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/SHA256SUMS) | Checksums for release-file verification. |
+| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
 
-The published `v0.6.1` release contains seven Flower assets and no runtime wheel.
-Verify downloads against its `SHA256SUMS`. The Windows launcher installs 0.6.1.
+The published `v0.6.2` release contains seven Flower assets and no runtime wheel.
+Verify downloads against its `SHA256SUMS`. The Windows launcher installs 0.6.2.
 Historical [0.4.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1) retains eight historical assets,
 including optional runtime-llama `0.4.0`; that old Flower extra remains unchanged.
 The Python distribution is `flow-of-work-mcp`; the command is `flower-mcp`.
@@ -37,7 +37,7 @@ preparation-era guides; later current documentation does not replace those bytes
 
 ## Current source and optional runtime
 
-Flower `0.6.1` contains seven Flower assets: wheel, source archive,
+Flower `0.6.2` contains seven Flower assets: wheel, source archive,
 three installers, `BOOTSTRAP.md` and `SHA256SUMS`. It does not bundle a runtime
 wheel or replace the historical 0.4.1 assets.
 
@@ -49,8 +49,8 @@ Its SHA256 is
 The upstream wheel includes Apache-2.0 `LICENSE`/`NOTICE` and vendored
 llamatelemetry MIT attribution.
 
-Published Flower `0.6.1` and its matching source select runtime `0.5.0`.
-Historical Flower `0.6.0` selected the same optional runtime.
+Published Flower `0.6.2` and its matching source select runtime `0.5.0`.
+Historical Flower `0.6.1` and `0.6.0` selected the same runtime.
 Historical Flower `0.5.2` still selects runtime `0.4.1`; its assets are immutable.
 Use this source command only in a fresh/manual Flower environment:
 
@@ -66,8 +66,8 @@ This local-build example is separate from the verified published artifact:
 .venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.2-py3-none-any.whl[inference]'
 ```
 
-Flower 0.6.1 is published at commit
-`8de41beb1368ef772755b068b7404a91d3197f49`. Verify its official wheel against
+Flower 0.6.2 is published at commit
+`12ad69317dab92bdba06ae113ac22d107d259236`. Verify its official wheel against
 its own `SHA256SUMS`; the release and local build are separate artifacts.
 The extra selects runtime `0.5.0`. A rebuilt same-version source wheel
 is a separate artifact; earlier published assets remain immutable.
@@ -101,16 +101,28 @@ schema: `prerequisite_requirement_ids` replaces `dependency_closure_ids`; use `[
 when none apply. Native deletion is never an MCP tool or upgrade step; see its
 [limits](https://github.com/Damel91/flower-mcp/tree/main/docs/NATIVE-PROJECT-DELETION.md).
 Windows native purge durability remains unqualified. The writer witness remains
-deferred. The commands below install published 0.6.1;
+deferred. The commands below install published 0.6.2;
 installation mechanics and provider/client usability remain separate evidence.
 
-Version 0.6.1 adds a complete read-only lens operation catalog so a host can
+Version 0.6.1 introduced a complete read-only lens operation catalog so a host can
 present relevant direct verbs while retaining ordinary execution gates. See the
 [current catalog guide](https://github.com/Damel91/flower-mcp/tree/main/docs/LENS-CATALOG.md).
-Seven anonymous assets and an owned macOS HTTPS 0.6.0 → 0.6.1 upgrade were verified
+Seven anonymous assets and an owned macOS HTTPS 0.6.1 → 0.6.2 upgrade were verified
 separately from source, installed-package and CI checks. No real user installation
 was changed; this does not certify an unknown OS, model usability or acceptance.
 Published tags and assets are preserved by policy, not GitHub-enforced immutability.
+
+Version 0.6.2 renders lifecycle records, guided roadmaps and generated references
+as complete readable Markdown. Paragraphs, ordered steps, prerequisites and
+verification obligations remain visible; the complete roadmap appears once
+beside its summary and gates. The structured application envelope and canonical
+fields are retained; derived Markdown values change in both response channels.
+See the [current readable lifecycle guide](https://github.com/Damel91/flower-mcp/tree/main/docs/readable-lifecycle-example.md).
+The preserved [0.6.1 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1)
+remains at commit `8de41beb1368ef772755b068b7404a91d3197f49`; its catalog and
+0.6.0 → 0.6.1 upgrade qualification are historical facts. Actual Noxi adoption
+uses its owner's native updater and separate preservation evidence; it is not
+inferred from the owned fixture or CI.
 
 ## Before installing
 
@@ -136,21 +148,21 @@ and coding clients sharing that environment. For an installer-owned installation
 preview the upgrade before changing packages:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 On Windows download the new `install.ps1` shown below, then preview without a
 client-registration option:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.1' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Upgrade -DryRun
 ```
 
 Add your original `--venv`, `--profile` and `--profile-root` options for custom
 paths; Windows uses `-Venv`, `-Profile` and `-ProfileRoot`. Inspect the plan, then
 repeat without `--dry-run` / `-DryRun`. The upgrade backs up the selected SQLite
 ledger and exact YAML before pip, preserves client registration and applies
-no new migration when upgrading a schema 55 profile to 0.6.1.
+no new migration when upgrading a schema 55 profile to 0.6.2.
 An older 0.3.1/schema 52 installation still uses the existing additive migrations
 52 to 55 at the next server start. Keep the reported backup paths. The upgrade
 never resets the ledger or automatically restores a backup; a failed pip operation
@@ -175,11 +187,11 @@ After checking prerequisites, the public command starts the guided installer
 and lets you choose a client or installation only:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash
 ```
 
 The script prepares an isolated Python environment and verifies backend and
-wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.sh)
+wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh)
 before running it. Options and manual procedures are in the complete guide.
 
 ### Windows
@@ -188,8 +200,8 @@ In a writable directory, download the public launcher and choose a client.
 This example uses Codex:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.1/install.ps1" -OutFile ".\install.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.1' -Platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1" -OutFile ".\install.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Platform codex
 ```
 
 Run the commands separately and stop if the download fails. You can inspect the
@@ -222,7 +234,7 @@ and retrieve a snapshot.
 
 If you encounter an issue, report it in the [repository issues](https://github.com/Damel91/flower-mcp/issues)
 with your operating system, version, client, operation and error, without
-credentials or personal data. Flower `0.6.1` remains in testing. Installation
+credentials or personal data. Flower `0.6.2` remains in testing. Installation
 mechanics and the coding client's actual usability are separate checks.
 
 [Back to Require](01-require.md) · [GitHub repository](https://github.com/Damel91/flower-mcp) · [Index](README.md)
