@@ -150,6 +150,10 @@ def test_meaning_staleness_retirement_missing_milestone_scope_and_no_progress_no
 
 def test_registered_guided_markdown_and_progress_channels_are_complete(tmp_path):
     runtime, ids, _revs, bootstrap_id, milestone_id, _answer, _mapping = prepared(tmp_path)
+    runtime.guided_bootstrap.record_answer(ids[0], bootstrap_id, answer={
+        'answer_key':'future', 'question':'Any later work?', 'answer':'UNASSIGNED_REAL_DRAFT_SENTINEL',
+        'kind':'proposal', 'source_reference':'synthetic-dialogue:future',
+    }, actor='engineer', request_id='future-draft')
     async def run():
         app = create_app(runtime)
         result = await app.call_tool('fow_bootstrap', {'project_id':ids[0], 'operation':'roadmap',
@@ -158,10 +162,53 @@ def test_registered_guided_markdown_and_progress_channels_are_complete(tmp_path)
         payload = result.structuredContent['result']['result']['bootstrap']
         assert payload['markdown'] in result.content[0].text
         assert '\n## Milestones' in result.content[0].text
+        assert payload['draft_context']['authority'] == 'outside_selected_scope'
+        for fact in ('The client returns value + 1', 'UNASSIGNED_REAL_DRAFT_SENTINEL', 'outside_selected_scope'):
+            assert payload['markdown'].count(fact) == result.content[0].text.count(fact) == 1
         progress = await app.call_tool('fow_handover', {'project_id':ids[0], 'operation':'project_progress', 'milestone_ids':[milestone_id]})
         assert not progress.isError
         assert progress.structuredContent['result']['result']['project_progress']['contract_version'] == 'flow.milestone_progress.v1'
     try:
+        asyncio.run(run())
+    finally:
+        runtime.close()
+
+
+def test_roadmap_presentation_cannot_change_canonical_scope_confirmation_or_public_envelope(tmp_path, monkeypatch):
+    from hashlib import sha256
+    import json
+    from flow_of_work_mcp.application import guided_bootstrap
+
+    runtime, ids, _revs, bootstrap_id, milestone_id, _answer, _mapping = prepared(tmp_path)
+    try:
+        confirm(runtime, ids, bootstrap_id, milestone_id)
+        arguments = {'project_id':ids[0], 'operation':'roadmap', 'bootstrap_id':bootstrap_id,
+                     'milestone_ids':[milestone_id], 'actor':'engineer'}
+        original = runtime.guided_bootstrap.roadmap(ids[0], bootstrap_id, milestone_ids=[milestone_id])
+        encoded_basis = json.dumps(original['canonical_scope'], sort_keys=True, ensure_ascii=False,
+                                   separators=(',', ':'), allow_nan=False).encode()
+        assert original['roadmap_fingerprint'] == sha256(encoded_basis).hexdigest()
+        version = runtime.ledger.ledger_version(ids[0])
+        state = deepcopy(runtime.bootstrap.state(ids[0], bootstrap_id))
+        todo = deepcopy(runtime.external_work.todo(*ids))
+        with monkeypatch.context() as rendering:
+            rendering.setattr(guided_bootstrap, 'render_roadmap', lambda *_args, **_kwargs: 'PRESENTATION_ONLY')
+            alternate = runtime.guided_bootstrap.roadmap(ids[0], bootstrap_id, milestone_ids=[milestone_id])
+        assert alternate['markdown'] == 'PRESENTATION_ONLY'
+        assert {k:v for k,v in alternate.items() if k != 'markdown'} == {
+            k:v for k,v in original.items() if k != 'markdown'}
+        assert runtime.ledger.ledger_version(ids[0]) == version
+        assert runtime.bootstrap.state(ids[0], bootstrap_id) == state
+        assert runtime.external_work.todo(*ids) == todo
+        raw = handle_bootstrap(runtime, **arguments)
+
+        async def run():
+            projected = await create_app(runtime).call_tool('fow_bootstrap', arguments)
+            assert not projected.isError
+            assert projected.structuredContent == {'result':raw}
+            assert original['markdown'] in projected.content[0].text
+            assert '"entry_policy"' not in original['markdown']
+            assert '"canonical_references"' not in original['markdown']
         asyncio.run(run())
     finally:
         runtime.close()

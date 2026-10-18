@@ -23,7 +23,7 @@ def test_export_preserves_full_semantic_context_and_physical_prose_lines(tmp_pat
     content = render_plan(snapshot, projection, project_predecessor=external._projection)
     assert snapshot == before
     assert content == render_plan(snapshot, projection, project_predecessor=external._projection)
-    for context in ['Entry policy', 'Exit policy', 'Requirement ids', 'Dependency closure ids',
+    for context in ['Entry policy', 'Exit policy', 'Requirement ids', 'Prerequisite requirement ids',
                     'sequence', 'Participants', 'Export accepted work.', 'Execute offline.', 'Failure steps',
                     'authority.md', 'Stable IDs.\n', 'Preserve authority.', 'host_declared', 'risk:known',
                     'No hidden side effects.', 'Revision', 'reference:8']:

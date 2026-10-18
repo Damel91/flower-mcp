@@ -20,6 +20,7 @@ from flow_of_work_mcp.core.ports import (
     RequirementLedger,
 )
 from flow_of_work_mcp.core.standards import StandardProfileRegistry
+from flow_of_work_mcp.application.roadmap_markdown import render_goal, render_requirement
 
 
 def _utc_now() -> str:
@@ -241,40 +242,19 @@ class ArtifactGenerationService:
     def _requirement_rows(
         requirements: list[Mapping[str, Any]], *, include_statement: bool
     ) -> list[str]:
-        headers = ["| ID | Title | Category | Status | Revision |"]
-        separators = ["| --- | --- | --- | --- | ---: |"]
-        if include_statement:
-            headers = ["| ID | Title | Category | Status | Revision | Statement |"]
-            separators = ["| --- | --- | --- | --- | ---: | --- |"]
-        lines = headers + separators
+        lines = []
         for requirement in requirements:
-            values = [
-                ArtifactGenerationService._cell(requirement["requirement_id"]),
-                ArtifactGenerationService._cell(requirement["title"]),
-                ArtifactGenerationService._cell(requirement["category"]),
-                ArtifactGenerationService._cell(requirement["lifecycle_status"]),
-                ArtifactGenerationService._cell(requirement["current_revision"]),
-            ]
-            if include_statement:
-                values.append(ArtifactGenerationService._cell(requirement["statement"]))
-            lines.append("| " + " | ".join(values) + " |")
-        return lines
+            fields = {key: value for key, value in requirement.items()
+                      if include_statement or key != "statement"}
+            lines.extend([render_requirement(fields).rstrip(), ""])
+        return lines or ["No requirements recorded."]
 
     @staticmethod
     def _goal_rows(nodes: list[Mapping[str, Any]]) -> list[str]:
-        lines = ["| Goal | Type | Title | Payload |", "| --- | --- | --- | --- |"]
+        lines = []
         for node in nodes:
-            lines.append(
-                "| {goal_id} | {node_type} | {title} | {payload} |".format(
-                    goal_id=ArtifactGenerationService._cell(node["goal_node_id"]),
-                    node_type=ArtifactGenerationService._cell(node["node_type"]),
-                    title=ArtifactGenerationService._cell(node["title"]),
-                    payload=ArtifactGenerationService._cell(
-                        json.dumps(node.get("payload") or {}, sort_keys=True)
-                    ),
-                )
-            )
-        return lines
+            lines.extend([render_goal(node).rstrip(), ""])
+        return lines or ["No Goal nodes recorded."]
 
     @staticmethod
     def _requirement_mappings(requirements: list[Mapping[str, Any]]) -> list[ArtifactMapping]:

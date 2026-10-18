@@ -17,6 +17,8 @@ from flow_of_work_mcp.application.operation_contracts import (
     public_tool_names,
 )
 from flow_of_work_mcp.application.external_plan_markdown import render_assurance_result, render_external_result
+from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
+from flow_of_work_mcp.core.domain.artifacts import ArtifactKind
 from flow_of_work_mcp.markdown_adapter import (
     MarkdownArtifact,
     MarkdownJsonIsland,
@@ -308,6 +310,23 @@ def project_markdown(
         exact_call_keys=spec.exact_call_keys,
         preserve_multiline=complete_evidence or payload.get("status") in {"rejected", "blocked", "failed"},
     )
+    if (
+        tool_name == "fow_bootstrap" and operation == "roadmap"
+        and payload.get("status") == "success" and isinstance(result, Mapping)
+        and _complete_roadmap_reference(result.get("bootstrap"), artifacts)
+    ):
+        # The exact complete reference already carries these facts. Retain all
+        # summary/gate fields and the raw envelope; remove only their second
+        # human representation after the full artifact has been extracted.
+        presented_result = document[spec.result_heading]
+        document[spec.result_heading] = {
+            **presented_result,
+            "bootstrap": {
+                **presented_result["bootstrap"],
+                "canonical_scope": "Presented in the complete roadmap below.",
+                "draft_context": "Presented in the complete roadmap below.",
+            },
+        }
     if complete_evidence:
         # A single explicitly requested evidence body is a complete reference,
         # like an exported artifact. Never silently flatten or budget-cut it.
@@ -376,6 +395,56 @@ def project_markdown(
     )
 
 
+def _complete_roadmap_reference(
+    roadmap: Any, artifacts: list[tuple[str, str, str]],
+) -> bool:
+    """Eligibility for narrative deduplication, never lifecycle admission."""
+    if not isinstance(roadmap, Mapping) or roadmap.get("contract_version") != "flow.guided_roadmap.v1":
+        return False
+    if not all(isinstance(roadmap.get(key), str) and roadmap[key].strip() for key in (
+        "project_id", "bootstrap_id", "roadmap_fingerprint", "semantic_completeness", "markdown",
+    )):
+        return False
+    if not all(isinstance(roadmap.get(key), bool) for key in ("confirmable", "confirmed", "human_acceptance")):
+        return False
+    if not isinstance(roadmap.get("milestone_ids"), list) or not all(
+        isinstance(value, str) for value in roadmap["milestone_ids"]
+    ):
+        return False
+    gaps = roadmap.get("gaps")
+    if not isinstance(gaps, list) or not all(isinstance(value, Mapping) for value in gaps):
+        return False
+    scope, draft = roadmap.get("canonical_scope"), roadmap.get("draft_context")
+    if not isinstance(scope, Mapping) or set(scope) != {
+        "project_id", "bootstrap_id", "milestones", "requirements", "goals",
+        "goal_edges", "answers", "correspondence",
+    }:
+        return False
+    if any(scope[key] != roadmap[key] for key in ("project_id", "bootstrap_id")):
+        return False
+    if not all(isinstance(scope[key], list) and all(isinstance(value, Mapping) for value in scope[key])
+               for key in ("milestones", "requirements", "goals", "goal_edges")):
+        return False
+    if not all(isinstance(scope[key], Mapping) for key in ("answers", "correspondence")):
+        return False
+    if not isinstance(draft, Mapping) or set(draft) != {
+        "authority", "unassigned_answers", "outside_scope_answers", "outside_scope_correspondence",
+    } or draft["authority"] != "outside_selected_scope" or not all(
+        isinstance(draft[key], Mapping)
+        for key in ("unassigned_answers", "outside_scope_answers", "outside_scope_correspondence")
+    ):
+        return False
+    markdown = roadmap["markdown"]
+    if not any(body == markdown and language == "markdown" for _label, body, language in artifacts):
+        return False
+    try:
+        expected = render_roadmap(scope, fingerprint=roadmap["roadmap_fingerprint"], draft_context=draft, gaps=gaps)
+    except (KeyError, TypeError, ValueError):
+        # Malformed presentation input cannot justify hiding its original facts.
+        return False
+    return markdown == expected
+
+
 def _projection_spec(
     tool_name: str,
     arguments: Mapping[str, Any],
@@ -441,7 +510,10 @@ def _extract_special_values(
                 and item
                 and _is_artifact_value(key, item)
             ):
-                artifacts.append((_label(item_path), item, _artifact_language(key, value)))
+                language = _artifact_language(key, value)
+                if key not in artifact_keys and key not in {"source", "stdout", "stderr", "logs"}:
+                    language = "markdown"
+                artifacts.append((_label(item_path), item, language))
                 continue
             if key in exact_call_keys and _is_exact_call_value(item):
                 exact_calls.append((_label(item_path), item))
@@ -472,7 +544,7 @@ def _extract_special_values(
             exact_calls.extend(child_calls)
         return output_list, artifacts, exact_calls
     if preserve_multiline and isinstance(value, str) and ("\n" in value or "\r" in value):
-        return "Complete multiline content below.", [(_label(path), value, "text")], []
+        return "Complete multiline content below.", [(_label(path), value, "markdown")], []
     return value, artifacts, exact_calls
 
 
@@ -485,18 +557,32 @@ def _is_artifact_value(key: str, value: str) -> bool:
 
 
 def _is_exact_call_value(value: Any) -> bool:
+    def call(item: Any) -> bool:
+        return (
+            isinstance(item, Mapping)
+            and isinstance(item.get("tool"), str)
+            and bool(item["tool"].strip())
+            and isinstance(item.get("arguments"), Mapping)
+        )
+
     if isinstance(value, Mapping):
-        return bool(value)
-    if isinstance(value, list):
-        return bool(value) and all(isinstance(item, Mapping) for item in value)
+        return call(value) or (bool(value) and all(call(item) for item in value.values()))
+    if isinstance(value, (list, tuple)):
+        return bool(value) and all(call(item) for item in value)
     return False
 
 
 def _artifact_language(key: str, owner: Mapping[str, Any]) -> str:
-    if key in {"markdown", "task_markdown"}:
+    if key in {"markdown", "task_markdown", "prompt"}:
         return "markdown"
     if key in {"stdout", "stderr", "logs"}:
         return "text"
+    if key in {"content", "text"} and any(
+        isinstance(owner.get(field), str)
+        and owner[field] in {kind.value for kind in ArtifactKind}
+        for field in ("artifact_kind", "kind")
+    ):
+        return "markdown"
     return str(owner.get("language") or owner.get("media_type") or "text").strip()
 
 

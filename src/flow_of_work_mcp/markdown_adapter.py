@@ -12,8 +12,6 @@ import json
 import re
 from typing import Any
 
-from md_generator.text.md_emit_json import json_to_markdown
-
 _CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _INFO_STRING_RE = re.compile(r"[^A-Za-z0-9_+.-]+")
 
@@ -46,19 +44,15 @@ def render_markdown(
         raise ValueError("model-facing output budget must be at least 1024 chars")
     fragments = [f"# {safe_heading(title)}"]
     if document:
-        body = json_to_markdown(
-            safe_structured_value(document),
-            "",
-            include_source_block=False,
-            generate_toc=False,
-        ).strip()
+        body = render_structured(document).strip()
         if body:
             fragments.append(body)
     for artifact in artifacts:
-        fragments.append(
-            f"## {safe_heading(artifact.label)}\n\n"
-            f"{fenced_text(artifact.content, language=artifact.language)}"
-        )
+        language = artifact.language.lower().split(";", 1)[0].strip()
+        body = safe_text(artifact.content) if language in {
+            "markdown", "md", "text/markdown", "text/x-markdown"
+        } else fenced_text(artifact.content, language=artifact.language)
+        fragments.append(f"## {safe_heading(artifact.label)}\n\n{body}")
     if json_islands:
         fragments.append("## Continue")
         for island in json_islands:
@@ -82,30 +76,136 @@ def render_markdown(
     )
 
 
-def safe_structured_value(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            safe_inline(str(key)): safe_structured_value(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, (list, tuple)):
-        return [safe_structured_value(item) for item in value]
-    if isinstance(value, str):
-        return safe_inline(value)
-    return value
+def safe_text(value: str) -> str:
+    """Keep physical Markdown lines; escape only non-printing controls."""
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    return _CONTROL_CHARACTER_RE.sub(
+        lambda match: f"\\u{ord(match.group(0)):04x}", normalized
+    )
+
+
+def _scalar(value: Any) -> str:
+    if value is None:
+        return "Not provided (null)."
+    if value == "":
+        return "Empty text."
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    return safe_text(str(value))
+
+
+def _container(value: Any) -> bool:
+    return isinstance(value, (Mapping, list, tuple))
+
+
+def _label(value: Any) -> str:
+    return safe_heading(str(value).replace("_", " ")).title()
+
+
+def _table_label(value: Any) -> str:
+    # Give the scalar-table emitter final, idempotently formatted headings.
+    text = safe_inline(str(value)).replace("_", " ").replace("-", " ")
+    return re.sub(r"([a-z])([A-Z])", r"\1 \2", text).strip().title() or text
+
+
+def render_structured(value: Any, *, level: int = 2) -> str:
+    """Render records without serializing containers or flattening prose.
+
+    Tables are an optimization for uniform, single-line scalar records only.
+    Everything else keeps explicit parent/item structure and all supplied facts.
+    """
+    lines: list[str] = []
+
+    def heading(label: str, depth: int, path: tuple[str, ...]) -> None:
+        title = " / ".join((*path, label)) if depth > 6 else label
+        lines.extend(["", "#" * min(max(depth, 1), 6) + " " + title, ""])
+
+    def text_line(text: str, prefix: str = "") -> None:
+        physical = text.split("\n")
+        if prefix and len(physical) > 1:
+            lines.extend([prefix.rstrip(), ""])
+            lines.extend("  " + part if part else "" for part in physical)
+            lines.append("")
+            return
+        lines.append(prefix + physical[0])
+        indent = "  " if prefix else ""
+        lines.extend(indent + part for part in physical[1:])
+
+    def walk(item: Any, depth: int, path: tuple[str, ...]) -> None:
+        if isinstance(item, Mapping):
+            if not item:
+                lines.append("No fields recorded (empty object).")
+            mixed = any(_container(child) for child in item.values()) and any(
+                not _container(child) for child in item.values()
+            )
+            labels = [_label(key) for key in item]
+            def record_label(key: Any) -> str:
+                label = _label(key)
+                if labels.count(label) > 1:
+                    identity = safe_text(str(key)).replace("\n", "\\n")
+                    return f"{label} (field name: {identity})"
+                return label
+            for key, child in item.items():
+                if not _container(child):
+                    text_line(_scalar(child), f"- **{record_label(key)}:** ")
+                elif mixed:
+                    # A nested list item has a real Markdown boundary. A later
+                    # parent field cannot accidentally belong to the child.
+                    label = record_label(key)
+                    lines.extend([f"- **{label}:**", ""])
+                    start = len(lines)
+                    walk(child, depth + 1, (*path, label))
+                    lines[start:] = ["  " + line if line else "" for line in lines[start:]]
+                    lines.append("")
+                else:
+                    label = record_label(key)
+                    heading(label, depth, path)
+                    walk(child, depth + 1, (*path, label))
+        elif isinstance(item, (list, tuple)):
+            if not item:
+                lines.append("No items recorded (empty list).")
+                return
+            if all(isinstance(row, Mapping) and row for row in item):
+                keys = tuple(item[0])
+                headers = [_table_label(key) for key in keys]
+                table_headers = len(set(headers)) == len(headers) and all(
+                    "\n" not in safe_text(str(key)) for key in keys
+                )
+                if table_headers and all(tuple(row) == keys and all(
+                    not _container(cell) and "\n" not in _scalar(cell)
+                    for cell in row.values()
+                ) for row in item):
+                    # The external emitter never receives recursive values.
+                    from md_generator.text.md_emit_json import json_to_markdown
+
+                    rows = [{header.replace("\\", "\\\\"): _scalar(row[key]).replace("\\", "\\\\")
+                             for key, header in zip(keys, headers)} for row in item]
+                    table = json_to_markdown(rows, "", include_source_block=False,
+                                             generate_toc=False).strip()
+                    lines.extend(table.splitlines())
+                    return
+            if all(not _container(child) for child in item):
+                for child in item:
+                    text_line(_scalar(child), "- ")
+            else:
+                for index, child in enumerate(item, 1):
+                    label = f"Item {index}"
+                    heading(label, depth, path)
+                    walk(child, depth + 1, (*path, label))
+        else:
+            text_line(_scalar(item))
+
+    walk(value, level, ())
+    return "\n".join(lines).strip() + "\n"
 
 
 def safe_inline(value: str) -> str:
-    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
-    normalized = _CONTROL_CHARACTER_RE.sub(
-        lambda match: f"\\u{ord(match.group(0)):04x}",
-        normalized,
-    )
-    return " / ".join(normalized.split("\n"))
+    return " / ".join(safe_text(value).split("\n"))
 
 
 def safe_heading(value: str) -> str:
-    cleaned = _CONTROL_CHARACTER_RE.sub("", str(value)).replace("\n", " ").strip()
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = _CONTROL_CHARACTER_RE.sub("", text).replace("\n", " ").strip()
     return cleaned or "Artifact"
 
 
@@ -160,7 +260,8 @@ __all__ = [
     "fenced_text",
     "projection_boundary",
     "render_markdown",
+    "render_structured",
     "safe_heading",
     "safe_inline",
-    "safe_structured_value",
+    "safe_text",
 ]

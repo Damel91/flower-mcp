@@ -17,6 +17,7 @@ from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisit
 from flow_of_work_mcp.application.bootstrap_input_contracts import (
     ANSWER_SCHEMA, CORRESPONDENCE_SCHEMA, REFERENCES_SCHEMA,
 )
+from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
 
 
 ROLE_GUIDANCE = """Act as the software engineer working with the stakeholder.
@@ -334,33 +335,12 @@ class GuidedBootstrapService:
         confirmation = guided.get('roadmap_confirmation', {})
         confirmed = (confirmation.get('roadmap_fingerprint') == revision and
                      confirmation.get('milestone_ids') == list(selected) and not gaps)
-        parts = ['# Flower engineering roadmap', '',
-                 f'Project: {project_id}; bootstrap: {bootstrap_id}',
-                 f'Semantic roadmap fingerprint: {revision}', '',
-                 'This describes the entire selected milestone spectrum. Human scope confirmation authorizes planning/execution; it does not accept implemented software.', '',
-                 '## Scenarios and intent', '']
-        for goal in goals:
-            parts.extend([f"### {goal['goal_node_id']}: {goal['title']}", '',
-                          json.dumps(goal['payload'], ensure_ascii=False, indent=2), ''])
-        parts.extend(['## Requirements', ''])
-        for r in requirements:
-            parts.extend([f"- {r['requirement_id']}: {r['title']}", f"  {r['statement']}"])
-        parts.extend(['', '## Milestones in selected order', ''])
-        for m in milestones:
-            parts.extend([f"### {m['milestone_id']}: {m['name']}", '',
-                          json.dumps(m, ensure_ascii=False, indent=2), ''])
-        parts.extend(['## Selected stakeholder answers and correspondence', '',
-                      json.dumps({'answers':relevant_answers, 'correspondence':relevant_mappings}, ensure_ascii=False, indent=2), '',
-                      '## Draft intake outside the selected scope', '',
-                      'Unassigned or unrelated answers remain draft context. They do not govern this roadmap or authorize additional work; explicit correspondence and ordinary canonical authority are required to include them.', '',
-                      json.dumps(draft_context, ensure_ascii=False, indent=2), '',
-                      '## Unresolved obligations', '', json.dumps(gaps, ensure_ascii=False, indent=2), '',
-                      'I have gathered enough information to define this roadmap. Does it represent what you want, or is there anything else I need to know?'])
+        markdown = render_roadmap(basis, fingerprint=revision, draft_context=draft_context, gaps=gaps)
         return {'contract_version':'flow.guided_roadmap.v1', 'project_id':project_id, 'bootstrap_id':bootstrap_id,
                 'milestone_ids':list(selected), 'roadmap_fingerprint':revision, 'confirmable':not gaps,
                 'confirmed':confirmed, 'gaps':gaps, 'canonical_scope':_plain(basis),
                 'draft_context':_plain(draft_context),
-                'markdown':'\n'.join(parts), 'semantic_completeness':'host_judgment_and_human_confirmation',
+                'markdown':markdown, 'semantic_completeness':'host_judgment_and_human_confirmation',
                 'human_acceptance':False}
 
     def confirm_roadmap(self, project_id, bootstrap_id, *, milestone_ids,

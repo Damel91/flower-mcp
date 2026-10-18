@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verification
-from flow_of_work_mcp.markdown_adapter import safe_heading, safe_inline
+from flow_of_work_mcp.markdown_adapter import render_structured, safe_heading, safe_inline
 
 
 def _text(value: object) -> str:
@@ -61,6 +61,9 @@ def _record(lines: list[str], value: object, *, level: int = 3) -> None:
                     if isinstance(child, Mapping):
                         _section(lines, f'{_label(key)} {index}', level + 1)
                         _record(lines, child, level=level + 2)
+                    elif isinstance(child, (list, tuple)):
+                        _section(lines, f'{_label(key)} {index}', level + 1)
+                        lines.extend(render_structured(child, level=level + 2).splitlines())
                     else:
                         _list(lines, [child])
     elif isinstance(value, (list, tuple)):
@@ -68,6 +71,9 @@ def _record(lines: list[str], value: object, *, level: int = 3) -> None:
             if isinstance(child, Mapping):
                 _section(lines, f'Item {index}', level)
                 _record(lines, child, level=level + 1)
+            elif isinstance(child, (list, tuple)):
+                _section(lines, f'Item {index}', level)
+                lines.extend(render_structured(child, level=level + 1).splitlines())
             else:
                 _list(lines, [child])
     else:
