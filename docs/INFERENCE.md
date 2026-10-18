@@ -56,8 +56,8 @@ Windows:
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-For a reviewed local 0.6.1 source/candidate wheel, replace `'.[inference]'` with
-`'./dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'` in a fresh/manual
+For a reviewed local 0.6.2 source/candidate wheel, replace `'.[inference]'` with
+`'./dist/flow_of_work_mcp-0.6.2-py3-none-any.whl[inference]'` in a fresh/manual
 environment. This remains a local-build example, separate from the published
 0.6.1 artifact. For a fresh/manual official installation, acquire its wheel and
 `SHA256SUMS` through the [release-wheel procedure](INSTALLATION.md#manual-installation-from-a-release-wheel),

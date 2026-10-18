@@ -6,9 +6,10 @@ The Markdown channel presents the same supplied facts as sections, records, list
 and shallow tables. An executable tool call remains explicit JSON so a host can
 copy its arguments without guessing.
 
-The readable-reference correction is source work after the immutable 0.6.1
-release. It does not change existing release assets, update an installation or
-rewrite previously generated artifacts.
+The readable-reference correction is included in the 0.6.2 candidate after the
+immutable 0.6.1 release. Final versioned delivery has its own qualification.
+Previously released assets and generated artifacts remain unchanged; installing
+or updating the selected release is a separate explicit operation.
 
 ## A roadmap the stakeholder can inspect
 
