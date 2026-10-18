@@ -11,7 +11,8 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Published Flower 0.6.0 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Published Flower 0.6.1 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Historical published Flower `0.6.0` wheel | Independently published `runtime-llama` `0.5.0` |
 | Immutable published Flower `0.5.0`, `0.5.1` and `0.5.2` wheels | `runtime-llama` `0.4.1` |
 | Historical published Flower `0.4.1` wheel | `runtime-llama` `0.4.0` |
 
@@ -27,8 +28,10 @@ runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.
 - Python 3.11+ and `requests>=2.31,<3`; Apache-2.0 `LICENSE`/`NOTICE` and the
   retained llamatelemetry MIT attribution remain in the upstream wheel.
 
-[Flower 0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0) is published
-with this optional pin. Historical
+[Flower 0.6.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1) is published
+at commit `8de41beb1368ef772755b068b7404a91d3197f49` with this optional pin.
+[Flower 0.6.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0) used the
+same runtime 0.5.0 pin and remains a separate preserved release. Historical
 [Flower 0.5.2 assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2) remain immutable.
 Earlier source builds could carry version `0.5.2` with this newer optional pin;
 those were distinct from the immutable released wheel. Retain the selected
@@ -55,9 +58,12 @@ Windows:
 
 For a reviewed local 0.6.1 source/candidate wheel, replace `'.[inference]'` with
 `'./dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'` in a fresh/manual
-environment. This source example does not establish publication. After release,
-verify the official artifact's exact commit and `SHA256SUMS`; a rebuilt
-same-version wheel remains a different artifact. Historical **0.5.2** still selects
+environment. This remains a local-build example, separate from the published
+0.6.1 artifact. For a fresh/manual official installation, acquire its wheel and
+`SHA256SUMS` through the [release-wheel procedure](INSTALLATION.md#manual-installation-from-a-release-wheel),
+then use that verified wheel path with `[inference]`. Its wheel SHA256 is
+`7f510b27e63824d42c1644f4931dde404044229343ba0c1942043bca8d1ba982`.
+A rebuilt same-version wheel remains a different artifact. Historical **0.5.2** still selects
 runtime `0.4.1`. Core installers remain core-only.
 The extra fetches the exact upstream URL/hash and its normal dependency closure;
 it requires no Flower-bundled runtime or upstream PyPI publication.

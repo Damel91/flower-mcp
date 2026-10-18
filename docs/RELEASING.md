@@ -1,18 +1,40 @@
 # Flower MCP releases
 
-## 0.6.1 candidate delivery
+## Published 0.6.1 delivery
 
-The current candidate adds the read-only [lens catalog](LENS-CATALOG.md) with
-37 tools, 445 fields and 182 routes and unchanged schema 55. Build with
-`python tools/build_release.py --version 0.6.1 --output dist`; the reviewed
-[0.6.1 notes](RELEASE-NOTES-0.6.1.md) are its release-note authority. Inspect final
-bytes/core dependencies, repeat public MCP, qualify a populated owned official
-0.6.0 → candidate upgrade with backup-before-pip and the separate 0.3.1 migration, then
-require CI on the exact commit before publishing under the specific applicable
-human authorization. Check anonymous release assets/HTTPS separately afterward;
-Noxi's owner alone updates its preview. Previous 0.6.0 authority is not reused.
-No Glama action or U6 work is part of this delivery. Preserve immutable old tags,
-resources, license and optional runtime 0.5.0; retain all failed attempts/limits.
+[Release 416461595](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1)
+is published at tag `v0.6.1`, commit
+`8de41beb1368ef772755b068b7404a91d3197f49`.
+It adds the read-only [lens catalog](LENS-CATALOG.md): 37 tools, 445 fields and
+182 routes, with SQLite schema 55 unchanged. The versioned
+[0.6.1 notes](RELEASE-NOTES-0.6.1.md) remain its reviewed note authority.
+
+[Candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39129035522)
+passed all six jobs. The [Release workflow, attempt 2](https://github.com/Damel91/flower-mcp/actions/runs/39130028443/attempts/2)
+has eight successful job results: the container and publication jobs ran during
+the retake, while successful upstream jobs retained their original results.
+The first container attempt received an empty external HTTP 200 response; that
+failed attempt remains recorded. No source change was used to disguise it.
+The unchanged targeted retake passed before publication. The separate
+[main CI](https://github.com/Damel91/flower-mcp/actions/runs/39130021709) passed six jobs.
+
+Seven official assets were acquired anonymously and checked against GitHub
+digests, sizes and `SHA256SUMS`. All 193 wheel members, 186 source/resource files,
+licenses and 294 regular source-archive files matched the exact source and
+candidate member bytes. Official wheel SHA256:
+`7f510b27e63824d42c1644f4931dde404044229343ba0c1942043bca8d1ba982`.
+Archive hashes can differ after a CI rebuild even when member bytes match.
+The separate populated macOS HTTPS 0.6.0 → 0.6.1 upgrade preserved schema 55,
+authority/history, configuration, client paths and restart continuity; see
+[the upgrade checkpoint](UPGRADING.md#preparing-a-061-upgrade).
+
+Publication consumed the specific human authorization for this release.
+Current guide commits on `main` are separate documentation checkpoints: do not
+dispatch Release again, move this tag or replace its assets for guide changes.
+GitHub reports `immutable:false`; preservation is maintainer delivery policy,
+not GitHub enforcement. Noxi's owner alone performs its actual preview update.
+There is no Glama action, witness/U6 work, unknown-OS certification, model
+usability claim or human acceptance in this delivery.
 
 The following 0.6.0 paragraphs describe its completed historical release.
 

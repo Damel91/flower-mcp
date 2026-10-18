@@ -85,6 +85,13 @@ catalog authorities. This feature implements no writer witness or U6 integration
 
 ## Upgrade boundary
 
+The catalog is included in published
+[Flower 0.6.1](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1), commit
+`8de41beb1368ef772755b068b7404a91d3197f49`. Use the
+[current installation guide](INSTALLATION.md) for its verified release assets.
+Published bytes are preserved by delivery policy; later source builds and guide
+commits do not replace them.
+
 0.6.0 does not support `catalog`. Use the reviewed
 [SQLite-preserving upgrade procedure](UPGRADING.md#preparing-a-061-upgrade) and
 refresh tool schemas and registry after installing 0.6.1. A locally built wheel
