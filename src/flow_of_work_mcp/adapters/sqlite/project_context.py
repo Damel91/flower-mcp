@@ -33,6 +33,58 @@ class ProjectContextStoreMixin:
             ).fetchone()
             return ProjectContextBinding(**dict(row)) if row is not None else None
 
+    def read_interaction_catalog_snapshot(self, interaction_session_ref: str) -> Mapping[str, object]:
+        """Observe raw selection and prerequisite counts in one query-only snapshot.
+
+        In particular, do not repair stale lenses or allocate a continuation.
+        Event heads retain the identity of cleared selections.
+        """
+        interaction = required_text(interaction_session_ref, "interaction_session_ref")
+        with self.consistent_read() as connection:
+            context = self.get_interaction_project_context(interaction)
+            lens = self.get_interaction_capability_lens(interaction)
+            if context is not None and (type(context.revision) is not int or context.revision < 1):
+                raise ValueError("lens_catalog_state_invalid")
+            revisions = {}
+            for key, table, binding in (
+                ("project_context", "interaction_project_context_events", context),
+                ("capability_lens", "interaction_capability_lens_events", lens),
+            ):
+                head = connection.execute(
+                    f"SELECT MAX(revision) FROM {table} WHERE interaction_session_ref = ?",
+                    (interaction,),
+                ).fetchone()[0]
+                head = 0 if head is None else head
+                if type(head) is not int or head < 0 or (binding and head < binding.revision):
+                    raise ValueError("lens_catalog_state_invalid")
+                revisions[key] = head
+            exists = bool(context and connection.execute(
+                "SELECT 1 FROM projects WHERE project_id = ?", (context.project_id,)
+            ).fetchone())
+            counts = {key: 0 for key in ("requirements", "milestones", "changes", "packets")}
+            if exists:
+                for key, table in (("requirements", "requirements"),
+                                   ("milestones", "milestones"),
+                                   ("changes", "change_units"),
+                                   ("packets", "implementation_packets")):
+                    counts[key] = connection.execute(
+                        f"SELECT COUNT(*) FROM {table} WHERE project_id = ?",
+                        (context.project_id,),
+                    ).fetchone()[0]
+            return {
+                "project_context": None if context is None else {
+                    "project_id": context.project_id, "revision": context.revision,
+                    "provider_configured": bool(context.provider_context_id),
+                },
+                "capability_lens": None if lens is None else {
+                    "provider": lens.producing_provider, "area": lens.selected_area,
+                    "revision": lens.revision, "project_id": lens.project_id,
+                    "project_context_revision": lens.project_context_revision,
+                },
+                "revisions": revisions, "project_exists": exists,
+                "prerequisite_counts": counts,
+            }
+
     def set_interaction_project_context(
         self,
         interaction_session_ref: str,

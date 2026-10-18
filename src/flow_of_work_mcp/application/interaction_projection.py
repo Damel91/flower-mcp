@@ -9,6 +9,9 @@ from typing import Any, Mapping
 from flow_of_work_mcp.application.operation_contracts import (
     ContinuationPolicy,
     operation_contract,
+    operation_contract_index,
+    lens_operation_membership,
+    registry_version,
     operation_names,
     work_area_catalog,
 )
@@ -84,6 +87,8 @@ class InteractionProjectionService:
     ) -> Mapping[str, object]:
         op = str(operation or "status").strip().lower()
         interaction = self._required_interaction(interaction_session_ref)
+        if op == "catalog":
+            return self.catalog(interaction)
         if op in {"status", "discover"}:
             return self.discover(
                 interaction, query=query, limit=limit, page_action=page_action
@@ -146,6 +151,62 @@ class InteractionProjectionService:
         if op == "resolve":
             return self.resolve(interaction, frame_ref, selection)
         raise InteractionProjectionError("interaction_operation_invalid")
+
+    def catalog(self, interaction_session_ref: str) -> Mapping[str, object]:
+        """Project complete membership and raw durable state, never next actions."""
+        interaction = self._required_interaction(interaction_session_ref)
+        membership = lens_operation_membership()
+        snapshot = self._repository.read_interaction_catalog_snapshot(interaction)
+        context, lens = snapshot["project_context"], snapshot["capability_lens"]
+        areas = {item["area"] for item in membership["lenses"]}
+        if context is None:
+            state, reason = (("stale", "project_context_changed") if lens else
+                             ("project_unselected", "project_context_required"))
+        elif not snapshot["project_exists"]:
+            state, reason = "stale", "project_not_found"
+        elif lens is None:
+            state, reason = "lens_unselected", "work_area_required"
+        elif (lens["project_id"] != context["project_id"] or
+              lens["project_context_revision"] != context["revision"]):
+            state, reason = "stale", "project_context_changed"
+        elif lens["provider"] != "flow":
+            state, reason = "foreign_provider", "provider_catalog_not_in_scope"
+        elif lens["area"] not in areas:
+            state, reason = "stale", "area_not_registered"
+        else:
+            state, reason = "current", ""
+        lenses = []
+        for item in membership["lenses"]:
+            if context is None:
+                availability = {"availability": "available_with_prerequisites",
+                                "reason": "project_context_required", "prerequisites": ["project_context"]}
+            elif not snapshot["project_exists"]:
+                availability = {"availability": "blocked", "reason": "project_not_found", "prerequisites": []}
+            else:
+                availability = self._flow_area_availability(
+                    item["area"], snapshot["prerequisite_counts"], lens=None)
+            lenses.append({**item, "provider": "flow", "selected": bool(
+                state == "current" and lens["area"] == item["area"]), **availability})
+        operations = [{
+            **{key: item[key] for key in ("tool", "operation", "area", "risk", "effect_class", "continuation_policy")},
+            "owner": item.get("owner", "flow"), "availability": "declared",
+            "reason": "operation_admission_not_evaluated", "execution_admission": "not_evaluated",
+        } for item in operation_contract_index()]
+        revision = registry_version()
+        result = {
+            "contract": "flow.lens-operation-catalog.v1", "scope": "flower_public_operations",
+            "complete": True, "registry_version": revision, "catalog_revision": revision,
+            "interaction_session_ref": interaction, "revisions": snapshot["revisions"],
+            "project_context": context, "capability_lens": lens,
+            "selection_state": state, "selection_reason": reason,
+            "operation_count": len(operations), "lens_count": len(lenses),
+            "operations": operations, "core_operations": membership["core_operations"], "lenses": lenses,
+            "execution_admission": "not_evaluated", "selection_contract": {
+                "tool": "fow_interaction", "discover": "discover", "select": "select", "switch": "switch"},
+        }
+        encoded = json.dumps(result, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        result["interaction_revision"] = "flow.interaction-catalog." + hashlib.sha256(encoded).hexdigest()
+        return result
 
     def discover(
         self,

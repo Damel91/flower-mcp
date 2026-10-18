@@ -250,6 +250,34 @@ def model_facing_tool(
     return cast(F, wrapped)
 
 
+def _lens_catalog_markdown(result: Mapping[str, Any]) -> str:
+    """Bounded model orientation; full route membership stays machine-facing."""
+    context = result["project_context"]
+    lines = ["# Flower Interaction: catalog", "", "## Current State", "",
+             "- **Status:** success",
+             f"- **Project:** {safe_inline(context['project_id']) if context else 'not selected'}",
+             f"- **Selection:** {safe_inline(result['selection_state'])}",
+             f"- **Reason:** {safe_inline(result['selection_reason']) or 'none'}",
+             f"- **Catalog revision:** {safe_inline(result['catalog_revision'])}",
+             f"- **Interaction revision:** {safe_inline(result['interaction_revision'])}",
+             "- **Execution admission:** not evaluated", "", "## Work Lenses", "",
+             "| Area | Selected | Availability | Prerequisites | Primary | Companions |",
+             "| --- | --- | --- | --- | --- | --- |"]
+    for lens in result["lenses"]:
+        lines.append("| " + " | ".join(safe_inline(str(value)) for value in (
+            lens["area"], "yes" if lens["selected"] else "no", lens["availability"],
+            ", ".join(lens["prerequisites"]) or lens["reason"] or "none",
+            len(lens["primary_operations"]), len(lens["companion_operations"]))) + " |")
+    core_tools = sorted({item["tool"] for item in result["core_operations"]})
+    lines += ["", "## Orientation And Selection", "",
+              "Core controls: " + ", ".join(safe_inline(tool) for tool in core_tools) + ".",
+              "Use fow_interaction discover for current issued choices; select/switch changes the durable lens.",
+              "", f"The structured machine catalog is complete: {result['operation_count']} operations, "
+              f"{result['lens_count']} lenses. This Markdown summarizes membership; it does not truncate the machine catalog.",
+              "Declared membership grants no execution permission. Request exact inputs with fow_capabilities view=operation."]
+    return "\n".join(lines) + "\n"
+
+
 def project_markdown(
     tool_name: str,
     payload: Mapping[str, Any],
@@ -260,6 +288,13 @@ def project_markdown(
     """Project one already-authorized Flower application envelope."""
 
     arguments = arguments or {}
+    result = payload.get("result")
+    if tool_name == "fow_interaction" and arguments.get("operation") == "catalog" and payload.get("status") == "success":
+        rendered = _lens_catalog_markdown(result)
+        if output_budget is not None and len(rendered) > output_budget:
+            return projection_boundary(title="Flower Interaction: catalog", status="success",
+                                       required_chars=len(rendered), output_budget=output_budget)
+        return rendered
     spec = _projection_spec(tool_name, arguments)
     if spec is None:
         raise ModelFacingProjectionError(f"missing_model_facing_projector:{tool_name}")

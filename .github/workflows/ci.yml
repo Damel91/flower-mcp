@@ -62,6 +62,7 @@ jobs:
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_author_receipts.py" "$GITHUB_WORKSPACE/tests/test_external_work_recovery.py" "$GITHUB_WORKSPACE/tests/test_flower_portability.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_provider_sync_only.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_tool_definitions.py"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_lens_operation_catalog.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_snapshot_read_cost.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_mcp_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_packet_provider_deadline.py" "$GITHUB_WORKSPACE/tests/test_mfpr_structured_provider.py"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_milestone_prerequisites.py" "$GITHUB_WORKSPACE/tests/test_milestone_effect_receipts.py" "$GITHUB_WORKSPACE/tests/test_milestone_public_contract.py" "$GITHUB_WORKSPACE/tests/test_external_milestone_progress.py" "$GITHUB_WORKSPACE/tests/test_guided_bootstrap.py" "$GITHUB_WORKSPACE/tests/test_external_work.py"
@@ -243,6 +244,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Installed native Windows upgrade regressions failed.' }
             & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_tool_definitions.py')
             if ($LASTEXITCODE -ne 0) { throw 'Installed tool definition and input-compatibility regressions failed.' }
+            & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_lens_operation_catalog.py')
+            if ($LASTEXITCODE -ne 0) { throw 'Installed lens operation catalog regressions failed.' }
             & $python -m pytest -c $pytestConfig --rootdir $env:RUNNER_TEMP -p no:cacheprovider --noconftest (Join-Path $env:GITHUB_WORKSPACE 'tests\test_mcp_provider_deadline.py') (Join-Path $env:GITHUB_WORKSPACE 'tests\test_packet_provider_deadline.py') (Join-Path $env:GITHUB_WORKSPACE 'tests\test_mfpr_structured_provider.py')
             if ($LASTEXITCODE -ne 0) { throw 'Installed provider deadline and process-cleanup regression checks failed.' }
           }

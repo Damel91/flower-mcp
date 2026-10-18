@@ -227,6 +227,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
     }
     read_operation = (operation == "call" and read_only_simple) or operation in {
         "status",
+        "catalog",
         "state",
         "view",
         "get_change",
@@ -1986,6 +1987,7 @@ _SIMPLE["fow_traceability"] = _c(
 
 _INTERACTION_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "status": (("interaction_session_ref", "operation"), ()),
+    "catalog": (("interaction_session_ref", "operation"), ()),
     "discover": (
         ("interaction_session_ref", "operation"),
         ("query", "limit", "page_action"),
@@ -2078,6 +2080,8 @@ _INTERACTION = {
             }
         ),
         paging_owner="interaction_projection" if operation == "discover" else "none",
+        guidance={"catalog": "Read complete revision-bound Flower lens membership without writes, repairs or provider/model probes. Read structuredContent.result.result; membership is not execution admission. Selection still uses current issued discover/select/switch choices."}
+        if operation == "catalog" else None,
     )
     for operation, (required, optional) in _INTERACTION_FIELDS.items()
 }
@@ -2435,11 +2439,85 @@ def operation_descriptors_for_area(area: str) -> tuple[Mapping[str, object], ...
     )
 
 
+# Flower owns membership. These semantic companion groups are independent of
+# the currently observed next action; only registered route identities expand.
+_LENS_CONTEXT_PAIRS = (
+    ("fow_goal", "view"), ("fow_bootstrap", "guidance"),
+    ("fow_traceability", "call"),
+)
+_LENS_EXTERNAL_PAIRS = tuple(
+    ("fow_external_work", operation)
+    for operation in ("todo", "reconcile_outcome", "report_outcome", "validation",
+                      "provider_validation", "export_plan")
+)
+_LENS_JOB_PAIRS = (("fow_get_job", "call"), ("fow_list_jobs", "call"))
+_LENS_COMPANION_PAIRS = MappingProxyType({
+    "requirements": _LENS_JOB_PAIRS,
+    "changes": _LENS_EXTERNAL_PAIRS + _LENS_JOB_PAIRS,
+    "assurance": (("fow_campaign_author", "start"),
+                  ("fow_packet_advance", "advance"),
+                  ("fow_packet_author", "start_packet")) + _LENS_JOB_PAIRS,
+    "campaigns": _LENS_EXTERNAL_PAIRS,
+})
+
+
+def lens_operation_membership() -> dict[str, object]:
+    """Expand and validate the complete immutable registry policy, without I/O."""
+    if set(_BY_TOOL) != set(public_tool_names()) or any(
+        contract.tool != tool or contract.operation != operation
+        for tool, values in _BY_TOOL.items() for operation, contract in values.items()
+    ):
+        raise ValueError("lens_catalog_registry_invalid")
+    contracts = {
+        (contract.tool, contract.operation): contract
+        for values in _BY_TOOL.values() for contract in values.values()
+    }
+    if len(contracts) != sum(len(values) for values in _BY_TOOL.values()):
+        raise ValueError("lens_catalog_registry_invalid")
+    areas = {area.name for area in _WORK_AREAS}
+    if len(areas) != len(_WORK_AREAS) or not set(_LENS_COMPANION_PAIRS) <= areas:
+        raise ValueError("lens_catalog_registry_invalid")
+    core = {pair for pair in contracts if pair[0] == "fow_interaction"} | {
+        ("fow_capabilities", "call"), ("fow_create_project", "call"),
+        ("fow_handover", "project_state_snapshot"), ("fow_what_next", "call"),
+    }
+    shared = set(_LENS_CONTEXT_PAIRS) | {
+        pair for pair, contract in contracts.items()
+        if pair[0] in {"fow_packet_inspect", "fow_campaign_inspect"}
+        or (pair[0] == "fow_handover" and contract.risk == OperationRisk.READ)
+    }
+    declared = shared | core | {
+        pair for pairs in _LENS_COMPANION_PAIRS.values() for pair in pairs
+    }
+    if not declared <= contracts.keys() or any(
+        contract.area not in areas for pair, contract in contracts.items()
+        if pair not in core
+    ):
+        raise ValueError("lens_catalog_registry_invalid")
+
+    def refs(pairs: set[tuple[str, str]]) -> list[dict[str, str]]:
+        return [{"tool": tool, "operation": operation} for tool, operation in sorted(pairs)]
+
+    lenses = []
+    covered = set(core)
+    for area in work_area_catalog():
+        primary = {pair for pair, contract in contracts.items()
+                   if contract.area == area["area"]} - core
+        companions = (shared | set(_LENS_COMPANION_PAIRS.get(area["area"], ()))) - core - primary
+        covered.update(primary)
+        lenses.append({**area, "primary_operations": refs(primary),
+                       "companion_operations": refs(companions)})
+    if covered != contracts.keys():
+        raise ValueError("lens_catalog_registry_invalid")
+    return {"core_operations": refs(core), "lenses": lenses}
+
+
 @lru_cache(maxsize=1)
 def registry_version() -> str:
     payload = {
         "tools": list(public_tool_catalog()),
         "areas": list(work_area_catalog()),
+        "lens_membership": lens_operation_membership(),
         # The version covers exact help as well as the compact index. A change to
         # input shape, accepted values, guidance, or examples must invalidate a
         # host-side registry cache even when its route classifiers are unchanged.
