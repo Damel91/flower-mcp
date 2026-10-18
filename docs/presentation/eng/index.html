@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 35504e4ab5a1b526da5881befcf9a834b1c1dd12d30cd16a1fc0c2a835ba1dd6. -->
+<!-- Generated from linked Markdown. Source digest: 2e28be1c82eb4329c12c6bc12a38b041d43b81ef40680693e7a07c828f0f7206. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -562,11 +562,12 @@ Use this source command only in a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>For the <strong>published 0.6.0 wheel</strong>, verify its exact release commit and
-<code>SHA256SUMS</code>, then use a fresh/manual environment:</p>
+<p>For a <strong>local 0.6.1 source/candidate wheel</strong>, use a fresh/manual environment.
+This example does not establish that the release has been published:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'
 </code></pre>
-<p>This release extra selects runtime <code>0.5.0</code>. A rebuilt same-version source wheel
+<p>After publication, verify the exact official commit and <code>SHA256SUMS</code>.
+The extra selects runtime <code>0.5.0</code>. A rebuilt same-version source wheel
 is a separate artifact; earlier published assets remain immutable.</p>
 <p>For the verified published <code>0.5.2</code> wheel, use
 <code>'./dist/flow_of_work_mcp-0.5.2-py3-none-any.whl[inference]'</code> instead; it selects

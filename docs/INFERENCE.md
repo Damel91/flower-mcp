@@ -53,10 +53,11 @@ Windows:
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-The verified published wheel can replace `'.[inference]'` with
+For a reviewed local 0.6.1 source/candidate wheel, replace `'.[inference]'` with
 `'./dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'` in a fresh/manual
-environment. Verify its exact release commit and `SHA256SUMS` first; a rebuilt
-same-version wheel is a different artifact. Historical **0.5.2** still selects
+environment. This source example does not establish publication. After release,
+verify the official artifact's exact commit and `SHA256SUMS`; a rebuilt
+same-version wheel remains a different artifact. Historical **0.5.2** still selects
 runtime `0.4.1`. Core installers remain core-only.
 The extra fetches the exact upstream URL/hash and its normal dependency closure;
 it requires no Flower-bundled runtime or upstream PyPI publication.

@@ -58,14 +58,15 @@ Use this source command only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
-For the **published 0.6.0 wheel**, verify its exact release commit and
-`SHA256SUMS`, then use a fresh/manual environment:
+For a **local 0.6.1 source/candidate wheel**, use a fresh/manual environment.
+This example does not establish that the release has been published:
 
 ```sh
 .venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'
 ```
 
-This release extra selects runtime `0.5.0`. A rebuilt same-version source wheel
+After publication, verify the exact official commit and `SHA256SUMS`.
+The extra selects runtime `0.5.0`. A rebuilt same-version source wheel
 is a separate artifact; earlier published assets remain immutable.
 
 For the verified published `0.5.2` wheel, use

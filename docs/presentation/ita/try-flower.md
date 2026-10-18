@@ -58,14 +58,15 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:
 .venv/bin/python -m pip check
 ```
 
-Per il **wheel pubblicato 0.6.0**, verifica il commit esatto della release e il
-suo `SHA256SUMS`, poi usa un ambiente nuovo/manuale:
+Per un **wheel locale 0.6.1 ottenuto dal sorgente o candidato**, usa un ambiente
+nuovo/manuale. Questo esempio non dimostra che la release sia pubblicata:
 
 ```sh
 .venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.1-py3-none-any.whl[inference]'
 ```
 
-L'extra della release seleziona runtime `0.5.0`. Un wheel ricostruito da sorgente
+Dopo la pubblicazione, verifica il commit e `SHA256SUMS` degli asset ufficiali.
+L'extra seleziona runtime `0.5.0`. Un wheel ricostruito da sorgente
 con la stessa versione è un altro artefatto; gli asset precedenti restano immutabili.
 
 Per il wheel pubblicato `0.5.2` verificato, usa invece
