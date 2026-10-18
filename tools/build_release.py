@@ -116,7 +116,8 @@ def asset_names(project: dict) -> set[str]:
 
 def release_documentation(project: dict) -> set[str]:
     return {"docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/NATIVE-PROJECT-DELETION.md",
-            "docs/LENS-CATALOG.md",
+            "docs/LENS-CATALOG.md", "docs/readable-lifecycle-example.md",
+            "docs/RELEASE-NOTES-0.6.0.md",
             "docs/INFERENCE.md", "docs/ADVANCED-CONFIGURATION.md", "docs/glama-build-spec.example.json",
             f"docs/RELEASE-NOTES-{project['version']}.md"}
 

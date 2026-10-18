@@ -22,7 +22,7 @@ import venv
 
 
 REPOSITORY = "https://github.com/Damel91/flower-mcp"
-DEFAULT_VERSION = "0.6.1"
+DEFAULT_VERSION = "0.6.2"
 OWNER_FILE = ".flower-release-install.json"
 OWNER_CONTRACT = "flower.release-installation.v1"
 DOWNLOAD_TIMEOUT = 30
