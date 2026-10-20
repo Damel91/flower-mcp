@@ -1,5 +1,44 @@
 # Upgrade Flower without losing project data
 
+## Preparing a 0.6.3 upgrade
+
+**0.6.3 is a release candidate.** Its [focused HTTP cleanup correction](RELEASE-NOTES-0.6.3.md)
+adds no database migration or transport/schema change. Existing schema-55 data,
+revisions, receipts, evidence, handovers and historical artifacts remain in the
+same ledger. Stdio is unchanged. The release and installed-artifact checkpoints
+are separate from the already qualified corrected-source behavior; candidate
+preparation does not update a real installation or prove a named client connected.
+
+After official 0.6.3 assets are published, download its `install_flower.py` and
+`SHA256SUMS`, verify that backend's exact checksum, then preview with the existing
+environment and data paths:
+
+```sh
+python3 -I ./install_flower.py --version 0.6.3 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state' --backup-root '/absolute/private/flower-backups'
+```
+
+This prepared command requires matching published 0.6.3 assets; a source push is
+not publication. Windows uses `py -3 -I` and its actual paths. Keep the original
+venv, profile root, database, YAML, import/log paths and client configuration.
+Stop every Flower owner/client sharing the environment before executing the
+inspected command without `--dry-run`. The existing installer refuses an active
+selected-ledger owner and creates a consistent SQLite backup plus an exact YAML
+copy before pip. Keep that private backup. Do not reset projects, replace
+bindings, move the ledger or bypass the owned installation receipt with manual
+pip. Manual environments use the separate procedure later in this guide.
+
+After upgrade, reconnect the host using its intended transport and the same
+profile, inspect the known project through public MCP, and confirm continuity
+after restart. Restarting a coding client and confirming its own stdio connection
+is a distinct client check; an HTTP shutdown result does not prove it. Genuine
+cleanup failures must be investigated, not dismissed as successful termination.
+Failed pip does not promise automatic restoration or atomic package/database
+rollback. The predecessor 0.3.1/schema52-to55 route remains separate.
+
+The historical 0.6.2 checkpoint below retains its exact release, commit, digest,
+commands and qualification evidence. General published-install commands remain
+on 0.6.2 until the new assets exist.
+
 ## Preparing a 0.6.2 upgrade
 
 0.6.2 is published with [readable lifecycle references](readable-lifecycle-example.md).

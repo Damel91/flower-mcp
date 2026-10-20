@@ -11,9 +11,23 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Published release: [0.6.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Source candidate: **0.6.3** · Published release: [0.6.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
+
+## Flower 0.6.3 candidate
+
+The [0.6.3 notes](docs/RELEASE-NOTES-0.6.3.md) describe a focused HTTP shutdown
+correction. After SIGTERM, Flower reaches its existing runtime cleanup, waits
+for owned workers, releases ownership and closes logging. Repeated termination
+signals do not interrupt that cleanup; genuine shutdown failures remain failures.
+Stdio behavior, the 37 tools, 445 input fields, 182 operation routes, dependencies
+and SQLite schema 55 are unchanged. No provider, model or witness feature is added.
+
+0.6.3 is being prepared; no published artifact or actual client upgrade is implied.
+The download commands below still select published 0.6.2. Once matching 0.6.3
+assets are published, follow the [same-profile upgrade](docs/UPGRADING.md#preparing-a-063-upgrade),
+preserving the database, configuration, receipts, evidence and handovers.
 
 ## Flower 0.6.2
 
