@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import signal
+import threading
 import math
 from pathlib import Path
 from dataclasses import asdict
@@ -5814,6 +5816,13 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be in the range 1..65535")
+    previous_sigterm = None
+    if args.transport == "streamable-http":
+        if threading.current_thread() is not threading.main_thread():
+            parser.error("streamable-http transport requires the main thread")
+        previous_sigterm = signal.getsignal(signal.SIGTERM)
+        if previous_sigterm is None:
+            parser.error("streamable-http transport requires a restorable SIGTERM handler")
     try:
         if args.config is not None and args.profile_root is not None:
             raise ProfileError("--config and --profile-root cannot be combined")
@@ -5831,6 +5840,15 @@ def main(argv: list[str] | None = None) -> None:
     logger = None
     runtime: McpRuntime | None = None
     composition_cleanup_incomplete = False
+    closing = False
+    restore_sigterm = False
+
+    def stop_http(signum, frame) -> None:
+        nonlocal closing
+        if not closing:
+            closing = True
+            raise SystemExit(0)
+
     try:
         manager.setup(config.logging)
         logger = get_logger("server", session_id="server")
@@ -5846,6 +5864,14 @@ def main(argv: list[str] | None = None) -> None:
             summary["bootstrap_provider_enabled"],
         )
         runtime = build_runtime_from_config(config, ownership=ownership)
+        if args.transport == "streamable-http":
+            previous_sigterm = signal.getsignal(signal.SIGTERM)
+            if previous_sigterm is None:
+                parser.error("streamable-http transport requires a restorable SIGTERM handler")
+            # Uvicorn restores and re-raises TERM after ASGI shutdown. Keep
+            # Flower's outer cleanup reachable, including interrupted install.
+            restore_sigterm = True
+            signal.signal(signal.SIGTERM, stop_http)
         app = create_app(runtime, host=args.host, port=args.port)
         logger.info(
             "MCP server ready transport=%s host=%s port=%d",
@@ -5853,31 +5879,38 @@ def main(argv: list[str] | None = None) -> None:
         )
         app.run(transport=args.transport)
     except RuntimeCompositionCleanupError:
+        closing = True
         composition_cleanup_incomplete = True
         if logger is not None:
             logger.error("server composition cleanup incomplete; runtime ownership retained")
         raise
     except Exception as exc:
+        closing = True
         if logger is not None:
             logger.error("server startup/runtime failure type=%s", type(exc).__name__)
         raise
     finally:
-        runtime_stopped = False
+        closing = True
         try:
-            if runtime is not None:
-                runtime.close()
-                runtime_stopped = True
-        finally:
-            # Failed shutdown may leave live workers. Keep the OS lease until
-            # successful close or process exit rather than admitting a rival.
-            if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
-                ownership.close()
-            if logger is not None:
+            runtime_stopped = False
+            try:
+                if runtime is not None:
+                    runtime.close()
+                    runtime_stopped = True
+            finally:
+                # Failed shutdown may leave live workers. Keep the OS lease until
+                # successful close or process exit rather than admitting a rival.
                 if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
-                    logger.info("MCP server stopped")
-                else:
-                    logger.error("MCP server shutdown incomplete; runtime ownership retained")
-            manager.close()
+                    ownership.close()
+                if logger is not None:
+                    if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
+                        logger.info("MCP server stopped")
+                    else:
+                        logger.error("MCP server shutdown incomplete; runtime ownership retained")
+                manager.close()
+        finally:
+            if restore_sigterm:
+                signal.signal(signal.SIGTERM, previous_sigterm)
 
 
 if __name__ == "__main__":
