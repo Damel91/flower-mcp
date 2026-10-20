@@ -1285,7 +1285,8 @@ _PACKET_AUTHOR = {
             "predecessor_dependency_policy": ("materialized", "context_only"),
             "target_policy": tuple(item.value for item in PacketTargetPolicy),
         },
-        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE},
+        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE,
+                  "change_id": "Use an existing CHANGE-000000 in the selected project. Only a correlated flow.operation-effect.v1 pre_effect_validation receipt certifies that this invocation started no mutation. Match tool=fow_packet_author, operation=start_packet, project_id and request_id in receipt and audit_reference. Generic rejection, rollback, timeout or lost response is unknown; never replay blindly. A new rejection does not erase earlier work under the same request ID."},
     ),
     "revise_packet": _c(
         "fow_packet_author",

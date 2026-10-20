@@ -3,7 +3,7 @@
 set -euo pipefail
 
 FLOWER_REPOSITORY="https://github.com/Damel91/flower-mcp"
-FLOWER_VERSION="0.6.3"
+FLOWER_VERSION="0.6.4"
 UV_VERSION="0.12.21"
 selection=""
 has_client_config=0
@@ -23,7 +23,7 @@ Options:
   --platform codex|claude-code|cursor|antigravity|gemini-cli
                                        Register this agent without a menu
   --no-register                       Install without registering an agent
-  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.6.3)
+  --version MAJOR.MINOR.PATCH          Pinned release (default: 0.6.4)
   --venv PATH                          Dedicated installation environment
   --upgrade                            Upgrade an existing owned installation
   --dry-run                            Upgrade plan only; backend makes no changes

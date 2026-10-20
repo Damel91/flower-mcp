@@ -26,6 +26,7 @@ from flow_of_work_mcp.core.domain.identifiers import (
 )
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError,
+    ChangeNotFoundError,
     RequirementConflictError,
 )
 
@@ -1246,7 +1247,7 @@ class ChangeStoreMixin:
             (project_id, change_id),
         ).fetchone()
         if row is None:
-            raise RequirementConflictError(f"unknown change in project {project_id}: {change_id}")
+            raise ChangeNotFoundError(f"unknown change in project {project_id}: {change_id}")
         return row
 
     def _packet_row(

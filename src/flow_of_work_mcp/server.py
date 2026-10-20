@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import math
 import signal
 import threading
-import math
 from pathlib import Path
 from dataclasses import asdict
 from typing import Annotated, Any, Callable, Literal, Mapping
@@ -89,11 +89,13 @@ from flow_of_work_mcp.core.errors import (
     BootstrapBlockedError,
     BootstrapStartConflictError,
     ChangeControlBlockedError,
+    ChangeNotFoundError,
     ImplementationProviderContractError,
     ImplementationProviderUnavailableError,
     InputValidationError,
     LifecycleError,
     MilestonePreEffectError,
+    OperationPreEffectError,
     PacketValidationAlreadyUpgradedError,
     ProjectNotFoundError,
     RequirementConflictError,
@@ -101,6 +103,7 @@ from flow_of_work_mcp.core.errors import (
     RunControlBlockedError,
 )
 from flow_of_work_mcp.mcp_envelope import envelope
+from flow_of_work_mcp.core.domain.change_control import validate_change_id
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_project_id
 from flow_of_work_mcp.logger import LoggerManager, get_logger, log_bootstrap_error
 from flow_of_work_mcp.mcp_runtime import McpRuntime
@@ -777,6 +780,19 @@ def handle_capabilities(
     )
 
 
+def _packet_start_input(value: object, field: str, validator: Callable[[Any], Any], rule: str) -> Any:
+    try:
+        if not isinstance(value, str):
+            raise TypeError("Expected text")
+        return validator(value)
+    except (ValueError, TypeError) as exc:
+        raise OperationPreEffectError(
+            "packet_start_input_invalid", f"The packet input {field} is invalid.",
+            field=field, received_value=value, rule=rule,
+            resolution=f"Correct {field} using the exact start_packet contract, then submit explicitly.",
+        ) from exc
+
+
 def handle_packet_author(
     runtime: McpRuntime,
     *,
@@ -820,87 +836,119 @@ def handle_packet_author(
     request_id: str = "",
 ) -> dict[str, object]:
     operation = str(operation or "add_unit").strip().lower()
-    if not request_id:
-        raise ValueError("request_id is required")
     if operation == "start_packet":
-        if not project_id:
-            raise ValueError("project_id is required")
-        if not change_id:
-            raise ValueError("change_id is required")
-        with runtime.ledger.atomic():
-            created = runtime.packet_factory.create_packet(
-                project_id,
-                change_id=change_id,
-                packet=ImplementationPacketDraft(
-                    title=title,
-                    objective=intent,
-                    rationale=rationale,
-                    completion_criteria=_require_string_list(
-                        completion_criteria or [], "completion_criteria"
-                    ),
-                    requirement_ids=_require_string_list(
-                        requirement_ids or [], "requirement_ids"
-                    ),
-                    goal_ids=_require_string_list(goal_ids or [], "goal_ids"),
-                    in_scope=_require_string_list(in_scope or [], "in_scope"),
-                    out_of_scope=_require_string_list(
-                        out_of_scope or [], "out_of_scope"
-                    ),
-                    invariants=_require_string_list(invariants or [], "invariants"),
-                    unresolved_questions=_require_string_list(
-                        unresolved_questions or [], "unresolved_questions"
-                    ),
-                    architecture_refs=architecture_refs,
-                    target_policy=target_policy,
-                ),
-                purpose=PacketPurpose(purpose),
-                actor=actor,
-                request_id=request_id,
-                milestone_id=milestone_id,
-                active_provider=active_provider,
-                source_revision=source_revision,
-                finding_ids=_require_string_list(finding_ids or [], "finding_ids"),
-                predecessor_packet_id=predecessor_packet_id,
-                predecessor_dependency_policy=predecessor_dependency_policy,
-                required_regression_evidence=required_regression_evidence,
-                required_campaign_ids=_require_string_list(
-                    required_campaign_ids or [], "required_campaign_ids"
-                ),
+        original_project, original_request = project_id, request_id
+        # No service dispatch in this phase: identity/draft failures are proof.
+        try:
+            project_id = _packet_start_input(project_id, "project_id", validate_project_id,
+                "Use a canonical lowercase project ID of at most 64 characters.")
+            change_id = _packet_start_input(change_id, "change_id", validate_change_id,
+                "change_id must match CHANGE-000000.")
+            actor = _packet_start_input(actor, "actor", lambda value: required_text(value, "actor"),
+                "actor must be a nonempty identity string.")
+            request_id = _packet_start_input(request_id, "request_id", lambda value: required_text(value, "request_id"),
+                "Use a nonempty request identity; retain it for explicit reconciliation.")
+            packet_purpose = _packet_start_input(purpose, "purpose", PacketPurpose,
+                "purpose must be implementation or remediation.")
+            intent = _packet_start_input(intent, "intent", lambda value: required_text(value, "intent"),
+                "Supply the nonempty implementation intent before starting a packet.")
+            draft = ImplementationPacketDraft(
+                title=title, objective=intent, rationale=rationale,
+                completion_criteria=_require_string_list(completion_criteria or [], "completion_criteria"),
+                requirement_ids=_require_string_list(requirement_ids or [], "requirement_ids"),
+                goal_ids=_require_string_list(goal_ids or [], "goal_ids"),
+                in_scope=_require_string_list(in_scope or [], "in_scope"),
+                out_of_scope=_require_string_list(out_of_scope or [], "out_of_scope"),
+                invariants=_require_string_list(invariants or [], "invariants"),
+                unresolved_questions=_require_string_list(unresolved_questions or [], "unresolved_questions"),
+                architecture_refs=architecture_refs, target_policy=target_policy,
             )
-            created_packet_id = str(created["packet_id"])
-            created_spec_revision, _ = _current_packet_revisions(
+        except OperationPreEffectError as exc:
+            return _pre_effect_rejection(exc, tool="fow_packet_author",
+                operation="start_packet", project_id=original_project, request_id=original_request)
+        except (ValueError, TypeError):
+            rejected = OperationPreEffectError(
+                "packet_start_input_invalid", "The packet draft could not be validated.",
+                field="packet", received_value=None,
+                rule="Supply title, implementation intent, completion criteria and valid packet scope.",
+                resolution="Read the exact start_packet contract and correct the packet draft before submitting.",
+            )
+            return _pre_effect_rejection(rejected, tool="fow_packet_author",
+                operation="start_packet", project_id=original_project, request_id=original_request)
+        try:
+            with runtime.ledger.atomic():
+                # This read shares BEGIN IMMEDIATE with creation. Only exact lookup
+                # failures here certify no mutation; the same types later do not.
+                try:
+                    runtime.changes.get_change(project_id, change_id)
+                except (ChangeNotFoundError, ProjectNotFoundError) as exc:
+                    field = "change_id" if isinstance(exc, ChangeNotFoundError) else "project_id"
+                    rejected = OperationPreEffectError(
+                        "packet_start_scope_missing", "The packet's parent scope does not exist.",
+                        field=field, received_value=change_id if field == "change_id" else project_id,
+                        rule="Use an existing change in the explicitly selected project.",
+                        resolution="Read the current project scope and correct the parent identity before submitting.",
+                    )
+                    return _pre_effect_rejection(rejected, tool="fow_packet_author",
+                        operation="start_packet", project_id=original_project, request_id=original_request)
+                created = runtime.packet_factory.create_packet(
+                    project_id,
+                    change_id=change_id,
+                    packet=draft,
+                    purpose=packet_purpose,
+                    actor=actor,
+                    request_id=request_id,
+                    milestone_id=milestone_id,
+                    active_provider=active_provider,
+                    source_revision=source_revision,
+                    finding_ids=_require_string_list(finding_ids or [], "finding_ids"),
+                    predecessor_packet_id=predecessor_packet_id,
+                    predecessor_dependency_policy=predecessor_dependency_policy,
+                    required_regression_evidence=required_regression_evidence,
+                    required_campaign_ids=_require_string_list(
+                        required_campaign_ids or [], "required_campaign_ids"
+                    ),
+                )
+                created_packet_id = str(created["packet_id"])
+                created_spec_revision, _ = _current_packet_revisions(
+                    runtime, project_id, change_id, created_packet_id
+                )
+                provider_queue = runtime.packet_provider_overlay.queue_plan_delta(
+                    project_id,
+                    change_id,
+                    created_packet_id,
+                    flow_spec_revision=created_spec_revision,
+                    before=None,
+                    after=None,
+                    actor=actor,
+                    request_id=request_id,
+                )
+            continuation = _packet_author_continuation(
                 runtime, project_id, change_id, created_packet_id
             )
-            provider_queue = runtime.packet_provider_overlay.queue_plan_delta(
-                project_id,
-                change_id,
-                created_packet_id,
-                flow_spec_revision=created_spec_revision,
-                before=None,
-                after=None,
-                actor=actor,
-                request_id=request_id,
-            )
-        continuation = _packet_author_continuation(
-            runtime, project_id, change_id, created_packet_id
-        )
-        return envelope(
-            tool="fow_packet_author",
-            status="success",
-            result={
-                "packet": dict(created),
-                "semantic_delta": {
-                    "operation": "start_packet",
-                    "purpose": str(created["purpose"]),
+            return envelope(
+                tool="fow_packet_author",
+                status="success",
+                result={
+                    "packet": dict(created),
+                    "semantic_delta": {
+                        "operation": "start_packet",
+                        "purpose": str(created["purpose"]),
+                    },
+                    "provider_queue": dict(provider_queue),
+                    **continuation,
                 },
-                "provider_queue": dict(provider_queue),
-                **continuation,
-            },
-            audit_reference={
-                "change_id": change_id,
-                "packet_id": created_packet_id,
-            },
-        )
+                audit_reference={
+                    "change_id": change_id,
+                    "packet_id": created_packet_id,
+                },
+            )
+        except Exception:
+            return _operation_effect_unknown(tool="fow_packet_author", operation="start_packet",
+                project_id=original_project, request_id=original_request)
+
+    if not request_id:
+        raise ValueError("request_id is required")
 
     project_id, change_id, packet_id = _resolve_packet_address(
         runtime,
@@ -4054,12 +4102,13 @@ def handle_revise_srs_baseline(
     return _guard("fow_revise_srs_baseline", submit)
 
 
-def _milestone_pre_effect_rejection(
-    exc: MilestonePreEffectError, *, project_id: str, request_id: str,
+def _pre_effect_rejection(
+    exc: OperationPreEffectError, *, project_id: str, request_id: str,
+    tool: str = "fow_promote_milestone", operation: str = "call",
 ) -> dict[str, object]:
-    """Project only proof established before this milestone's first write."""
+    """Project only proof established inside an audited pre-write phase."""
     correlation = {
-        "tool": "fow_promote_milestone", "operation": "call",
+        "tool": tool, "operation": operation,
         "project_id": project_id, "request_id": request_id,
     }
     diagnostic = {
@@ -4071,7 +4120,7 @@ def _milestone_pre_effect_rejection(
         diagnostic["accepted_values"] = list(exc.accepted_values)
     diagnostic["received_value"] = _bounded_problem_value(exc.received_value)
     next_call: dict[str, object] = {"tool": "fow_capabilities", "arguments": {
-        "view": "operation", "operation_tool": "fow_promote_milestone", "operation_name": "call",
+        "view": "operation", "operation_tool": tool, "operation_name": operation,
     }}
     if exc.reason in {
         "milestone_request_replay_unverifiable", "milestone_request_conflict", "milestone_name_conflict",
@@ -4080,7 +4129,7 @@ def _milestone_pre_effect_rejection(
             "project_id": project_id, "operation": "project_state_snapshot",
         }}
     return envelope(
-        tool="fow_promote_milestone", status="rejected",
+        tool=tool, status="rejected",
         reason=exc.reason,
         result={
             "operation_state": "rejected", "effect_state": "none",
@@ -4095,14 +4144,15 @@ def _milestone_pre_effect_rejection(
     )
 
 
-def _milestone_effect_unknown(*, project_id: str, request_id: str) -> dict[str, object]:
+def _operation_effect_unknown(*, project_id: str, request_id: str,
+    tool: str = "fow_promote_milestone", operation: str = "call") -> dict[str, object]:
     return envelope(
-        tool="fow_promote_milestone", status="failed", reason="operation_effect_unknown",
-        result=_uncertain_error_result("fow_promote_milestone", {
+        tool=tool, status="failed", reason="operation_effect_unknown",
+        result=_uncertain_error_result(tool, {
             "code": "operation_effect_unknown",
-            "message": "The milestone operation failed after dispatch; its durable effect is not confirmed.",
-        }, project_id=project_id, request_id=request_id, operation="call"),
-        audit_reference={"tool": "fow_promote_milestone", "operation": "call",
+            "message": "The operation failed after dispatch; its durable effect is not confirmed.",
+        }, project_id=project_id, request_id=request_id, operation=operation),
+        audit_reference={"tool": tool, "operation": operation,
             "project_id": project_id, "request_id": request_id},
     )
 
@@ -4186,7 +4236,7 @@ def handle_promote_milestone(
             risk_disposition=risk_disposition, acceptance_evidence=lists["acceptance_evidence"],
         )
     except MilestonePreEffectError as exc:
-        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+        return _pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
     except (ValueError, TypeError):
         # A known construction failure still precedes all service dispatch.
         exc = MilestonePreEffectError(
@@ -4195,18 +4245,18 @@ def handle_promote_milestone(
             rule="Milestone identity, requirement lists and planning policies must satisfy the public contract.",
             resolution="Read the exact milestone operation contract and correct the draft before submitting it.",
         )
-        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+        return _pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
 
     try:
         milestone = runtime.lifecycle.promote_milestone(
             normalized_project, draft, actor=normalized_actor, request_id=normalized_request,
         )
     except MilestonePreEffectError as exc:
-        return _milestone_pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
+        return _pre_effect_rejection(exc, project_id=project_id, request_id=request_id)
     except Exception:
         # An unexpected exception may follow commit or an external side effect.
         # Never expose its raw text or certify a safe mutation retry.
-        return _milestone_effect_unknown(project_id=project_id, request_id=request_id)
+        return _operation_effect_unknown(project_id=project_id, request_id=request_id)
 
     try:
         result = dict(milestone)
@@ -4221,7 +4271,7 @@ def handle_promote_milestone(
     except Exception:
         # Output construction is after the mutating call returned. Even a typed
         # validation-shaped exception here cannot certify absence of effects.
-        return _milestone_effect_unknown(project_id=project_id, request_id=request_id)
+        return _operation_effect_unknown(project_id=project_id, request_id=request_id)
 
 
 def handle_accept_milestone(

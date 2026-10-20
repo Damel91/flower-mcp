@@ -26,13 +26,8 @@ class InputValidationError(ValueError):
         super().__init__(message)
 
 
-class MilestonePreEffectError(InputValidationError):
-    """Milestone validation rejected before this operation's first write.
-
-    Only the draft constructor and the audited allocating transaction validator
-    may raise this proof-bearing subtype. Generic input/transaction failures do
-    not establish absence of an effect.
-    """
+class OperationPreEffectError(InputValidationError):
+    """Validation proof, trusted only inside an audited pre-write phase."""
 
     def __init__(self, code: str, message: str, *, field: str,
                  received_value: object, rule: str, resolution: str,
@@ -41,6 +36,10 @@ class MilestonePreEffectError(InputValidationError):
         super().__init__(message, field=field, received_value=received_value,
                          details={**dict(details or {}), "code": code,
                                   "rule": rule, "resolution": resolution})
+
+
+class MilestonePreEffectError(OperationPreEffectError):
+    """Milestone draft/allocating validator rejected before its first write."""
 
 
 class ProjectNotFoundError(LifecycleError):
@@ -61,6 +60,10 @@ class JobNotFoundError(LifecycleError):
 
 class RequirementConflictError(LifecycleError):
     """Raised for deterministic duplicate or conflicting requirement input."""
+
+
+class ChangeNotFoundError(RequirementConflictError):
+    """An exact project-scoped change lookup found no such change."""
 
 
 class PacketValidationAlreadyUpgradedError(RequirementConflictError):
