@@ -11,7 +11,8 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Published Flower 0.6.2 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Flower 0.6.4 candidate/source (official assets after publication) | Independently published `runtime-llama` `0.5.0` |
+| Historical published Flower 0.6.2 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.1` wheel | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.0` wheel | Independently published `runtime-llama` `0.5.0` |
 | Immutable published Flower `0.5.0`, `0.5.1` and `0.5.2` wheels | `runtime-llama` `0.4.1` |
@@ -90,7 +91,7 @@ example downloads the selected local Flower wheel's core dependency closure and
 explicitly selects the independent runtime 0.5.0:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.2-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.4-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 sha256sum wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 # macOS alternative:
 shasum -a 256 wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
