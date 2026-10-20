@@ -1,7 +1,6 @@
 # Flower MCP installation
 
-For the packet-start correction candidate 0.6.4, use official assets only after
-publication. Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-064-upgrade);
+For the published packet-start correction 0.6.4, use its checksum-verified official assets. Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-064-upgrade);
 keep the same environment, profile root, ledger, YAML and client settings.
 See the [release notes](RELEASE-NOTES-0.6.4.md) for receipt semantics and limits.
 
@@ -103,7 +102,7 @@ retains eight successful results. Its seven anonymous assets and populated
 ## Published 0.6.1 and selected source
 
 The historical [0.6.1 upgrade checkpoint](UPGRADING.md#preparing-a-061-upgrade)
-and its assets remain available. The current operational examples after Prerequisites select 0.6.4 after publication.
+and its assets remain available. The current operational examples after Prerequisites select published 0.6.4.
 
 The historical 0.6.0 tag remains
 `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7`
@@ -282,7 +281,7 @@ SHA-256 checksum and installs the declared dependencies. It then invokes
 Flower's agent registration and doctor commands. Reload the selected client
 and follow its connection/trust prompt.
 
-The planned `v0.6.4` assets contain the Python installer, model `BOOTSTRAP.md`
+The published `v0.6.4` assets contain the Python installer, model `BOOTSTRAP.md`
 and `SHA256SUMS`. Anonymous download access is unavailable while the repository
 is private. Downloads and dependency installation need Internet access.
 
@@ -335,7 +334,7 @@ Options are PowerShell named parameters:
 
 - Fresh installation requires exactly one of `-Platform codex|claude-code|cursor|antigravity|gemini-cli` or `-NoRegister`.
 - Upgrade implies no registration; omit `-Platform` and `-ClientConfig`.
-- The 0.6.4 launcher defaults to that version; use official assets after publication.
+- The published 0.6.4 launcher defaults to that version.
   Use `-Version 0.6.4` explicitly when selecting the current release.
 - `-Venv 'C:\Users\tester\Flower test\venv'` selects an installation location.
 - `-Upgrade` explicitly upgrades an environment already owned by the backend.
@@ -589,7 +588,7 @@ Do not delete lock files to bypass an active owner.
 ## Upgrades and removal
 
 Use the [complete safe upgrade plan](UPGRADING.md) before updating an existing
-installation. The commands below select 0.6.4 after publication.
+installation. The commands below select published 0.6.4.
 Stop **all Flower processes and coding clients sharing the
 installation environment**; the installer does not stop services. Keep the same
 environment, profile name and profile root. For an installer-owned environment:

@@ -2,11 +2,13 @@
 
 ## Preparing a 0.6.4 upgrade
 
-0.6.4 is the packet-start effect-proof candidate. Publication and official
-checksum verification are required before using its assets; the exact Release
-workflow result will be recorded here. The [release notes](RELEASE-NOTES-0.6.4.md)
-explain the bounded correction and genuine uncertainty. It keeps SQLite schema 55
-and dependencies unchanged; no new migration or automatic pending-chat recovery.
+0.6.4 is published: tag `v0.6.4`, commit `76b3fbd666f027a8c2007819e5ae589828cdf731`
+([release 418844855](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.4)).
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39490419031)
+passed all eight jobs. Seven anonymous assets match SHA256SUMS; wheel SHA256:
+`572baa55357ffe35b31d6dfb9c4229f1495b814bb72f22d4c46b22a4f8e83d67`. The [release notes](RELEASE-NOTES-0.6.4.md) explain
+packet-start effect proof and genuine uncertainty. SQLite schema 55 and dependencies
+remain unchanged; historical request recovery is a separate native host operation.
 
 Use the original environment, profile, ledger, YAML, import/log paths and client
 configuration. Verify the new official `install_flower.py` and `SHA256SUMS`, then
@@ -27,7 +29,7 @@ new receipt. Restart/reconnect the intended client using the same profile.
 Failed pip does not promise automatic restore or atomic rollback.
 
 The 0.6.3 and earlier sections below retain their historical pins and evidence.
-Current operational commands later in this guide select 0.6.4 after publication.
+Current operational commands later in this guide select published 0.6.4.
 
 ## Preparing a 0.6.3 upgrade
 
@@ -166,7 +168,7 @@ an actual client deployment or human acceptance.
 
 The following paragraphs retain the historical 0.6.0 compatibility checkpoint.
 The general preview, execution and manual-pip instructions later in this guide
-select current 0.6.4 assets after publication.
+select current published 0.6.4 assets.
 
 **Flower MCP 0.6.0 is published.** Its
 [milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
@@ -267,7 +269,7 @@ without an original fingerprint, inspect durable state before retrying; a new
 request key is not a substitute for that inspection. Retain original evidence
 and handover payloads while assessing current authority.
 
-The remaining operational commands select **0.6.4 after publication**. See the
+The remaining operational commands select published **0.6.4**. See the
 [current release notes](RELEASE-NOTES-0.6.4.md) and the retained
 [0.6.0 compatibility notes](RELEASE-NOTES-0.6.0.md).
 Native project deletion is never an upgrade step.

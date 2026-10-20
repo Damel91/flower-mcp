@@ -11,11 +11,11 @@ verification, acceptance and handover. It stores project state in a SQLite ledge
 and exposes it through the Model Context Protocol (MCP), while your coding agent
 investigates repositories, writes code and runs checks.
 
-Published release: [0.6.3](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.3) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
+Published release: [0.6.4](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.4) · **In testing** · Python: `3.11+` · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
-## Flower 0.6.4 candidate
+## Flower 0.6.4
 
 The [0.6.4 notes](docs/RELEASE-NOTES-0.6.4.md) describe explicit packet-start
 rejection receipts. Known validation before creation certifies no mutation for
@@ -24,8 +24,7 @@ a lost response remain uncertain; they must not trigger a blind retry or erase
 older work. Both readable Markdown and structured results carry the correlation.
 The 37 tools, 445 fields, 182 routes, SQLite schema 55 and dependencies remain unchanged.
 
-This candidate is awaiting the exact Release workflow. Use its official assets
-only after publication and checksum verification. The
+Flower 0.6.4 is published with verified official assets. The
 [same-profile upgrade](docs/UPGRADING.md#preparing-a-064-upgrade) preserves SQLite,
 configuration, receipts, evidence and handovers. Consumer UI/recovery and
 witness/U6 are separate from this producer correction.
@@ -39,7 +38,7 @@ signals do not interrupt that cleanup; genuine shutdown failures remain failures
 Stdio behavior, the 37 tools, 445 input fields, 182 operation routes, dependencies
 and SQLite schema 55 are unchanged. No provider, model or witness feature is added.
 
-Flower 0.6.3 is preserved as a historical release. Current candidate commands below select 0.6.4.
+Flower 0.6.3 is preserved as a historical release. Current operational commands below select 0.6.4.
 Use the [same-profile upgrade](docs/UPGRADING.md#preparing-a-063-upgrade),
 preserving SQLite, configuration, receipts, evidence and handovers.
 
@@ -167,7 +166,7 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
-These download commands select **0.6.4 after publication**. Use the existing environment
+These download commands select published **0.6.4**. Use the existing environment
 and profile when upgrading, so the SQLite ledger and client registration stay in place.
 
 ### macOS / Linux
@@ -341,6 +340,19 @@ the library's development lifecycle; installing or using the library does not
 require Flower.
 
 ## Status and operating limits
+
+Flower `0.6.4` is published at commit `76b3fbd666f027a8c2007819e5ae589828cdf731`
+([release 418844855](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.4)).
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39490419031)
+passed all eight jobs, including installed Python 3.11–3.14, Windows and the core container.
+Seven anonymous official assets match SHA256SUMS; the wheel SHA256 is
+`572baa55357ffe35b31d6dfb9c4229f1495b814bb72f22d4c46b22a4f8e83d67`. The qualified packet-start source matches the released wheel and
+source archive. SQLite remains at schema 55 and optional runtime-llama remains 0.5.0.
+Actual retained-chat recovery and module update belong to the consuming host;
+publication does not clear its historical unknown results. Witness/U6 stays deferred.
+
+Historical release checkpoints follow.
+
 
 Flower `0.6.3` is published at commit
 `e6e6649bf631ed986217bf758ff3d9d8d389937e`

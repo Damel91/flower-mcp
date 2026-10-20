@@ -11,7 +11,7 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Flower 0.6.4 candidate/source (official assets after publication) | Independently published `runtime-llama` `0.5.0` |
+| Published Flower 0.6.4 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower 0.6.2 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.1` wheel | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.0` wheel | Independently published `runtime-llama` `0.5.0` |
