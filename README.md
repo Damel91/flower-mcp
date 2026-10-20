@@ -15,6 +15,21 @@ Published release: [0.6.3](https://github.com/Damel91/flower-mcp/releases/tag/v0
 
 [Quick start](#quick-start) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md) · [Development method](docs/presentation/eng/method.md)
 
+## Flower 0.6.4 candidate
+
+The [0.6.4 notes](docs/RELEASE-NOTES-0.6.4.md) describe explicit packet-start
+rejection receipts. Known validation before creation certifies no mutation for
+that invocation and explains how to correct the input. Errors after dispatch or
+a lost response remain uncertain; they must not trigger a blind retry or erase
+older work. Both readable Markdown and structured results carry the correlation.
+The 37 tools, 445 fields, 182 routes, SQLite schema 55 and dependencies remain unchanged.
+
+This candidate is awaiting the exact Release workflow. Use its official assets
+only after publication and checksum verification. The
+[same-profile upgrade](docs/UPGRADING.md#preparing-a-064-upgrade) preserves SQLite,
+configuration, receipts, evidence and handovers. Consumer UI/recovery and
+witness/U6 are separate from this producer correction.
+
 ## Flower 0.6.3
 
 The [0.6.3 notes](docs/RELEASE-NOTES-0.6.3.md) describe a focused HTTP shutdown
@@ -24,7 +39,7 @@ signals do not interrupt that cleanup; genuine shutdown failures remain failures
 Stdio behavior, the 37 tools, 445 input fields, 182 operation routes, dependencies
 and SQLite schema 55 are unchanged. No provider, model or witness feature is added.
 
-Flower 0.6.3 is published. The commands below select its official assets.
+Flower 0.6.3 is preserved as a historical release. Current candidate commands below select 0.6.4.
 Use the [same-profile upgrade](docs/UPGRADING.md#preparing-a-063-upgrade),
 preserving SQLite, configuration, receipts, evidence and handovers.
 
@@ -40,7 +55,7 @@ application envelope. Requirements, prerequisites, producer contracts and
 verification obligations remain explicit. Formatting does not resolve gaps,
 change authority or grant acceptance.
 
-Flower 0.6.2 remains a preserved historical release. Current commands select 0.6.3.
+Flower 0.6.2 remains a preserved historical release. Current commands select 0.6.4.
 Use the [SQLite-preserving upgrade](docs/UPGRADING.md#preparing-a-062-upgrade)
 with the original environment and profile. Schema 55, configuration, historical
 artifacts, receipts, evidence and handovers stay in place. The core remains
@@ -55,7 +70,7 @@ verbs from complete core/primary/companion membership. Flower keeps 37 tools and
 445 input fields; selection and execution gates remain explicit.
 
 Flower 0.6.1 remains a preserved historical release. Its catalog and verified
-assets remain available; current operational commands below select 0.6.3.
+assets remain available; current operational commands below select 0.6.4.
 Source builds and installer-owned release artifacts remain distinct.
 Use the [same-profile upgrade](docs/UPGRADING.md#preparing-a-061-upgrade), preserving
 SQLite schema 55, configuration, receipts, evidence and handovers.
@@ -152,16 +167,16 @@ access and trusted HTTPS certificates. Check the
 For an existing installation, use the [safe upgrade plan](docs/UPGRADING.md)
 with its original environment and profile. The commands below require matching
 published release assets; changes on `main` do not publish a release.
-These download commands select published **0.6.3**. Use the existing environment
+These download commands select **0.6.4 after publication**. Use the existing environment
 and profile when upgrading, so the SQLite ledger and client registration stay in place.
 
 ### macOS / Linux
 
 Requires Bash, `curl`, `awk`, `sha256sum` or `shasum`, and standard shell utilities.
-Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.3/install.sh) before execution:
+Review the [release installer](https://github.com/Damel91/flower-mcp/releases/download/v0.6.4/install.sh) before execution:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.3/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.4/install.sh | bash
 ```
 
 The installer prepares an isolated Python environment, obtaining Python if
@@ -173,7 +188,7 @@ Requires Windows PowerShell 5.1+. Download the launcher, inspect it, then run th
 second command only after the download succeeds:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.3/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.4/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -197,7 +212,7 @@ See [Google client setup](docs/GOOGLE-CLIENTS.md) for Antigravity and Gemini CLI
 
 ### Optional internal inference
 
-Flower `0.6.3` selects the independently published
+Flower `0.6.4` selects the independently published
 [runtime-llama `0.5.0`](https://github.com/Damel91/llama-runtime/releases/tag/v0.5.0),
 pinned by URL and SHA256 through its optional `inference` extra.
 Historical Flower `0.6.1` and `0.6.0` selected the same SDK. Historical Flower `0.5.2` still selects runtime `0.4.1`; its assets remain immutable. Existing optional installations can update
@@ -263,7 +278,7 @@ Already installed? Follow the [SQLite-preserving upgrade plan](docs/UPGRADING.md
 Stop clients sharing the Flower environment, preview with the new installer's
 `--upgrade --dry-run` (PowerShell `-Upgrade -DryRun`), then upgrade with the same
 environment/profile paths. Flower backs up SQLite and YAML before package
-changes. Updating an existing schema 55 installation to 0.6.3 keeps
+changes. Updating an existing schema 55 installation to 0.6.4 keeps
 schema 55 unchanged; older 0.3.1/schema 52 installations use the existing additive
 migrations to 55. Resume the existing project and verify another restart.
 
@@ -282,7 +297,7 @@ The [presentation index](docs/presentation/README.md) also links the offline rea
 
 [Advanced configuration](docs/ADVANCED-CONFIGURATION.md) explains internal LLM
 setup, supported host semantic roles and external technical providers. The
-[0.6.3 release notes](docs/RELEASE-NOTES-0.6.3.md) and
+[0.6.4 release notes](docs/RELEASE-NOTES-0.6.4.md) and
 [readable lifecycle guide](docs/readable-lifecycle-example.md) describe current
 references. The [0.6.1 notes](docs/RELEASE-NOTES-0.6.1.md) and
 [lens catalog guide](docs/LENS-CATALOG.md) retain the catalog introduction.

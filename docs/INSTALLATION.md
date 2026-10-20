@@ -1,5 +1,10 @@
 # Flower MCP installation
 
+For the packet-start correction candidate 0.6.4, use official assets only after
+publication. Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-064-upgrade);
+keep the same environment, profile root, ledger, YAML and client settings.
+See the [release notes](RELEASE-NOTES-0.6.4.md) for receipt semantics and limits.
+
 ## Published 0.6.2
 
 The [0.6.2 notes](RELEASE-NOTES-0.6.2.md) and
