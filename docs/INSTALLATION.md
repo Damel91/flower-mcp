@@ -1,6 +1,19 @@
 # Install Flower MCP
 
-Use Flower 0.6.5's checksum-verified official assets once its Release workflow publishes them. Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-065-upgrade), keeping their existing environment and profile. The [release notes](RELEASE-NOTES-0.6.5.md) explain guided operational responses and the bounded no-effect diagnostic correction. Release qualification does not update a real installation.
+Install [Flower 0.6.5](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.5)
+from its checksum-verified official assets. Existing installations follow the
+[SQLite-preserving upgrade](UPGRADING.md#preparing-a-065-upgrade), keeping their
+existing environment and profile. The [release notes](RELEASE-NOTES-0.6.5.md)
+explain guided operational responses and the bounded no-effect diagnostic
+correction. Release qualification does not update a real installation.
+
+The release is pinned to commit `2eaf234cecfdacaa75610eeb1949293beb5c5f45`.
+Its [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39682198095)
+passed all eight jobs. Seven assets are anonymously accessible; all six payloads
+match the release's `SHA256SUMS`. The official wheel SHA256 is
+`48da3678367b8cc99e3cf81669f004960d04c4969523ac6ad4fa4e5c609198f4`.
+SQLite remains at schema 55. Actual client adoption is a separate owner check;
+the older release checkpoints below retain their original pins and evidence.
 
 ## Historical published 0.6.2
 
@@ -100,7 +113,7 @@ retains eight successful results. Its seven anonymous assets and populated
 ## Published 0.6.1 and selected source
 
 The historical [0.6.1 upgrade checkpoint](UPGRADING.md#preparing-a-061-upgrade)
-and its assets remain available. The current operational examples after Prerequisites select 0.6.5 once published.
+and its assets remain available. The current operational examples after Prerequisites select published 0.6.5.
 
 The historical 0.6.0 tag remains
 `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7`
@@ -279,7 +292,7 @@ SHA-256 checksum and installs the declared dependencies. It then invokes
 Flower's agent registration and doctor commands. Reload the selected client
 and follow its connection/trust prompt.
 
-The `v0.6.5` release assets, once published, contain the Python installer, model `BOOTSTRAP.md`
+The `v0.6.5` release assets contain the Python installer, model `BOOTSTRAP.md`
 and `SHA256SUMS`. Anonymous download access is unavailable while the repository
 is private. Downloads and dependency installation need Internet access.
 
@@ -391,7 +404,7 @@ For managed Python preparation, use the PowerShell release launcher above.
 
 Have Git and Python 3.11+ available, then clone with authorized access if private.
 These examples install the checked-out source revision. To use the exact
-official `v0.6.5` bytes once published, select the release wheel route instead.
+official `v0.6.5` bytes, select the release wheel route instead.
 No checkout configuration file needs to be copied.
 Record the selected commit with `git rev-parse HEAD` and retain build provenance.
 Source on `main` may differ from the immutable release; the published wheel
@@ -586,7 +599,7 @@ Do not delete lock files to bypass an active owner.
 ## Upgrades and removal
 
 Use the [complete safe upgrade plan](UPGRADING.md) before updating an existing
-installation. The commands below select 0.6.5 once published.
+installation. The commands below select published 0.6.5.
 Stop **all Flower processes and coding clients sharing the
 installation environment**; the installer does not stop services. Keep the same
 environment, profile name and profile root. For an installer-owned environment:

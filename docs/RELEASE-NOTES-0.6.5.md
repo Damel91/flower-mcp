@@ -47,7 +47,9 @@ Focused deterministic regressions and actual isolated public source/core-wheel
 workflows verify both response channels, ten long answers, explicit details,
 replay/read/rejection invariance, canonical authoring and roadmap confirmation,
 restart and no internal model dependency. Severe review found and corrected the
-progress-code blocker seam; only that affected seam was retested afterward.
+progress-code blocker seam, then the output boundary for explicitly requested
+complete details. Each correction received focused regressions and installed
+public read verification; unchanged workflows were not replayed.
 Exact Release CI separately qualifies the official package/platform/container
 and upgrade mechanics. Noxi owns actual adapter/preview qualification and
 preservation; that evidence and human acceptance remain separate. Witness/U6

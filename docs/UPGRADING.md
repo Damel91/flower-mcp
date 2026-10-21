@@ -3,8 +3,14 @@
 ## Preparing a 0.6.5 upgrade
 
 Flower 0.6.5 improves guided bootstrap responses and exact operation help; see the
-[release notes](RELEASE-NOTES-0.6.5.md). Use its checksum-verified official assets
-once published. SQLite remains at schema 55; there is no new migration, model
+[release notes](RELEASE-NOTES-0.6.5.md). Use its checksum-verified
+[official assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.5).
+The tag identifies commit `2eaf234cecfdacaa75610eeb1949293beb5c5f45`;
+the official wheel SHA256 is
+`48da3678367b8cc99e3cf81669f004960d04c4969523ac6ad4fa4e5c609198f4`.
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39682198095)
+passed all eight jobs, including installed upgrade checks.
+SQLite remains at schema 55; there is no new migration, model
 requirement or change to the existing backup/upgrade implementation.
 
 Keep the original environment, profile, ledger, YAML, import/log paths and client
@@ -196,7 +202,7 @@ an actual client deployment or human acceptance.
 
 The following paragraphs retain the historical 0.6.0 compatibility checkpoint.
 The general preview, execution and manual-pip instructions later in this guide
-select 0.6.5 assets once published.
+select published 0.6.5 assets.
 
 **Flower MCP 0.6.0 is published.** Its
 [milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
@@ -297,7 +303,7 @@ without an original fingerprint, inspect durable state before retrying; a new
 request key is not a substitute for that inspection. Retain original evidence
 and handover payloads while assessing current authority.
 
-The remaining operational commands select **0.6.5** once published. See the
+The remaining operational commands select published **0.6.5**. See the
 [current release notes](RELEASE-NOTES-0.6.5.md) and the retained
 [0.6.0 compatibility notes](RELEASE-NOTES-0.6.0.md).
 Native project deletion is never an upgrade step.
