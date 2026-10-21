@@ -31,6 +31,35 @@ when your request authorizes creating it. Current `fow_capabilities` recipes
 guide the next action. The model adds or updates a bounded Flower section and
 keeps your existing build, testing and repository rules.
 
+## Compact guided continuation and explicit details
+
+For `path=guided_engineering`, ordinary state-returning responses show a brief
+operational view: current status, counts, the changed answer key/revision, the
+first blocker and the current `next_gate`. Repeated answers and audit payloads
+stay in complete structured state instead of being echoed after every answer.
+The next gate is an action template: supply its actual required inputs and
+prerequisites; it is not permission to skip engineering or confirmation.
+
+- `state` reads the compact continuation.
+- `state_details` explicitly reads full state and the recent ten-event audit
+  window. This window is not the complete audit history.
+- `guidance` reads full canonical context and existing gate explanations.
+- `roadmap` returns the complete scope reference using explicit existing
+  milestone IDs; it never creates missing milestones.
+
+Machine consumers retain `result.bootstrap` and can read the additive
+`result.operational_projection` (`flow.guided-bootstrap-operational.v1`). Its
+`detail_calls` provide explicit read calls. Normal bounded-identity Markdown is
+at most 8,192 characters; unusually large legacy identities retain their exact
+read call even if that boundary itself exceeds the budget. No machine gate is
+silently truncated. Projection/detail reads invoke no model or provider.
+
+Guided engineering uses selected answers, ordinary canonical authoring,
+correspondence and explicit roadmap confirmation. The intake/import paths are
+separate; `derive_behavior` is code-import-only and requires its optional
+provider/model prerequisites. Request one operation's exact contract through
+`fow_capabilities` rather than applying another path's steps.
+
 ## The persistent engineering agent template
 
 The printed bootstrap contains one complete, marked template for the project's

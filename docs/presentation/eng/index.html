@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 0bce3f2003ba4ea7c6d56334e366e8f745cc163bc2eadb82f6ee31c436cf32d4. -->
+<!-- Generated from linked Markdown. Source digest: 7c27d72a8d121f55221ef97c9934fdd516eb685df4fb554f9a46363ddac3ba3b. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -563,9 +563,9 @@ Use this source command only in a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>For a <strong>local 0.6.4 source/candidate wheel</strong>, use a fresh/manual environment.
+<p>For a <strong>local 0.6.5 source/candidate wheel</strong>, use a fresh/manual environment.
 This local-build example is separate from the verified published artifact:</p>
-<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.4-py3-none-any.whl[inference]'
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.5-py3-none-any.whl[inference]'
 </code></pre>
 <p>Flower 0.6.2 is published at commit
 <code>12ad69317dab92bdba06ae113ac22d107d259236</code>. Verify its official wheel against
@@ -1866,6 +1866,32 @@ snapshot through <code>fow_handover</code>. An empty profile requires a new proj
 when your request authorizes creating it. Current <code>fow_capabilities</code> recipes
 guide the next action. The model adds or updates a bounded Flower section and
 keeps your existing build, testing and repository rules.</p>
+<h2 id="doc-609e0ef9e8b2--compact-guided-continuation-and-explicit-details">Compact guided continuation and explicit details</h2>
+<p>For <code>path=guided_engineering</code>, ordinary state-returning responses show a brief
+operational view: current status, counts, the changed answer key/revision, the
+first blocker and the current <code>next_gate</code>. Repeated answers and audit payloads
+stay in complete structured state instead of being echoed after every answer.
+The next gate is an action template: supply its actual required inputs and
+prerequisites; it is not permission to skip engineering or confirmation.</p>
+<ul>
+<li><code>state</code> reads the compact continuation.</li>
+<li><code>state_details</code> explicitly reads full state and the recent ten-event audit
+window. This window is not the complete audit history.</li>
+<li><code>guidance</code> reads full canonical context and existing gate explanations.</li>
+<li><code>roadmap</code> returns the complete scope reference using explicit existing
+milestone IDs; it never creates missing milestones.</li>
+</ul>
+<p>Machine consumers retain <code>result.bootstrap</code> and can read the additive
+<code>result.operational_projection</code> (<code>flow.guided-bootstrap-operational.v1</code>). Its
+<code>detail_calls</code> provide explicit read calls. Normal bounded-identity Markdown is
+at most 8,192 characters; unusually large legacy identities retain their exact
+read call even if that boundary itself exceeds the budget. No machine gate is
+silently truncated. Projection/detail reads invoke no model or provider.</p>
+<p>Guided engineering uses selected answers, ordinary canonical authoring,
+correspondence and explicit roadmap confirmation. The intake/import paths are
+separate; <code>derive_behavior</code> is code-import-only and requires its optional
+provider/model prerequisites. Request one operation's exact contract through
+<code>fow_capabilities</code> rather than applying another path's steps.</p>
 <h2 id="doc-609e0ef9e8b2--the-persistent-engineering-agent-template">The persistent engineering agent template</h2>
 <p>The printed bootstrap contains one complete, marked template for the project's
 <code>AGENTS.md</code>. Merge the entire section, including the engineering mindset:</p>

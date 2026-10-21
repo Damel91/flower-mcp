@@ -11,7 +11,7 @@ Select the Flower artifact and the optional SDK separately:
 
 | Flower source/build | Its `inference` extra selects |
 | --- | --- |
-| Published Flower 0.6.4 and matching source | Independently published `runtime-llama` `0.5.0` |
+| Flower 0.6.5 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower 0.6.2 and matching source | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.1` wheel | Independently published `runtime-llama` `0.5.0` |
 | Historical published Flower `0.6.0` wheel | Independently published `runtime-llama` `0.5.0` |
@@ -63,13 +63,14 @@ Windows:
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
-For a reviewed local 0.6.4 source/candidate wheel, replace `'.[inference]'` with
-`'./dist/flow_of_work_mcp-0.6.4-py3-none-any.whl[inference]'` in a fresh/manual
-environment. This remains a local-build example, separate from the published
-0.6.2 artifact even when its version matches. For a fresh/manual official installation, acquire its wheel and
-`SHA256SUMS` through the [release-wheel procedure](INSTALLATION.md#manual-installation-from-a-release-wheel),
-then use that verified wheel path with `[inference]`. Its official 0.6.2 wheel
-SHA256 is `0e2a37013bcfcce0476edf1324e6a660bd5ac3c8ea783d62cf7cf8a3148df182`.
+For a reviewed local 0.6.5 source/candidate wheel, replace `'.[inference]'` with
+`'./dist/flow_of_work_mcp-0.6.5-py3-none-any.whl[inference]'` in a fresh/manual
+environment. This remains a local-build example, separate from any official
+release artifact. For a fresh/manual official installation, acquire the selected
+release's wheel and `SHA256SUMS` through the
+[release-wheel procedure](INSTALLATION.md#manual-installation-from-a-release-wheel),
+then use that verified wheel path with `[inference]`. The older 0.6.2 wheel digest
+recorded above is historical and does not identify a 0.6.5 artifact.
 A rebuilt same-version wheel remains a different artifact. Historical **0.5.2** still selects
 runtime `0.4.1`. Core installers remain core-only.
 The extra fetches the exact upstream URL/hash and its normal dependency closure;
@@ -91,7 +92,7 @@ example downloads the selected local Flower wheel's core dependency closure and
 explicitly selects the independent runtime 0.5.0:
 
 ```sh
-python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.4-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
+python -m pip download --only-binary=:all: --dest wheelhouse './dist/flow_of_work_mcp-0.6.5-py3-none-any.whl' 'runtime-llama @ https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/runtime_llama-0.5.0-py3-none-any.whl#sha256=dc7c2e056f55f68181dd82158417e5f53e0aed8189a07acf10e59314a80f6d13'
 sha256sum wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
 # macOS alternative:
 shasum -a 256 wheelhouse/runtime_llama-0.5.0-py3-none-any.whl
