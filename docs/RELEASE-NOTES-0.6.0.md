@@ -184,3 +184,17 @@ this version. Optional adapters still need their declared prerequisites; missing
 dependencies block the affected operation. Host-reported evidence retains its
 provenance. This release does not certify a coding model's understanding or human
 acceptance of the software it builds.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.6.0` is published and remains in testing. Published tag `v0.6.0` identifies commit `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7` ([release 416096822](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.0)). [Candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39072677376) and [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39073239681) are separate from anonymous asset checks and the populated-profile HTTPS upgrade.
+The official assets and a fresh owned 0.5.2/schema55 → 0.6.0/schema55 HTTPS upgrade
+were checked separately from source, installed-package and CI checks.
+No user installation or real project deletion was used for those checks.
+The incompatible milestone input is documented above; refresh the host schema.
+The writer witness remains deferred. Windows native purge durability and real
+Noxi/client acceptance remain separate qualifications.

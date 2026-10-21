@@ -108,3 +108,25 @@ MCP calls covered the original state, upgrade and restart. All 349 schema object
 evidence and handovers were preserved; a consistent backup was observed before
 pip. This owned-fixture result is distinct from another user's installation,
 the unchanged 10-second adapter qualification and human acceptance.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.5.2` is published and remains in testing. Its
+[release notes](docs/RELEASE-NOTES-0.5.2.md), the historical
+[0.4.1 release notes](docs/RELEASE-NOTES-0.4.1.md) and
+[installation status](docs/INSTALLATION.md#testing-status-and-release-access)
+distinguish installed-package and CI checks from end-to-end installer and
+target-client qualification.
+The patch corrects repeated authority reads and shared-predecessor PVP work in
+complete project recovery, preserving full results, gates and the existing
+deadlines. It retains 0.5.1's descriptions for all 37 tools and 445 inputs,
+conservative MCP annotations and canonical examples, together with the
+0.5.0 receipt/error-recovery corrections, explicit sync-only provider delivery
+and bounded provider RPCs, with the same callable contracts and schema 55. The writer witness remains deferred; this release does not claim
+its integration or cross-server acceptance.
+The immutable release archive retains its preparation-era documentation; these
+current guides on `main` align installation instructions with the published assets.

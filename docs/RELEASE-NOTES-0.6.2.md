@@ -75,3 +75,23 @@ that a later checkpoint has already executed. Version-pinned download commands
 require the corresponding published assets. Human/local-model usability,
 unknown workstation compatibility and physical/cross-provider/U6 acceptance
 remain separate. Flower remains in testing.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.6.2` is published and remains in testing. Tag `v0.6.2` identifies
+commit `12ad69317dab92bdba06ae113ac22d107d259236`
+([release 416738867](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2)).
+[Exact candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39168606257) passed six jobs;
+the [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39169849356) passed all eight.
+Seven anonymous official assets and a fresh owned macOS HTTPS 0.6.1 → 0.6.2
+upgrade were verified separately, preserving SQLite schema 55, existing history,
+configuration, client paths and restart continuity. New artifact generation was
+checked separately from pure preservation of the old records. These fixtures
+changed no real user installation. Noxi's actual adoption follows its owner's
+native updater and remains a separate deployment checkpoint; it is not inferred
+from package or CI checks. Unknown OS/client usability, model quality and human
+acceptance remain separate. The writer witness stays deferred.

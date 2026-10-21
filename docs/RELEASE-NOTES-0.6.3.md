@@ -60,3 +60,19 @@ The exact versioned package, existing Release CI, official assets and preserved
 upgrade have separate delivery checkpoints. Source qualification alone does not establish those deployment results. No duplicate historical campaign or automatic client
 restart is required by these notes. Source pushes do not publish a release.
 Flower remains in testing.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.6.3` is published at commit
+`e6e6649bf631ed986217bf758ff3d9d8d389937e`
+([release 418513137](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.3)).
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39439773272)
+passed all eight jobs, including Python 3.11–3.14, Windows and the core container.
+Seven official assets were downloaded and checked against SHA256SUMS. The wheel
+SHA256 is `dc1716e87c10f5417693edd7ed6656b49da95c7c9e72c27e7a3c9b952f613f20`.
+SQLite stays at schema 55; use the existing backup-preserving upgrade procedure.
+Client startup and human acceptance remain separate. The writer witness stays deferred.

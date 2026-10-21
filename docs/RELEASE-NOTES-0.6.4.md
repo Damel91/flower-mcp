@@ -62,3 +62,19 @@ audit utility has 26 checks and an owned exact 0.6.3 artifact fixture; this does
 qualify a user's real recovery. Existing exact-commit Release CI qualifies the
 installed wheel and published assets separately. An owner's actual update,
 retained-chat recovery, local UI and human acceptance remain separate evidence.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.6.4` is published at commit `76b3fbd666f027a8c2007819e5ae589828cdf731`
+([release 418844855](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.4)).
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/39490419031)
+passed all eight jobs, including installed Python 3.11–3.14, Windows and the core container.
+Seven anonymous official assets match SHA256SUMS; the wheel SHA256 is
+`572baa55357ffe35b31d6dfb9c4229f1495b814bb72f22d4c46b22a4f8e83d67`. The qualified packet-start source matches the released wheel and
+source archive. SQLite remains at schema 55 and optional runtime-llama remains 0.5.0.
+Actual retained-chat recovery and module update belong to the consuming host;
+publication does not clear its historical unknown results. Witness/U6 stays deferred.

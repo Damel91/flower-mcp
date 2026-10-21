@@ -54,3 +54,23 @@ is reviewed release guidance, not proof that every later checkpoint or owner
 update has happened. Version-pinned commands require the corresponding published
 assets. Consumer fixtures do not certify model usability, human acceptance or
 physical/cross-provider quiescence. Flower remains in testing.
+
+## Published delivery record
+
+This record preserves the package-verification checkpoint previously included
+in the project README. Client adoption and user acceptance have their own
+verification records.
+
+Flower `0.6.1` is published and remains in testing. Tag `v0.6.1` identifies
+commit `8de41beb1368ef772755b068b7404a91d3197f49`
+([release 416461595](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.1)).
+[Exact candidate CI](https://github.com/Damel91/flower-mcp/actions/runs/39129035522)
+passed six jobs. The [Release workflow, attempt 2](https://github.com/Damel91/flower-mcp/actions/runs/39130028443/attempts/2)
+has eight successful job results. Seven anonymous official assets and a fresh
+owned macOS HTTPS upgrade from 0.6.0 to 0.6.1 were verified separately, including
+SQLite schema 55, existing history, configuration, client paths and restart.
+No real user installation was changed for those checks. Published tags and
+assets are preserved by maintainer policy; GitHub does not enforce immutability
+for this release. Current guides on `main` do not replace its published bytes.
+These checks do not certify an unknown OS, model usability, a real client update
+or human acceptance. The witness remains deferred.
