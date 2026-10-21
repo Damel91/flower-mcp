@@ -12,7 +12,7 @@ from hashlib import sha256
 import json
 from typing import Mapping
 
-from flow_of_work_mcp.core.errors import BootstrapBlockedError, ChangeControlBlockedError
+from flow_of_work_mcp.core.errors import BootstrapBlockedError, ChangeControlBlockedError, OperationPreEffectError
 from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 from flow_of_work_mcp.application.bootstrap_input_contracts import (
     ANSWER_SCHEMA, CORRESPONDENCE_SCHEMA, REFERENCES_SCHEMA,
@@ -84,6 +84,20 @@ def _ids(value, field, *, required=False):
     if len(set(ids)) != len(ids) or (required and not ids):
         raise ValueError(f"{field} must contain unique {'nonempty ' if required else ''}IDs")
     return ids
+
+
+def validate_roadmap_selection(value):
+    """Pure selection validation; only the handler's pre-dispatch catch is proof."""
+    try:
+        return _ids(value, 'milestone_ids', required=True)
+    except ValueError as exc:
+        raise OperationPreEffectError(
+            'bootstrap_milestone_selection_invalid', str(exc), field='milestone_ids',
+            received_value=value, rule='Select 1..128 unique existing canonical milestone IDs.',
+            resolution='If milestones do not exist, follow the milestone-planning recipe to author them '
+                       'through ordinary canonical operations. Request roadmap again with their returned IDs. '
+                       'Roadmap is a read and does not create milestones.',
+        ) from exc
 
 
 def _exact(value, fields, name):
@@ -253,7 +267,7 @@ class GuidedBootstrapService:
                 operation='record_correspondence', mutation=normalized, guided=guided, actor=actor, request_id=request_id)
 
     def roadmap(self, project_id, bootstrap_id, *, milestone_ids):
-        selected = _ids(milestone_ids, 'milestone_ids', required=True)
+        selected = validate_roadmap_selection(milestone_ids)
         with self._ledger.consistent_read():
             return self._roadmap(project_id, bootstrap_id, selected)
 
@@ -448,6 +462,44 @@ class GuidedBootstrapService:
             return self._ledger.record_guided_bootstrap(project_id, bootstrap_id,
                 operation='record_continuation', mutation=mutation, guided=guided,
                 actor=actor, request_id=request_id, stage=state['stage'])
+
+    def operational_projection(self, project_id, state, *, actor, answer_key=''):
+        """Project a state receipt inside the caller's ledger transaction/snapshot.
+
+        Gate semantics belong to guidance. This view never persists authority or
+        repeats answer/audit bodies, and the transport renderer never reads here.
+        """
+        guidance = self.guidance(project_id, state['bootstrap_id'])
+        guided = self._guided(state)
+        answers = guided.get('answers', {})
+        changed = answers.get(answer_key)
+        blockers = guidance['blockers']
+        first = blockers[0] if blockers else None
+        primary = None
+        if first is not None:
+            # Correspondence gaps name their discriminator reason; milestone
+            # progress gaps name the same diagnostic discriminator code.
+            discriminator = first.get('reason') or first.get('code')
+            if not isinstance(discriminator, str) or not discriminator:
+                raise ValueError('guided blocker requires an existing reason or code')
+            primary = {'reason': discriminator}
+            if 'answer_key' in first:
+                primary['answer_key'] = first['answer_key']
+        return {
+            'contract_version': 'flow.guided-bootstrap-operational.v1',
+            **{key: state[key] for key in ('project_id', 'bootstrap_id', 'path', 'status', 'stage')},
+            'counts': {'answers': len(answers), 'correspondence': len(guided.get('correspondence', {})),
+                       'open_contradictions': state['open_contradiction_count'], 'blockers': len(blockers)},
+            'changed_answer': ({'answer_key': answer_key, 'answer_revision': changed['revision']}
+                               if changed is not None else None),
+            'primary_blocker': primary,
+            'next_gate': guidance['next_gate'],
+            'detail_calls': {name: {'tool': 'fow_bootstrap', 'arguments': {
+                'project_id': project_id, 'bootstrap_id': state['bootstrap_id'],
+                'operation': operation, 'actor': actor,
+            }} for name, operation in (('state', 'state_details'), ('guidance', 'guidance'))},
+            'semantic_truth_verified': False, 'human_acceptance': False,
+        }
 
     def guidance(self, project_id, bootstrap_id=''):
         with self._ledger.consistent_read():

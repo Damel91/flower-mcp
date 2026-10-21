@@ -280,6 +280,34 @@ def _lens_catalog_markdown(result: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _guided_bootstrap_markdown(payload: Mapping[str, Any], operation: str, output_budget: int) -> str:
+    """Render only the issued operational view; never read runtime services."""
+    view = payload['result']['operational_projection']
+    title = f"Lifecycle Bootstrap: {operation}"
+    note = ('Next gate is an action template. Supply its required inputs and prerequisites; '
+            'request exact operation help when needed. It does not authorize coding or acceptance.')
+    rendered = render_markdown(
+        title=title, status=str(payload['status']), output_budget=None,
+        document={'next_gate': view['next_gate'], 'next_gate_note': note,
+                  'bootstrap': {key: value for key, value in view.items()
+                                if key not in {'next_gate', 'detail_calls'}}},
+        json_islands=tuple(MarkdownJsonIsland(f"Read full {name}", call)
+                           for name, call in view['detail_calls'].items()),
+    )
+    budget = min(8192, output_budget) if output_budget is not None else 8192
+    if len(rendered) <= budget:
+        return rendered
+    # Never byte-cut an issued action or its actor/identity. Unusually large
+    # legacy identities can exceed even this boundary; the full read is exact.
+    return render_markdown(
+        title=title, status=str(payload['status']), output_budget=None,
+        document={'status': view['status'], 'counts': view['counts'],
+                  'presentation_boundary': 'Operational view exceeds the text budget. Read full guidance '
+                    'for the complete next gate. Structured content retains the complete gate and state.'},
+        json_islands=(MarkdownJsonIsland('Read full guidance', view['detail_calls']['guidance']),),
+    )
+
+
 def project_markdown(
     tool_name: str,
     payload: Mapping[str, Any],
@@ -291,6 +319,9 @@ def project_markdown(
 
     arguments = arguments or {}
     result = payload.get("result")
+    if (tool_name == "fow_bootstrap" and payload.get("status") == "success"
+            and isinstance(result, Mapping) and "operational_projection" in result):
+        return _guided_bootstrap_markdown(payload, str(arguments.get("operation") or ""), output_budget)
     if tool_name == "fow_interaction" and arguments.get("operation") == "catalog" and payload.get("status") == "success":
         rendered = _lens_catalog_markdown(result)
         if output_budget is not None and len(rendered) > output_budget:

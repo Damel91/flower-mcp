@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import WithJsonSchema
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
+from flow_of_work_mcp.application.guided_bootstrap import validate_roadmap_selection
 
 from flow_of_work_mcp.application.jobs import JobBlockedError
 from flow_of_work_mcp.application.operation_contracts import (
@@ -1848,8 +1849,19 @@ def handle_bootstrap(
 ) -> dict[str, object]:
     """Apply one bounded bootstrap transition and return its durable state."""
 
+    selected = str(operation or "").strip()
+    if selected == "roadmap":
+        try:
+            validate_roadmap_selection([] if milestone_ids is None else milestone_ids)
+        except OperationPreEffectError as exc:
+            response = _pre_effect_rejection(exc, project_id=project_id, request_id=request_id,
+                                            tool="fow_bootstrap", operation=selected)
+            response["result"]["next_tool_call"] = {"tool": "fow_capabilities", "arguments": {
+                "view": "recipe", "recipe_name": "milestone-planning",
+            }}
+            return response
+
     def operation_fn() -> dict[str, object]:
-        selected = str(operation or "").strip()
         if selected == "bind_implementation_provider":
             result = runtime.provider_bindings.bind(
                 project_id,
@@ -1901,7 +1913,7 @@ def handle_bootstrap(
             result = runtime.bootstrap.resume(
                 project_id, bootstrap_id, actor=actor, request_id=request_id
             )
-        elif selected == "state":
+        elif selected in {"state", "state_details"}:
             result = runtime.bootstrap.state(project_id, bootstrap_id)
         elif selected == "record_intake":
             result = runtime.bootstrap.record_intake(
@@ -1940,7 +1952,8 @@ def handle_bootstrap(
             result = runtime.guided_bootstrap.record_correspondence(project_id, bootstrap_id,
                 correspondence=correspondence, actor=actor, request_id=request_id)
         elif selected == "roadmap":
-            result = runtime.guided_bootstrap.roadmap(project_id, bootstrap_id, milestone_ids=milestone_ids or [])
+            result = runtime.guided_bootstrap.roadmap(project_id, bootstrap_id,
+                milestone_ids=[] if milestone_ids is None else milestone_ids)
         elif selected == "confirm_roadmap":
             result = runtime.guided_bootstrap.confirm_roadmap(project_id, bootstrap_id,
                 milestone_ids=milestone_ids or [], roadmap_fingerprint=roadmap_fingerprint,
@@ -1969,14 +1982,37 @@ def handle_bootstrap(
             )
         else:
             raise ValueError("bootstrap operation is invalid")
+        response_result = {"bootstrap": dict(result)}
+        if result.get("path") == "guided_engineering" and selected not in {"state_details", "guidance", "roadmap"}:
+            response_result["operational_projection"] = runtime.guided_bootstrap.operational_projection(
+                project_id, result, actor=actor,
+                answer_key=str(answer["answer_key"]).strip() if selected == "record_answer" else "",
+            )
         return envelope(
             tool="fow_bootstrap",
             status="success",
-            result={"bootstrap": dict(result)},
+            result=response_result,
             audit_reference={"bootstrap_id": result.get("bootstrap_id", "")},
         )
 
-    return _guard("fow_bootstrap", operation_fn)
+    def coherent_operation() -> dict[str, object]:
+        if selected in {"state", "state_details", "guidance", "roadmap"}:
+            with runtime.ledger.consistent_read():
+                return operation_fn()
+        guided = selected in {"record_answer", "record_correspondence", "confirm_roadmap", "record_continuation"}
+        if selected == "start":
+            guided = path == "guided_engineering"
+        elif selected in {"resume", "record_contradiction", "complete", "cancel"}:
+            # A cycle's path is immutable; actual state and derived gate are
+            # read again inside the outer transaction. Legacy provider work
+            # never acquires this wrapper.
+            guided = runtime.bootstrap.state(project_id, bootstrap_id)["path"] == "guided_engineering"
+        if guided:
+            with runtime.ledger.atomic():
+                return operation_fn()
+        return operation_fn()
+
+    return _guard("fow_bootstrap", coherent_operation)
 
 
 def handle_change(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum, StrEnum
 from functools import lru_cache
 from types import MappingProxyType
@@ -113,7 +113,8 @@ class OperationContract:
             },
             "example": _example(self),
             "field_descriptions": {
-                name: parameter_help(self.tool, name)["description"]
+                name: parameter_help(self.tool, name,
+                    selected_operation=self.operation if self.tool == "fow_bootstrap" else "")["description"]
                 for name in dict.fromkeys(
                     path.split(".", 1)[0] for path in (*self.required, *self.optional)
                 )
@@ -229,6 +230,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "status",
         "catalog",
         "state",
+        "state_details",
         "view",
         "get_change",
         "get_finding",
@@ -608,7 +610,10 @@ _BOOTSTRAP = {
         guidance={"existing_project": "Use the exact registered project name. Inspect an active bootstrap instead of starting another; a replay request must retain its original actor, name and path."},
     ),
     "resume": _c("fow_bootstrap", "resume", _P + ("bootstrap_id",), _R),
-    "state": _c("fow_bootstrap", "state", _P + ("bootstrap_id",)),
+    "state": _c("fow_bootstrap", "state", _P + ("bootstrap_id",),
+        guidance={"presentation": "Guided cycles return a compact operational continuation. Read state_details for complete state/recent audit, or guidance for full canonical context and the current next_gate template."}),
+    "state_details": _c("fow_bootstrap", "state_details", _P + ("bootstrap_id",),
+        guidance={"detail": "Explicit full state and recent ten-event audit window. No operational guidance is computed. Use state for a compact guided continuation and guidance for full canonical context."}),
     "record_intake": _c(
         "fow_bootstrap", "record_intake", _P + ("bootstrap_id", "intake"), _R
     ),
@@ -649,6 +654,21 @@ _BOOTSTRAP.update({
     "confirm_roadmap": _c("fow_bootstrap", "confirm_roadmap", _P + ("bootstrap_id", "milestone_ids", "roadmap_fingerprint", "confirmation_reference", "request_id")),
     "record_continuation": _c("fow_bootstrap", "record_continuation", _P + ("bootstrap_id", "continuation_choice", "continuation_reference", "roadmap_fingerprint", "progress_revision", "reason", "request_id"), enums={"continuation_choice": ("continue", "review")}),
 })
+
+# Applicability is explanatory authority, not another gate or mode dispatcher.
+for _name in ("record_intake", "confirm_intake", "derive_behavior", "record_answer",
+              "record_correspondence", "roadmap", "confirm_roadmap", "record_continuation"):
+    _contract = _BOOTSTRAP[_name]
+    _path_help = (
+        "code_import only, after confirmed intake; requires a configured bootstrap-behavior provider and internal model. It is not a guided_engineering step."
+        if _name == "derive_behavior" else
+        "requirements_import, requirements_creation or code_import intake path. guided_engineering uses record_answer and ordinary canonical authoring instead."
+        if _name in {"record_intake", "confirm_intake"} else
+        "guided_engineering only. Author requirements, use cases and milestones through their ordinary canonical operations, then correspondence and roadmap confirmation. No derive_behavior step or internal model is required."
+    )
+    _BOOTSTRAP[_name] = replace(_contract, guidance=MappingProxyType({
+        **_contract.guidance, "workflow_path": _path_help,
+    }))
 
 
 _CHANGE_OWNER = {
@@ -2373,7 +2393,7 @@ def tool_annotations(name: str) -> Mapping[str, bool]:
     ))
 
 
-def parameter_help(tool: str, name: str) -> Mapping[str, object]:
+def parameter_help(tool: str, name: str, *, selected_operation: str = "") -> Mapping[str, object]:
     """Publish semantic help without adding constraints to accepted inputs.
 
     Every semantic meaning is explicit. Only route applicability, selector
@@ -2383,7 +2403,9 @@ def parameter_help(tool: str, name: str) -> Mapping[str, object]:
     if tool not in _BY_TOOL:
         raise KeyError(f"missing_tool_help:{tool}")
     description = FIELD_OVERRIDES.get((tool, name), FIELD_HELP[name])
-    contracts = tuple(_BY_TOOL[tool].values())
+    contracts = ((_BY_TOOL[tool][selected_operation],) if selected_operation
+                 else tuple(_BY_TOOL[tool].values()))
+    selectors = (selected_operation,) if selected_operation else operation_names(tool)
     required = tuple(c.operation for c in contracts if any(
         path.split(".", 1)[0] == name for path in c.required
     ))
@@ -2391,7 +2413,7 @@ def parameter_help(tool: str, name: str) -> Mapping[str, object]:
         path.split(".", 1)[0] == name for path in (*c.required, *c.optional)
     ))
     if name == "operation":
-        description += " Canonical values: " + ", ".join(operation_names(tool)) + "."
+        description += " Canonical values: " + ", ".join(selectors) + "."
     elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
         description += " Canonical values: " + ", ".join(operation_names(tool)) + "."
     elif len(contracts) > 1 and name not in {"actor", "request_id", "project_id", "change_id", "packet_id"}:
@@ -2409,7 +2431,7 @@ def parameter_help(tool: str, name: str) -> Mapping[str, object]:
     metadata: dict[str, object] = {"description": description}
     if name in {"operation", "view", "mode", "payload", "decision", "association_receipt", "result", "answer", "correspondence", "unit"}:
         if name == "operation":
-            metadata["examples"] = [operation_names(tool)[0]]
+            metadata["examples"] = [selectors[0]]
         elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
             metadata["examples"] = [operation_names(tool)[0]]
         elif values:

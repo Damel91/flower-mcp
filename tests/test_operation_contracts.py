@@ -30,6 +30,7 @@ EXPECTED_OPERATIONS = {
         "start",
         "resume",
         "state",
+        "state_details",
         "record_intake",
         "record_contradiction",
         "confirm_intake",
