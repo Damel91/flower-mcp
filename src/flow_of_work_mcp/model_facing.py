@@ -358,8 +358,10 @@ def project_markdown(
                 "draft_context": "Presented in the complete roadmap below.",
             },
         }
-    if complete_evidence:
-        # A single explicitly requested evidence body is a complete reference,
+    if complete_evidence or (
+        tool_name == "fow_bootstrap" and operation == "state_details" and payload.get("status") == "success"
+    ):
+        # An explicitly requested evidence/state body is a complete reference,
         # like an exported artifact. Never silently flatten or budget-cut it.
         output_budget = None
     status = str(payload.get("status") or "unknown")

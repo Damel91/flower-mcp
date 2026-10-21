@@ -79,6 +79,17 @@ def test_explicit_details_bypass_projection_and_reads_are_pure(owned, monkeypatc
     assert snapshot(runtime)==before
 
 
+def test_explicit_state_details_are_complete_even_with_small_presentation_budget(owned):
+    value=answer(text='FULL-ANSWER-START\n\n'+'observable behavior '*160+'\nFULL-ANSWER-END')
+    assert call(owned,'record_answer',answer=value,request_id='long-detail')['status']=='success'
+    response=call(owned,'state_details')
+    text=project_markdown('fow_bootstrap',response,arguments={'operation':'state_details'},output_budget=1024)
+    assert len(text)>1024 and 'model_facing_output_budget_exceeded' not in text
+    assert 'FULL-ANSWER-START' in text and 'FULL-ANSWER-END' in text
+    assert 'guided state' in text.lower() and 'audit events' in text.lower()
+    assert response['result']['bootstrap']['intake']['_guided']['answers']['scenario']['answer']==value['answer']
+
+
 def test_projection_shares_write_transaction_and_failure_rolls_back(owned, monkeypatch):
     runtime, bootstrap_id, _boot=owned
     original=runtime.guided_bootstrap.operational_projection
