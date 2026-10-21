@@ -83,7 +83,7 @@ def test_missing_semantic_definition_fails_without_name_fallback():
 
 def test_published_signature_and_schema_keep_raw_handler_validation(tools):
     contracts = registry.operation_contract_catalog()
-    assert len(contracts) == 182
+    assert len(contracts) == 183
     checked_routes = set()
     for name, tool in tools.items():
         raw = tool.fn.__wrapped__
@@ -104,7 +104,7 @@ def test_published_signature_and_schema_keep_raw_handler_validation(tools):
             assert _validation(tool.fn_metadata.arg_model, value) == _validation(
                 unwrapped.fn_metadata.arg_model, value
             ), (name, value)
-    assert len(checked_routes) == 182
+    assert len(checked_routes) == 183
 
 
 def test_selector_help_does_not_add_constraints_to_permissive_strings(tools):
@@ -156,9 +156,9 @@ def test_required_selector_and_inspect_examples_are_actionable():
     )["optional_fields"]
 
 
-def test_all_182_canonical_examples_match_unchanged_sdk_input_shapes(tools):
+def test_all_canonical_examples_match_unchanged_sdk_input_shapes(tools):
     contracts = registry.operation_contract_catalog()
-    assert len(contracts) == 182
+    assert len(contracts) == 183
     for contract in contracts:
         tool = tools[contract["tool"]]
         # This checks shape/selector compatibility only. Example identities and
