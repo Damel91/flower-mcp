@@ -7,6 +7,7 @@ import sqlite3
 from typing import Any, Mapping
 
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
+from flow_of_work_mcp.core.domain.architecture import applicability, selected_closure
 from flow_of_work_mcp.core.domain.external_work import normalize_declarations
 from flow_of_work_mcp.core.domain.change_control import validate_change_id, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_project_id
@@ -19,7 +20,7 @@ from flow_of_work_mcp.core.domain.packet_work_plan import (
 from flow_of_work_mcp.core.domain.provider_surfaces import (
     codingcastle_provider_surface,
 )
-from flow_of_work_mcp.core.errors import RequirementConflictError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 
 
 def _draft_fingerprint(draft: PacketWorkPlanDraft) -> str:
@@ -1027,6 +1028,7 @@ class PacketWorkPlanStoreMixin:
                 raise RequirementConflictError("work-plan revision targets a stale packet revision")
 
             if next_status == PacketWorkPlanStatus.ACCEPTED:
+                self._assert_work_plan_architecture(connection, project_id, packet)
                 self._revalidate_persisted_bindings(
                     connection, project_id, work_plan_id, plan_revision
                 )
@@ -1166,11 +1168,59 @@ class PacketWorkPlanStoreMixin:
                 event_type=f"work_plan_{next_status.value}",
                 actor=actor,
                 request_id=request_id,
-                payload={"rationale": rationale},
+                payload={
+                    "rationale": rationale,
+                    **({"engineering_cycle_version": 1}
+                       if next_status == PacketWorkPlanStatus.ACCEPTED else {}),
+                },
                 occurred_at=occurred_at,
             )
             return self._work_plan_revision_value(
                 connection, project_id, work_plan_id, plan_revision
+            )
+
+    def _assert_work_plan_architecture(self, connection, project_id, packet):
+        """Admit new accepted plans against adopted, selected architecture.
+
+        Historical transition replay returns before this check. Architecture
+        selection and applicability are read from the same write transaction;
+        unrelated adoptions do not force an otherwise current selection forward.
+        """
+        current = self._architecture_value(connection, project_id)
+        condition = ""
+        if current["state"] != "adopted":
+            condition = "architecture_not_adopted"
+        elif not current["definition"]["components"]:
+            condition = "architecture_components_missing"
+        else:
+            refs = json.loads(packet["architecture_refs_json"])
+            if not refs:
+                condition = "packet_architecture_refs_missing"
+            else:
+                try:
+                    normalized, selected = self._validate_architecture_refs(
+                        connection, project_id, refs
+                    )
+                    closure = selected_closure(selected["definition"], normalized)
+                    if applicability(closure, current["definition"])["status"] != "current":
+                        condition = "architecture_authority_stale"
+                except ChangeControlBlockedError as exc:
+                    condition = exc.reason
+        if condition:
+            raise ChangeControlBlockedError(
+                "architecture_required",
+                details={
+                    "architecture_condition": condition,
+                    "current_adopted_revision": current["current_adopted_revision"],
+                    "next_tool_call": {
+                        "tool": "fow_architecture",
+                        "arguments": {"project_id": project_id, "operation": "inspect"},
+                    },
+                    "recipe_call": {
+                        "tool": "fow_capabilities",
+                        "arguments": {"view": "recipe", "recipe_name": "project-architecture-v1"},
+                    },
+                },
             )
 
     def _create_work_plan_identity(
@@ -1459,6 +1509,12 @@ class PacketWorkPlanStoreMixin:
             "request_id": str(row["request_id"]),
             "units": units,
             "events": events,
+            "engineering_cycle_version": next(
+                (event["payload"].get("engineering_cycle_version")
+                 for event in reversed(events)
+                 if event["event_type"] == "work_plan_accepted"),
+                None,
+            ),
         }
 
     @staticmethod

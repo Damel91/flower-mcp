@@ -55,8 +55,8 @@ def test_actual_catalog_has_explicit_complete_bounded_help(app, tools):
                for item in asyncio.run(app.list_tools())]
     assert len(catalog) == len(tools) == 37
     fields = [name for item in catalog for name in item["inputSchema"]["properties"]]
-    assert len(fields) == 445
-    assert set(fields) == set(FIELD_HELP) and len(FIELD_HELP) == 233
+    assert len(fields) == 447
+    assert set(fields) == set(FIELD_HELP) and len(FIELD_HELP) == 234
     assert set(TOOL_GUIDANCE) == set(TOOL_EFFECTS) == set(tools)
     for item in catalog:
         assert item["description"] == registry.tool_description(item["name"])

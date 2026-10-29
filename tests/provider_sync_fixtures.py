@@ -9,6 +9,7 @@ from flow_of_work_mcp.core.domain.packet_provider import PacketProviderCommand, 
 from flow_of_work_mcp.core.errors import ImplementationProviderUnavailableError, PacketProviderRejectedError
 from flow_of_work_mcp.mcp_runtime import build_runtime
 from flow_of_work_mcp.server import handle_packet_author
+from tests.engineering_cycle_support import adopt_minimal_architecture
 
 
 class _PacketProvider:
@@ -197,6 +198,7 @@ def _seed_packet(tmp_path, *, mode: str, provider=None, test_provider=None):
     )
     requirements = RequirementService(runtime.ledger)
     requirements.create_project("alpha", "Alpha", actor="operator")
+    architecture_refs = adopt_minimal_architecture(runtime.ledger)
     requirement = requirements.register(
         "alpha",
         RequirementDraft(
@@ -230,6 +232,7 @@ def _seed_packet(tmp_path, *, mode: str, provider=None, test_provider=None):
         out_of_scope=["semantic acceptance"],
         invariants=["provider completion does not accept the requirement"],
         target_policy="code_targets_required",
+        architecture_refs=list(architecture_refs),
         actor="operator",
         request_id=f"start-{mode}",
     )

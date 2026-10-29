@@ -13,6 +13,7 @@ from flow_of_work_mcp.core.domain.provider_binding import ImplementationProvider
 from flow_of_work_mcp.core.domain.provider_validation import build_context, validate_capability, validate_context
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 from flow_of_work_mcp.core.errors import ImplementationProviderUnavailableError
+from tests.engineering_cycle_support import adopt_minimal_architecture
 
 
 CAPABILITY = {
@@ -50,6 +51,7 @@ def fixture(tmp_path, *, bind=True, target_policy='documental_only', producer_op
     ledger = SQLiteRequirementLedger(tmp_path / 'executor.sqlite')
     requirements = RequirementService(ledger)
     requirements.create_project('alpha', 'Explicit execution', actor='human')
+    architecture_refs = adopt_minimal_architecture(ledger)
     requirement = requirements.register('alpha', RequirementDraft(title='Protocol',
         statement='a returns one and b calls a.', category='functional', rationale='Bounded contract.'), actor='human')
     changes = ChangeControlService(ledger)
@@ -58,7 +60,7 @@ def fixture(tmp_path, *, bind=True, target_policy='documental_only', producer_op
     packet = changes.add_packet('alpha', change['change_id'], ImplementationPacketDraft(
         title='Producer and consumer', objective='Create a and b.', rationale='Canonical producer contract.',
         completion_criteria=('a returns one', 'b calls a'), in_scope=('src/a.py and src/b.py',),
-        invariants=('No I/O.',), target_policy=target_policy), actor='engineer')['packets'][0]
+        invariants=('No I/O.',), target_policy=target_policy, architecture_refs=architecture_refs), actor='engineer')['packets'][0]
     ids = ('alpha', change['change_id'], packet['packet_id'])
     external = ExternalWorkService(ledger)
     external.call(*ids, 'upgrade_validation', actor='engineer', request_id='upgrade',

@@ -11,7 +11,7 @@ from flow_of_work_mcp.application.srs_validation import SrsValidationService
 from flow_of_work_mcp.application.intention_grounding import IntentionGroundingService
 from flow_of_work_mcp.core.domain import ValidationAuditRecord, ValidationDisposition
 from flow_of_work_mcp.core.domain.identifiers import required_text
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, ModelGatewayError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, ModelGatewayError
 from flow_of_work_mcp.core.ports import ModelGateway, ModelRequest, ModelResult
 from flow_of_work_mcp.core.ports.semantic_assignments import SemanticAssignmentRepository
 from flow_of_work_mcp.core.standards import StandardProfileRegistry
@@ -70,7 +70,7 @@ class SemanticAssignmentService:
         self, project_id: str, *, role: str, execution_mode: str,
         source_path: str = "", standard_profile: str = "", actor: str, request_id: str = "",
         goal_node_ids: tuple[str, ...] = (), host_evidence: Mapping[str, object] | None = None,
-        source_revision: str = "",
+        source_revision: str = "", requirement_ids: list[str] | None = None,
     ) -> Mapping[str, object]:
         self._repository.ensure_semantic_project(project_id)
         if role != _ROLE and not (role == "intention_grounding" and self._grounding is not None):
@@ -85,10 +85,15 @@ class SemanticAssignmentService:
                 raise ValueError("grounding does not accept SRS-only arguments")
             try:
                 preparation = self._grounding.prepare(project_id, goal_node_ids=goal_node_ids,
-                    execution_mode=execution_mode, host_evidence=host_evidence, source_revision=source_revision)
+                    execution_mode=execution_mode, host_evidence=host_evidence, source_revision=source_revision,
+                    requirement_ids=requirement_ids)
             except ChangeControlBlockedError as exc:
                 return self._blocked(exc.reason, {"project_id": project_id, "role": role}, "prepare")
         else:
+            if requirement_ids is not None:
+                raise InputValidationError('SRS validation does not accept grounding-only requirement scope',
+                    field='requirement_ids', received_value=requirement_ids,
+                    details={'resolution': 'Omit requirement_ids for SRS validation; select intention_grounding/host to investigate a scoped implementation.'})
             if goal_node_ids or host_evidence is not None or source_revision:
                 raise ValueError("SRS validation does not accept grounding-only arguments")
             structural = self._structural.validate(source_path, standard_profile=standard_profile)

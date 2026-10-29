@@ -7,15 +7,18 @@ from flow_of_work_mcp import ChangeControlService, ImplementationPacketDraft, Pa
 from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 from tests.test_external_work import fixture, report
+from tests.engineering_cycle_support import record_test_repository_review
 
 
 def dependent_fixture(tmp_path):
     ledger, external, first_ids, first_revs = fixture(tmp_path)
     changes = ChangeControlService(ledger)
+    architecture_refs = tuple(ledger.change_state(*first_ids[:2])['packets'][0]['architecture_refs'])
     packet = changes.add_packet(first_ids[0], first_ids[1], ImplementationPacketDraft(title='Downstream facade',
         objective='Add a facade consuming the predecessor protocol.', rationale='Canonical packet order preserves producer materialization.',
         completion_criteria=('facade returns the next integer',), in_scope=('src/facade.py',),
-        invariants=('Use the predecessor increment contract without changing arithmetic',)), actor='human')['packets'][-1]
+        invariants=('Use the predecessor increment contract without changing arithmetic',),
+        architecture_refs=architecture_refs), actor='human')['packets'][-1]
     ids = (first_ids[0], first_ids[1], packet['packet_id'])
     external.call(*ids, 'upgrade_validation', actor='human', request_id='facade-upgrade',
         payload={'expected_spec_revision': packet['spec_revision'], 'expected_plan_revision': 0})
@@ -46,6 +49,8 @@ def finish_predecessor(external, ids, revs):
     for unit in ('producer', 'consumer'):
         payload = report(external, ids, revs, unit, report_key='first-' + unit)
         external.call(*ids, 'report_outcome', actor='agent', request_id='submit-' + unit, payload=payload)
+    if all(row['status'] == 'complete' for row in external.todo(*ids)['todos']):
+        record_test_repository_review(external._ledger, ids)
 
 
 def test_export_carries_predecessor_context_offline_order_and_stable_semantic_identity(tmp_path, monkeypatch):
@@ -72,6 +77,7 @@ def test_export_carries_predecessor_context_offline_order_and_stable_semantic_id
     assert external.validation(*ids)['execution_allowed'] is True
     assert external.todo(*ids)['current_unit']['unit_key'] == 'facade'
     external.call(*ids, 'report_outcome', actor='agent', request_id='offline-facade', payload=data)
+    record_test_repository_review(ledger, ids)
     assert external.todo(*ids)['current_unit'] is None
     stamped = ledger.external_work_state(*ids)['reports'][0]['predecessor_reports']
     assert stamped == {'packet:' + first_ids[2] + ':unit:producer': 'first-producer',
@@ -97,6 +103,7 @@ def test_predecessor_conflict_and_replacement_invalidate_downstream_evidence(tmp
     external.call(*first_ids, 'report_outcome', actor='agent', request_id='consumer-rechecked', payload=consumer)
     external.call(*first_ids, 'reconcile_outcome', actor='human', request_id='choose-rechecked-consumer',
         payload={**first_revs, 'report_key': consumer['report_key'], 'rationale': 'The client was rechecked against rebuilt producer.'})
+    record_test_repository_review(_ledger, first_ids)
     todo = external.todo(*ids)
     assert todo['authority_fingerprint'] == fingerprint
     assert todo['current_unit']['status'] == 'stale'
@@ -133,6 +140,7 @@ def test_producer_only_unit_without_criterion_ownership_is_required_by_closure(t
     assert closure['complete'] is False
     extra_report = report(external, ids, revs, 'producer-only', report_key='producer-only-1')
     external.call(*ids, 'report_outcome', actor='agent', request_id='producer-only-1', payload=extra_report)
+    record_test_repository_review(ledger, ids)
     assert external.implementation_closure(*ids)['complete'] is True
 
 

@@ -43,6 +43,8 @@ _GATE_AREAS: Mapping[str, frozenset[str]] = {
     "campaign_execution": frozenset({"campaigns"}),
     "acceptance": frozenset({"milestones", "assurance"}),
     "lifecycle_audit": frozenset({"assurance"}),
+    "repository_reconciliation": frozenset({"assurance"}),
+    "architecture_authority": frozenset({"project_bootstrap"}),
 }
 
 
@@ -407,14 +409,27 @@ class InteractionProjectionService:
         ):
             raise InteractionProjectionError("interaction_choice_invalid")
         choice = dict(choices[selection - 1])
+        arguments = dict(choice.get("arguments") or {})
+        review_template = choice.get("repository_review_template")
+        if isinstance(review_template, Mapping):
+            supplied_review = arguments.get("repository_review")
+            if supplied_review is not None and not isinstance(supplied_review, Mapping):
+                raise InteractionProjectionError("interaction_review_template_invalid")
+            supplied_review = dict(supplied_review or {})
+            if any(key in supplied_review and supplied_review[key] != value
+                   for key, value in review_template.items()):
+                raise InteractionProjectionError("interaction_review_template_conflict")
+            arguments["repository_review"] = {**dict(review_template), **supplied_review}
         return {
             "status": "resolved",
             "frame_ref": frame_ref,
             "selection": selection,
             "next_tool_call": {
                 "tool": choice["tool"],
-                "arguments": dict(choice.get("arguments") or {}),
+                "arguments": arguments,
             },
+            **({"repository_review_template": dict(review_template)}
+               if isinstance(review_template, Mapping) else {}),
             "semantic_inputs": list(choice.get("semantic_inputs") or ()),
             "injected_inputs": list(choice.get("injected_inputs") or ()),
             "continuation_policy": choice["continuation_policy"],
@@ -432,7 +447,39 @@ class InteractionProjectionService:
         )
         next_gate = dict(snapshot.get("next_gate") or {})
         actions: list[Mapping[str, object]] = []
-        if str(next_gate.get("kind") or "") != "idle" and lens.selected_area in (
+        engineering_gate = str(next_gate.get("kind") or "") in {
+            "repository_reconciliation", "architecture_authority"
+        }
+        if engineering_gate:
+            route = next_gate.get("route")
+            if not isinstance(route, Mapping):
+                raise InteractionProjectionError("engineering_gate_route_missing")
+            pair = (str(route.get("tool") or ""), str(route.get("operation") or "call"))
+            membership = lens_operation_membership()
+            core = {(item["tool"], item["operation"]) for item in membership["core_operations"]}
+            target_areas = {
+                item["area"] for item in membership["lenses"]
+                if pair in {(ref["tool"], ref["operation"])
+                            for ref in (*item["primary_operations"], *item["companion_operations"])}
+            }
+            if pair in core or lens.selected_area in target_areas:
+                actions.append(self._action_from_route(route, next_gate))
+            else:
+                if not target_areas:
+                    raise InteractionProjectionError("engineering_gate_route_unavailable")
+                primary_area = str(operation_contract(*pair).get("area") or "")
+                preferred = {primary_area} if primary_area in target_areas else target_areas
+                target = next((dict(item, number=number)
+                               for number, item in enumerate(work_area_catalog(), 1)
+                               if item["area"] in preferred), None)
+                if target is None:
+                    raise InteractionProjectionError("engineering_gate_area_missing")
+                actions.append(self._action(
+                    1, "Select " + str(target["label"]) + " for the current engineering gate",
+                    "fow_interaction", "select", {"operation": "select", "area": int(target["number"])},
+                    required_inputs=(),
+                ))
+        elif str(next_gate.get("kind") or "") != "idle" and lens.selected_area in (
             _GATE_AREAS.get(str(next_gate.get("kind") or ""), frozenset())
         ):
             route = next_gate.get("route")
@@ -445,6 +492,8 @@ class InteractionProjectionService:
             "focus": snapshot.get("focus"),
             "active_work": snapshot.get("active_work"),
             "next_gate": next_gate,
+            **({"repository_review": snapshot["repository_review"]}
+               if isinstance(snapshot.get("repository_review"), Mapping) else {}),
             "blockers": list(snapshot.get("blockers") or ())[:6],
             "open_decisions": list(snapshot.get("open_decisions") or ())[:6],
         }
@@ -830,7 +879,7 @@ class InteractionProjectionService:
                 ),
                 operation,
             )
-        return self._action(
+        result = dict(self._action(
             1,
             str(gate.get("reason") or gate.get("kind") or "Continue current work"),
             tool,
@@ -840,7 +889,10 @@ class InteractionProjectionService:
                 str(item) for item in route.get("required_inputs", ())
             ),
             continuation_policy=str(gate.get("continuation_policy") or ""),
-        )
+        ))
+        if isinstance(route.get("repository_review_template"), Mapping):
+            result["repository_review_template"] = dict(route["repository_review_template"])
+        return result
 
     @staticmethod
     def _action(

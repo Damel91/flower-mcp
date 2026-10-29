@@ -7,6 +7,7 @@ from typing import Callable, Mapping
 
 from flow_of_work_mcp.application.change_control import ChangeControlService
 from flow_of_work_mcp.application.external_plan_markdown import render_plan
+from flow_of_work_mcp.application.engineering_cycle import repository_review_projection, engineering_cycle_version
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
@@ -126,8 +127,9 @@ class ExternalWorkService:
                     return {'status': 'success', 'criteria': state['criteria'], 'history': state['criterion_history'],
                             'validation_version': state['validation_version']}
             if operation == 'validation':
-                fields(payload, {'detail'}, operation)
-                return self.validation(project_id, change_id, packet_id, detail=str(payload.get('detail', 'standard')))
+                fields(payload, {'detail', 'history_offset'}, operation)
+                return self.validation(project_id, change_id, packet_id, detail=str(payload.get('detail', 'standard')),
+                                       history_offset=payload.get('history_offset', 0))
             fields(payload, {'unit_key'}, operation)
             return self.todo(project_id, change_id, packet_id, unit_key=str(payload.get('unit_key', '')))
         if operation not in MUTATION_OPERATIONS:
@@ -334,14 +336,49 @@ class ExternalWorkService:
             snapshot['contextual_predecessor'] = self._snapshot(project_id, change_id, identity,
                 _cache=cache, _path=(*_path, packet_id), _change=change)
             authority_basis['contextual_predecessor_authority'] = fingerprint(snapshot['contextual_predecessor']['authority_basis'])
+        audit_key = ('repository_review_audits', project_id)
+        if audit_key not in cache:
+            cache[audit_key] = self._ledger.read_projection('engineering_cycle_audits', (project_id,),
+                lambda: self._ledger.all_phase_audits(project_id))
+        snapshot['engineering_cycle_version'] = (plan or {}).get('engineering_cycle_version')
+        snapshot['repository_review'] = repository_review_projection(snapshot, cache[audit_key])
         cache[packet_id] = snapshot
         return snapshot
 
-    def validation(self, project_id: str, change_id: str, packet_id: str, *, detail: str = 'standard') -> Mapping[str, object]:
+    def validation(self, project_id: str, change_id: str, packet_id: str, *, detail: str = 'standard', history_offset=0) -> Mapping[str, object]:
         if detail not in {'standard', 'full'}:
             raise ValueError('detail must be standard or full')
+        if isinstance(history_offset, bool) or not isinstance(history_offset, int) or history_offset < 0:
+            raise InputValidationError('history_offset must be a nonnegative integer', field='payload.history_offset',
+                                       received_value=history_offset)
+        if history_offset and detail != 'full':
+            raise InputValidationError('history_offset requires detail=full', field='payload.history_offset',
+                                       received_value=history_offset)
         with self._ledger.consistent_read():
-            snapshot = self._snapshot(project_id, change_id, packet_id)
+            # Original reports remain readable even when current authority cannot
+            # be resolved. This path never supplies executable admission.
+            raw = self._ledger.external_work_state(project_id, change_id, packet_id) if detail == 'full' else None
+            try:
+                snapshot = self._snapshot(project_id, change_id, packet_id)
+            except (ChangeControlBlockedError, ValueError) as exc:
+                if detail != 'full':
+                    raise
+                plan = self._ledger.packet_work_plan_state(project_id, change_id, packet_id)
+                version = engineering_cycle_version(plan)
+                return {'status': 'blocked', 'reason': getattr(exc, 'reason', 'current_authority_unresolved'),
+                        'diagnostic': {'cause': str(exc), 'scope': {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id},
+                                       'resolution': 'Inspect original report provenance and resolve the named canonical authority; reading history does not authorize execution.'},
+                        'execution_allowed': False, 'execution_readiness': 'not_evaluated',
+                        'repository_review': {'contract_version': 'flow.repository-review-projection.v1',
+                                              'state': 'authority_blocked', 'engineering_cycle_version': version,
+                                              'required': version == 1 and raw['consumption_mode'] == 'external_agent',
+                                              'complete': False, 'scope_id': '', 'requirement_ids': [],
+                                              'basis_fingerprint': None, 'latest_audit_id': None, 'source': None,
+                                              'coverage': [], 'retrospective_recorded': False,
+                                              'semantic_truth_verified': False, 'human_acceptance': False,
+                                              'next_gate': self._history_route(project_id, change_id, packet_id)},
+                        **self._report_history(raw['reports'], history_offset=history_offset),
+                        'next_gate': self._history_route(project_id, change_id, packet_id), 'acceptance': 'not_inferred'}
             projection = self._projection(snapshot)
             gate = self._validation_gate(projection)
             inactive = snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
@@ -362,7 +399,38 @@ class ExternalWorkService:
                     'next_gate': self._inactive_gate(snapshot) if inactive else ((admission.get('next_gate') or {'tool': 'fow_handover', 'operation': 'project_state_snapshot', 'reason': admission['reason']}) if admission else gate), 'consumption_mode': snapshot['external']['consumption_mode'],
                     'plan_executable': plan_executable, 'execution_allowed': execution_allowed, 'execution_admission': admission,
                     'engineer_gate': snapshot.get('engineer_gate'),
-                    'packet_dependencies': dependencies}
+                    'packet_dependencies': dependencies, 'repository_review': snapshot['repository_review'],
+                    **(self._report_history(raw['reports'], snapshot=snapshot, projection=projection, history_offset=history_offset)
+                       if detail == 'full' else {})}
+
+    @staticmethod
+    def _history_route(project_id, change_id, packet_id):
+        return {'tool': 'fow_external_work', 'operation': 'validation',
+                'arguments': {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id,
+                              'operation': 'validation', 'payload': {'detail': 'full'}},
+                'reason': 'read_original_report_provenance_without_execution'}
+
+    @staticmethod
+    def _report_history(reports, *, snapshot=None, projection=None, history_offset=0):
+        result = []
+        for report in reports[history_offset:history_offset + 20]:
+            if snapshot is None or projection is None:
+                state, reason = 'not_evaluated', 'current_authority_unresolved'
+            else:
+                matches = (report['spec_revision'] == projection['spec_revision']
+                           and report['plan_revision'] == projection['plan_revision']
+                           and report['authority_fingerprint'] == projection['authority_fingerprint'])
+                state = 'current_authority' if matches and report['disposition'] != 'stale' else 'historical_on_original_pin'
+                reason = ('current_report_conflict' if report['disposition'] == 'conflict' else 'matches_current_authority') if state == 'current_authority' else 'issued_authority_differs_or_report_was_stale'
+            result.append({k: report.get(k) for k in ('report_key', 'unit_key', 'spec_revision', 'plan_revision', 'authority_fingerprint', 'disposition', 'actor', 'occurred_at')})
+            result[-1].update(source_revision=report['payload']['source_revision'], outcome=report['payload']['outcome'],
+                              summary=report['payload']['summary'], provenance='host_reported',
+                              currentness=state, currentness_reason=reason,
+                              compatibility='not_assessed_by_history_read', semantic_truth_verified=False, human_acceptance=False)
+        end = history_offset + len(result)
+        return {'report_history': result, 'report_history_page': {'offset': history_offset, 'limit': 20, 'total': len(reports),
+                'truncated': end < len(reports), 'next_offset': end if end < len(reports) else None},
+                'history_rule': 'Original pins and provenance are preserved. Missing current reports do not prove missing implementation.'}
 
     @staticmethod
     def _projection(snapshot, *, consumer_scope='external_agent', _cache=None) -> dict[str, object]:
@@ -454,7 +522,9 @@ class ExternalWorkService:
                 for evidence in effective[unit['client_unit_key']]['payload']['verification'])
                 for intent in unit['verifies'] if intent['kind'] == 'unit_check')
             for unit in projection['units'])
-        complete = implementation_complete and local_verification_complete and dependencies['ready']
+        review = snapshot['repository_review']
+        reconciliation_complete = not review['required'] or review['complete']
+        complete = implementation_complete and local_verification_complete and dependencies['ready'] and reconciliation_complete
         reason = ''
         if not scope_complete:
             reason = 'external_mode_not_selected' if snapshot['external']['consumption_mode'] != 'external_agent' else (
@@ -462,10 +532,13 @@ class ExternalWorkService:
                 (projection['next_gap'] or {}).get('code', 'external_unit_scope_missing'))
         elif not dependencies['ready']:
             reason = 'packet_dependencies_unresolved'
+        elif implementation_complete and local_verification_complete and not reconciliation_complete:
+            reason = 'repository_review_required'
         elif not complete:
             reason = 'external_unit_reports_incomplete'
         return {'scope_complete': scope_complete, 'implementation_complete': implementation_complete,
             'local_verification_complete': local_verification_complete, 'dependencies_complete': dependencies['ready'], 'complete': complete,
+            'reconciliation_complete': reconciliation_complete, 'repository_review': review,
             'reason': reason, 'gaps': projection['gaps'],
             'current_reports': {key: effective[key]['report_key'] for key in sorted(effective) if effective[key] and key in done},
             'authority_fingerprint': projection['authority_fingerprint'], 'spec_revision': projection['spec_revision'],
@@ -616,7 +689,11 @@ class ExternalWorkService:
     def todo(self, project_id: str, change_id: str, packet_id: str, *, unit_key: str = '') -> Mapping[str, object]:
         with self._ledger.consistent_read():
             snapshot = self._snapshot(project_id, change_id, packet_id)
-            return self._todo(snapshot, unit_key=unit_key)
+            result = dict(self._todo(snapshot, unit_key=unit_key))
+            result.setdefault('repository_review', snapshot['repository_review'])
+            if result.get('status') == 'blocked':
+                result['history_route'] = self._history_route(project_id, change_id, packet_id)
+            return result
 
     def criterion_progress(self, project_id: str, change_id: str, packet_id: str) -> Mapping[str, object]:
         """Inspect current host claims without admitting execution or acceptance."""
@@ -696,7 +773,9 @@ class ExternalWorkService:
         except ChangeControlBlockedError as exc:
             return {'status': 'blocked', 'reason': exc.reason, 'next_gate': self._inactive_gate(snapshot) if snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
                     else (dict(exc.details).get('next_gate') or {'action_kind': 'external_obligation', 'external_operation': 'resolve_guided_authority', 'details': exc.details}),
-                    'engineer_gate': snapshot.get('engineer_gate'), 'execution_allowed': False}
+                    'engineer_gate': snapshot.get('engineer_gate'), 'execution_allowed': False,
+                    'repository_review': snapshot['repository_review'],
+                    'history_route': self._history_route(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])}
         dependencies = self._packet_dependencies(snapshot)
         if not dependencies['ready']:
             first = next(row for row in dependencies['predecessors'] if not row['complete'])
@@ -737,6 +816,9 @@ class ExternalWorkService:
         else:
             gate = {'action_kind': 'verification_or_acceptance', 'external_operation': 'obtain_deferred_verification' if deferred else 'request_human_acceptance',
                     'reason': 'agent_work_complete_acceptance_pending'}
+            review = snapshot['repository_review']
+            if review['required'] and not review['complete']:
+                gate = {**review['next_gate'], 'reason': 'repository_review_required'}
         criterion_traceability = []
         for criterion in projection['criteria']:
             evidence = [dict(v, unit_key=key, report_key=r['report_key'], source_revision=r['payload']['source_revision'], evidence_authority='host_reported')
@@ -746,7 +828,7 @@ class ExternalWorkService:
         return {'status': 'success', 'consumption_mode': 'external_agent', 'engineer_gate': snapshot.get('engineer_gate'), 'authority_fingerprint': current,
                 'spec_revision': projection['spec_revision'], 'plan_revision': projection['plan_revision'],
                 'todos': rows, 'current_unit': selected, 'deferred_verification': deferred, 'next_gate': gate,
-                'packet_dependencies': self._packet_dependencies(snapshot),
+                'packet_dependencies': self._packet_dependencies(snapshot), 'repository_review': snapshot['repository_review'],
                 'acceptance': 'not_inferred', 'historical_reports': [r['report_key'] for r in snapshot['external']['reports']
                     if r['authority_fingerprint'] != current or r['disposition'] == 'stale'
                     or r['spec_revision'] != projection['spec_revision'] or r['plan_revision'] != projection['plan_revision']],
@@ -863,9 +945,16 @@ class ExternalWorkService:
             predecessor_reports = {**dependencies['report_refs'],
                 **{t['unit_key']: t['report_key'] for t in frontier['todos'] if t['unit_key'] in unit['depends_on']}}
         receipt = self._ledger.record_external_outcome(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'], value, disposition=disposition, actor=actor, predecessor_reports=predecessor_reports)
-        return {'status': 'historical' if receipt['disposition'] == 'stale' else 'conflict' if receipt['disposition'] == 'conflict' else 'success',
+        result = {'status': 'historical' if receipt['disposition'] == 'stale' else 'conflict' if receipt['disposition'] == 'conflict' else 'success',
                 'reason': 'stale_authority' if receipt['disposition'] == 'stale' else 'outcome_reconciliation_required' if receipt['disposition'] == 'conflict' else '',
                 **receipt, 'acceptance': 'not_inferred', 'provenance': 'external_agent_report'}
+        if current:
+            updated = self._snapshot(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])
+            frontier = self._todo(updated)
+            result.update(repository_review=updated['repository_review'], next_gate=frontier.get('next_gate'))
+        else:
+            result['next_gate'] = self._history_route(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])
+        return result
 
     def _reconcile(self, snapshot, payload):
         fields(payload, {'report_key', 'expected_spec_revision', 'expected_plan_revision', 'rationale'}, 'reconcile_outcome')

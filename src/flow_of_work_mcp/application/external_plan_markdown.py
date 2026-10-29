@@ -21,6 +21,31 @@ def _label(key: object) -> str:
     return safe_heading(str(key).replace('_', ' ')).capitalize()
 
 
+def repository_review_summary(review: Mapping[str, Any]) -> dict[str, Any]:
+    """Pure presentation of issued review facts; full rows remain machine data."""
+    summary = {key: review[key] for key in (
+        'contract_version', 'engineering_cycle_version', 'required', 'state',
+        'scope_id', 'requirement_ids', 'basis_fingerprint', 'latest_audit_id',
+        'source', 'complete', 'retrospective_recorded', 'semantic_truth_verified',
+        'human_acceptance', 'diagnostic', 'next_gate', 'change_id', 'packet_id',
+        'expected_basis_fingerprint', 'source_identity', 'source_revision',
+    ) if key in review}
+    summary['coverage'] = [
+        {key: row[key] for key in ('dimension', 'state') if key in row}
+        for row in (review.get('coverage') or ()) if isinstance(row, Mapping)
+    ]
+    summary['coverage_count'] = len(summary['coverage'])
+    summary['coverage_detail'] = (
+        'Full original audit rationale and evidence references remain in the structured '
+        'original_audit.repository_review body returned by fow_get_job. Current validation '
+        'is a separate comparison and may reference a newer audit.'
+        if review.get('contract_version') == 'flow.repository-review.v1' else
+        'Full rationale and evidence references remain in structured content. '
+        'Read fow_external_work validation with detail=full for explicit review and original report history.'
+    )
+    return summary
+
+
 def _section(lines: list[str], title: str, level: int = 2) -> None:
     lines.extend(['', '#' * min(level, 6) + ' ' + safe_heading(title), ''])
 
@@ -179,6 +204,7 @@ def render_plan(
         'packet_specification_revision': projection['spec_revision'], 'plan_revision': projection['plan_revision'],
         'authority_fingerprint': projection['authority_fingerprint'], 'projection_contract': projection['contract_version'],
         'consumer_scope': projection['consumer_scope'], 'validation': projection['status'],
+        'engineering_cycle_version': snapshot.get('engineering_cycle_version'),
         'repository_source_revision': packet.get('source_revision') or 'not declared; inspect the supplied repository before effects',
     })
     _section(lines, 'Intent and scope')
@@ -278,6 +304,25 @@ def render_plan(
         lines.append('Semantic plan closure is current. Implementation, verification and human acceptance are still separate obligations.')
     _section(lines, 'Offline execution and reconciliation')
     lines.extend([
+        'Follow the provider-agnostic engineering cycle: recover current authority, investigate the repository, use adopted architecture, execute authorized work, record outcomes and reconcile the affected scope. The host owns the loop; no internal model or technical provider is required.', '',
+        'Flower is canonical for project components, interfaces and governing decisions. Repository Markdown may explain or export a named Flower revision; it is not replacement architecture authority. Investigate existing software before proposing new implementation. A planned requirement or absent current report alone does not establish missing code.', '',
+        'At a packet/increment boundary, compare scoped requirements, selected architecture, grounding, verification and original outcomes with the observed repository. Preserve actual source identity/revision and original proof pins. Distinguish missing canonical data, historical evidence on its pin, compatibility needing review and an unmet current obligation. Record only demonstrated differences through ordinary canonical mutations; never rewrite intent to justify code or automatically relabel historical tests for new authority.', '',
+    ])
+    if snapshot.get('engineering_cycle_version') == 1:
+        lines.extend([
+            'This issued plan uses engineering cycle version1. After unit outcomes, final closure and affected dependent work require a current bounded repository review. Implemented work and local verification remain facts while review is open; human acceptance remains separate.', '',
+            'Collect review observations and evidence offline. On reconnection, report outcomes using their original issued authority, then read current fow_external_work validation with detail=full to obtain repository_review.scope_id, requirement_ids and basis_fingerprint. Use those issued values for fow_audit_phase; do not invent a scope or reuse the pre-work basis after relevant outcomes changed.', '',
+            'The repository_review object uses contract_version=flow.repository-review.v1, change_id, packet_id, expected_basis_fingerprint, source_identity, source_revision and coverage. Coverage has exactly five unique dimensions: requirements, architecture, grounding, verification, outcomes. Each row contains dimension, state, rationale and evidence_refs. Actual actor/request_id are required. Copy the current known IDs above and retain actual source/evidence provenance.', '',
+            'Coverage states are aligned, reconciled, historical_on_pin, authority_missing, compatibility_review, current_obligation, unknown and not_applicable. aligned/reconciled/historical_on_pin require evidence references. Only aligned/reconciled satisfy applicable current dimensions. historical_on_pin records retrospective bookkeeping, not current closure; unknown or truncated coverage is not complete. not_applicable requires actual absence of canonical objects for that dimension, not a convenient waiver.', '',
+        ])
+    else:
+        lines.extend([
+            'This plan retains historical issued authority without engineering cycle version1. It is not silently enrolled in the new closure gate. A voluntary bounded review can record observations while preserving original outcome provenance and current ordinary guards.', '',
+        ])
+    lines.extend([
+        'Save an interruption handover even when review remains open, with unresolved obligations visible. If new intent or missing mutation authority prevents continuation offline, stop affected effects and retain the observations for recovery. A completed review never verifies the filesystem automatically or grants human acceptance.', '',
+    ])
+    lines.extend([
         'Execute with your own repository, coding, build and test tools. Flower can remain offline. Do not treat future paths/symbols as existing evidence. Finish a producer and its local checks before consuming its declared output.', '',
         'Retain this original authority fingerprint and revisions. On reconnection, use fow_external_work report_outcome for each unit in dependency order. A report contains report_key, expected_spec_revision, expected_plan_revision, authority_fingerprint, unit_key, outcome, summary, source_revision, artifacts, produced_contracts, verification and unresolved.', '',
         'Artifacts: reference, description, optional sha256. Produced contracts: name and included artifact_ref. Verification: exact declared criterion, kind and statement; status pass/fail/not_run; evidence_ref and provenance. A complete report requires every local check to pass, every produced contract to reference an artifact, and no unresolved unit obligations. Deferred campaign/Oracle checks remain deferred.', '',
@@ -315,13 +360,13 @@ def render_plan(
     return '\n'.join(lines).rstrip() + '\n'
 
 
-def render_external_result(result: Mapping[str, Any], *, inspection: bool = False) -> str:
+def render_external_result(result: Mapping[str, Any], *, inspection: bool = False, full_review: bool = False) -> str:
     """Select human work sections from an existing public structured result."""
     nested = result.get('packet')
     if inspection and isinstance(nested, Mapping) and (nested.get('consumption_mode') == 'external_agent' or 'external_work' in nested):
         # Canonical fow_packet_inspect wraps its aggregate in result.packet.
         # That aggregate itself contains the semantic packet and working sheet.
-        lines = [render_external_result(nested, inspection=True)]
+        lines = [render_external_result(nested, inspection=True, full_review=full_review)]
         residual = {key: value for key, value in result.items() if key != 'packet'}
         if residual:
             _section(lines, 'Receipt details')
@@ -334,6 +379,12 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
     _record(lines, {key: result[key] for key in identity_fields if key in result})
     lines.append('Agent completion, local verification, deferred verification and human acceptance are separate. Host reports do not provide provider attestation.')
     handled = set(identity_fields)
+    if isinstance(result.get('repository_review'), Mapping):
+        _section(lines, 'Repository and lifecycle reconciliation')
+        review = result['repository_review']
+        _record(lines, review if full_review else repository_review_summary(review))
+        lines.append('Repository observations are host-declared. Missing canonical data or current reports do not establish missing code; historical evidence retains its original authority.')
+        handled.add('repository_review')
     if inspection:
         for key, title in (('packet', 'Packet scope'), ('working_sheet', 'Packet working sheet'), ('engineering_questions', 'Engineering questions'), ('summary', 'Inspection summary')):
             value = result.get(key)
@@ -359,7 +410,7 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
                 handled.add(key)
         if isinstance(result.get('external_work'), Mapping):
             _section(lines, 'External work frontier')
-            lines.append(render_external_result(result['external_work']))
+            lines.append(render_external_result(result['external_work'], full_review=full_review))
             handled.add('external_work')
     todos = result.get('todos')
     if isinstance(todos, list):
@@ -381,7 +432,11 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
     validation = result.get('validation')
     if isinstance(validation, Mapping):
         _section(lines, 'Packet validation projection')
-        _record(lines, {key: value for key, value in validation.items() if key not in {'criteria', 'units'}})
+        _record(lines, {key: value for key, value in validation.items() if key not in {'criteria', 'units', 'repository_review'}})
+        if isinstance(validation.get('repository_review'), Mapping):
+            _section(lines, 'Repository and lifecycle reconciliation', 3)
+            review = validation['repository_review']
+            _record(lines, review if full_review else repository_review_summary(review))
         if validation.get('criteria'):
             _section(lines, 'Criterion coverage')
             for criterion in validation['criteria']:
@@ -400,12 +455,15 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
     for key, title in (
         ('packet_dependencies', 'Canonical predecessor readiness'), ('deferred_verification', 'Deferred verification'),
         ('criterion_traceability', 'Criterion evidence'), ('historical_reports', 'Historical reports'),
+        ('report_history', 'Original report history'), ('history_page', 'Report history completeness'),
         ('engineer_gate', 'Current engineer gate'), ('remediation_context', 'Corrective lineage and reassessment context'),
     ):
         if key in result:
             _section(lines, title)
             _record(lines, result[key])
             handled.add(key)
+    if 'report_history' in result or result.get('historical_reports'):
+        lines.append('Historical records describe their original pin and provenance. Compatibility review or missing current authority does not authorize replay, replacement fingerprints or reimplementation.')
     for key in ('next_gate', 'gate', 'next_action'):
         if key in result:
             _section(lines, 'Next authorized operation' if key == 'next_gate' else _label(key))

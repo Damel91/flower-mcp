@@ -10,6 +10,8 @@ from flow_of_work_mcp import (ChangeControlService, GovernedChangeDraft, Impleme
 from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
+from tests.engineering_cycle_support import record_test_repository_review
+from tests.engineering_cycle_support import adopt_minimal_architecture
 
 
 def fixture(tmp_path):
@@ -19,6 +21,7 @@ def fixture(tmp_path):
     requirement = requirements.register('alpha', RequirementDraft(
         title='Exact producer consumer handoff', statement='A producer shall expose increment and a consumer shall use it.',
         category='functional', rationale='The offline task must preserve a declared protocol.'), actor='human')
+    architecture_refs = adopt_minimal_architecture(ledger)
     changes = ChangeControlService(ledger)
     change = changes.create_change('alpha', GovernedChangeDraft(title='Offline task', rationale='Bounded standalone trial',
                                                                requirement_ids=(requirement['requirement_id'],)), actor='human')
@@ -26,7 +29,8 @@ def fixture(tmp_path):
         title='Increment protocol', objective='Produce increment and a client.', rationale='An exact producer contract drives the consumer.',
         completion_criteria=('increment preserves its exact arithmetic contract', 'consumer calls increment'),
         requirement_ids=(requirement['requirement_id'],), in_scope=('src/increment.py and src/client.py',),
-        invariants=('increment takes one integer and returns its successor',), out_of_scope=('Packaging/publication',)), actor='human')['packets'][0]
+        invariants=('increment takes one integer and returns its successor',), out_of_scope=('Packaging/publication',),
+        architecture_refs=architecture_refs), actor='human')['packets'][0]
     service = ExternalWorkService(ledger)
     ids = ('alpha', change['change_id'], packet['packet_id'])
     service.call(*ids, 'upgrade_validation', actor='human', request_id='upgrade',
@@ -101,6 +105,8 @@ def test_dependency_frontier_report_restart_offline_replay_and_deferred_gate(tmp
     assert use['provenance'] == 'external_agent_report'
     consumer = report(resumed, ids, revs, 'consumer', report_key='consumer-1')
     resumed.call(*ids, 'report_outcome', actor='agent', request_id='outcome-2', payload=consumer)
+    assert resumed.todo(*ids)['next_gate']['tool'] == 'fow_audit_phase'
+    record_test_repository_review(reopened, ids)
     complete = resumed.todo(*ids)
     assert complete['current_unit'] is None
     assert complete['next_gate']['external_operation'] == 'obtain_deferred_verification'

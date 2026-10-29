@@ -289,8 +289,15 @@ class LifecycleStoreMixin:
                     (audit.project_id, str(request_id)),
                 ).fetchone()
                 if existing is not None:
+                    stored = self._phase_audit_value(connection, int(existing["phase_audit_id"]))
+                    if (audit.repository_review is not None or stored.get("repository_review") is not None) and (
+                        stored.get("request_fingerprint") != audit.request_fingerprint
+                        or stored.get("created_by") != actor
+                        or stored.get("repository_review") != audit.repository_review
+                    ):
+                        raise RequirementConflictError("phase_audit_request_conflict")
                     return self._phase_audit_to_domain(
-                        self._phase_audit_value(connection, int(existing["phase_audit_id"]))
+                        stored
                     )
             if audit.previous_audit_id is not None:
                 previous = connection.execute(
@@ -369,6 +376,9 @@ class LifecycleStoreMixin:
                     "snapshot_count": len(audit.snapshots),
                     "delta_count": len(audit.deltas),
                     "policy_version": audit.policy_version,
+                    **({"repository_review": dict(audit.repository_review),
+                        "request_fingerprint": audit.request_fingerprint}
+                       if audit.repository_review is not None else {}),
                 },
                 occurred_at=occurred_at,
             )
@@ -401,7 +411,8 @@ class LifecycleStoreMixin:
                 """,
                 (project_id, required_text(scope_id, "scope_id")),
             ).fetchall()
-            return [self._phase_audit_value(connection, int(row["phase_audit_id"])) for row in records]
+            reviews = self._phase_audit_review_payloads(connection, project_id)
+            return [self._phase_audit_value(connection, int(row["phase_audit_id"]), reviews) for row in records]
 
     def all_phase_audits(self, project_id: str) -> list[Mapping[str, object]]:
         with self._read_connection() as connection:
@@ -414,7 +425,58 @@ class LifecycleStoreMixin:
                 """,
                 (project_id,),
             ).fetchall()
-            return [self._phase_audit_value(connection, int(row["phase_audit_id"])) for row in records]
+            reviews = self._phase_audit_review_payloads(connection, project_id)
+            return [self._phase_audit_value(connection, int(row["phase_audit_id"]), reviews) for row in records]
+
+    def phase_audit_request_replay(self, project_id, request_id, request_fingerprint):
+        """Return a reserved exact job; never reuse an unrelated/legacy request."""
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            rows = connection.execute(
+                "SELECT payload_json FROM requirement_events WHERE project_id=? "
+                "AND event_type='phase_audit_requested' AND request_id=? ORDER BY event_id",
+                (project_id, request_id)).fetchall()
+            if rows:
+                payload = json.loads(rows[0]["payload_json"])
+                if len(rows) != 1 or payload.get("request_fingerprint") != request_fingerprint:
+                    raise RequirementConflictError("phase_audit_request_conflict")
+                return self._job_row(connection, project_id, payload["job_id"])
+            if connection.execute("SELECT 1 FROM jobs WHERE project_id=? AND request_id=?",
+                                  (project_id, request_id)).fetchone() is not None:
+                raise RequirementConflictError("phase_audit_request_conflict")
+            return None
+
+    def reserve_phase_audit_request(self, project_id, *, request_id, actor,
+                                   request_fingerprint, job_id, repository_review):
+        with self._transaction() as connection:
+            self._ensure_project(connection, project_id)
+            self._append_event(connection, project_id=project_id, requirement_id=None,
+                event_type="phase_audit_requested", actor=actor, request_id=request_id,
+                payload={"request_fingerprint": request_fingerprint, "job_id": job_id,
+                         "change_id": repository_review["change_id"],
+                         "packet_id": repository_review["packet_id"]}, occurred_at=_utc_now())
+
+    def phase_audit_request_context(self, project_id, request_id):
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            row = connection.execute("SELECT payload_json,actor,request_id FROM requirement_events WHERE project_id=? "
+                "AND event_type='phase_audit_requested' AND request_id=? ORDER BY event_id LIMIT 1",
+                (project_id, request_id)).fetchone()
+            return {**json.loads(row["payload_json"]), "actor": row["actor"],
+                    "request_id": row["request_id"]} if row is not None else None
+
+    def phase_audit_record_replay(self, project_id, *, request_id, actor, request_fingerprint):
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            row = connection.execute("SELECT phase_audit_id,created_by FROM phase_audits "
+                "WHERE project_id=? AND request_id=? ORDER BY phase_audit_id LIMIT 1",
+                (project_id, request_id)).fetchone()
+            if row is None:
+                return None
+            value = self._phase_audit_value(connection, int(row["phase_audit_id"]))
+            if value.get("request_fingerprint") != request_fingerprint or row["created_by"] != actor:
+                raise RequirementConflictError("phase_audit_request_conflict")
+            return self._phase_audit_to_domain(value)
 
     def record_validation_audit(
         self,
@@ -574,9 +636,20 @@ class LifecycleStoreMixin:
         return value
 
     @staticmethod
+    def _phase_audit_review_payloads(connection, project_id):
+        result = {}
+        for row in connection.execute("SELECT payload_json FROM requirement_events WHERE project_id=? "
+            "AND event_type='phase_audit_recorded' ORDER BY event_id", (project_id,)):
+            payload = json.loads(row["payload_json"])
+            if payload.get("repository_review") is not None:
+                result[int(payload["phase_audit_id"])] = payload
+        return result
+
+    @staticmethod
     def _phase_audit_value(
         connection: sqlite3.Connection,
         phase_audit_id: int,
+        review_payloads=None,
     ) -> Mapping[str, object]:
         row = connection.execute(
             """
@@ -621,6 +694,11 @@ class LifecycleStoreMixin:
             deltas.append(delta)
         value["snapshots"] = snapshots
         value["deltas"] = deltas
+        if review_payloads is None:
+            review_payloads = LifecycleStoreMixin._phase_audit_review_payloads(connection, value["project_id"])
+        payload = review_payloads.get(phase_audit_id, {})
+        value["repository_review"] = payload.get("repository_review")
+        value["request_fingerprint"] = payload.get("request_fingerprint", "")
         return value
 
     @staticmethod
@@ -660,6 +738,8 @@ class LifecycleStoreMixin:
             deltas=deltas,
             policy_version=str(value["policy_version"]),
             audit_id=int(value["phase_audit_id"]),
+            repository_review=value.get("repository_review"),
+            request_fingerprint=str(value.get("request_fingerprint", "")),
         )
 
     def _ledger_version(self, connection: sqlite3.Connection, project_id: str) -> int:

@@ -183,6 +183,8 @@ class GoalHookProjectionService:
                 ),
                 "scope": dict(_mapping(next_gate.get("scope"))),
             },
+            **({"repository_review": _review_anchor(snapshot["repository_review"])}
+               if isinstance(snapshot.get("repository_review"), Mapping) else {}),
             "unresolved_obligations": _unresolved_obligations(
                 snapshot=snapshot,
                 next_gate=next_gate,
@@ -247,12 +249,32 @@ def _role_summary(value: Mapping[str, object]) -> Mapping[str, object]:
     }
 
 
+def _review_anchor(review: Mapping[str, object]) -> Mapping[str, object]:
+    """Keep bounded existing review facts in the host's factual re-anchor."""
+    return {
+        **_selected_fields(review, (
+            "contract_version", "engineering_cycle_version", "required", "state",
+            "scope_id", "basis_fingerprint", "source", "complete",
+            "retrospective_recorded", "semantic_truth_verified", "human_acceptance",
+        )),
+        "coverage": [
+            _selected_fields(row, ("dimension", "state"))
+            for row in list(review.get("coverage") or ())[:5]
+            if isinstance(row, Mapping)
+        ],
+    }
+
+
 def _unresolved_obligations(
     *,
     snapshot: Mapping[str, object],
     next_gate: Mapping[str, object],
 ) -> list[Mapping[str, object]]:
     result: list[Mapping[str, object]] = []
+    review = _mapping(snapshot.get("repository_review"))
+    if review.get("required") and not review.get("complete"):
+        result.append({"kind": "repository_reconciliation",
+                       **_selected_fields(review, ("state", "scope_id", "basis_fingerprint"))})
     for item in list(snapshot.get("blockers") or ()):
         if isinstance(item, Mapping):
             result.append(

@@ -169,6 +169,11 @@ class ProjectStateSnapshotService:
                 packet_lifecycle=packet_lifecycle,
                 provider_enabled=self._provider_enabled,
             )
+            external_frontier = packet_lifecycle.get("external_work")
+            repository_review = (
+                external_frontier.get("repository_review")
+                if isinstance(external_frontier, Mapping) else None
+            )
             all_goal_reach = context.goal_reach()
             focused_goal_reach = context.focus_goal_reach(
                 all_goal_reach, focus, primary_action
@@ -247,6 +252,8 @@ class ProjectStateSnapshotService:
             "focus": dict(focus),
             "goal_reach": goal_projection,
             "active_work": active_work,
+            **({"repository_review": dict(repository_review)}
+               if isinstance(repository_review, Mapping) else {}),
             "next_gate": next_gate,
             "secondary_actions": secondary_actions,
             "blockers": blockers["items"],
@@ -755,6 +762,19 @@ class _SnapshotContext:
                     },
                 }
             )
+            refs.append(
+                {
+                    "kind": "repository_review_and_original_reports",
+                    "tool": "fow_external_work",
+                    "arguments": {
+                        "project_id": self.project_id,
+                        "change_id": active["change_id"],
+                        "packet_id": active["packet_id"],
+                        "operation": "validation",
+                        "payload": {"detail": "full"},
+                    },
+                }
+            )
             for kind, view in (
                 ("packet_gate", "gates"), ("packet_questions", "working_sheet")
             ):
@@ -1098,6 +1118,8 @@ def _next_gate(
             "required_inputs": [
                 str(item) for item in action.get("required_inputs", [])
             ],
+            **({"repository_review_template": dict(action["repository_review_template"])}
+               if isinstance(action.get("repository_review_template"), Mapping) else {}),
         }
     else:
         route = {
@@ -1129,6 +1151,10 @@ def _gate_kind(
     reason: str,
     traceability: Mapping[str, object],
 ) -> str:
+    if action_kind == "repository_reconciliation":
+        return "repository_reconciliation"
+    if action_kind in {"architecture_required", "architecture_authority"}:
+        return "architecture_authority"
     if action_kind == "external_validation":
         return "packet_construction"
     if action_kind in {"external_todo", "external_reconcile"}:

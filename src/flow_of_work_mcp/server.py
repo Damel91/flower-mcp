@@ -122,6 +122,7 @@ SERVER_INSTRUCTIONS = (
     "The agent owns repository investigation, coding, builds and tests; Flower owns lifecycle authority. "
     "Call fow_interaction first with the host-provided interaction session "
     "reference; select one project and work area, then use its bounded frame. "
+    "Follow the provider-agnostic-engineering-cycle recipe and current next gate at work completion and context recovery. "
     "Use fow_capabilities only for expert contract or recipe inspection. "
     "Use fow_packet_author/inspect/advance for packet work and "
     "fow_campaign_author/inspect/advance for verification campaigns. "
@@ -131,6 +132,8 @@ SERVER_INSTRUCTIONS = (
     "an asynchronous operation has returned a durable job_id. "
     "Use fow_external_work for explicit external-agent mode, standalone plan validation, complete offline Markdown export and outcome reconciliation. "
     "Use fow_architecture for adopted project components, interfaces and decisions pinned by ordinary packet references. "
+    "Keep architecture canonical in Flower; repository Markdown is explanatory or a revision-linked export. "
+    "At the bounded work boundary compare the repository with scoped authority and original evidence, then record repository_review through fow_audit_phase. Missing registrations or historical reports do not prove missing implementation. "
     "Use fow_external_work select_executor and negotiate_provider for new explicitly selected provider work; compatible v3 acknowledgements are required for enriched delivery. "
     "Use fow_bindings for portable associations and fow_semantic for explicit bounded assignments; internal models and implementation providers are optional. "
     "Core operations never invoke inference automatically. Agent completion, verification and human acceptance are separate."
@@ -745,9 +748,8 @@ def handle_capabilities(
             "preferred_entrypoint": "fow_interaction",
             "interaction_contract": "flow.interaction-frame.v1",
             "orientation": (
-                "Flower MCP supports standalone lifecycle planning for external coding agents. "
-                "Select one explicit project and work area, then follow the current frame or exact operation help. "
-                "Use standalone-external-plan, portable-associations and host-semantic-assignment recipes for independent operation."
+                "Select a project and work area through fow_interaction; follow its current frame. "
+                "Read one named recipe or exact operation contract when needed."
             ),
             "standalone": {
                 "core_requires_inference": False,
@@ -4347,11 +4349,24 @@ def handle_audit_phase(
     actor: str,
     requirement_ids: list[str] | None = None,
     request_id: str = "",
+    repository_review: dict[str, object] | None = None,
 ) -> dict[str, object]:
     def submit() -> dict[str, object]:
+        if repository_review is not None and requirement_ids is not None and not isinstance(requirement_ids, list):
+            raise InputValidationError("Review requirement_ids must be the exact derived list.",
+                field="requirement_ids", received_value=requirement_ids,
+                details={"scope_id": scope_id, "resolution": "Copy requirement_ids from full packet validation, including an explicit empty list when applicable."})
         scope = PhaseAuditScope(
             scope_id, _require_string_list(requirement_ids or [], "requirement_ids")
         )
+
+        if repository_review is not None:
+            from flow_of_work_mcp.application.engineering_cycle import RepositoryReviewService
+            job = RepositoryReviewService(runtime.ledger).submit(project_id, scope, repository_review,
+                actor=actor, request_id=request_id, jobs=runtime.jobs, lifecycle=runtime.lifecycle)
+            return envelope(tool="fow_audit_phase", status="success", result={"job": _job_view(job), "next_tool_call": {"tool": "fow_get_job",
+                "arguments": {"project_id": project_id, "job_id": job.job_id}}},
+                            audit_reference={"job_id": job.job_id})
 
         def operation() -> Mapping[str, object]:
             try:
@@ -4369,21 +4384,49 @@ def handle_audit_phase(
                 "delta_count": len(audit.deltas),
             }
 
-        job = runtime.jobs.submit(
-            project_id=project_id,
-            kind="audit_phase",
-            actor=actor,
-            request_id=request_id,
-            operation=operation,
-        )
+        from flow_of_work_mcp.core.domain.jobs import JobRecord
+        job = None
+        if request_id:
+            with runtime.ledger.atomic():
+                if runtime.ledger.phase_audit_request_context(project_id, request_id) is not None:
+                    raise RequirementConflictError("phase_audit_request_conflict")
+                job = runtime.ledger.create_job(JobRecord(project_id=project_id, kind="audit_phase",
+                    created_by=actor, request_id=request_id))
+        if job is None or job.status.value == "queued":
+            job = runtime.jobs.submit(project_id=project_id, kind="audit_phase", actor=actor,
+                request_id=request_id, operation=operation)
         return envelope(
             tool="fow_audit_phase",
             status="success",
-            result={"job": _job_view(job)},
+            result={"job": _job_view(job), "next_tool_call": {"tool": "fow_get_job",
+                "arguments": {"project_id": project_id, "job_id": job.job_id}}},
             audit_reference={"job_id": job.job_id},
         )
 
-    return _guard("fow_audit_phase", submit)
+    def recovery():
+        if not isinstance(repository_review, Mapping):
+            return {"next_tool_call": {"tool": "fow_capabilities", "arguments": {"view": "operation",
+                "operation_tool": "fow_audit_phase", "operation_name": "call"}}}
+        from flow_of_work_mcp.application.engineering_cycle import RepositoryReviewService
+        result = {"scope_id": scope_id, "resolution": "Use exact current review scope/basis, preserve the original request identity, and supply real host evidence."}
+        reservation = runtime.ledger.phase_audit_request_context(project_id, request_id) if request_id else None
+        if reservation is not None:
+            result["diagnostics"] = [{"code": "phase_audit_request_conflict", "field": "request_id",
+                "scope_id": scope_id, "message": "This request identity is already bound to its original actor, scope and review contents.",
+                "resolution": "Inspect the original job. Preserve its request for exact replay; use a new identity only for a new grounded review."}]
+            result["next_tool_call"] = {"tool": "fow_get_job", "arguments": {
+                "project_id": project_id, "job_id": reservation["job_id"]}}
+            return result
+        change, packet = repository_review.get("change_id"), repository_review.get("packet_id")
+        if isinstance(change, str) and isinstance(packet, str):
+            result["next_tool_call"] = RepositoryReviewService.read_call(project_id, change, packet)
+            try:
+                result["repository_review"] = RepositoryReviewService(runtime.ledger).context(project_id, change, packet)
+            except (ValueError, LifecycleError):
+                pass
+        return result
+
+    return _guard("fow_audit_phase", submit, recovery=recovery if repository_review is not None else None)
 
 
 def handle_what_next(
@@ -4695,14 +4738,16 @@ def handle_ground_intent(
 def handle_get_job(
     runtime: McpRuntime, *, project_id: str, job_id: str
 ) -> dict[str, object]:
-    return _guard(
-        "fow_get_job",
-        lambda: envelope(
-            tool="fow_get_job",
-            status="success",
-            result={"job": _job_view(runtime.jobs.get(project_id, job_id))},
-        ),
-    )
+    def read():
+        job = runtime.jobs.get(project_id, job_id)
+        result = {"job": _job_view(job)}
+        if job.kind == "audit_phase":
+            from flow_of_work_mcp.application.engineering_cycle import RepositoryReviewService
+            recovery = RepositoryReviewService(runtime.ledger).job_recovery(project_id, job)
+            if recovery is not None:
+                result.update(recovery)
+        return envelope(tool="fow_get_job", status="success", result=result)
+    return _guard("fow_get_job", read)
 
 
 def handle_list_jobs(runtime: McpRuntime, *, project_id: str) -> dict[str, object]:
@@ -4784,14 +4829,17 @@ def handle_semantic(
     standard_profile: str = "", assignment_id: str = "",
     result: Mapping[str, object] | None = None, executor_ref: str = "",
     goal_node_ids: list[str] | None = None, host_evidence: Mapping[str, object] | None = None,
-    source_revision: str = "", actor: str = "", request_id: str = "",
+    source_revision: str = "", actor: str = "", request_id: str = "", requirement_ids: list[str] | None = None,
 ) -> dict[str, object]:
     def run() -> dict[str, object]:
+        if requirement_ids is not None and operation != "prepare":
+            raise InputValidationError("requirement_ids applies only to host intention-grounding preparation",
+                                       field="requirement_ids", received_value=requirement_ids)
         service = runtime.semantic_assignments
         if operation == "inventory":
             value = service.inventory(project_id)
         elif operation == "prepare":
-            value = service.prepare(project_id, role=role, execution_mode=execution_mode, source_path=source_path, standard_profile=standard_profile, goal_node_ids=tuple(goal_node_ids or []), host_evidence=host_evidence, source_revision=source_revision, actor=actor, request_id=request_id)
+            value = service.prepare(project_id, role=role, execution_mode=execution_mode, source_path=source_path, standard_profile=standard_profile, goal_node_ids=tuple(goal_node_ids or []), host_evidence=host_evidence, source_revision=source_revision, actor=actor, request_id=request_id, requirement_ids=requirement_ids)
         elif operation == "inspect":
             value = service.inspect(project_id, assignment_id)
         elif operation == "submit":
@@ -5519,6 +5567,7 @@ def create_app(
         actor: str,
         requirement_ids: list[str] | None = None,
         request_id: str = "",
+        repository_review: dict[str, object] | None = None,
     ) -> dict[str, object]:
         return handle_audit_phase(
             runtime,
@@ -5527,6 +5576,7 @@ def create_app(
             actor=actor,
             requirement_ids=requirement_ids,
             request_id=request_id,
+            repository_review=repository_review,
         )
 
     def fow_what_next(
@@ -5852,9 +5902,9 @@ def create_app(
         standard_profile: str = "", assignment_id: str = "",
         result: dict[str, Any] | None = None, executor_ref: str = "",
         goal_node_ids: list[str] | None = None, host_evidence: dict[str, Any] | None = None,
-        source_revision: str = "", actor: str = "", request_id: str = "",
+        source_revision: str = "", actor: str = "", request_id: str = "", requirement_ids: list[str] | None = None,
     ) -> dict[str, object]:
-        return handle_semantic(runtime, project_id=project_id, operation=operation, role=role, execution_mode=execution_mode, source_path=source_path, standard_profile=standard_profile, assignment_id=assignment_id, result=result, executor_ref=executor_ref, goal_node_ids=goal_node_ids, host_evidence=host_evidence, source_revision=source_revision, actor=actor, request_id=request_id)
+        return handle_semantic(runtime, project_id=project_id, operation=operation, role=role, execution_mode=execution_mode, source_path=source_path, standard_profile=standard_profile, assignment_id=assignment_id, result=result, executor_ref=executor_ref, goal_node_ids=goal_node_ids, host_evidence=host_evidence, source_revision=source_revision, actor=actor, request_id=request_id, requirement_ids=requirement_ids)
 
     handler_namespace = locals()
     assert_projector_registry(public_tool_names())

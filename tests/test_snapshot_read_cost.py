@@ -15,6 +15,7 @@ from flow_of_work_mcp.core.errors import ChangeControlBlockedError, ProjectNotFo
 from flow_of_work_mcp.mcp_runtime import build_runtime
 from flow_of_work_mcp.core.domain.assurance import ReviewFindingDraft
 from tests.test_external_work import fixture
+from tests.engineering_cycle_support import adopt_minimal_architecture
 import flow_of_work_mcp.application.external_work as external_module
 
 
@@ -32,6 +33,7 @@ def _basic_project(runtime):
 def dag_fixture(tmp_path, count=8):
     runtime = build_runtime(database_path=tmp_path / 'dag.sqlite', import_root=tmp_path)
     reqs, requirement, milestone = _basic_project(runtime)
+    architecture_refs = adopt_minimal_architecture(runtime.ledger)
     second = reqs.register('alpha', RequirementDraft(title='Shared scope',
         statement='The shared packet shall retain all recovery authority.', category='functional'), actor='fixture')
     changes = ChangeControlService(runtime.ledger)
@@ -45,7 +47,8 @@ def dag_fixture(tmp_path, count=8):
         packet = changes.add_packet('alpha', change['change_id'], ImplementationPacketDraft(
             title=f'Output {index}', objective=f'Produce output {index}.', rationale='A bounded shared predecessor.',
             completion_criteria=(f'Output {index} passes its check',),
-            in_scope=(f'src/output_{index}.py',), invariants=('Preserve predecessor authority.',)), actor='fixture')['packets'][-1]
+            in_scope=(f'src/output_{index}.py',), invariants=('Preserve predecessor authority.',),
+            architecture_refs=architecture_refs), actor='fixture')['packets'][-1]
         ids = ('alpha', change['change_id'], packet['packet_id'])
         for previous in packets[max(0, index-2):index]:
             changes.link_dependency(*ids, previous, actor='fixture')

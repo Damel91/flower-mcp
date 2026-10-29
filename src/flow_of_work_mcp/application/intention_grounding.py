@@ -13,7 +13,8 @@ from flow_of_work_mcp.core.domain.grounding import (
     GroundingAudit, GroundingDisposition, GroundingDivergence, GroundingItem,
     ImplementationAnchor, ImplementationGoalScope, ImplementationSnapshotRequest,
 )
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, ModelGatewayError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, ModelGatewayError
+from flow_of_work_mcp.core.domain.identifiers import validate_requirement_id
 from flow_of_work_mcp.core.ports import (
     GoalGraphRepository, GroundingAuditRepository, ImplementationGraphProvider,
     ModelGateway, ModelRequest, ModelResult, RequirementLedger,
@@ -96,7 +97,7 @@ class IntentionGroundingService:
     def provider_available(self):
         return self._provider is not None
 
-    def _authority(self, project_id, selected):
+    def _authority(self, project_id, selected, requirement_ids=None):
         graph = self._goals.goal_graph(project_id)
         nodes = {n['goal_node_id']: n for n in graph['nodes']}
         if set(selected) - set(nodes):
@@ -112,8 +113,32 @@ class IntentionGroundingService:
         fields = ('requirement_id', 'current_revision', 'title', 'category', 'statement', 'lifecycle_status', 'source_anchor')
         requirements = sorted([{k: r.get(k) for k in fields}
                                for r in self._requirements.traceability_matrix(project_id)], key=lambda r: r['requirement_id'])
+        if requirement_ids is not None:
+            identities = self._requirement_scope(requirement_ids)
+            if set(identities) - {row['requirement_id'] for row in requirements}:
+                raise InputValidationError('selected requirements do not belong to project', field='requirement_ids',
+                    received_value=requirement_ids, details={'project_id': project_id,
+                    'resolution': 'Inspect canonical requirement IDs in this project and select only the intended existing scope.'})
+            requirements = [row for row in requirements if row['requirement_id'] in identities]
         return {'project_id': project_id, 'goals': goals, 'candidates': candidates,
                 'edges': edges, 'requirements': requirements}
+
+    @staticmethod
+    def _requirement_scope(value):
+        def invalid(message):
+            return InputValidationError(message, field='requirement_ids', received_value=value,
+                details={'resolution': 'Supply0..128 unique existing same-project requirement IDs; [] selects none and omission selects the broad project scope.'})
+        if not isinstance(value, list) or len(value) > 128:
+            raise invalid('requirement_ids must be a list of at most128 unique same-project requirement IDs')
+        if any(not isinstance(item, str) for item in value):
+            raise invalid('selected requirement IDs must be strings')
+        try:
+            identities = [validate_requirement_id(item) for item in value]
+        except ValueError as exc:
+            raise invalid(str(exc)) from exc
+        if len(identities) != len(set(identities)):
+            raise invalid('selected requirement IDs must be unique')
+        return sorted(identities)
 
     def _selected(self, ids):
         if not isinstance(ids, (list, tuple)) or not 1 <= len(ids) <= self._policy.max_goal_nodes:
@@ -176,9 +201,13 @@ class IntentionGroundingService:
                 'source_revision': _text(receipt['source_revision'], 'source_revision'),
                 'truncated': receipt['truncated'], 'anchors': [asdict(a) for a in anchors]}
 
-    def prepare(self, project_id, *, goal_node_ids, execution_mode, host_evidence=None, source_revision=''):
+    def prepare(self, project_id, *, goal_node_ids, execution_mode, host_evidence=None, source_revision='', requirement_ids=None):
         selected = self._selected(goal_node_ids)
-        authority = self._authority(project_id, selected)
+        if requirement_ids is not None and execution_mode != 'host':
+            raise InputValidationError('explicit requirement scope is supported only for host grounding',
+                field='requirement_ids', received_value=requirement_ids,
+                details={'resolution': 'Use a host intention-grounding assignment for explicit scope, or omit the field for the existing internal contract.'})
+        authority = self._authority(project_id, selected, requirement_ids)
         if execution_mode == 'host':
             evidence = self.host_evidence(host_evidence)
             if source_revision and source_revision != evidence['source_revision']:
@@ -203,11 +232,17 @@ class IntentionGroundingService:
         else:
             raise ValueError("execution_mode must be host or internal")
         scope = self._scope(authority, evidence, provider_id, evidence_authority)
+        if requirement_ids is not None:
+            scope['requirement_scope'] = {
+                'mode': 'explicit', 'selected_count': len(authority['requirements']),
+                'project_count_as_of_preparation': len(self._requirements.traceability_matrix(project_id)),
+                'completeness': 'host_declared_for_selected_goals_not_whole_project',
+            }
         request = self._request(scope)
         if len(_json(asdict(request)).encode('utf-8')) > 512000:
             raise ChangeControlBlockedError('semantic_grounding_input_budget_exceeded')
         flow_fingerprint = _hash(authority)
-        return {'project_id': project_id, 'selected_goal_ids': list(selected),
+        preparation = {'project_id': project_id, 'selected_goal_ids': list(selected),
                 'source_revision': evidence['source_revision'], 'source_identity': evidence['source_identity'],
                 'evidence_authority': evidence_authority, 'provider_id': provider_id,
                 'flow_authority_fingerprint': flow_fingerprint, 'evidence_fingerprint': _hash(evidence),
@@ -223,6 +258,9 @@ class IntentionGroundingService:
                     + ('Coverage is bounded/truncated; omitted evidence has not been assessed.\n\n' if scope['input_truncated'] else '')
                     + '## Frozen context\n\n```json\n' + json.dumps(scope, indent=2, sort_keys=True) + '\n```\n\n'
                     + '## Exact output contract\n\n```json\n' + json.dumps(request.output_schema, indent=2, sort_keys=True) + '\n```\n'}
+        if requirement_ids is not None:
+            preparation['selected_requirement_ids'] = self._requirement_scope(requirement_ids)
+        return preparation
 
     def _scope(self, authority, evidence, provider_id, evidence_authority):
         requirements = authority['requirements'][:self._policy.max_requirements]
@@ -277,7 +315,8 @@ class IntentionGroundingService:
 
     def currentness_reason(self, preparation):
         try:
-            current = self._authority(preparation['project_id'], tuple(preparation['selected_goal_ids']))
+            current = self._authority(preparation['project_id'], tuple(preparation['selected_goal_ids']),
+                                      preparation.get('selected_requirement_ids'))
         except ValueError:
             return 'semantic_flow_authority_stale'
         if _hash(current) != preparation['flow_authority_fingerprint']:

@@ -47,6 +47,8 @@ Request one current recipe for the intended engineering activity:
 
 - Initial scenario and roadmap guidance:
   `fow_capabilities(view="recipe", recipe_name="engineering-bootstrap")`.
+- Canonical architecture, bounded completion and context recovery:
+  `fow_capabilities(view="recipe", recipe_name="provider-agnostic-engineering-cycle")`.
 - Repository work performed by your host coding tools:
   `fow_capabilities(view="recipe", recipe_name="standalone-external-plan")`.
 
@@ -80,8 +82,8 @@ Use a single clearly bounded section with these markers:
 <!-- flower-mcp:begin -->
 ## Flower MCP
 
-Flower owns canonical requirements, goals, milestones, changes, plans, findings,
-verification records, acceptance and durable handover. The coding agent and any
+Flower owns canonical requirements, goals, milestones, architecture, changes,
+plans, findings, verification records, acceptance and durable handover. The coding agent and any
 explicitly configured technical tools own repository investigation, code, builds,
 tests and Git effects. Follow this project's existing technical and user policies.
 
@@ -121,6 +123,32 @@ and explicit-authority verification remain separate obligations. Investigate and
 register missing technical decisions before closure; unknown intended behavior
 or unresolved semantic gaps stop affected work. Do not execute a draft export.
 
+### Keep governing architecture and bounded reconciliation in Flower
+
+Keep governing components, interfaces and technical decisions canonical in
+Flower through ordinary architecture proposal/adoption and packet references.
+Repository Markdown may explain or export a named revision; do not create a
+competing mutable architecture store. New plan acceptance requires an adopted
+nonempty architecture and valid selected references. Previously issued plans
+retain their original contract; do not rewrite their history to enroll them.
+
+At packet/increment completion and context reconstruction, follow the current
+`provider-agnostic-engineering-cycle` recipe. Compare the repository with scoped
+requirements, adopted architecture, Goal grounding, verification obligations and
+recorded outcomes. Distinguish implemented facts, missing registrations, evidence
+valid on its original revision, demonstrated drift and current obligations.
+Missing ledger data does not prove missing implementation. Reuse historical
+evidence with its original date, revision and provenance. Run new checks when
+changed behavior, failure or an unresolved concern requires them.
+
+Record the bounded host observation through the repository review next gate and
+its exact scope/basis. New external-agent cycle-1 work may have all unit outcomes
+complete while reconciliation is open; preserve those facts and resolve the
+review before final closure or dependent admission. Historical-on-pin evidence
+is not current closure, and a host declaration is not server-attested truth.
+Do not review after every tool call or request unnecessary repeated testing.
+Keep interrupted handovers and original reports recoverable with open gaps.
+
 ### Resolve semantic gaps before continuing
 
 Actively identify divergence from agreed behavior. Stop affected execution,
@@ -153,7 +181,9 @@ project-state snapshot. Follow its current next gate and refresh after lifecycle
 mutations. Inspect current state before retrying any uncertain effect.
 
 For new engineering scope, use the current `engineering-bootstrap` recipe.
-For host coding work, use `standalone-external-plan` and the current
+For architecture, bounded completion and context recovery, use
+`provider-agnostic-engineering-cycle`. For host coding work, use
+`standalone-external-plan` and the current
 `fow_external_work` contracts. Select external-agent mode only with current
 authority; consume dependency-ordered TODOs, perform authorized repository work,
 and report outcomes against the issued plan revision and fingerprint. Exported

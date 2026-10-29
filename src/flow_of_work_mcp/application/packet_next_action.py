@@ -20,6 +20,8 @@ _WORKSPACE_REVIEW_REQUIRED_INPUTS = tuple(
 
 
 _ROUTES: Mapping[str, tuple[str, str, str, tuple[str, ...]]] = {
+    "architecture_required": ("fow_architecture", "inspect", "semantic", ()),
+    "repository_reconciliation": ("fow_audit_phase", "call", "semantic", ()),
     "executor_select": ("fow_external_work", "select_executor", "semantic", ("payload.executor", "actor", "request_id")),
     "provider_negotiate": ("fow_external_work", "negotiate_provider", "semantic", ("actor", "request_id")),
     "provider_validation": ("fow_external_work", "provider_validation", "semantic", ()),
@@ -262,6 +264,14 @@ class PacketNextActionProjectionService:
             ) from exc
         if decision.next_operation == "revise_packet":
             required_inputs = _packet_metadata_inputs(decision)
+        review_gate = None
+        if decision.next_operation == "repository_reconciliation":
+            review = decision.repository_review
+            review_gate = review.get("next_gate") if isinstance(review, Mapping) else None
+            if not isinstance(review_gate, Mapping):
+                raise ValueError("repository review is missing its issued next gate")
+            tool, operation = str(review_gate["tool"]), str(review_gate["operation"])
+            required_inputs = tuple(str(value) for value in review_gate.get("required_inputs", ()))
         blocker = decision.blockers[0] if decision.blockers else None
         reason = (
             blocker.code
@@ -286,7 +296,7 @@ class PacketNextActionProjectionService:
             "decision_class": decision_class,
             "continuation_policy": continuation_policy,
             "reason": reason,
-            "arguments": _fixed_arguments(
+            "arguments": dict(review_gate["arguments"]) if review_gate is not None else _fixed_arguments(
                 tool,
                 operation,
                 project_id=project_id,
@@ -297,6 +307,10 @@ class PacketNextActionProjectionService:
                 decision_class=decision_class,
             ),
             "required_inputs": list(required_inputs),
+            **({"repository_review_template": dict(review_gate["repository_review_template"])}
+               if review_gate is not None and "repository_review_template" in review_gate else {}),
+            **({"engineering_recipe": "project-architecture-v1"}
+               if decision.next_operation == "architecture_required" else {}),
             "alternatives": [],
         }
 
@@ -341,6 +355,9 @@ def _fixed_arguments(
     plan_revision: int,
     decision_class: str,
 ) -> dict[str, object]:
+    if tool == "fow_architecture":
+        return {"project_id": project_id, "operation": operation,
+                "payload": {"revision": 0, "kind": "all", "offset": 0, "limit": 20}}
     if tool == "fow_packet_author":
         arguments: dict[str, object] = {
             "project_id": project_id,

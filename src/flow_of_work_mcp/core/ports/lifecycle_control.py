@@ -42,6 +42,11 @@ class LifecycleControlRepository(Protocol):
         request_id: str = "",
     ) -> PhaseAudit: ...
 
+    def phase_audit_record_replay(
+        self, project_id: str, *, request_id: str, actor: str,
+        request_fingerprint: str,
+    ) -> PhaseAudit | None: ...
+
     def latest_phase_audit(
         self, project_id: str, scope_id: str
     ) -> Mapping[str, object] | None: ...

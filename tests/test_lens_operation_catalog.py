@@ -188,7 +188,7 @@ def test_public_schema_help_and_markdown_keep_machine_catalog_separate(runtime):
         return tools, result, help_result
     tools, response, help_response = asyncio.run(inspect())
     assert len(tools) == 37
-    assert sum(len(tool.inputSchema["properties"]) for tool in tools) == 445
+    assert sum(len(tool.inputSchema["properties"]) for tool in tools) == 447
     interaction = next(tool for tool in tools if tool.name == "fow_interaction")
     operation_schema = interaction.inputSchema["properties"]["operation"]
     if "$ref" in operation_schema:

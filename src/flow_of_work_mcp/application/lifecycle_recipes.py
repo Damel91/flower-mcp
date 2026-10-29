@@ -64,6 +64,45 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             escalation_conditions=("intended behavior or scope remains unresolved after canonical reread and engineer investigation", "stakeholder explicitly requests architecture participation"),
             safety_notes=("Read fow_bootstrap guidance without bootstrap_id to discover the active cycle, latest guided cycle and current-work/active-roadmap/new-cycle routes. An active cycle is reused; terminal cycles remain history. Use existing scope authorization or obtain missing intent confirmation.", "Start with path=guided_engineering on a new or populated project; read guidance. Record only selected governing answers, keep private exploration private.", "Use ordinary canonical authoring, record_correspondence, roadmap with explicit milestone_ids, then confirm_roadmap using the displayed fingerprint and actual human confirmation_reference.", "Prepare accepted external plans/PVP for every confirmed milestone; complete closes initial preparation and hands off TODO execution. It never claims implementation completion.", "At a result checkpoint read fow_handover project_progress, then record_continuation with continue|review, current roadmap/progress fingerprints and the actual human reference.", "Architecture, implementation and reuse are engineer-owned by default. Investigate technical gaps yourself; use examples/consequences to help the stakeholder resolve intent. No arbitrary unit/question-count interruption or automatic model invocation.", "For implementation divergence, reread canonical requirement/Goal/scenario/milestone/change/packet intent, record intent reassessment and use ordinary finding-linked corrective work with regression evidence. New requested behavior requires ordinary intent revision and affected scope confirmation."),
         ),
+        "provider-agnostic-engineering-cycle": _recipe(
+            "provider-agnostic-engineering-cycle", "Engineering and reconciliation cycle",
+            area="project_bootstrap",
+            intent="Recover current authority, investigate the repository, adopt canonical architecture, execute bounded work and reconcile the affected lifecycle at natural work boundaries.",
+            authority_owner="Flower canonical architecture and lifecycle; host repository investigation, implementation and evidence",
+            authority_boundary="Flower validates declared scope, references and revision coherence. Repository observations remain host-declared; implemented work, current verification, reconciliation and human acceptance are distinct.",
+            semantic_decisions=(
+                "Which current intent and adopted architecture govern the affected work?",
+                "Does the repository show missing canonical data, historical evidence on its original pin, compatibility needing review, or an unmet current obligation?",
+                "Which demonstrated differences require ordinary architecture, grounding, evidence or corrective mutations?",
+                "Has the affected scope been reconciled against its final semantic basis before dependent work or closure?",
+            ),
+            evidence=(
+                "current interaction frame, project-state snapshot and issued packet authority",
+                "adopted components, interfaces and decisions selected by packet architecture_refs",
+                "original unit outcomes, source identity/revision and precisely attributed verification evidence",
+                "bounded repository review covering requirements, architecture, grounding, verification and outcomes",
+            ),
+            stop_conditions=(
+                "new executable plan lacks adopted architecture or current selected references",
+                "attempted final closure or affected dependent admission lacks current complete repository review",
+                "intended behavior or semantic authority is unresolved",
+            ),
+            escalation_conditions=(
+                "stakeholder intent or requested scope remains ambiguous after canonical investigation",
+                "stakeholder explicitly requests participation in architecture decisions",
+                "a concrete capability limit prevents the required investigation or evidence",
+            ),
+            safety_notes=(
+                "Compose engineering-bootstrap, project-architecture-v1 and standalone-external-plan; current frames and exact help provide executable arguments. The host owns the agent loop. No provider or internal model is required.",
+                "Flower is canonical for project components, interfaces and governing decisions. Investigate and use fow_architecture inspect/propose/adopt before newly accepting the affected work plan; ordinary packet architecture_refs select its governing entities. Repository Markdown may explain or export a named Flower revision; its presence is not adopted architecture.",
+                "At packet or increment completion, reconcile only the affected scope through the current fow_audit_phase repository_review contract. A recovered context requires another comparison when its relevant declared source or semantic basis changed, not after every tool or unit.",
+                "A planned requirement or missing current outcome does not prove absent code. Inspect historical reports through fow_external_work validation with detail=full. Preserve original source pins, revisions, fingerprints and provenance; never relabel old tests as evidence for new authority or rewrite completed features from the initial backlog.",
+                "Update canonical architecture, grounding, evidence and findings only for demonstrated differences. Resolve technical choices as the engineer; a behavior mismatch uses canonical rereading and finding-linked corrective work rather than changing intent to justify code.",
+                "Current admitted unit execution and outcome collection remain available while repository review is open. The review condition applies at final closure or affected dependent admission, not before the packet's own unit work. Historical issued plans remain historical authority; they are not silently enrolled or upgraded.",
+                "The phase audit retains traceability and a separate host-declared repository comparison. A no-change result still needs actual coverage and evidence references. historical_on_pin bookkeeping does not satisfy applicable current obligations, and unknown or truncated input is not complete.",
+                "An interrupted handover may retain an open review. Offline execution retains issued authority, original outcomes and review obligations; unresolved intent or authority stops affected effects until ordinary reconciliation is possible. A completed review never grants human acceptance.",
+            ),
+        ),
         "standalone-external-plan": _recipe(
             "standalone-external-plan", "Prepare and consume an offline Flower plan",
             area="packet_lifecycle",
@@ -88,6 +127,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "Use reconcile_outcome with current specification/plan revisions, an existing current-authority report_key and explicit rationale to resolve competing reports. It cannot promote a stale report or imply acceptance; reassess work against the current plan before recording new current-authority evidence.",
                 "The original full cross-server PVP contract and CodingCastle IMPL-67 remain deferred. The separate negotiated provider bridge is optional, requires exact consumer support and does not alter this standalone route; real paired qualification is separate.",
                 "The engineer chooses architecture, implementation and reuse, and records technical decisions before closure. Reread canonical intent and reassess semantic findings before ordinary corrective work; never alter agreed intent to justify an implementation defect.",
+                "Follow provider-agnostic-engineering-cycle for architecture authority and final bounded repository review. Cycle1 accepted external plans retain implemented/local verification facts while an open repository review holds closure and affected dependent work; historic reads, outcome reports, exports and interruption handovers remain available.",
             ),
         ),
         "project-architecture-v1": _recipe(
@@ -122,6 +162,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "A changed adopted decision uses a new ID and retains explicit supersession lineage. Relevant changed/removed/superseded selected authority blocks work; unrelated adoption or unadopted proposals leave its fingerprint stable.",
                 "Complete Markdown and frozen HAND carry selected definitions, linked intent and provenance without chat history. Keep future symbols/contracts planned until evidence establishes implementation.",
                 "Pi owns the agent loop; Noxi owns UI/correlations/process observation/transport. Flower owns architecture/lifecycle semantics and does not launch a new coding harness.",
+                "For projects managed by Flower, adopted architecture is canonical; repository Markdown is explanatory or an export tied to a named Flower revision. A new accepted work plan requires adopted components and current nonempty architecture_refs. Existing software is investigated and recorded as observed, without restarting historical packets or retrodating acceptance.",
             ),
         ),
         "negotiated-provider-handoff-v1": _recipe(
@@ -531,6 +572,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
 
 _RECIPE_ORDER = (
     "engineering-bootstrap",
+    "provider-agnostic-engineering-cycle",
     "project-architecture-v1",
     "project-state-recovery-v1",
     "standalone-external-plan",

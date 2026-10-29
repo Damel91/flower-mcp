@@ -457,7 +457,7 @@ _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         "fow_audit_phase",
         "assurance",
-        'Compare current requirement traceability with the previous snapshot of a named scope and retain the resulting phase audit as a durable local job.',
+        'Record a durable phase audit of requirement traceability and, when supplied, a bounded host-declared repository review against the exact current packet basis. Historical evidence, current closure and human acceptance remain distinct.',
     ),
     ToolDescriptor(
         "fow_what_next",
@@ -1929,7 +1929,7 @@ _SIMPLE_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "fow_audit_phase": (
         ("project_id", "scope_id", "actor"),
-        ("requirement_ids", "request_id"),
+        ("requirement_ids", "repository_review", "request_id"),
     ),
     "fow_what_next": (
         ("project_id",),
@@ -2004,6 +2004,25 @@ _SIMPLE["fow_traceability"] = _c(
     "fow_traceability", "call", *_SIMPLE_FIELDS["fow_traceability"],
     enums=_SIMPLE_ENUMS["fow_traceability"],
     guidance={"evidence_read": "evidence_id defaults to 0 for ordinary traceability. A positive evidence_id requires detail_level=audit, offset=0, limit=10 and no milestone_id. It returns one original project-scoped verification evidence body with full metadata/provenance. Unknown and foreign IDs return the same rejection; no artifact or evidence is created."},
+)
+_SIMPLE["fow_audit_phase"] = _c(
+    "fow_audit_phase", "call", *_SIMPLE_FIELDS["fow_audit_phase"],
+    guidance={
+        "scope": "A plain audit compares requirement traceability only. For a repository review, copy scope_id, requirement_ids and basis_fingerprint from the current repository_review projection; do not invent scope identities. Changed requirement membership needs its newly issued scope.",
+        "repository_review": {
+            "contract_version": "flow.repository-review.v1",
+            "required_fields": ("contract_version", "change_id", "packet_id", "expected_basis_fingerprint", "source_identity", "source_revision", "coverage"),
+            "coverage": {"required_fields": ("dimension", "state", "rationale", "evidence_refs"),
+                "dimensions": ("requirements", "architecture", "grounding", "verification", "outcomes"),
+                "states": ("aligned", "reconciled", "historical_on_pin", "authority_missing", "compatibility_review", "current_obligation", "unknown", "not_applicable")},
+            "limits": "Exactly five unique coverage dimensions; unknown fields, malformed values, missing dimensions and foreign identities reject. Canonical payload is at most64KiB. Source identity/revision are nonempty strings up to512characters. Each rationale is nonempty and at most4096characters; up to16 nonempty evidence_refs of at most512characters per dimension.",
+            "evidence": "aligned/reconciled/historical_on_pin require actual evidence references. Missing canonical data, historical evidence on its pin, compatibility requiring review and unmet current obligations are different findings; none proves missing implementation by itself.",
+            "closure": "For applicable current cycle1 dimensions only aligned/reconciled close the review. historical_on_pin records retrospective bookkeeping, never current coverage. authority_missing/compatibility_review/current_obligation/unknown remain open. not_applicable is valid only when that dimension has no canonical objects in the issued scope.",
+        },
+        "identity": "Repository-review mode requires nonempty actor and request_id. Exact input replays its original durable job; changed actor, scope, requirement set or review under that request conflicts. Legacy traceability-only job collisions do not certify a review.",
+        "currentness": "The worker rechecks the issued semantic/report basis atomically. Source identity/revision and evidence remain host-declared; Flower does not inspect the filesystem, verify semantic truth or grant acceptance. New relevant reports/semantic edits stale the review; unrelated events and the audit itself do not.",
+        "recovery": "Read the returned durable job only after receiving job_id. Current review projection retains committed audit/read references even if a later job completion fails. An interrupted handover and original outcome reporting remain possible while review is open.",
+    },
 )
 
 _INTERACTION_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -2185,7 +2204,7 @@ _EXTERNAL_WORK_FIELDS = {
     "add_criterion": (("payload.statement", "payload.expected_spec_revision"), ()),
     "edit_criterion": (("payload.number", "payload.statement", "payload.expected_spec_revision"), ()),
     "remove_criterion": (("payload.number", "payload.expected_spec_revision"), ()),
-    "validation": ((), ("payload.detail",)),
+    "validation": ((), ("payload.detail", "payload.history_offset")),
     "provider_validation": ((), ("payload.detail",)),
     "export_plan": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ("payload.allow_draft",)),
     "todo": ((), ("payload.unit_key",)),
@@ -2225,6 +2244,8 @@ _EXTERNAL_WORK = {
             **({"verification_identity": "Copy the exact criterion/kind/statement from this unit's issued plan/TODO declarations used for the work. No approximate matching is accepted. Rejections identify the input field, unit, expected and received declaration and a bounded public recovery call; invalid reports persist no outcome."} if op == "report_outcome" else {}),
             **({"durable_export": "export_plan records an immutable artifact generation and a durable receipt. Nonempty actor and request_id are required. Retry the identical operation, actor and payload with the same request_id to recover the original receipt, including after authority changes; changed request contents under that ID conflict. A new request uses current specification/plan revisions. The aggregate tool schema also serves pure criteria/validation/provider_validation/todo reads, which may omit identity; exact operation help defines the mutation requirements. Flower does not generate request IDs. The host saves returned Markdown with its file tools."} if op == "export_plan" else {}),
             **({"upgrade_recovery": "upgrade_validation initializes stable criterion identities once. An identical original request replays its historical receipt; changed contents under the same request ID conflict. A new request at current revisions for an already upgraded packet remains rejected with packet_validation_already_upgraded and read-only validation/criteria recovery. Stale revision failures take precedence. Read current validation and criteria before deciding whether actual criterion-authority drift requires explicit reconcile_criteria; never repeat initialization to rewrite identities or invent a mapping/rationale."} if op == "upgrade_validation" else {}),
+            **({"history": "detail=full includes bounded original report_history and page completeness. history_offset defaults0 and must be a nonnegative integer, never bool; page size20. This read remains available outside guided execution admission. Authority composition failures retain original report provenance and an explicit diagnostic; currentness/readiness are not_evaluated, not success. Historical reports are not promoted and reading does not extend the confirmed roadmap."} if op == "validation" else {}),
+            "engineering_cycle": "Newly accepted plans require adopted architecture and current selected architecture_refs. Cycle1 external plans require bounded current repository_review at final closure and for affected dependencies. Unit implementation/local verification, review closure and human acceptance stay distinct; report_outcome records facts even while review is open. Historical issued plans are not silently upgraded.",
         },
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
 }
@@ -2246,9 +2267,10 @@ _SEMANTIC = {
         "result_schema": {"findings": [{"code": "string", "severity": "error|warning|info", "section_id": "prepared allowed section", "entity_id": "prepared allowed entity", "message": "string, max 1000 characters"}]},
         "limits": "At most 128 findings/128000 encoded bytes; every finding field required; unknown fields and invented identities rejected.",
         "adoption": "Submit validates only; adopt records canonical validation/grounding audit with declared execution/evidence provenance. Neither imports a baseline nor accepts intent or a milestone. execute_internal is an explicit bounded invocation on an internal-mode assignment.",
+        "requirement_scope": "Optional top-level requirement_ids applies only to prepare/role=intention_grounding/execution_mode=host. Omission retains the broad project requirement selection; explicit [] selects no canonical requirements. Supply at most128 unique existing same-project requirement IDs. Other roles and internal mode reject the field. Selected scope/completeness remains host-declared; truncation cannot be cleared and old preparations retain their originally issued basis.",
     }) for op, required, optional in (
         ("inventory", ("project_id",), ()),
-        ("prepare", ("project_id", "role", "execution_mode", "actor"), ("source_path", "standard_profile", "goal_node_ids", "host_evidence", "source_revision", "request_id")),
+        ("prepare", ("project_id", "role", "execution_mode", "actor"), ("source_path", "standard_profile", "goal_node_ids", "host_evidence", "source_revision", "requirement_ids", "request_id")),
         ("inspect", ("project_id", "assignment_id"), ()),
         ("submit", ("project_id", "assignment_id", "result", "executor_ref", "actor"), ("source_revision", "request_id",)),
         ("adopt", ("project_id", "assignment_id", "actor"), ("request_id",)),
@@ -2648,6 +2670,25 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
                 expected_revision=0, revision=1,
                 rationale="Adopt the investigated lifecycle boundary as engineering authority.",
             )
+    if contract.tool == "fow_audit_phase":
+        result.update(
+            scope_id="copy current repository_review.scope_id",
+            requirement_ids=["REQ-000001"],
+            request_id="host-repository-review-001",
+            repository_review={
+                "contract_version": "flow.repository-review.v1",
+                "change_id": "CHANGE-000001", "packet_id": "PACKET-000001",
+                "expected_basis_fingerprint": "copy current repository_review.basis_fingerprint",
+                "source_identity": "host-declared repository identity",
+                "source_revision": "actual inspected commit or labelled artifact content identity",
+                "coverage": [
+                    {"dimension": dimension, "state": "unknown",
+                     "rationale": "Replace with the actual scoped investigation result; this example leaves review open.",
+                     "evidence_refs": []}
+                    for dimension in ("requirements", "architecture", "grounding", "verification", "outcomes")
+                ],
+            },
+        )
     if contract.tool == "fow_bootstrap":
         if contract.operation == "record_answer":
             result["answer"] = {"answer_key": "successor-scenario", "question": "What should the software do?", "answer": "Return the integer successor through the declared API.", "kind": "intent", "source_reference": "stakeholder:scenario-1"}

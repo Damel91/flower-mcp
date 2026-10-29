@@ -180,6 +180,8 @@ class PhaseAudit:
     deltas: tuple[PhaseRequirementDelta, ...]
     policy_version: str
     audit_id: int | None = None
+    repository_review: Mapping[str, object] | None = None
+    request_fingerprint: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "project_id", required_text(self.project_id, "project_id"))
@@ -188,6 +190,14 @@ class PhaseAudit:
             raise ValueError("phase audit ID must be positive")
         if self.previous_audit_id is not None and self.previous_audit_id <= 0:
             raise ValueError("previous phase audit ID must be positive")
+        if self.repository_review is not None:
+            if not isinstance(self.repository_review, Mapping):
+                raise ValueError("repository review must be a mapping")
+            object.__setattr__(self, "repository_review", json.loads(json.dumps(
+                dict(self.repository_review), sort_keys=True, allow_nan=False)))
+            if (not isinstance(self.request_fingerprint, str) or len(self.request_fingerprint) != 64
+                    or any(c not in "0123456789abcdef" for c in self.request_fingerprint)):
+                raise ValueError("repository review requires its normalized request fingerprint")
 
 
 @dataclass(frozen=True)

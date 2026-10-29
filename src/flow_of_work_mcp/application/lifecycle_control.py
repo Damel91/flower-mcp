@@ -368,43 +368,37 @@ class LifecycleControlService:
         *,
         actor: str,
         request_id: str = "",
+        repository_review: Mapping[str, object] | None = None,
+        request_fingerprint: str = "",
     ) -> PhaseAudit:
         """Record a project/scope delta without applying a lifecycle transition."""
-
-        matrix = self._requirements.traceability_matrix(project_id)
-        current_rows = self._select_scope(matrix, scope)
-        previous = self._control.latest_phase_audit(project_id, scope.scope_id)
-        if previous is not None:
-            previous_scope = tuple(
-                str(item) for item in previous["scope_requirement_ids"]
-            )
-            if previous_scope != scope.requirement_ids:
-                raise ValueError(
-                    "phase audit scope_id cannot be reused with a different requirement set"
-                )
-        previous_snapshots = {
-            str(item["requirement_id"]): item
-            for item in (previous or {}).get("snapshots", [])
-            if isinstance(item, Mapping)
-        }
-        snapshots = tuple(self._snapshot_from_row(row) for row in current_rows)
-        current_by_id = {snapshot.requirement_id: snapshot for snapshot in snapshots}
-        deltas = self._derive_deltas(current_by_id, previous_snapshots)
-        audit = PhaseAudit(
-            project_id=project_id,
-            scope=scope,
-            previous_audit_id=(
-                None if previous is None else int(previous["phase_audit_id"])
-            ),
-            snapshots=snapshots,
-            deltas=deltas,
-            policy_version=self._policy.version,
-        )
-        return self._control.record_phase_audit(
-            audit,
-            actor=required_text(actor, "actor"),
-            request_id=str(request_id or ""),
-        )
+        with self._control.atomic():
+            if repository_review is not None:
+                replay = self._control.phase_audit_record_replay(project_id,
+                    request_id=request_id, actor=actor, request_fingerprint=request_fingerprint)
+                if replay is not None:
+                    return replay
+                from flow_of_work_mcp.application.engineering_cycle import RepositoryReviewService
+                repository_review = RepositoryReviewService(self._control).validate(project_id, scope, repository_review)
+            matrix = self._requirements.traceability_matrix(project_id)
+            current_rows = ([] if repository_review is not None and not scope.requirement_ids
+                            else self._select_scope(matrix, scope))
+            previous = self._control.latest_phase_audit(project_id, scope.scope_id)
+            if previous is not None:
+                previous_scope = tuple(str(item) for item in previous["scope_requirement_ids"])
+                if previous_scope != scope.requirement_ids:
+                    raise ValueError("phase audit scope_id cannot be reused with a different requirement set")
+            previous_snapshots = {str(item["requirement_id"]): item
+                for item in (previous or {}).get("snapshots", []) if isinstance(item, Mapping)}
+            snapshots = tuple(self._snapshot_from_row(row) for row in current_rows)
+            current_by_id = {snapshot.requirement_id: snapshot for snapshot in snapshots}
+            deltas = self._derive_deltas(current_by_id, previous_snapshots)
+            audit = PhaseAudit(project_id=project_id, scope=scope,
+                previous_audit_id=None if previous is None else int(previous["phase_audit_id"]),
+                snapshots=snapshots, deltas=deltas, policy_version=self._policy.version,
+                repository_review=repository_review, request_fingerprint=request_fingerprint)
+            return self._control.record_phase_audit(audit, actor=required_text(actor, "actor"),
+                                                    request_id=str(request_id or ""))
 
     def what_next(
         self,

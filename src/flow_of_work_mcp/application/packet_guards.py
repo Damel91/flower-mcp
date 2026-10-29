@@ -49,10 +49,14 @@ class PacketGuardDecision:
     next_operation: str
     required_provider_capability: str = ""
     workflow_version: str = PACKET_WORKFLOW_VERSION
+    repository_review: Mapping[str, object] | None = None
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, object]) -> "PacketGuardDecision":
         """Rehydrate an internal, pure canonical gate projection."""
+        review = payload.get('repository_review')
+        if review is not None and not isinstance(review, Mapping):
+            raise ValueError('repository_review guard payload must be a mapping')
         return cls(
             state=str(payload['state']), authoring_ready=bool(payload['authoring_ready']),
             provider_ready=bool(payload['provider_ready']), execution_ready=bool(payload['execution_ready']),
@@ -61,6 +65,7 @@ class PacketGuardDecision:
             next_operation=str(payload['next_operation']),
             required_provider_capability=str(payload.get('required_provider_capability') or ''),
             workflow_version=str(payload.get('workflow_version') or PACKET_WORKFLOW_VERSION),
+            repository_review=dict(review) if review is not None else None,
         )
 
     def as_payload(self) -> dict[str, object]:
@@ -75,6 +80,8 @@ class PacketGuardDecision:
             "next_operation": self.next_operation,
             "required_provider_capability": self.required_provider_capability,
             "workflow_version": self.workflow_version,
+            **({"repository_review": dict(self.repository_review)}
+               if self.repository_review is not None else {}),
         }
 
 
@@ -158,6 +165,12 @@ class PacketGuardEvaluator:
                 "packet_author",
             )
         if plan_status == "proposed":
+            if not packet.get("architecture_refs"):
+                return _decision(
+                    "architecture_required",
+                    (_blocker("architecture_required", "architecture", "architecture_required"),),
+                    (), risks, "architecture_required",
+                )
             return _decision(
                 "needs_instructions",
                 (),
@@ -418,6 +431,14 @@ class PacketGuardService:
             return _decision("external_mode_required", (
                 _blocker("context_only_requires_external_mode", "packet_validation", "external_select_mode"),
             ), (), (), "external_select_mode")
+        if (plan and plan.get("status") == "proposed"
+                and int(plan.get("packet_revision") or 0) == spec_revision
+                and str(packet.get("objective") or "").strip()
+                and packet.get("completion_criteria")
+                and not packet.get("architecture_refs")):
+            return _decision("architecture_required", (
+                _blocker("architecture_required", "architecture", "architecture_required"),
+            ), (), (), "architecture_required")
         if self._external_work is not None and (packet.get('architecture_refs') or (plan and any(
             unit.get(field) for unit in plan.get("units", [])
             for field in ("implements", "provides", "requires", "verifies")
@@ -473,6 +494,17 @@ class PacketGuardService:
             if unit:
                 return PacketGuardDecision("external_" + state, True, False,
                                            state == "actionable", (), (), (), "external_todo")
+            repository_review = frontier.get("repository_review")
+            if (isinstance(repository_review, Mapping)
+                    and repository_review.get("required")
+                    and not repository_review.get("complete")):
+                return PacketGuardDecision(
+                    "repository_reconciliation_pending", True, False, False,
+                    (_blocker("repository_review_" + str(repository_review.get("state") or "pending"),
+                              "repository_review", "repository_reconciliation"),),
+                    (), (), "repository_reconciliation",
+                    repository_review=dict(repository_review),
+                )
             return PacketGuardDecision("external_work_complete", True, False, False,
                                        (), (), (), "external_verification" if frontier.get("deferred_verification")
                                        else "external_acceptance")

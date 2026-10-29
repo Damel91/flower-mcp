@@ -1,0 +1,6605 @@
+{
+  "contract": {
+    "catalog": [
+      [
+        "fow_capabilities",
+        "Discover a bounded workflow summary, one named recipe, or the full diagnostic catalog."
+      ],
+      [
+        "fow_create_project",
+        "Create an isolated canonical lifecycle project."
+      ],
+      [
+        "fow_register_requirement",
+        "Register one canonical requirement."
+      ],
+      [
+        "fow_get_requirement",
+        "Read one canonical requirement and immutable history."
+      ],
+      [
+        "fow_revise_requirement",
+        "Append one immutable canonical requirement revision."
+      ],
+      [
+        "fow_set_requirement_lifecycle",
+        "Apply one policy-checked requirement lifecycle transition."
+      ],
+      [
+        "fow_record_verification",
+        "Append deterministic or live verification evidence."
+      ],
+      [
+        "fow_traceability",
+        "Read a bounded, paginated project traceability projection."
+      ],
+      [
+        "fow_goal",
+        "Create, link and inspect Goal Graph use cases, sequences and expectations."
+      ],
+      [
+        "fow_validate_srs",
+        "Start a durable structural/semantic SRS validation job."
+      ],
+      [
+        "fow_import_srs",
+        "Validate and atomically import one accepted initial SRS baseline."
+      ],
+      [
+        "fow_revise_srs_baseline",
+        "Classify and append one source-proven SRS baseline revision."
+      ],
+      [
+        "fow_promote_milestone",
+        "Freeze a bounded requirement set as a planned milestone; omit acceptance_evidence for planning-only scope."
+      ],
+      [
+        "fow_accept_milestone",
+        "Append governed acceptance evidence after validation/campaign acceptance."
+      ],
+      [
+        "fow_audit_phase",
+        "Start a durable phase-audit job for a named scope."
+      ],
+      [
+        "fow_what_next",
+        "Derive bounded, paginated next work from durable project state."
+      ],
+      [
+        "fow_generate_artifacts",
+        "Start a durable standard-profile artifact generation job."
+      ],
+      [
+        "fow_get_artifacts",
+        "Read persisted generated artifact metadata or content."
+      ],
+      [
+        "fow_ground_intent",
+        "Start a durable goal-to-implementation reconciliation job."
+      ],
+      [
+        "fow_get_job",
+        "Read one durable job state."
+      ],
+      [
+        "fow_list_jobs",
+        "List durable jobs for a project."
+      ],
+      [
+        "fow_bootstrap",
+        "Start, derive, confirm or close an authority-gated project bootstrap."
+      ],
+      [
+        "fow_change",
+        "Advanced governed lifecycle surface for change, evidence, handoff, and packet state; use fow_packet_* for ordinary packet work."
+      ],
+      [
+        "fow_assurance",
+        "Record findings, link remediation packets, and request governed change acceptance."
+      ],
+      [
+        "fow_run",
+        "Manage implementation runs, run steps and derived task views."
+      ],
+      [
+        "fow_handover",
+        "Create resume contexts, bounded ledger projections, and one coherent project-state recovery snapshot."
+      ],
+      [
+        "fow_packet_author",
+        "Create or atomically revise one canonical packet plan using stable project_id and packet_id addressing."
+      ],
+      [
+        "fow_packet_advance",
+        "Perform safe deterministic packet transitions until the next decision or asynchronous boundary."
+      ],
+      [
+        "fow_packet_inspect",
+        "Inspect one bounded packet summary, unit page, gate view or history page."
+      ],
+      [
+        "fow_campaign_author",
+        "Create or incrementally revise one qualified campaign, obligation, oracle or materialization authority."
+      ],
+      [
+        "fow_campaign_advance",
+        "Perform deterministic campaign work until one semantic, provider or evidence boundary."
+      ],
+      [
+        "fow_campaign_inspect",
+        "Inspect one bounded campaign summary, working sheet, semantic component or history page."
+      ]
+    ],
+    "operation_contracts": [
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "finding_id": "example-finding-id",
+          "operation": "get_finding",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_finding",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "finding_id"
+        ],
+        "tool": "fow_assurance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "expected_correction": "example-expected-correction",
+          "finding_id": "example-finding-id",
+          "operation": "link_fixing_packet",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "link_fixing_packet",
+        "optional_fields": [
+          "required_regression_evidence",
+          "required_campaign_ids",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "finding_id",
+          "packet_id",
+          "expected_correction"
+        ],
+        "tool": "fow_assurance"
+      },
+      {
+        "accepted_values": {
+          "severity": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "expected_correction": "example-expected-correction",
+          "operation": "record_finding",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale",
+          "scope_kind": "example-scope-kind",
+          "scope_ref": "example-scope-ref",
+          "severity": "info",
+          "title": "example-title"
+        },
+        "operation": "record_finding",
+        "optional_fields": [
+          "packet_id",
+          "source_anchor",
+          "implementation_ref",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "severity",
+          "title",
+          "rationale",
+          "expected_correction",
+          "scope_kind",
+          "scope_ref"
+        ],
+        "tool": "fow_assurance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "acceptance_reference": "example-acceptance-reference",
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "request_change_acceptance",
+          "project_id": "example-project-id"
+        },
+        "operation": "request_change_acceptance",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "acceptance_reference"
+        ],
+        "tool": "fow_assurance"
+      },
+      {
+        "accepted_values": {
+          "disposition": [
+            "open",
+            "confirmed",
+            "resolved",
+            "accepted_exception",
+            "deferred",
+            "superseded",
+            "cancelled"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "disposition": "open",
+          "finding_id": "example-finding-id",
+          "operation": "set_finding_disposition",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale"
+        },
+        "operation": "set_finding_disposition",
+        "optional_fields": [
+          "evidence_refs",
+          "disposition_reference",
+          "supersedes_finding_id",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "finding_id",
+          "disposition",
+          "rationale"
+        ],
+        "tool": "fow_assurance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "bind_implementation_provider",
+          "project_id": "example-project-id",
+          "provider_kind": "example-provider-kind",
+          "provider_scope_id": "example-provider-scope-id"
+        },
+        "operation": "bind_implementation_provider",
+        "optional_fields": [
+          "provider_context_id",
+          "surfaces",
+          "replacement_reason",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "provider_kind",
+          "provider_scope_id"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "operation": "cancel",
+          "project_id": "example-project-id",
+          "reason": "example-reason"
+        },
+        "operation": "cancel",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id",
+          "reason"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "completion_reference": "example-completion-reference",
+          "operation": "complete",
+          "project_id": "example-project-id"
+        },
+        "operation": "complete",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id",
+          "completion_reference"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "confirmation_reference": "example-confirmation-reference",
+          "operation": "confirm_intake",
+          "project_id": "example-project-id"
+        },
+        "operation": "confirm_intake",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id",
+          "confirmation_reference"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "operation": "derive_behavior",
+          "project_id": "example-project-id"
+        },
+        "operation": "derive_behavior",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "list_provider_bindings",
+          "project_id": "example-project-id"
+        },
+        "operation": "list_provider_bindings",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "provider_binding_state",
+          "project_id": "example-project-id",
+          "provider_kind": "example-provider-kind"
+        },
+        "operation": "provider_binding_state",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "provider_kind"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "contradiction": {},
+          "operation": "record_contradiction",
+          "project_id": "example-project-id"
+        },
+        "operation": "record_contradiction",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id",
+          "contradiction"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "intake": {},
+          "operation": "record_intake",
+          "project_id": "example-project-id"
+        },
+        "operation": "record_intake",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id",
+          "intake"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "operation": "resume",
+          "project_id": "example-project-id"
+        },
+        "operation": "resume",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {
+          "path": [
+            "requirements_import",
+            "code_import",
+            "requirements_creation"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "operation": "start",
+          "path": "requirements_import",
+          "project_id": "example-project-id",
+          "project_name": "example-project-name"
+        },
+        "operation": "start",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "project_name",
+          "path"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "bootstrap_id": "example-bootstrap-id",
+          "operation": "state",
+          "project_id": "example-project-id"
+        },
+        "operation": "state",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "bootstrap_id"
+        ],
+        "tool": "fow_bootstrap"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "advance",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "transition_budget"
+        ],
+        "required_fields": [
+          "project_id",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_campaign_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "disposition_reference": "example-disposition-reference",
+          "evidence_gaps": "example-evidence-gaps",
+          "exception_obligation_ids": [
+            "example-ref"
+          ],
+          "operation": "accept_exception",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "risk_authority": "example-risk-authority"
+        },
+        "operation": "accept_exception",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "exception_obligation_ids",
+          "evidence_gaps",
+          "risk_authority",
+          "disposition_reference"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case": {
+            "action": "example-action",
+            "case_kind": "example-case-kind",
+            "expected_outcome": "example-expected-outcome",
+            "observation_point": "example-observation-point",
+            "purpose": "example-purpose",
+            "title": "example-title"
+          },
+          "operation": "add_case",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "add_case",
+        "optional_fields": [
+          "case.prohibited_outcome",
+          "case.setup",
+          "case.cleanup",
+          "case.execution_class",
+          "case.required",
+          "case.obligation_ids",
+          "case.oracle_kind",
+          "expected_fingerprint"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case.title",
+          "case.purpose",
+          "case.case_kind",
+          "case.action",
+          "case.expected_outcome",
+          "case.observation_point"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {
+          "answer_authority": [
+            "grounded_fact",
+            "accepted_decision",
+            "derived_hypothesis",
+            "unknown",
+            "waived"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "answer": {},
+          "answer_authority": "grounded_fact",
+          "campaign_id": "example-campaign-id",
+          "operation": "answer_question",
+          "oracle_id": "example-oracle-id",
+          "project_id": "example-project-id",
+          "provenance": [
+            "example-ref"
+          ],
+          "question_id": "example-question-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "answer_question",
+        "optional_fields": [
+          "waiver_scope"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "oracle_id",
+          "question_id",
+          "answer",
+          "answer_authority",
+          "provenance"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "authority_reference": "example-authority-reference",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "operation": "attest_source",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "source_files": {}
+        },
+        "operation": "attest_source",
+        "optional_fields": [
+          "harness"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "source_files",
+          "authority_reference"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "operation": "author_oracle",
+          "oracle": {
+            "authority_reference": "example-authority-reference",
+            "oracle_kind": "example-oracle-kind",
+            "semantic_fields": {},
+            "subject_bindings": [
+              "example-ref"
+            ]
+          },
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "author_oracle",
+        "optional_fields": [
+          "oracle.goal_bindings",
+          "oracle_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "oracle.oracle_kind",
+          "oracle.subject_bindings",
+          "oracle.authority_reference",
+          "oracle.semantic_fields"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "authority_reference": "example-authority-reference",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "operation": "authorize_materialization",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "requested_capability": {
+            "framework": "example-framework",
+            "language": "example-language"
+          }
+        },
+        "operation": "authorize_materialization",
+        "optional_fields": [
+          "requested_capability.artifact_scope_preference"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "requested_capability.language",
+          "requested_capability.framework",
+          "authority_reference"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "authority_reference": "example-authority-reference",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "evidence_id": "example-evidence-id",
+          "operation": "authorize_promotion",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "authorize_promotion",
+        "optional_fields": [
+          "regression_obligation"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "evidence_id",
+          "authority_reference"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "coverage_intent": "example-coverage-intent",
+          "obligation_id": "example-obligation-id",
+          "operation": "bind_obligation",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "bind_obligation",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "obligation_id",
+          "coverage_intent"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "disposition_reference": "example-disposition-reference",
+          "operation": "cancel",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "cancel",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "disposition_reference"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {
+          "decision": [
+            "required",
+            "out_of_scope",
+            "duplicate",
+            "investigate",
+            "waived"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "decision": "required",
+          "obligation_id": "example-obligation-id",
+          "operation": "decide_obligation",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale",
+          "request_id": "example-request-id"
+        },
+        "operation": "decide_obligation",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "obligation_id",
+          "decision",
+          "rationale"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case": {
+            "action": "example-action",
+            "case_kind": "example-case-kind",
+            "expected_outcome": "example-expected-outcome",
+            "observation_point": "example-observation-point",
+            "purpose": "example-purpose",
+            "title": "example-title"
+          },
+          "case_id": "example-case-id",
+          "operation": "edit_case",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "edit_case",
+        "optional_fields": [
+          "case.prohibited_outcome",
+          "case.setup",
+          "case.cleanup",
+          "case.execution_class",
+          "case.required",
+          "case.obligation_ids",
+          "case.oracle_kind",
+          "expected_fingerprint"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "case.title",
+          "case.purpose",
+          "case.case_kind",
+          "case.action",
+          "case.expected_outcome",
+          "case.observation_point"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "operation": "edit_scope",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "scope": {
+            "change_id": "example-change-id"
+          },
+          "title": "example-title"
+        },
+        "operation": "edit_scope",
+        "optional_fields": [
+          "scope.milestone_id",
+          "scope.requirement_ids",
+          "scope.goal_ids",
+          "scope.packet_ids",
+          "scope.finding_ids",
+          "scope.invariants",
+          "scope.environment_assumptions",
+          "expected_fingerprint"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "title",
+          "scope.change_id"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case_id": "example-case-id",
+          "operation": "remove_case",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale",
+          "request_id": "example-request-id"
+        },
+        "operation": "remove_case",
+        "optional_fields": [
+          "expected_fingerprint"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_id",
+          "rationale"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "case_order": [
+            "example-ref"
+          ],
+          "operation": "reorder_cases",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "reorder_cases",
+        "optional_fields": [
+          "expected_fingerprint"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "case_order"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "campaign_id": "example-campaign-id",
+          "operation": "retry_provider_rejection",
+          "project_id": "example-project-id",
+          "provider_command_id": "example-provider-command-id",
+          "rationale": "example-rationale",
+          "request_id": "example-request-id"
+        },
+        "operation": "retry_provider_rejection",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "campaign_id",
+          "provider_command_id",
+          "rationale"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "start",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "scope": {
+            "change_id": "example-change-id"
+          },
+          "title": "example-title"
+        },
+        "operation": "start",
+        "optional_fields": [
+          "scope.milestone_id",
+          "scope.requirement_ids",
+          "scope.goal_ids",
+          "scope.packet_ids",
+          "scope.finding_ids",
+          "scope.invariants",
+          "scope.environment_assumptions",
+          "case"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "request_id",
+          "title",
+          "scope.change_id"
+        ],
+        "tool": "fow_campaign_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "attestation",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "cases",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "constructibility",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "evidence",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "history",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "obligations",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "oracle_ir",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "oracles",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "residuals",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "summary",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "working_sheet",
+        "optional_fields": [
+          "campaign_id",
+          "change_id",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "view"
+        ],
+        "tool": "fow_campaign_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "accepted_risk_ref": "example-accepted-risk-ref",
+          "actor": "example-actor",
+          "operation": "accept_residual_risk",
+          "pressure_id": "example-pressure-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "accept_residual_risk",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "packet_pressure",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "pressure_id",
+          "accepted_risk_ref"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "construction_audit_id": "example-construction-audit-id",
+          "operation": "answer_packet_question",
+          "project_id": "example-project-id",
+          "question_id": "example-question-id"
+        },
+        "operation": "answer_packet_question",
+        "optional_fields": [
+          "answer_summary",
+          "summary",
+          "evidence_refs",
+          "linked_navigation_refs",
+          "request_id"
+        ],
+        "owner": "packet_construction",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "construction_audit_id",
+          "question_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "construction_audit_id": "example-construction-audit-id",
+          "operation": "block_packet_question",
+          "project_id": "example-project-id",
+          "question_id": "example-question-id"
+        },
+        "operation": "block_packet_question",
+        "optional_fields": [
+          "blocking_reasons",
+          "rationale",
+          "answer_summary",
+          "summary",
+          "request_id"
+        ],
+        "owner": "packet_construction",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "construction_audit_id",
+          "question_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "collect_packet_evidence_snapshot",
+          "project_id": "example-project-id",
+          "reconciliation_scope_id": "example-reconciliation-scope-id"
+        },
+        "operation": "collect_packet_evidence_snapshot",
+        "optional_fields": [
+          "max_claims",
+          "max_depth",
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "reconciliation_scope_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "create_change",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale",
+          "requirement_ids": [
+            "example-ref"
+          ],
+          "title": "example-title"
+        },
+        "operation": "create_change",
+        "optional_fields": [
+          "source_refs",
+          "baseline_refs",
+          "milestone_id",
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "title",
+          "rationale",
+          "requirement_ids"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {
+          "claim_type": [
+            "target",
+            "symbol_contract",
+            "impact",
+            "cleanup",
+            "test_obligation"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "claim_key": "example-claim-key",
+          "claim_type": "target",
+          "object_ref": "example-object-ref",
+          "operation": "declare_packet_evidence_claim",
+          "predicate": "example-predicate",
+          "project_id": "example-project-id",
+          "reconciliation_scope_id": "example-reconciliation-scope-id",
+          "subject_ref": "example-subject-ref"
+        },
+        "operation": "declare_packet_evidence_claim",
+        "optional_fields": [
+          "assertion",
+          "evidence_refs",
+          "claim_required",
+          "claim_dynamic",
+          "claim_contradicted",
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "reconciliation_scope_id",
+          "claim_type",
+          "claim_key",
+          "subject_ref",
+          "predicate",
+          "object_ref"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "derive_packet_pressure",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "derive_packet_pressure",
+        "optional_fields": [
+          "profile",
+          "request_id"
+        ],
+        "owner": "packet_pressure",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {
+          "reconciliation_disposition": [
+            "resolved",
+            "waived",
+            "rejected",
+            "escalated",
+            "superseded"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "operation": "disposition_packet_evidence_residual",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale",
+          "reconciliation_disposition": "resolved",
+          "reconciliation_item_id": "example-reconciliation-item-id"
+        },
+        "operation": "disposition_packet_evidence_residual",
+        "optional_fields": [
+          "policy_ref",
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "reconciliation_item_id",
+          "reconciliation_disposition",
+          "rationale"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "evaluate_packet_readiness",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "evaluate_packet_readiness",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "get_change",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_change",
+        "optional_fields": [],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "get_packet_construction_audit",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_packet_construction_audit",
+        "optional_fields": [
+          "construction_audit_id",
+          "change_id",
+          "packet_id"
+        ],
+        "owner": "packet_construction",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "get_packet_pressure",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_packet_pressure",
+        "optional_fields": [
+          "pressure_id",
+          "change_id",
+          "packet_id"
+        ],
+        "owner": "packet_pressure",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "get_packet_reconciliation",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_packet_reconciliation",
+        "optional_fields": [
+          "reconciliation_scope_id",
+          "change_id",
+          "packet_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "claims": {},
+          "completeness": {},
+          "fingerprint": "example-fingerprint",
+          "operation": "import_packet_evidence_snapshot",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "provider_id": "example-provider-id",
+          "provider_scope_id": "example-provider-scope-id",
+          "provider_snapshot_id": "example-provider-snapshot-id",
+          "reconciliation_scope_id": "example-reconciliation-scope-id",
+          "selection_ref": "example-selection-ref",
+          "source_revision": "example-source-revision"
+        },
+        "operation": "import_packet_evidence_snapshot",
+        "optional_fields": [
+          "workspace_revision",
+          "surfaces",
+          "contract_version",
+          "truncated",
+          "diagnostics",
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "reconciliation_scope_id",
+          "packet_id",
+          "provider_id",
+          "provider_scope_id",
+          "provider_snapshot_id",
+          "selection_ref",
+          "source_revision",
+          "fingerprint",
+          "completeness",
+          "claims"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "initialize_packet_reconciliation",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "initialize_packet_reconciliation",
+        "optional_fields": [
+          "reconciliation_profile",
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "milestone_id": "example-milestone-id",
+          "operation": "link_change_milestone",
+          "project_id": "example-project-id"
+        },
+        "operation": "link_change_milestone",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "milestone_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "depends_on_packet_id": "example-depends-on-packet-id",
+          "operation": "link_dependency",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "link_dependency",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id",
+          "depends_on_packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "reconcile_packet_evidence",
+          "project_id": "example-project-id",
+          "reconciliation_scope_id": "example-reconciliation-scope-id",
+          "snapshot_id": "example-snapshot-id"
+        },
+        "operation": "reconcile_packet_evidence",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "reconciliation_scope_id",
+          "snapshot_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {
+          "target_policy": [
+            "code_targets_required",
+            "documental_only"
+          ],
+          "target_state": [
+            "draft",
+            "needs_targets",
+            "needs_authority",
+            "refined",
+            "execution_ready",
+            "stale",
+            "blocked"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "revise_packet",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "revise_packet",
+        "optional_fields": [
+          "title",
+          "intent",
+          "rationale",
+          "requirement_ids",
+          "goal_ids",
+          "in_scope",
+          "out_of_scope",
+          "invariants",
+          "unresolved_questions",
+          "completion_criteria",
+          "target_policy",
+          "target_state",
+          "navigation_audit_ids",
+          "target_binding_ids",
+          "candidate_set_ids",
+          "context_snapshot_ids",
+          "blocking_reasons",
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {
+          "target_policy": [
+            "code_targets_required",
+            "documental_only"
+          ],
+          "target_state": [
+            "draft",
+            "needs_targets",
+            "needs_authority",
+            "refined",
+            "execution_ready",
+            "stale",
+            "blocked"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "set_packet_target_state",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "set_packet_target_state",
+        "optional_fields": [
+          "target_policy",
+          "target_state",
+          "navigation_audit_ids",
+          "target_binding_ids",
+          "candidate_set_ids",
+          "context_snapshot_ids",
+          "blocking_reasons",
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "start_packet_construction_audit",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "start_packet_construction_audit",
+        "optional_fields": [
+          "milestone_id",
+          "profile",
+          "request_id"
+        ],
+        "owner": "packet_construction",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "claim_id": "example-claim-id",
+          "operation": "supersede_packet_evidence_claim",
+          "project_id": "example-project-id",
+          "rationale": "example-rationale"
+        },
+        "operation": "supersede_packet_evidence_claim",
+        "optional_fields": [
+          "request_id"
+        ],
+        "owner": "packet_reconciliation",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "claim_id",
+          "rationale"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {
+          "packet_status": [
+            "planned",
+            "scaffolded",
+            "partial",
+            "idle",
+            "implemented",
+            "superseded",
+            "cancelled"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "transition_packet",
+          "packet_id": "example-packet-id",
+          "packet_status": "planned",
+          "project_id": "example-project-id"
+        },
+        "operation": "transition_packet",
+        "optional_fields": [
+          "criterion_results",
+          "blocking_reasons",
+          "disposition",
+          "successor_packet_id",
+          "request_id"
+        ],
+        "owner": "change_control",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id",
+          "packet_status"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "construction_audit_id": "example-construction-audit-id",
+          "operation": "waive_packet_question",
+          "policy_ref": "example-policy-ref",
+          "project_id": "example-project-id",
+          "question_id": "example-question-id"
+        },
+        "operation": "waive_packet_question",
+        "optional_fields": [
+          "waiver_rationale",
+          "rationale",
+          "request_id"
+        ],
+        "owner": "packet_construction",
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "construction_audit_id",
+          "question_id",
+          "policy_ref"
+        ],
+        "tool": "fow_change"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "category": "example-category",
+          "observable_outcome": "example-observable-outcome",
+          "operation": "add_behavioral_expectation",
+          "project_id": "example-project-id",
+          "statement": "example-statement",
+          "title": "example-title"
+        },
+        "operation": "add_behavioral_expectation",
+        "optional_fields": [
+          "source_anchor",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "title",
+          "statement",
+          "category",
+          "observable_outcome"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "expected_effects": "example-expected-effects",
+          "normal_steps": "example-normal-steps",
+          "operation": "add_sequence",
+          "participants": "example-participants",
+          "project_id": "example-project-id",
+          "title": "example-title"
+        },
+        "operation": "add_sequence",
+        "optional_fields": [
+          "alternate_steps",
+          "failure_steps",
+          "source_anchor",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "title",
+          "participants",
+          "normal_steps",
+          "expected_effects"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "objective": "example-objective",
+          "observable_outcome": "example-observable-outcome",
+          "operation": "add_use_case",
+          "project_id": "example-project-id",
+          "title": "example-title",
+          "use_case_actor": "example-use-case-actor"
+        },
+        "operation": "add_use_case",
+        "optional_fields": [
+          "preconditions",
+          "postconditions",
+          "invariants",
+          "source_anchor",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "title",
+          "use_case_actor",
+          "objective",
+          "observable_outcome"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "derive_requirement_candidates",
+          "project_id": "example-project-id"
+        },
+        "operation": "derive_requirement_candidates",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "link",
+          "project_id": "example-project-id",
+          "relation": "example-relation",
+          "source_goal_id": "example-source-goal-id",
+          "target_goal_id": "example-target-goal-id"
+        },
+        "operation": "link",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "source_goal_id",
+          "target_goal_id",
+          "relation"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {
+          "detail_level": [
+            "standard",
+            "audit"
+          ],
+          "view": [
+            "summary",
+            "nodes",
+            "edges",
+            "candidates"
+          ]
+        },
+        "example": {
+          "operation": "view",
+          "project_id": "example-project-id"
+        },
+        "operation": "view",
+        "optional_fields": [
+          "view",
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation"
+        ],
+        "tool": "fow_goal"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "operation": "create_handover",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id"
+        },
+        "operation": "create_handover",
+        "optional_fields": [
+          "profile_version",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "change_id",
+          "packet_id",
+          "run_id",
+          "actor"
+        ],
+        "tool": "fow_handover"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "handover_id": "example-handover-id",
+          "operation": "get_handover",
+          "project_id": "example-project-id"
+        },
+        "operation": "get_handover",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "handover_id"
+        ],
+        "tool": "fow_handover"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "operation": "ledger_projection",
+          "project_id": "example-project-id"
+        },
+        "operation": "ledger_projection",
+        "optional_fields": [
+          "projection_kind"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation"
+        ],
+        "tool": "fow_handover"
+      },
+      {
+        "accepted_values": {
+          "focus_kind": [
+            "project",
+            "milestone",
+            "use_case",
+            "sequence",
+            "packet",
+            "gate"
+          ]
+        },
+        "example": {
+          "operation": "project_state_snapshot",
+          "project_id": "example-project-id"
+        },
+        "operation": "project_state_snapshot",
+        "optional_fields": [
+          "focus_kind",
+          "focus_ref",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation"
+        ],
+        "tool": "fow_handover"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "operation": "resume_context",
+          "project_id": "example-project-id"
+        },
+        "operation": "resume_context",
+        "optional_fields": [
+          "change_id",
+          "packet_id",
+          "run_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation"
+        ],
+        "tool": "fow_handover"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "accepted_risk_ref": "example-accepted-risk-ref",
+            "operation": "accept_residual_risk"
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "accept_residual_risk",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.accepted_risk_ref",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "operation": "accept_work_plan",
+            "rationale": "example-rationale"
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "accept_work_plan",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.rationale",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "advance",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {
+          "decision.review.completeness": [
+            "complete",
+            "partial"
+          ],
+          "decision.review.disposition": [
+            "approved",
+            "findings",
+            "rejected"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "operation": "record_workspace_review",
+            "review": {
+              "candidate_revision": "example-candidate-revision",
+              "completeness": "complete",
+              "disposition": "approved",
+              "evidence_refs": [
+                "example-ref"
+              ],
+              "provider_review_ref": "example-provider-review-ref",
+              "provider_revision": "example-provider-revision",
+              "reviewed_target_refs": [
+                "example-ref"
+              ],
+              "workspace_candidate_id": "example-workspace-candidate-id"
+            }
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "record_workspace_review",
+        "optional_fields": [
+          "decision.review.findings",
+          "decision.review.existing_finding_ids",
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.review.provider_revision",
+          "decision.review.workspace_candidate_id",
+          "decision.review.candidate_revision",
+          "decision.review.provider_review_ref",
+          "decision.review.completeness",
+          "decision.review.disposition",
+          "decision.review.reviewed_target_refs",
+          "decision.review.evidence_refs",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "operation": "reject_work_plan",
+            "rationale": "example-rationale"
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "reject_work_plan",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.rationale",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {
+          "decision.disposition": [
+            "accepted",
+            "rejected",
+            "waived",
+            "escalated",
+            "investigate"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "disposition": "accepted",
+            "operation": "resolve_reconciliation_residual",
+            "rationale": "example-rationale"
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "resolve_reconciliation_residual",
+        "optional_fields": [
+          "decision.policy_ref",
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.disposition",
+          "decision.rationale",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "decision": {
+            "operation": "retry_provider_rejection",
+            "rationale": "example-rationale"
+          },
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "retry_provider_rejection",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "decision.operation",
+          "decision.rationale",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_advance"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "add_unit",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "add_unit",
+        "optional_fields": [
+          "unit",
+          "client_unit_key",
+          "target_selection",
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {
+          "response.disposition": [
+            "answered",
+            "waived",
+            "blocked"
+          ],
+          "response.temporal_authority": [
+            "current_fact",
+            "future_instruction",
+            "completion_evidence"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "gate_fingerprint": "example-gate-fingerprint",
+          "operation": "answer_gate",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "response": "example-response"
+        },
+        "operation": "answer_gate",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "response",
+          "gate_fingerprint",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "client_unit_key": "example-client-unit-key",
+          "expected_plan_revision": 1,
+          "operation": "rebind_unit",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "unit_patch": {}
+        },
+        "operation": "rebind_unit",
+        "optional_fields": [
+          "expected_spec_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "client_unit_key",
+          "unit_patch",
+          "actor",
+          "request_id",
+          "expected_plan_revision"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "client_unit_key": "example-client-unit-key",
+          "expected_plan_revision": 1,
+          "operation": "remove_unit",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "remove_unit",
+        "optional_fields": [
+          "expected_spec_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "client_unit_key",
+          "actor",
+          "request_id",
+          "expected_plan_revision"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "replace_plan",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "work_plan": {}
+        },
+        "operation": "replace_plan",
+        "optional_fields": [
+          "answers",
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "work_plan",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "answers": [
+            "example-ref"
+          ],
+          "operation": "resolve_questions",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "resolve_questions",
+        "optional_fields": [
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "answers",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "revise_packet",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "revise_packet",
+        "optional_fields": [
+          "title",
+          "intent",
+          "rationale",
+          "completion_criteria",
+          "requirement_ids",
+          "goal_ids",
+          "in_scope",
+          "out_of_scope",
+          "invariants",
+          "unresolved_questions",
+          "expected_spec_revision",
+          "expected_plan_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "client_unit_key": "example-client-unit-key",
+          "expected_plan_revision": 1,
+          "operation": "revise_unit",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id",
+          "unit_patch": {}
+        },
+        "operation": "revise_unit",
+        "optional_fields": [
+          "expected_spec_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "client_unit_key",
+          "unit_patch",
+          "actor",
+          "request_id",
+          "expected_plan_revision"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "client_unit_key": "example-client-unit-key",
+          "depends_on": [
+            "example-ref"
+          ],
+          "expected_plan_revision": 1,
+          "operation": "set_dependencies",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "request_id": "example-request-id"
+        },
+        "operation": "set_dependencies",
+        "optional_fields": [
+          "expected_spec_revision"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "operation",
+          "client_unit_key",
+          "depends_on",
+          "actor",
+          "request_id",
+          "expected_plan_revision"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {
+          "purpose": [
+            "implementation",
+            "remediation"
+          ],
+          "target_policy": [
+            "code_targets_required",
+            "documental_only"
+          ]
+        },
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "completion_criteria": [
+            "example-ref"
+          ],
+          "intent": "example-intent",
+          "operation": "start_packet",
+          "project_id": "example-project-id",
+          "purpose": "implementation",
+          "request_id": "example-request-id",
+          "title": "example-title"
+        },
+        "operation": "start_packet",
+        "optional_fields": [
+          "rationale",
+          "milestone_id",
+          "requirement_ids",
+          "goal_ids",
+          "in_scope",
+          "out_of_scope",
+          "invariants",
+          "unresolved_questions",
+          "target_policy",
+          "active_provider",
+          "source_revision",
+          "finding_ids",
+          "predecessor_packet_id",
+          "required_regression_evidence",
+          "required_campaign_ids"
+        ],
+        "required_fields": [
+          "project_id",
+          "change_id",
+          "operation",
+          "title",
+          "intent",
+          "completion_criteria",
+          "purpose",
+          "actor",
+          "request_id"
+        ],
+        "tool": "fow_packet_author"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "gates",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "history",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "requirements",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "summary",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "units",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id",
+          "view": "example-view"
+        },
+        "operation": "working_sheet",
+        "optional_fields": [
+          "detail_level",
+          "offset",
+          "limit"
+        ],
+        "required_fields": [
+          "project_id",
+          "packet_id",
+          "view"
+        ],
+        "tool": "fow_packet_inspect"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "action": "example-action",
+          "actor": "example-actor",
+          "operation": "add_step",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id",
+          "title": "example-title"
+        },
+        "operation": "add_step",
+        "optional_fields": [
+          "target_refs",
+          "evidence_refs",
+          "step_required",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "title",
+          "action"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "blocking_reason": "example-blocking-reason",
+          "next_expected_action": "example-next-expected-action",
+          "operation": "block_step",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id",
+          "step_id": "example-step-id"
+        },
+        "operation": "block_step",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "step_id",
+          "blocking_reason",
+          "next_expected_action"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "cancel_run",
+          "project_id": "example-project-id",
+          "reason": "example-reason",
+          "run_id": "example-run-id"
+        },
+        "operation": "cancel_run",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "reason"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "cancel_step",
+          "project_id": "example-project-id",
+          "reason": "example-reason",
+          "run_id": "example-run-id",
+          "step_id": "example-step-id"
+        },
+        "operation": "cancel_step",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "step_id",
+          "reason"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "completion_reference": "example-completion-reference",
+          "operation": "complete_run",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id"
+        },
+        "operation": "complete_run",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "completion_reference"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "evidence_refs": [
+            "example-ref"
+          ],
+          "operation": "complete_step",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id",
+          "step_id": "example-step-id"
+        },
+        "operation": "complete_step",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "step_id",
+          "evidence_refs"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "change_id": "example-change-id",
+          "objective": "example-objective",
+          "operation": "create_run",
+          "packet_id": "example-packet-id",
+          "project_id": "example-project-id"
+        },
+        "operation": "create_run",
+        "optional_fields": [
+          "orchestrator_ref",
+          "external_ref",
+          "source_ref",
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "change_id",
+          "packet_id",
+          "objective"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "get_run",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id"
+        },
+        "operation": "get_run",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "depends_on_step_id": "example-depends-on-step-id",
+          "operation": "link_step_dependency",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id",
+          "step_id": "example-step-id"
+        },
+        "operation": "link_step_dependency",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "step_id",
+          "depends_on_step_id"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "start_step",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id",
+          "step_id": "example-step-id"
+        },
+        "operation": "start_step",
+        "optional_fields": [
+          "request_id"
+        ],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id",
+          "step_id"
+        ],
+        "tool": "fow_run"
+      },
+      {
+        "accepted_values": {},
+        "example": {
+          "actor": "example-actor",
+          "operation": "task_view",
+          "project_id": "example-project-id",
+          "run_id": "example-run-id"
+        },
+        "operation": "task_view",
+        "optional_fields": [],
+        "required_fields": [
+          "project_id",
+          "operation",
+          "actor",
+          "run_id"
+        ],
+        "tool": "fow_run"
+      }
+    ],
+    "public_tools": {
+      "fow_accept_milestone": {
+        "description": "Append governed acceptance evidence after validation/campaign acceptance.",
+        "input_schema": {
+          "properties": {
+            "acceptance_evidence": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Acceptance Evidence",
+              "type": "array"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "milestone_id": {
+              "title": "Milestone Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "milestone_id",
+            "acceptance_evidence",
+            "actor"
+          ],
+          "title": "fow_accept_milestoneArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_accept_milestoneDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_assurance": {
+        "description": "Record findings, link remediation packets, and request governed change acceptance.",
+        "input_schema": {
+          "properties": {
+            "acceptance_reference": {
+              "default": "",
+              "title": "Acceptance Reference",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "disposition": {
+              "default": "",
+              "title": "Disposition",
+              "type": "string"
+            },
+            "disposition_reference": {
+              "default": "",
+              "title": "Disposition Reference",
+              "type": "string"
+            },
+            "evidence_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evidence Refs"
+            },
+            "expected_correction": {
+              "default": "",
+              "title": "Expected Correction",
+              "type": "string"
+            },
+            "finding_id": {
+              "default": "",
+              "title": "Finding Id",
+              "type": "string"
+            },
+            "implementation_ref": {
+              "default": "",
+              "title": "Implementation Ref",
+              "type": "string"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "packet_id": {
+              "default": "",
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "rationale": {
+              "default": "",
+              "title": "Rationale",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "required_campaign_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Required Campaign Ids"
+            },
+            "required_regression_evidence": {
+              "default": "",
+              "title": "Required Regression Evidence",
+              "type": "string"
+            },
+            "scope_kind": {
+              "default": "",
+              "title": "Scope Kind",
+              "type": "string"
+            },
+            "scope_ref": {
+              "default": "",
+              "title": "Scope Ref",
+              "type": "string"
+            },
+            "severity": {
+              "default": "",
+              "title": "Severity",
+              "type": "string"
+            },
+            "source_anchor": {
+              "default": "",
+              "title": "Source Anchor",
+              "type": "string"
+            },
+            "supersedes_finding_id": {
+              "default": "",
+              "title": "Supersedes Finding Id",
+              "type": "string"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation",
+            "actor"
+          ],
+          "title": "fow_assuranceArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_assuranceDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_audit_phase": {
+        "description": "Start a durable phase-audit job for a named scope.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Requirement Ids"
+            },
+            "scope_id": {
+              "title": "Scope Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "scope_id",
+            "actor"
+          ],
+          "title": "fow_audit_phaseArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_audit_phaseDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_bootstrap": {
+        "description": "Start, derive, confirm or close an authority-gated project bootstrap.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "bootstrap_id": {
+              "default": "",
+              "title": "Bootstrap Id",
+              "type": "string"
+            },
+            "completion_reference": {
+              "default": "",
+              "title": "Completion Reference",
+              "type": "string"
+            },
+            "confirmation_reference": {
+              "default": "",
+              "title": "Confirmation Reference",
+              "type": "string"
+            },
+            "contradiction": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Contradiction"
+            },
+            "intake": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Intake"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "path": {
+              "default": "",
+              "title": "Path",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "project_name": {
+              "default": "",
+              "title": "Project Name",
+              "type": "string"
+            },
+            "provider_context_id": {
+              "default": "",
+              "title": "Provider Context Id",
+              "type": "string"
+            },
+            "provider_kind": {
+              "default": "",
+              "title": "Provider Kind",
+              "type": "string"
+            },
+            "provider_scope_id": {
+              "default": "",
+              "title": "Provider Scope Id",
+              "type": "string"
+            },
+            "reason": {
+              "default": "",
+              "title": "Reason",
+              "type": "string"
+            },
+            "replacement_reason": {
+              "default": "",
+              "title": "Replacement Reason",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "surfaces": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Surfaces"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation",
+            "actor"
+          ],
+          "title": "fow_bootstrapArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_bootstrapDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_campaign_advance": {
+        "description": "Perform deterministic campaign work until one semantic, provider or evidence boundary.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "campaign_id": {
+              "default": "",
+              "title": "Campaign Id",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "title": "Request Id",
+              "type": "string"
+            },
+            "transition_budget": {
+              "default": 8,
+              "title": "Transition Budget",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "project_id",
+            "actor",
+            "request_id"
+          ],
+          "title": "fow_campaign_advanceArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_campaign_advanceDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_campaign_author": {
+        "description": "Create or incrementally revise one qualified campaign, obligation, oracle or materialization authority.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "answer": {
+              "default": null,
+              "title": "Answer"
+            },
+            "answer_authority": {
+              "default": "",
+              "title": "Answer Authority",
+              "type": "string"
+            },
+            "authority_reference": {
+              "default": "",
+              "title": "Authority Reference",
+              "type": "string"
+            },
+            "campaign_id": {
+              "default": "",
+              "title": "Campaign Id",
+              "type": "string"
+            },
+            "case": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Case"
+            },
+            "case_id": {
+              "default": "",
+              "title": "Case Id",
+              "type": "string"
+            },
+            "case_order": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Case Order"
+            },
+            "coverage_intent": {
+              "default": "",
+              "title": "Coverage Intent",
+              "type": "string"
+            },
+            "decision": {
+              "default": "",
+              "title": "Decision",
+              "type": "string"
+            },
+            "disposition_reference": {
+              "default": "",
+              "title": "Disposition Reference",
+              "type": "string"
+            },
+            "evidence_gaps": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evidence Gaps"
+            },
+            "evidence_id": {
+              "default": "",
+              "title": "Evidence Id",
+              "type": "string"
+            },
+            "exception_obligation_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Exception Obligation Ids"
+            },
+            "expected_fingerprint": {
+              "default": "",
+              "title": "Expected Fingerprint",
+              "type": "string"
+            },
+            "harness": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Harness"
+            },
+            "obligation_id": {
+              "default": "",
+              "title": "Obligation Id",
+              "type": "string"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "oracle": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Oracle"
+            },
+            "oracle_id": {
+              "default": "",
+              "title": "Oracle Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "provenance": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Provenance"
+            },
+            "provider_command_id": {
+              "default": "",
+              "title": "Provider Command Id",
+              "type": "string"
+            },
+            "question_id": {
+              "default": "",
+              "title": "Question Id",
+              "type": "string"
+            },
+            "rationale": {
+              "default": "",
+              "title": "Rationale",
+              "type": "string"
+            },
+            "regression_obligation": {
+              "default": false,
+              "title": "Regression Obligation",
+              "type": "boolean"
+            },
+            "request_id": {
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requested_capability": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Requested Capability"
+            },
+            "risk_authority": {
+              "default": "",
+              "title": "Risk Authority",
+              "type": "string"
+            },
+            "scope": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Scope"
+            },
+            "source_files": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Files"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            },
+            "waiver_scope": {
+              "default": "",
+              "title": "Waiver Scope",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation",
+            "actor",
+            "request_id"
+          ],
+          "title": "fow_campaign_authorArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_campaign_authorDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_campaign_inspect": {
+        "description": "Inspect one bounded campaign summary, working sheet, semantic component or history page.",
+        "input_schema": {
+          "properties": {
+            "campaign_id": {
+              "default": "",
+              "title": "Campaign Id",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "limit": {
+              "default": 20,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "offset": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "view": {
+              "default": "summary",
+              "title": "View",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "title": "fow_campaign_inspectArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_campaign_inspectDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_capabilities": {
+        "description": "Discover a bounded workflow summary, one named recipe, or the full diagnostic catalog.",
+        "input_schema": {
+          "properties": {
+            "operation_name": {
+              "default": "",
+              "title": "Operation Name",
+              "type": "string"
+            },
+            "operation_tool": {
+              "default": "",
+              "title": "Operation Tool",
+              "type": "string"
+            },
+            "recipe_name": {
+              "default": "",
+              "title": "Recipe Name",
+              "type": "string"
+            },
+            "view": {
+              "default": "summary",
+              "title": "View",
+              "type": "string"
+            }
+          },
+          "title": "fow_capabilitiesArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_capabilitiesDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_change": {
+        "description": "Advanced governed lifecycle surface for change, evidence, handoff, and packet state; use fow_packet_* for ordinary packet work.",
+        "input_schema": {
+          "properties": {
+            "accepted_risk_ref": {
+              "default": "",
+              "title": "Accepted Risk Ref",
+              "type": "string"
+            },
+            "active_provider": {
+              "default": "",
+              "title": "Active Provider",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "answer_summary": {
+              "default": "",
+              "title": "Answer Summary",
+              "type": "string"
+            },
+            "assertion": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Assertion"
+            },
+            "baseline_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Baseline Refs"
+            },
+            "blocking_reasons": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Blocking Reasons"
+            },
+            "candidate_set_id": {
+              "default": "",
+              "title": "Candidate Set Id",
+              "type": "string"
+            },
+            "candidate_set_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Candidate Set Ids"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "claim_contradicted": {
+              "default": false,
+              "title": "Claim Contradicted",
+              "type": "boolean"
+            },
+            "claim_dynamic": {
+              "default": false,
+              "title": "Claim Dynamic",
+              "type": "boolean"
+            },
+            "claim_id": {
+              "default": "",
+              "title": "Claim Id",
+              "type": "string"
+            },
+            "claim_key": {
+              "default": "",
+              "title": "Claim Key",
+              "type": "string"
+            },
+            "claim_required": {
+              "default": true,
+              "title": "Claim Required",
+              "type": "boolean"
+            },
+            "claim_type": {
+              "default": "",
+              "title": "Claim Type",
+              "type": "string"
+            },
+            "claims": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Claims"
+            },
+            "completeness": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Completeness"
+            },
+            "completion_criteria": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Completion Criteria"
+            },
+            "construction_audit_id": {
+              "default": "",
+              "title": "Construction Audit Id",
+              "type": "string"
+            },
+            "context_snapshot_id": {
+              "default": "",
+              "title": "Context Snapshot Id",
+              "type": "string"
+            },
+            "context_snapshot_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Context Snapshot Ids"
+            },
+            "contract_version": {
+              "default": "packet-evidence-snapshot-v1",
+              "title": "Contract Version",
+              "type": "string"
+            },
+            "criterion_results": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Criterion Results"
+            },
+            "depends_on_packet_id": {
+              "default": "",
+              "title": "Depends On Packet Id",
+              "type": "string"
+            },
+            "diagnostics": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Diagnostics"
+            },
+            "disposition": {
+              "default": "",
+              "title": "Disposition",
+              "type": "string"
+            },
+            "evidence_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evidence Refs"
+            },
+            "fingerprint": {
+              "default": "",
+              "title": "Fingerprint",
+              "type": "string"
+            },
+            "goal_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Goal Ids"
+            },
+            "in_scope": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "In Scope"
+            },
+            "intent": {
+              "default": "",
+              "title": "Intent",
+              "type": "string"
+            },
+            "invariants": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Invariants"
+            },
+            "linked_navigation_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Linked Navigation Refs"
+            },
+            "max_claims": {
+              "default": 512,
+              "title": "Max Claims",
+              "type": "integer"
+            },
+            "max_depth": {
+              "default": 4,
+              "title": "Max Depth",
+              "type": "integer"
+            },
+            "milestone_id": {
+              "default": "",
+              "title": "Milestone Id",
+              "type": "string"
+            },
+            "navigation_audit_id": {
+              "default": "",
+              "title": "Navigation Audit Id",
+              "type": "string"
+            },
+            "navigation_audit_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Navigation Audit Ids"
+            },
+            "object_ref": {
+              "default": "",
+              "title": "Object Ref",
+              "type": "string"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "out_of_scope": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Out Of Scope"
+            },
+            "packet_id": {
+              "default": "",
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "packet_status": {
+              "default": "",
+              "title": "Packet Status",
+              "type": "string"
+            },
+            "policy_ref": {
+              "default": "",
+              "title": "Policy Ref",
+              "type": "string"
+            },
+            "predicate": {
+              "default": "",
+              "title": "Predicate",
+              "type": "string"
+            },
+            "pressure_id": {
+              "default": "",
+              "title": "Pressure Id",
+              "type": "string"
+            },
+            "profile": {
+              "default": "balanced",
+              "title": "Profile",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "provider": {
+              "default": "",
+              "title": "Provider",
+              "type": "string"
+            },
+            "provider_id": {
+              "default": "",
+              "title": "Provider Id",
+              "type": "string"
+            },
+            "provider_scope_id": {
+              "default": "",
+              "title": "Provider Scope Id",
+              "type": "string"
+            },
+            "provider_snapshot_id": {
+              "default": "",
+              "title": "Provider Snapshot Id",
+              "type": "string"
+            },
+            "question_id": {
+              "default": "",
+              "title": "Question Id",
+              "type": "string"
+            },
+            "rationale": {
+              "default": "",
+              "title": "Rationale",
+              "type": "string"
+            },
+            "reconciliation_disposition": {
+              "default": "",
+              "title": "Reconciliation Disposition",
+              "type": "string"
+            },
+            "reconciliation_item_id": {
+              "default": "",
+              "title": "Reconciliation Item Id",
+              "type": "string"
+            },
+            "reconciliation_profile": {
+              "default": "target-impact-v1",
+              "title": "Reconciliation Profile",
+              "type": "string"
+            },
+            "reconciliation_scope_id": {
+              "default": "",
+              "title": "Reconciliation Scope Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Requirement Ids"
+            },
+            "selection_ref": {
+              "default": "",
+              "title": "Selection Ref",
+              "type": "string"
+            },
+            "snapshot_id": {
+              "default": "",
+              "title": "Snapshot Id",
+              "type": "string"
+            },
+            "source_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Refs"
+            },
+            "source_revision": {
+              "default": "",
+              "title": "Source Revision",
+              "type": "string"
+            },
+            "subject_ref": {
+              "default": "",
+              "title": "Subject Ref",
+              "type": "string"
+            },
+            "successor_packet_id": {
+              "default": "",
+              "title": "Successor Packet Id",
+              "type": "string"
+            },
+            "summary": {
+              "default": "",
+              "title": "Summary",
+              "type": "string"
+            },
+            "surfaces": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Surfaces"
+            },
+            "target_binding_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Binding Ids"
+            },
+            "target_policy": {
+              "default": "",
+              "title": "Target Policy",
+              "type": "string"
+            },
+            "target_state": {
+              "default": "",
+              "title": "Target State",
+              "type": "string"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            },
+            "truncated": {
+              "default": false,
+              "title": "Truncated",
+              "type": "boolean"
+            },
+            "unresolved_questions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Unresolved Questions"
+            },
+            "waiver_rationale": {
+              "default": "",
+              "title": "Waiver Rationale",
+              "type": "string"
+            },
+            "workspace_revision": {
+              "default": "",
+              "title": "Workspace Revision",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation",
+            "actor"
+          ],
+          "title": "fow_changeArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_changeDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_create_project": {
+        "description": "Create an isolated canonical lifecycle project.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "name",
+            "actor"
+          ],
+          "title": "fow_create_projectArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_create_projectDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_generate_artifacts": {
+        "description": "Start a durable standard-profile artifact generation job.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "profile_id": {
+              "title": "Profile Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "profile_id",
+            "actor"
+          ],
+          "title": "fow_generate_artifactsArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_generate_artifactsDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_get_artifacts": {
+        "description": "Read persisted generated artifact metadata or content.",
+        "input_schema": {
+          "properties": {
+            "artifact_kind": {
+              "default": "",
+              "title": "Artifact Kind",
+              "type": "string"
+            },
+            "generation_id": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Generation Id"
+            },
+            "include_content": {
+              "default": false,
+              "title": "Include Content",
+              "type": "boolean"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "title": "fow_get_artifactsArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_get_artifactsDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_get_job": {
+        "description": "Read one durable job state.",
+        "input_schema": {
+          "properties": {
+            "job_id": {
+              "title": "Job Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "job_id"
+          ],
+          "title": "fow_get_jobArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_get_jobDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_get_requirement": {
+        "description": "Read one canonical requirement and immutable history.",
+        "input_schema": {
+          "properties": {
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "requirement_id": {
+              "title": "Requirement Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "requirement_id"
+          ],
+          "title": "fow_get_requirementArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_get_requirementDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_goal": {
+        "description": "Create, link and inspect Goal Graph use cases, sequences and expectations.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "default": "",
+              "title": "Actor",
+              "type": "string"
+            },
+            "alternate_steps": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Alternate Steps"
+            },
+            "category": {
+              "default": "",
+              "title": "Category",
+              "type": "string"
+            },
+            "detail_level": {
+              "default": "standard",
+              "title": "Detail Level",
+              "type": "string"
+            },
+            "expected_effects": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Expected Effects"
+            },
+            "failure_steps": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Failure Steps"
+            },
+            "invariants": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Invariants"
+            },
+            "limit": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "normal_steps": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Normal Steps"
+            },
+            "objective": {
+              "default": "",
+              "title": "Objective",
+              "type": "string"
+            },
+            "observable_outcome": {
+              "default": "",
+              "title": "Observable Outcome",
+              "type": "string"
+            },
+            "offset": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "participants": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Participants"
+            },
+            "postconditions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Postconditions"
+            },
+            "preconditions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Preconditions"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "relation": {
+              "default": "",
+              "title": "Relation",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_anchor": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Source Anchor"
+            },
+            "source_goal_id": {
+              "default": "",
+              "title": "Source Goal Id",
+              "type": "string"
+            },
+            "statement": {
+              "default": "",
+              "title": "Statement",
+              "type": "string"
+            },
+            "target_goal_id": {
+              "default": "",
+              "title": "Target Goal Id",
+              "type": "string"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            },
+            "use_case_actor": {
+              "default": "",
+              "title": "Use Case Actor",
+              "type": "string"
+            },
+            "view": {
+              "default": "summary",
+              "title": "View",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation"
+          ],
+          "title": "fow_goalArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_goalDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_ground_intent": {
+        "description": "Start a durable goal-to-implementation reconciliation job.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "goal_node_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Goal Node Ids",
+              "type": "array"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_revision": {
+              "default": "",
+              "title": "Source Revision",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "goal_node_ids",
+            "actor"
+          ],
+          "title": "fow_ground_intentArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_ground_intentDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_handover": {
+        "description": "Create resume contexts, bounded ledger projections, and one coherent project-state recovery snapshot.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "default": "",
+              "title": "Actor",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "focus_kind": {
+              "default": "project",
+              "title": "Focus Kind",
+              "type": "string"
+            },
+            "focus_ref": {
+              "default": "",
+              "title": "Focus Ref",
+              "type": "string"
+            },
+            "handover_id": {
+              "default": "",
+              "title": "Handover Id",
+              "type": "string"
+            },
+            "limit": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "packet_id": {
+              "default": "",
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "profile_version": {
+              "default": "handover-context-v1",
+              "title": "Profile Version",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "projection_kind": {
+              "default": "lifecycle",
+              "title": "Projection Kind",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "run_id": {
+              "default": "",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation"
+          ],
+          "title": "fow_handoverArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_handoverDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_import_srs": {
+        "description": "Validate and atomically import one accepted initial SRS baseline.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_path": {
+              "title": "Source Path",
+              "type": "string"
+            },
+            "standard_profile": {
+              "title": "Standard Profile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "source_path",
+            "standard_profile",
+            "actor"
+          ],
+          "title": "fow_import_srsArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_import_srsDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_list_jobs": {
+        "description": "List durable jobs for a project.",
+        "input_schema": {
+          "properties": {
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "title": "fow_list_jobsArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_list_jobsDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_packet_advance": {
+        "description": "Perform safe deterministic packet transitions until the next decision or asynchronous boundary.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "decision": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Decision"
+            },
+            "expected_plan_revision": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Expected Plan Revision"
+            },
+            "expected_spec_revision": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Expected Spec Revision"
+            },
+            "packet_id": {
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "actor",
+            "request_id",
+            "project_id",
+            "packet_id"
+          ],
+          "title": "fow_packet_advanceArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_packet_advanceDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_packet_author": {
+        "description": "Create or atomically revise one canonical packet plan using stable project_id and packet_id addressing.",
+        "input_schema": {
+          "properties": {
+            "active_provider": {
+              "default": "",
+              "title": "Active Provider",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "answers": {
+              "anyOf": [
+                {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Answers"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "client_unit_key": {
+              "default": "",
+              "title": "Client Unit Key",
+              "type": "string"
+            },
+            "completion_criteria": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Completion Criteria"
+            },
+            "depends_on": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Depends On"
+            },
+            "expected_plan_revision": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Expected Plan Revision"
+            },
+            "expected_spec_revision": {
+              "default": 0,
+              "title": "Expected Spec Revision",
+              "type": "integer"
+            },
+            "finding_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Finding Ids"
+            },
+            "gate_fingerprint": {
+              "default": "",
+              "title": "Gate Fingerprint",
+              "type": "string"
+            },
+            "goal_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Goal Ids"
+            },
+            "in_scope": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "In Scope"
+            },
+            "intent": {
+              "default": "",
+              "title": "Intent",
+              "type": "string"
+            },
+            "invariants": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Invariants"
+            },
+            "milestone_id": {
+              "default": "",
+              "title": "Milestone Id",
+              "type": "string"
+            },
+            "operation": {
+              "default": "add_unit",
+              "title": "Operation",
+              "type": "string"
+            },
+            "out_of_scope": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Out Of Scope"
+            },
+            "packet_id": {
+              "default": "",
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "predecessor_packet_id": {
+              "default": "",
+              "title": "Predecessor Packet Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "purpose": {
+              "default": "implementation",
+              "title": "Purpose",
+              "type": "string"
+            },
+            "rationale": {
+              "default": "",
+              "title": "Rationale",
+              "type": "string"
+            },
+            "request_id": {
+              "title": "Request Id",
+              "type": "string"
+            },
+            "required_campaign_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Required Campaign Ids"
+            },
+            "required_regression_evidence": {
+              "default": "",
+              "title": "Required Regression Evidence",
+              "type": "string"
+            },
+            "requirement_ids": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Requirement Ids"
+            },
+            "response": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Response"
+            },
+            "source_revision": {
+              "default": "",
+              "title": "Source Revision",
+              "type": "string"
+            },
+            "target_policy": {
+              "default": "code_targets_required",
+              "title": "Target Policy",
+              "type": "string"
+            },
+            "target_selection": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Selection"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            },
+            "unit": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Unit"
+            },
+            "unit_patch": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Unit Patch"
+            },
+            "unresolved_questions": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Unresolved Questions"
+            },
+            "work_plan": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Work Plan"
+            }
+          },
+          "required": [
+            "actor",
+            "request_id",
+            "project_id"
+          ],
+          "title": "fow_packet_authorArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_packet_authorDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_packet_inspect": {
+        "description": "Inspect one bounded packet summary, unit page, gate view or history page.",
+        "input_schema": {
+          "properties": {
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "detail_level": {
+              "default": "standard",
+              "title": "Detail Level",
+              "type": "string"
+            },
+            "limit": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "offset": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            },
+            "packet_id": {
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "view": {
+              "default": "summary",
+              "title": "View",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "packet_id"
+          ],
+          "title": "fow_packet_inspectArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_packet_inspectDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_promote_milestone": {
+        "description": "Freeze a bounded requirement set as a planned milestone; omit acceptance_evidence for planning-only scope.",
+        "input_schema": {
+          "properties": {
+            "acceptance_evidence": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Acceptance Evidence"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "dependency_closure_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Dependency Closure Ids",
+              "type": "array"
+            },
+            "entry_policy": {
+              "additionalProperties": true,
+              "title": "Entry Policy",
+              "type": "object"
+            },
+            "exit_policy": {
+              "additionalProperties": true,
+              "title": "Exit Policy",
+              "type": "object"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_ids": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Requirement Ids",
+              "type": "array"
+            },
+            "risk_disposition": {
+              "title": "Risk Disposition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "name",
+            "requirement_ids",
+            "dependency_closure_ids",
+            "entry_policy",
+            "exit_policy",
+            "risk_disposition",
+            "actor"
+          ],
+          "title": "fow_promote_milestoneArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_promote_milestoneDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_record_verification": {
+        "description": "Append deterministic or live verification evidence.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "metadata": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Metadata"
+            },
+            "outcome": {
+              "title": "Outcome",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "reference": {
+              "title": "Reference",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_id": {
+              "title": "Requirement Id",
+              "type": "string"
+            },
+            "verification_kind": {
+              "title": "Verification Kind",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "requirement_id",
+            "verification_kind",
+            "outcome",
+            "reference",
+            "actor"
+          ],
+          "title": "fow_record_verificationArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_record_verificationDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_register_requirement": {
+        "description": "Register one canonical requirement.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "category": {
+              "title": "Category",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "rationale": {
+              "title": "Rationale",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_anchor": {
+              "default": "",
+              "title": "Source Anchor",
+              "type": "string"
+            },
+            "statement": {
+              "title": "Statement",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "title",
+            "statement",
+            "category",
+            "rationale",
+            "actor"
+          ],
+          "title": "fow_register_requirementArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_register_requirementDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_revise_requirement": {
+        "description": "Append one immutable canonical requirement revision.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "category": {
+              "title": "Category",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "rationale": {
+              "title": "Rationale",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_id": {
+              "title": "Requirement Id",
+              "type": "string"
+            },
+            "source_anchor": {
+              "default": "",
+              "title": "Source Anchor",
+              "type": "string"
+            },
+            "statement": {
+              "title": "Statement",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "requirement_id",
+            "title",
+            "statement",
+            "category",
+            "rationale",
+            "actor"
+          ],
+          "title": "fow_revise_requirementArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_revise_requirementDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_revise_srs_baseline": {
+        "description": "Classify and append one source-proven SRS baseline revision.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "governed_approval_reference": {
+              "default": "",
+              "title": "Governed Approval Reference",
+              "type": "string"
+            },
+            "previous_baseline_id": {
+              "title": "Previous Baseline Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_path": {
+              "title": "Source Path",
+              "type": "string"
+            },
+            "standard_profile": {
+              "title": "Standard Profile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "previous_baseline_id",
+            "source_path",
+            "standard_profile",
+            "actor"
+          ],
+          "title": "fow_revise_srs_baselineArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_revise_srs_baselineDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_run": {
+        "description": "Manage implementation runs, run steps and derived task views.",
+        "input_schema": {
+          "properties": {
+            "action": {
+              "default": "",
+              "title": "Action",
+              "type": "string"
+            },
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "blocking_reason": {
+              "default": "",
+              "title": "Blocking Reason",
+              "type": "string"
+            },
+            "change_id": {
+              "default": "",
+              "title": "Change Id",
+              "type": "string"
+            },
+            "completion_reference": {
+              "default": "",
+              "title": "Completion Reference",
+              "type": "string"
+            },
+            "depends_on_step_id": {
+              "default": "",
+              "title": "Depends On Step Id",
+              "type": "string"
+            },
+            "evidence_refs": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Evidence Refs"
+            },
+            "external_ref": {
+              "default": "",
+              "title": "External Ref",
+              "type": "string"
+            },
+            "next_expected_action": {
+              "default": "",
+              "title": "Next Expected Action",
+              "type": "string"
+            },
+            "objective": {
+              "default": "",
+              "title": "Objective",
+              "type": "string"
+            },
+            "operation": {
+              "title": "Operation",
+              "type": "string"
+            },
+            "orchestrator_ref": {
+              "default": "",
+              "title": "Orchestrator Ref",
+              "type": "string"
+            },
+            "packet_id": {
+              "default": "",
+              "title": "Packet Id",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "reason": {
+              "default": "",
+              "title": "Reason",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "run_id": {
+              "default": "",
+              "title": "Run Id",
+              "type": "string"
+            },
+            "source_ref": {
+              "default": "",
+              "title": "Source Ref",
+              "type": "string"
+            },
+            "step_id": {
+              "default": "",
+              "title": "Step Id",
+              "type": "string"
+            },
+            "step_required": {
+              "default": true,
+              "title": "Step Required",
+              "type": "boolean"
+            },
+            "target_refs": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Target Refs"
+            },
+            "title": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "operation",
+            "actor"
+          ],
+          "title": "fow_runArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_runDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_set_requirement_lifecycle": {
+        "description": "Apply one policy-checked requirement lifecycle transition.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "governed_approval_reference": {
+              "default": "",
+              "title": "Governed Approval Reference",
+              "type": "string"
+            },
+            "lifecycle_status": {
+              "title": "Lifecycle Status",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "requirement_id": {
+              "title": "Requirement Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "requirement_id",
+            "lifecycle_status",
+            "reason",
+            "actor"
+          ],
+          "title": "fow_set_requirement_lifecycleArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_set_requirement_lifecycleDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_traceability": {
+        "description": "Read a bounded, paginated project traceability projection.",
+        "input_schema": {
+          "properties": {
+            "detail_level": {
+              "default": "standard",
+              "title": "Detail Level",
+              "type": "string"
+            },
+            "limit": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "milestone_id": {
+              "default": "",
+              "title": "Milestone Id",
+              "type": "string"
+            },
+            "offset": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "title": "fow_traceabilityArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_traceabilityDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_validate_srs": {
+        "description": "Start a durable structural/semantic SRS validation job.",
+        "input_schema": {
+          "properties": {
+            "actor": {
+              "title": "Actor",
+              "type": "string"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "request_id": {
+              "default": "",
+              "title": "Request Id",
+              "type": "string"
+            },
+            "source_path": {
+              "title": "Source Path",
+              "type": "string"
+            },
+            "standard_profile": {
+              "title": "Standard Profile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id",
+            "source_path",
+            "standard_profile",
+            "actor"
+          ],
+          "title": "fow_validate_srsArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_validate_srsDictOutput",
+          "type": "object"
+        }
+      },
+      "fow_what_next": {
+        "description": "Derive bounded, paginated next work from durable project state.",
+        "input_schema": {
+          "properties": {
+            "detail_level": {
+              "default": "standard",
+              "title": "Detail Level",
+              "type": "string"
+            },
+            "limit": {
+              "default": 10,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "milestone_id": {
+              "default": "",
+              "title": "Milestone Id",
+              "type": "string"
+            },
+            "offset": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            },
+            "project_id": {
+              "title": "Project Id",
+              "type": "string"
+            },
+            "scope_id": {
+              "default": "project-default",
+              "title": "Scope Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "project_id"
+          ],
+          "title": "fow_what_nextArguments",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "fow_what_nextDictOutput",
+          "type": "object"
+        }
+      }
+    },
+    "recipes": {
+      "project_state": {
+        "authority_rule": "The snapshot is a read-only projection. Never infer acceptance, live coverage or intent that is absent from its canonical evidence dimensions.",
+        "focus_values": [
+          "project",
+          "milestone",
+          "use_case",
+          "sequence",
+          "packet",
+          "gate"
+        ],
+        "guide_version": 1,
+        "name": "project-state-recovery-v1",
+        "purpose": "Recover current project direction after session start, context compaction or orchestrator handoff without reconstructing the ledger.",
+        "recipe_id": "project-state-recovery-v1",
+        "steps": [
+          "call fow_handover operation=project_state_snapshot with project focus",
+          "follow exactly one next_gate and provide only its listed required inputs",
+          "use detail_references only when the current gate needs more evidence",
+          "use a focused snapshot for one milestone, use case, sequence, packet or gate",
+          "refresh the snapshot after every material lifecycle mutation"
+        ],
+        "stop_conditions": [
+          "next_gate is authority_decision_required and no governing decision exists",
+          "completeness reports a source required by the current gate as unavailable",
+          "the retained snapshot fingerprint differs from a refreshed response"
+        ]
+      },
+      "remediation": {
+        "guide_version": 1,
+        "name": "packet-remediation-v2",
+        "purpose": "Convert accepted review findings into one ordinary successor packet that uses the normal packet-work-plan-v2 execution path.",
+        "recipe_id": "packet-remediation-v2",
+        "retry_policy": {
+          "new_packet": "open a normal successor packet for a reviewed post-run defect",
+          "same_run": "resume only an in-run provider failure that has not been reviewed as a defect"
+        },
+        "schema_rule": "Remediation is lifecycle metadata. Never invent a fixing packet schema or a provider path other than codingcastle.impl_packet.v2.",
+        "steps": [
+          "record or select the closed set of unresolved review findings",
+          "call fow_packet_author operation=start_packet with purpose=remediation, finding_ids and regression evidence",
+          "reuse predecessor scope and invariants unless the successor explicitly narrows them",
+          "inspect the result with fow_packet_inspect view=summary",
+          "navigate the effective repo or workspace surface through the implementation provider",
+          "select recent numbered targets while authoring each affected unit",
+          "author or incrementally refine the normal packet-work-plan-v2 plan through fow_packet_author",
+          "accept and advance it through fow_packet_advance",
+          "validate staged output before apply and resolve findings only from evidence"
+        ],
+        "stop_conditions": [
+          "a finding is terminal or belongs to another change",
+          "the correction has no regression-evidence requirement",
+          "the work plan or graph revision is stale",
+          "provider completion has not yet been validated"
+        ]
+      },
+      "work_plan": {
+        "author_operations": [
+          "start_packet",
+          "revise_packet",
+          "add_unit",
+          "revise_unit",
+          "remove_unit",
+          "rebind_unit",
+          "set_dependencies",
+          "answer_gate"
+        ],
+        "authoring_questions": [
+          "What exact behavior or contract must change?",
+          "Which accepted target owns that change?",
+          "What ordered implementation steps must the coder perform there?",
+          "Which existing contracts or context must be reused rather than redeclared?",
+          "Which predecessor output must exist first?",
+          "What cleanup or out-of-scope boundary prevents duplicate or dead work?",
+          "What local observable check shows that this unit is complete?"
+        ],
+        "expert_operations": [
+          "replace_plan",
+          "resolve_questions"
+        ],
+        "guide_version": 5,
+        "instruction_rule": "Instructions describe work to perform. Objectives and expected outcomes provide context but never substitute for instructions.",
+        "invalid_examples": [
+          {
+            "correction": "write ordered technical work the coder must perform",
+            "invalid": "instructions contain only the packet objective"
+          },
+          {
+            "correction": "state the behavior and contract changes at the accepted target",
+            "invalid": "instructions contain only IDs or symbol names"
+          },
+          {
+            "correction": "select only readable candidate ordinals returned by the same add_unit operation",
+            "invalid": "a caller supplies chunk IDs or binding IDs"
+          },
+          {
+            "correction": "keep only unit-local observable checks in unit_checks",
+            "invalid": "packet-wide checks copied into every unit"
+          }
+        ],
+        "name": "packet-work-plan-v2",
+        "operation_kinds": [
+          "modify_existing",
+          "delete_existing",
+          "new_file",
+          "extract_move",
+          "insert_in_file",
+          "replace_region"
+        ],
+        "provider_decision_example": {
+          "decision": {
+            "target": {
+              "context": [],
+              "mutation": 1
+            }
+          },
+          "rule": "choose one mutation ordinal and optional context ordinals from the current fow_packet_advance gate; the provider retains graph identities"
+        },
+        "purpose": "Create one packet and author its immutable work plan one unit at a time. Describe existing-code targets semantically; a configured packet provider resolves them later through its own readable choices.",
+        "recipe_id": "packet-work-plan-v2",
+        "steps": [
+          "create implementation or remediation through fow_packet_author operation=start_packet",
+          "refine missing packet scope or invariants only through the revise_packet action returned by the current gate",
+          "define each unit with fow_packet_author operation=add_unit and use target_description for existing code",
+          "add further units individually; Flow persists complete immutable plan revisions",
+          "inspect the bounded working sheet and current gate with fow_packet_inspect",
+          "answer one factual engineering gate through fow_packet_author operation=answer_gate",
+          "accept the proposed plan through the exact fow_packet_advance action returned by the gate",
+          "call fow_packet_advance for mechanical reconciliation, transient provider target decisions and provider progress",
+          "stop at semantic decisions, provider outages or asynchronous boundaries"
+        ],
+        "stop_conditions": [
+          "an existing-target unit has no semantic target description or no current provider candidate matches it",
+          "any unit has empty instructions or unit_checks",
+          "the packet or plan revision is stale",
+          "a required construction blocker remains unresolved",
+          "the configured packet provider does not support the socket contract",
+          "the provider reports unresolved or incomplete target evidence"
+        ],
+        "unit_shape": {
+          "deterministic_deletion": "delete_existing selects exactly one current parser symbol; Flow emits no byte range and CodingCastle performs zero model calls",
+          "future_destination": "new_file and extract_move require file_path. In provider-backed mode omit member_label when the provider can resolve one catalog member; when it presents multiple readable members, use only the selected provider label. Never infer a label from file_path, project ID, active ordering or another local heuristic",
+          "optional": [
+            "member_label",
+            "constraints",
+            "out_of_scope",
+            "depends_on",
+            "replaces",
+            "surface"
+          ],
+          "required": [
+            "client_unit_key",
+            "operation_kind",
+            "instructions",
+            "unit_checks"
+          ],
+          "target_choice": "in provider-backed mode set target_description and do not pass provider identities; fow_packet_advance later presents transient readable ordinals. In agnostic mode only, add_unit may offer Flow-local audited candidates without claiming executability"
+        },
+        "valid_example": {
+          "units": [
+            {
+              "client_unit_key": "types",
+              "file_path": "src/process/types.ts",
+              "instructions": [
+                "Export the process lifecycle and readiness contracts.",
+                "Keep the module free of process-launching behavior."
+              ],
+              "operation_kind": "new_file",
+              "unit_checks": [
+                "The required public contracts are exported."
+              ]
+            },
+            {
+              "client_unit_key": "runtime",
+              "depends_on": [
+                "types"
+              ],
+              "instructions": [
+                "Consume the predecessor contracts without redeclaring them.",
+                "Implement bounded process startup and shutdown behavior."
+              ],
+              "operation_kind": "modify_existing",
+              "target_description": "the existing process supervisor lifecycle implementation",
+              "unit_checks": [
+                "Startup and shutdown preserve the declared lifecycle contract."
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "server_instructions": "Flow of Work MCP is a durable software-lifecycle control plane. Call fow_capabilities first, then call fow_what_next for the current project. Use fow_packet_author/inspect/advance for packet work and fow_campaign_author/inspect/advance for verification campaigns. Use fow_get_job only after an asynchronous operation has returned a durable job_id."
+  },
+  "fixture_version": 1,
+  "measurement_method": "canonical-json chars; conservative ceil(chars/4) tokens",
+  "measurements": {
+    "canonical_chars": 100759,
+    "estimated_tokens": 25190,
+    "multiplexed_operation_count": 114,
+    "public_tool_count": 32,
+    "recipe_count": 3
+  },
+  "representative_receipts": {
+    "fow_campaign_inspect": {
+      "campaign": null,
+      "lifecycle_gate": {
+        "allowed_responses": [],
+        "contract": "flow.lifecycle_gate.v1",
+        "decision_required": {
+          "kind": "campaign_scope"
+        },
+        "dependency_fingerprint": "8cea3f07c7feb21e18828ac79ba2914fd14f8461d75f073f9881d4763e398c95",
+        "known_facts": [],
+        "lifecycle_state": "missing",
+        "next_action": {
+          "operation": "start",
+          "tool": "fow_campaign_author"
+        },
+        "semantic_effect": "create one qualified campaign from current scope",
+        "state": "semantic_decision",
+        "subject": "campaign"
+      }
+    },
+    "fow_capabilities": {
+      "advanced_lifecycle_tools": [
+        "fow_change",
+        "fow_assurance",
+        "fow_run",
+        "fow_handover"
+      ],
+      "operation_request": {
+        "available_operation_tools": [
+          "fow_assurance",
+          "fow_bootstrap",
+          "fow_campaign_advance",
+          "fow_campaign_author",
+          "fow_campaign_inspect",
+          "fow_change",
+          "fow_goal",
+          "fow_handover",
+          "fow_packet_advance",
+          "fow_packet_author",
+          "fow_packet_inspect",
+          "fow_run"
+        ],
+        "required_inputs": [
+          "operation_tool",
+          "operation_name"
+        ],
+        "tool": "fow_capabilities",
+        "view": "operation"
+      },
+      "preferred_campaign_tools": [
+        "fow_campaign_author",
+        "fow_campaign_inspect",
+        "fow_campaign_advance"
+      ],
+      "preferred_entrypoint": "fow_what_next",
+      "preferred_packet_tools": [
+        "fow_packet_author",
+        "fow_packet_inspect",
+        "fow_packet_advance"
+      ],
+      "provider_status": [
+        {
+          "available": false,
+          "name": "semantic_validation"
+        },
+        {
+          "available": false,
+          "name": "intention_grounding"
+        },
+        {
+          "available": false,
+          "name": "bootstrap_behavior_derivation"
+        }
+      ],
+      "recipe_request": {
+        "required_input": "recipe_name",
+        "tool": "fow_capabilities",
+        "view": "recipe"
+      },
+      "recipes": [
+        {
+          "name": "milestone-planning",
+          "purpose": "Create a planned milestone from requirements without prematurely marking acceptance evidence."
+        },
+        {
+          "name": "packet-work-plan-v2",
+          "purpose": "Create one packet and author its immutable work plan one unit at a time. Describe existing-code targets semantically; a configured packet provider resolves them later through its own readable choices."
+        },
+        {
+          "name": "packet-remediation-v2",
+          "purpose": "Convert accepted review findings into one ordinary successor packet that uses the normal packet-work-plan-v2 execution path."
+        },
+        {
+          "name": "project-state-recovery-v1",
+          "purpose": "Recover current project direction after session start, context compaction or orchestrator handoff without reconstructing the ledger."
+        },
+        {
+          "name": "closed-packet-workflow-v1",
+          "purpose": "Author one canonical packet, advance all mechanical lifecycle steps, and stop only at explicit semantic or provider boundaries."
+        },
+        {
+          "name": "implementation-provider-binding",
+          "purpose": "Bind a lifecycle project to one scope of an implementation provider whose transport is already authorized by server config."
+        },
+        {
+          "name": "packet-evidence-reconciliation",
+          "purpose": "Ground ordinary packet targets through consumer-native selection while Flow retains provider evidence internally."
+        },
+        {
+          "name": "workspace-review-continuation-v1",
+          "purpose": "Record one provider-neutral review of the current workspace artifact and continue into verification, remediation or blockage."
+        },
+        {
+          "name": "qualified-campaign-workflow-v1",
+          "purpose": "Author one qualified verification campaign, materialize source-authored or typed-oracle tests through the configured provider, and close only from current attested evidence."
+        }
+      ],
+      "view": "summary"
+    },
+    "fow_create_project": {
+      "created_at": "<timestamp>",
+      "name": "Baseline Project",
+      "project_id": "baseline-project"
+    },
+    "fow_list_jobs": {
+      "jobs": []
+    },
+    "fow_packet_inspect": {
+      "error_type": "ToolError",
+      "message": "Error executing tool fow_packet_inspect: unknown packet in project: PACKET-999999"
+    },
+    "fow_what_next": {
+      "alternatives": [],
+      "detail_level": "standard",
+      "primary_action": {
+        "action_id": "phase-audit:project-default",
+        "arguments": {},
+        "audit_ids": [],
+        "automatic_eligible": false,
+        "campaign_ids": [],
+        "candidate_ids": [],
+        "change_ids": [],
+        "decision_class": "",
+        "execution_class": "deterministic",
+        "finding_ids": [],
+        "goal_node_ids": [],
+        "kind": "run_phase_audit",
+        "milestone_ids": [],
+        "operation": "",
+        "packet_ids": [],
+        "priority": 90,
+        "rationale": "no phase audit has yet established a baseline for this scope",
+        "required_inputs": [],
+        "requirement_ids": [],
+        "run_ids": [],
+        "state": "pending",
+        "step_ids": [],
+        "tool": ""
+      },
+      "summary": {
+        "blocked_milestone_entry_count": 0,
+        "lifecycle_action_count": 1,
+        "milestone_count": 0,
+        "packet_action_count": 0
+      }
+    }
+  }
+}

@@ -1,5 +1,7 @@
 """Selected architecture survives offline artifacts and honest currentness checks."""
 from copy import deepcopy
+import json
+import sqlite3
 
 import pytest
 
@@ -33,7 +35,7 @@ def prepared(tmp_path):
     runtime = build_runtime(database_path=ledger.database_path, import_root=tmp_path, ledger=ledger)
     authority = definition()
     authority['decisions'][0]['links'] = [{'kind': 'requirement', 'requirement_id': 'REQ-000001'}]
-    adopted = adopt(runtime.architecture, authority)
+    adopted = adopt(runtime.architecture, authority, expected=runtime.ledger.architecture_revision(ids[0])['revision'])
     return runtime, ids, repin(runtime, ids, adopted['revision']), authority, adopted['revision']
 
 
@@ -101,10 +103,31 @@ def test_offline_outcome_restart_and_relevant_architecture_drift_remain_historic
         reopened.close()
 
 
-def test_unpinned_legacy_packet_ignores_unrelated_project_architecture(tmp_path):
+def pre_policy_unpinned_fixture(tmp_path):
     ledger, external, ids, revs = fixture(tmp_path)
+    plan = ledger.packet_work_plan_state(*ids)
+    # Model pre-policy issued history explicitly, never an upgrade or a runtime
+    # bypass. No report/evidence is promoted or assigned a new source pin.
+    with sqlite3.connect(ledger.database_path) as connection:
+        connection.execute("UPDATE implementation_packets SET architecture_refs_json='[]' WHERE project_id=? AND packet_id=?",
+                           (ids[0], ids[2]))
+        connection.execute("UPDATE implementation_packet_revisions SET architecture_refs_json='[]' WHERE project_id=? AND packet_id=?",
+                           (ids[0], ids[2]))
+        events = connection.execute('SELECT event_id,payload_json FROM packet_work_plan_events WHERE project_id=? AND work_plan_id=? AND event_type=?',
+                                    (ids[0], plan['work_plan_id'], 'work_plan_accepted')).fetchall()
+        for event_id, raw_payload in events:
+            payload = json.loads(raw_payload)
+            payload.pop('engineering_cycle_version', None)
+            connection.execute('UPDATE packet_work_plan_events SET payload_json=? WHERE event_id=?',
+                               (json.dumps(payload), event_id))
+    assert ledger.packet_work_plan_state(*ids)['engineering_cycle_version'] is None
+    return ledger, external, ids, revs
+
+
+def test_unpinned_legacy_packet_ignores_unrelated_project_architecture(tmp_path):
+    ledger, external, ids, revs = pre_policy_unpinned_fixture(tmp_path)
     original = external.call(*ids, 'export_plan', payload=revs, actor='agent', request_id='before')
-    adopt(ArchitectureService(ledger))
+    adopt(ArchitectureService(ledger), expected=ledger.architecture_revision(ids[0])['revision'])
     after = external.call(*ids, 'export_plan', payload=revs, actor='agent', request_id='after')
     assert original['authority_fingerprint'] == after['authority_fingerprint']
     assert original['content'] == after['content']

@@ -16,7 +16,7 @@ from flow_of_work_mcp.application.operation_contracts import (
     parameter_help,
     public_tool_names,
 )
-from flow_of_work_mcp.application.external_plan_markdown import render_assurance_result, render_external_result
+from flow_of_work_mcp.application.external_plan_markdown import render_assurance_result, render_external_result, repository_review_summary
 from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
 from flow_of_work_mcp.core.domain.artifacts import ArtifactKind
 from flow_of_work_mcp.markdown_adapter import (
@@ -308,6 +308,24 @@ def _guided_bootstrap_markdown(payload: Mapping[str, Any], operation: str, outpu
     )
 
 
+def _compact_repository_reviews(value: Any) -> Any:
+    """Render bounded review facts without changing the application envelope."""
+    if isinstance(value, Mapping):
+        if (value.get("contract_version") in (
+                "flow.repository-review-projection.v1", "flow.repository-review.v1")
+                and "coverage" in value):
+            # An audit rejection can return this projection directly. Templates
+            # share the raw contract name but have no observed coverage to trim.
+            return repository_review_summary(value)
+        return {
+            key: _compact_repository_reviews(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_compact_repository_reviews(item) for item in value]
+    return value
+
+
 def project_markdown(
     tool_name: str,
     payload: Mapping[str, Any],
@@ -333,9 +351,25 @@ def project_markdown(
         raise ModelFacingProjectionError(f"missing_model_facing_projector:{tool_name}")
     operation = str(arguments.get("operation") or "").strip()
     complete_evidence = tool_name == "fow_traceability" and bool(arguments.get("evidence_id")) and payload.get("status") == "success"
+    explicit_review_detail = (
+        tool_name == "fow_external_work" and operation == "validation"
+        and isinstance(arguments.get("payload"), Mapping)
+        and arguments["payload"].get("detail") == "full"
+    )
     title = spec.title + (f": {operation}" if operation else "")
+    full_review = (
+        explicit_review_detail
+    ) or (tool_name == "fow_packet_inspect" and arguments.get("detail_level") == "audit") or (
+        tool_name == "fow_handover" and operation == "get_handover"
+    )
+    presentation_payload = (
+        _compact_repository_reviews(payload)
+        if not full_review and tool_name in {
+            "fow_external_work", "fow_packet_inspect", "fow_interaction", "fow_handover", "fow_audit_phase", "fow_get_job"
+        } else payload
+    )
     document, artifacts, exact_calls = _presentation_parts(
-        payload,
+        presentation_payload,
         result_heading=spec.result_heading,
         artifact_keys=spec.artifact_keys,
         exact_call_keys=spec.exact_call_keys,
@@ -360,6 +394,8 @@ def project_markdown(
         }
     if complete_evidence or (
         tool_name == "fow_bootstrap" and operation == "state_details" and payload.get("status") == "success"
+    ) or (
+        explicit_review_detail and payload.get("status") in {"success", "blocked"}
     ):
         # An explicitly requested evidence/state body is a complete reference,
         # like an exported artifact. Never silently flatten or budget-cut it.
@@ -395,7 +431,7 @@ def project_markdown(
         clean_result = document.get(spec.result_heading, {})
         if not isinstance(clean_result, Mapping):
             clean_result = {"result": clean_result}
-        body = render_assurance_result(clean_result) if assurance_intent else render_external_result(clean_result, inspection=tool_name == "fow_packet_inspect")
+        body = render_assurance_result(clean_result) if assurance_intent else render_external_result(clean_result, inspection=tool_name == "fow_packet_inspect", full_review=full_review)
         supplemental = render_markdown(
             title=title, document={},
             artifacts=[MarkdownArtifact(label=label, content=value, language=language) for label, value, language in artifacts],
