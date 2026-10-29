@@ -1,12 +1,17 @@
 # Install Flower MCP
 
-Prepare Flower 0.7.0 with the [release notes](RELEASE-NOTES-0.7.0.md) and
-[bounded engineering cycle](ENGINEERING-CYCLE.md). Publication remains conditional
-on the exact Release workflow; no 0.7.0 commit, CI or checksum is claimed here
-before that checkpoint. Use its official assets once the release is published.
+Install [Flower 0.7.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.0)
+from its official assets. The [release notes](RELEASE-NOTES-0.7.0.md) and
+[engineering cycle](ENGINEERING-CYCLE.md) explain the current workflow.
 Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-070-upgrade),
-keeping their original environment and profile. SQLite remains at schema 55;
-release qualification does not update a real installation.
+keeping their environment, profile, database and client configuration.
+
+Tag `v0.7.0` identifies commit `ae96517e34f8c0b622249f22667f8f3471128dc4`.
+The [Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/40911424880)
+passed all eight jobs. Seven assets are published with `SHA256SUMS`; official wheel
+SHA256: `60d48ddc702b662e53115698bbf2c603b124461980571e2f9251abeb950ee0d0`.
+SQLite remains at schema 55. Use the ordinary upgrade in place; package installation
+and actual client adoption are separate operations.
 
 ## Historical published 0.6.5
 

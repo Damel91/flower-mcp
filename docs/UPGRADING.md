@@ -4,9 +4,12 @@
 
 Flower 0.7.0 adds the [bounded engineering cycle](ENGINEERING-CYCLE.md); see the
 [release notes](RELEASE-NOTES-0.7.0.md). SQLite remains at schema 55 with no new
-migration or dependency change. Use the matching official release assets and
-SHA256SUMS. Publication and exact official receipts are recorded separately
-from source qualification.
+migration or dependency change. Use the matching [official assets](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.0)
+and SHA256SUMS. Tag `v0.7.0` identifies commit
+`ae96517e34f8c0b622249f22667f8f3471128dc4`; the
+[Release workflow](https://github.com/Damel91/flower-mcp/actions/runs/40911424880)
+passed all eight jobs. Official wheel SHA256:
+`60d48ddc702b662e53115698bbf2c603b124461980571e2f9251abeb950ee0d0`.
 
 Keep the original environment, profile, ledger, YAML, imports/logs and coding-
 client configuration. Preview the same-profile plan:
@@ -28,7 +31,8 @@ new external-agent cycle-1 work also requires a current repository review before
 final closure or dependent admission. Historical evidence is not erased or
 promoted to current proof. Updating the package does not automatically edit
 project `AGENTS.md`: print the new `bootstrap` and authorize its bounded merge.
-No actual user installation is changed by release qualification.
+An ordinary upgrade replaces the package in the existing environment; it does
+not recreate the profile or database.
 
 The following historical sections retain their original pins and test evidence.
 
