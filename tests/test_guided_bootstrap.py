@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 
 from tests.test_external_work import fixture as external_fixture, report
+from tests.engineering_cycle_support import record_test_repository_review
 from flow_of_work_mcp import ImplementationPacketDraft, MilestoneDraft, RequirementDraft, UseCaseDraft
 from flow_of_work_mcp.core.domain.change_control import PacketStatus, PacketTransition
 from flow_of_work_mcp.core.domain.packet_construction import PacketConstructionAuditDraft
@@ -228,6 +229,9 @@ def test_explicit_external_implemented_transition_uses_current_reports_without_a
             runtime.external_work.call(*ids, 'report_outcome', actor='host', request_id=key+'-report',
                 payload=report(runtime.external_work, ids, revs, key, report_key=key+'-done'))
         assert runtime.ledger.change_state(ids[0], ids[1])['packets'][0]['status'] == 'planned'
+        with pytest.raises(ChangeControlBlockedError, match='external_packet_implementation_incomplete'):
+            runtime.changes.transition_packet(*ids, transition, actor='host', request_id='review-required')
+        record_test_repository_review(runtime.ledger, ids)
         missing = PacketTransition(status=PacketStatus.IMPLEMENTED)
         with pytest.raises(ChangeControlBlockedError, match='criteria_missing'):
             runtime.changes.transition_packet(*ids, missing, actor='host', request_id='missing-explicit-results')
