@@ -1,5 +1,37 @@
 # Upgrade Flower without losing project data
 
+## Preparing a 0.7.0 upgrade
+
+Flower 0.7.0 adds the [bounded engineering cycle](ENGINEERING-CYCLE.md); see the
+[release notes](RELEASE-NOTES-0.7.0.md). SQLite remains at schema 55 with no new
+migration or dependency change. Use the matching official release assets and
+SHA256SUMS. Publication and exact official receipts are recorded separately
+from source qualification.
+
+Keep the original environment, profile, ledger, YAML, imports/logs and coding-
+client configuration. Preview the same-profile plan:
+
+```sh
+python3 -I ./install_flower.py --version 0.7.0 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state' --backup-root '/absolute/private/flower-backups'
+```
+
+Stop all owners before running the reviewed command without `--dry-run`. The
+unchanged installer refuses active ownership and creates a consistent SQLite
+backup and exact YAML copy before pip. Retain that backup. Failed pip does not
+promise automatic restore or atomic rollback. Restart the intended client with
+the same profile; inspect the known existing project rather than creating a
+replacement. Windows uses `py -3 -I` or the PowerShell route below.
+
+Existing issued plans, outcomes, receipts, evidence, handovers and stored exports
+retain their original authority. New acceptances require adopted architecture;
+new external-agent cycle-1 work also requires a current repository review before
+final closure or dependent admission. Historical evidence is not erased or
+promoted to current proof. Updating the package does not automatically edit
+project `AGENTS.md`: print the new `bootstrap` and authorize its bounded merge.
+No actual user installation is changed by release qualification.
+
+The following historical sections retain their original pins and test evidence.
+
 ## Preparing a 0.6.5 upgrade
 
 Flower 0.6.5 improves guided bootstrap responses and exact operation help; see the
@@ -63,7 +95,7 @@ new receipt. Restart/reconnect the intended client using the same profile.
 Failed pip does not promise automatic restore or atomic rollback.
 
 The 0.6.3 and earlier sections below retain their historical pins and evidence.
-Current operational commands later in this guide select 0.6.5.
+Current operational commands later in this guide select 0.7.0.
 
 ## Preparing a 0.6.3 upgrade
 
@@ -202,7 +234,7 @@ an actual client deployment or human acceptance.
 
 The following paragraphs retain the historical 0.6.0 compatibility checkpoint.
 The general preview, execution and manual-pip instructions later in this guide
-select published 0.6.5 assets.
+select published 0.7.0 assets.
 
 **Flower MCP 0.6.0 is published.** Its
 [milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
@@ -303,8 +335,8 @@ without an original fingerprint, inspect durable state before retrying; a new
 request key is not a substitute for that inspection. Retain original evidence
 and handover payloads while assessing current authority.
 
-The remaining operational commands select published **0.6.5**. See the
-[current release notes](RELEASE-NOTES-0.6.5.md) and the retained
+The remaining operational commands select published **0.7.0**. See the
+[current release notes](RELEASE-NOTES-0.7.0.md) and the retained
 [0.6.0 compatibility notes](RELEASE-NOTES-0.6.0.md).
 Native project deletion is never an upgrade step.
 
@@ -362,24 +394,24 @@ Prerequisites remain those in [INSTALLATION.md](INSTALLATION.md#prerequisites).
 macOS/Linux, with default installation paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.5/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Windows, run the download separately and inspect the script before execution:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.6.5/install.ps1' -OutFile '.\install.ps1'
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.7.0/install.ps1' -OutFile '.\install.ps1'
 ```
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.5' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.7.0' -Upgrade -DryRun
 ```
 
 For a custom installation, add its original environment and data options to
 both preview and execution. For example, on macOS/Linux:
 
 ```sh
-python3 -I ./install_flower.py --version 0.6.5 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
+python3 -I ./install_flower.py --version 0.7.0 --upgrade --dry-run --venv '/absolute/flower-venv' --profile default --profile-root '/absolute/private/flower-state'
 ```
 
 Here `install_flower.py` is the selected new backend, checked against its own
@@ -393,7 +425,7 @@ For example, preview an existing custom Windows installation with its original
 values, replacing these example paths:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.5' -Upgrade -DryRun -Venv 'C:\absolute\flower-venv' -Profile 'default' -ProfileRoot 'C:\absolute\private\flower-state'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.7.0' -Upgrade -DryRun -Venv 'C:\absolute\flower-venv' -Profile 'default' -ProfileRoot 'C:\absolute\private\flower-state'
 ```
 
 The returned `flower.release-upgrade-plan.v1` identifies the previous/requested
@@ -419,13 +451,13 @@ After inspecting the plan and stopping clients, repeat the same command without
 `--dry-run` / `-DryRun`. For default macOS/Linux paths:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.5/install.sh | bash -s -- --upgrade
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.0/install.sh | bash -s -- --upgrade
 ```
 
 For Windows:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.5' -Upgrade
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.7.0' -Upgrade
 ```
 
 The backend verifies the release wheel, acquires the existing selected-ledger
@@ -445,7 +477,7 @@ of all imports or logs. The original imports, logs and registrations stay in pla
 On success, retain the returned old/new versions and backup paths. Run the
 same absolute Flower executable with `doctor` and the original profile options,
 then reconnect/reload your coding client. Ask the agent to check Flower's
-advertised installed distribution version is **0.6.5**, select the **known existing project**,
+advertised installed distribution version is **0.7.0**, select the **known existing project**,
 read its current snapshot and use `fow_handover` with `resume_context` when a
 handover is available. Get/replay preserves historical handover payloads; current
 resume compares authority instead of rewriting them. Verify another restart
@@ -476,7 +508,7 @@ separate private directory; preserve the original files.
 Manual environments have no release-installer ownership receipt. Do not create
 one by hand. Stop all clients sharing the environment, record the existing
 profile/config/database paths with `doctor`, and back up before pip mutation.
-Download the 0.6.5 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
+Download the 0.7.0 Flower wheel and `SHA256SUMS`, and compare the exact wheel's
 SHA256 using the [manual installation checks](INSTALLATION.md#manual-installation-from-a-release-wheel).
 
 For a consistent SQLite backup, save the following as `backup_flower.py` outside
@@ -521,7 +553,7 @@ print(destination)
 Use your existing environment's Python to run this script. For example:
 
 ```sh
-/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.6.5
+/absolute/flower-venv/bin/python ./backup_flower.py /absolute/private/profile/ledger.sqlite3 /absolute/private/profile/flower.yaml /absolute/private/backups/before-0.7.0
 ```
 
 On Windows use `& 'C:\absolute\flower-venv\Scripts\python.exe'` and your actual
@@ -533,12 +565,12 @@ and its configuration.
 Upgrade the verified core wheel **in the same environment**, then check dependencies:
 
 ```sh
-.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.6.5-py3-none-any.whl
+.venv/bin/python -m pip install --upgrade ./flow_of_work_mcp-0.7.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.6.5-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install --upgrade .\flow_of_work_mcp-0.7.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 

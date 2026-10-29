@@ -59,11 +59,11 @@ Use this source command only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
-For a **local 0.6.5 source/candidate wheel**, use a fresh/manual environment.
+For a **local 0.7.0 source/candidate wheel**, use a fresh/manual environment.
 This local-build example is separate from the verified published artifact:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.5-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.0-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 is published at commit

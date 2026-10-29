@@ -117,3 +117,23 @@ start exposes a typed cause, current project/bootstrap context and one explicit
 `next_tool_call`. Inspect an active bootstrap instead of starting another. A
 changed replay payload requires inspection of its original owner, not a blind
 retry. Suggested recovery is never performed automatically.
+
+## Canonical architecture and bounded reconciliation
+
+Use the `provider-agnostic-engineering-cycle` recipe for architecture, work
+completion and context recovery. The marked agent template now keeps governing
+architecture in Flower, with repository Markdown limited to explanation or a
+revision-linked export. Newly accepted plans require adopted architecture and
+valid packet references. Existing issued plans retain their contract.
+
+At packet/increment completion, the host compares repository facts with scoped
+authority and original evidence, then records the current repository review.
+Missing registrations do not prove missing code; historical evidence keeps its
+original pin and provenance. Unit outcomes remain true while reconciliation is
+open. This is a boundary check, not a review after each tool call or a reason to
+repeat previously valid tests. Follow the current frame's next gate and request the named recipe from the
+connected server for its exact policy.
+
+Updating Flower does not overwrite existing project instructions. Run the new
+`bootstrap` command and explicitly merge its marked section when authorized,
+preserving other rules. The host remains responsible for loading that file.

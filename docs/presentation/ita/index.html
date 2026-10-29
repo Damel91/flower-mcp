@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: f485ea0f1fc64a80ca00538006a32d9e9ccbb07a9a7199451754d86421392a23. -->
+<!-- Generated from linked Markdown. Source digest: bb3d69a61964c162dad8b59e625235201273909b6387dacdea3eb4384b242659. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -568,9 +568,9 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>Per un <strong>wheel locale 0.6.5 ottenuto dal sorgente o candidato</strong>, usa un ambiente
+<p>Per un <strong>wheel locale 0.7.0 ottenuto dal sorgente o candidato</strong>, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:</p>
-<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.6.5-py3-none-any.whl[inference]'
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.0-py3-none-any.whl[inference]'
 </code></pre>
 <p>Flower 0.6.2 è pubblicato al commit
 <code>12ad69317dab92bdba06ae113ac22d107d259236</code>. Verifica il wheel ufficiale rispetto
@@ -1968,6 +1968,22 @@ start exposes a typed cause, current project/bootstrap context and one explicit
 <code>next_tool_call</code>. Inspect an active bootstrap instead of starting another. A
 changed replay payload requires inspection of its original owner, not a blind
 retry. Suggested recovery is never performed automatically.</p>
+<h2 id="doc-609e0ef9e8b2--canonical-architecture-and-bounded-reconciliation">Canonical architecture and bounded reconciliation</h2>
+<p>Use the <code>provider-agnostic-engineering-cycle</code> recipe for architecture, work
+completion and context recovery. The marked agent template now keeps governing
+architecture in Flower, with repository Markdown limited to explanation or a
+revision-linked export. Newly accepted plans require adopted architecture and
+valid packet references. Existing issued plans retain their contract.</p>
+<p>At packet/increment completion, the host compares repository facts with scoped
+authority and original evidence, then records the current repository review.
+Missing registrations do not prove missing code; historical evidence keeps its
+original pin and provenance. Unit outcomes remain true while reconciliation is
+open. This is a boundary check, not a review after each tool call or a reason to
+repeat previously valid tests. Follow the current frame's next gate and request the named recipe from the
+connected server for its exact policy.</p>
+<p>Updating Flower does not overwrite existing project instructions. Run the new
+<code>bootstrap</code> command and explicitly merge its marked section when authorized,
+preserving other rules. The host remains responsible for loading that file.</p>
 </article>
 <noscript><p>Il percorso completo è disponibile anche nei file Markdown; abilita JavaScript per la navigazione nel reader.</p></noscript>
 </main>

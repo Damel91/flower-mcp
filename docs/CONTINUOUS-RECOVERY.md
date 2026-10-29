@@ -6,7 +6,8 @@ export a complete implementation plan, execute it while Flower is offline and
 report the results after reconnecting. Coding, repository investigation and
 local verification remain the agent's responsibility.
 
-Release 0.4.1 retains the recovery corrections introduced in0.3.1. Use the [safe upgrade
+Use the [engineering cycle](ENGINEERING-CYCLE.md) when recovering context or
+completing a bounded increment. Use the [safe upgrade
 plan](UPGRADING.md) to preserve an existing installation's ledger and profile;
 the already published 0.3.0 assets remain unchanged. Installed distribution metadata
 identifies the package version; it does not establish that a development checkout
@@ -262,3 +263,25 @@ Agent completion, successful unit checks, campaign/Oracle verification and human
 acceptance remain distinct. Flower's recovery and TODO reads execute no code.
 They do not certify the semantic truth of a report, general agent usability or
 that the stakeholder has accepted the result.
+
+## Original report and repository-review recovery
+
+`fow_external_work` validation with `payload: {"detail":"full"}` returns complete
+review detail and a page of original outcome reports. `history_offset` is a
+nonnegative integer inside that payload; pages contain up to 20 reports. History
+remains readable outside execution admission. If current authority cannot be
+resolved, the read returns original provenance plus an explicit diagnostic and
+unassessed readiness; it does not grant execution.
+
+For cycle-1 external work, preserve completed implementation/local verification
+while resolving the current repository review before final closure or dependent
+admission. Read its exact scope/basis/template, supply actual host observations
+and follow the returned `fow_audit_phase` job through `fow_get_job`. Exact replay
+recovers its original job; changed payload or actor conflicts. A committed audit
+remains in structured `original_audit` even after a newer audit or a post-commit
+job failure. Current validation is a separate comparison and can be stale.
+
+Original reports/audits never become current semantic proof merely because they
+can be read. Preserve dates, revisions, declared provenance and unresolved gaps.
+The [engineering cycle guide](ENGINEERING-CYCLE.md) explains historical versus
+current coverage and bounded host grounding.
