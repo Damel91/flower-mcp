@@ -379,7 +379,7 @@ def test_public_tool_schema_exposes_explicit_mode_with_backward_compatible_defau
 @pytest.mark.parametrize("operation", ["start", "stop"])
 def test_public_sync_control_hold_has_read_only_matching_continuations(tmp_path, operation):
     provider = _PacketProvider()
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "created", "operation_kind": "new_file",
             "file_path": "src/created.py", "instructions": ["Create the bounded output."],
@@ -452,6 +452,9 @@ def test_public_sync_delivers_authored_edit_and_remove_before_first_start(tmp_pa
         if pressure.get("residual_risks"):
             runtime.packet_pressure.accept_risk("alpha", pressure["pressure_id"],
                 accepted_risk_ref="test:accepted-delta-risk", actor="engineer", request_id="accept-delta-pressure")
+        runtime.external_work.call("alpha", change_id, packet_id, "negotiate_provider",
+            payload={"expected_spec_revision": packet["spec_revision"], "expected_plan_revision": plan["plan_revision"]},
+            actor="engineer", request_id="negotiate-delta-plan")
         result = handle_packet_advance(runtime, project_id="alpha", change_id=change_id, packet_id=packet_id,
             actor="engineer", request_id="sync-deltas", mode="sync_only")["result"]
         _assert_start_boundary(result["advancement"], public=True)
@@ -469,7 +472,7 @@ def test_public_sync_delivers_authored_edit_and_remove_before_first_start(tmp_pa
 
 def test_sync_target_choice_and_explicit_delta_retry_preserve_sync_mode(tmp_path):
     provider = _RejectUnitOnceProvider(reason="packet_provider_target_selection_required", offer_choices=True)
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "service", "operation_kind": "modify_existing",
             "target_description": "the public Service.run method", "instructions": ["Return the bounded service result."],
@@ -514,7 +517,7 @@ class _UnavailableDraftProvider(_PacketProvider):
 
 def test_sync_legacy_unavailable_draft_returns_after_one_transport_attempt(tmp_path):
     provider = _UnavailableDraftProvider()
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "created", "operation_kind": "new_file",
             "file_path": "src/created.py", "instructions": ["Create the bounded output."],
@@ -535,7 +538,7 @@ def test_sync_legacy_unavailable_draft_returns_after_one_transport_attempt(tmp_p
 
 def test_public_sync_retry_target_boundary_preserves_required_target_input(tmp_path):
     provider = _RejectUnitOnceProvider(reason="packet_provider_target_selection_required", offer_choices=True)
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "service", "operation_kind": "modify_existing",
             "target_description": "the public Service.run method", "instructions": ["Return the bounded service result."],
@@ -562,7 +565,7 @@ def test_public_sync_retry_target_boundary_preserves_required_target_input(tmp_p
 @pytest.mark.parametrize("operation", ["start", "stop"])
 def test_sync_fifo_does_not_jump_old_generation_control_to_current_delta(tmp_path, operation):
     provider = _PacketProvider()
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "created", "operation_kind": "new_file",
             "file_path": "src/created.py", "instructions": ["Create the bounded output."],
@@ -609,7 +612,7 @@ class _StableStatusProvider(_PacketProvider):
 
 def test_sync_status_settle_checks_historical_fifo_before_claiming_synchronized(tmp_path):
     provider = _StableStatusProvider()
-    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider)
+    runtime, change_id, packet_id, _started = _seed_packet(tmp_path, mode="required", provider=provider, legacy_wire=True)
     try:
         _author_unit(runtime, packet_id, {"client_unit_key": "created", "operation_kind": "new_file",
             "file_path": "src/created.py", "instructions": ["Create the bounded output."],
