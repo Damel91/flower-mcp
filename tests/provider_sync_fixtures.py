@@ -309,7 +309,7 @@ def _close_semantic_gates(runtime, change_id: str, packet_id: str) -> None:
             expected_spec_revision=packet["spec_revision"], expected_plan_revision=plan["plan_revision"],
             actor="operator", request_id="legacy-fixture-architecture")
         assert revised["status"] == "success"
-        packet, _ = _packet_and_plan(runtime, change_id, packet_id)
+        packet, plan = _packet_and_plan(runtime, change_id, packet_id)
         replaced = handle_packet_author(runtime, project_id="alpha", change_id=change_id, packet_id=packet_id,
             operation="replace_plan", work_plan={"units": plan["units"]},
             expected_spec_revision=packet["spec_revision"], expected_plan_revision=plan["plan_revision"],
