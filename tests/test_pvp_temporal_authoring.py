@@ -12,6 +12,7 @@ from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
 from flow_of_work_mcp.core.domain.external_work import fingerprint, normalize_declarations
 from flow_of_work_mcp.core.domain.provider_validation import build_context, validate_context
 from tests.test_external_work import fixture, report
+from tests.engineering_cycle_support import record_test_repository_review
 
 
 def deferred_unit(*, key="deferred", kind="live_campaign", criterion=1):
@@ -231,6 +232,10 @@ def test_deferred_only_export_frontier_report_restart_and_progress_stay_truthful
     resumed.call(*ids, "report_outcome", payload=consumer, actor="agent", request_id="consumer-deferred")
     final = resumed.todo(*ids)
     assert final["current_unit"] is None
+    assert final["next_gate"]["tool"] == "fow_audit_phase"
+    assert final["repository_review"]["required"] and not final["repository_review"]["complete"]
+    record_test_repository_review(reopened, ids)
+    final = resumed.todo(*ids)
     assert final["next_gate"]["external_operation"] == "obtain_deferred_verification"
     assert final["acceptance"] == "not_inferred"
     assert all(obligation["state"] == "verification_pending" for obligation in final["deferred_verification"])
