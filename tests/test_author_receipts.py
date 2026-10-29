@@ -277,13 +277,23 @@ def test_pending_selection_stale_resume_preserves_intent_and_plan(authored):
 
 
 def legacy_question_packet(runtime, ids):
+    original = next(packet for packet in runtime.ledger.change_state(*ids[:2])["packets"]
+                    if packet["packet_id"] == ids[2])
+    architecture_refs = original["architecture_refs"]
     response = handle_packet_author(runtime, project_id=ids[0], change_id=ids[1], operation="start_packet",
         title="Bounded authority question", intent="Create a supporting module.",
         completion_criteria=["The module imports."], in_scope=["A supporting module"], invariants=["No I/O"],
-        unresolved_questions=["Which customer approval closes the scenario?"], actor="engineer", request_id="start-question")
+        unresolved_questions=["Which customer approval closes the scenario?"], architecture_refs=architecture_refs,
+        actor="engineer", request_id="start-question")
     scoped = (ids[0], ids[1], response["result"]["packet"]["packet_id"])
     call(runtime, scoped, "add_unit", "question-unit", unit=extra_unit(), **current(runtime, scoped))
     plan = runtime.ledger.packet_work_plan_state(*scoped)
+    # Selected architecture makes executor ownership explicit. Select the
+    # provider route locally; this fixture neither negotiates nor calls it.
+    selected = runtime.external_work.call(*scoped, "select_executor", payload={
+        "executor": "provider", "provider_kind": "codingcastle", **current(runtime, scoped)},
+        actor="engineer", request_id="question-executor-select")
+    assert selected["status"] == "success"
     runtime.packet_work_plan.accept(*scoped, plan_revision=plan["plan_revision"],
         expected_packet_revision=plan["packet_revision"], expected_current_plan_revision=plan["plan_revision"],
         rationale="The bounded plan is complete; customer authority remains separately open.", actor="engineer", request_id="question-plan-accept")
