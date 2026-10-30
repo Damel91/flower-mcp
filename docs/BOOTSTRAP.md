@@ -75,8 +75,9 @@ The printed bootstrap contains one complete, marked template for the project's
 - Require a complete accepted plan, closed Packet Validation Projection (PVP)
   and current admission before coding. Keep producer/consumer contracts and
   local versus deferred verification explicit.
-- Stop affected work on semantic gaps, reread canonical intent and record its
-  reassessment. A finding-linked corrective packet and regression can proceed
+- Hold affected repository execution on semantic gaps; continue investigation
+  and ordinary authoring within confirmed intent. Reread canonical intent and
+  record its reassessment. A finding-linked corrective packet and regression can proceed
   only when the assessment establishes a correction within agreed intent.
 - Report Flower's current criterion-based progress and evidence honestly,
   keeping implementation, verification and human acceptance separate. Execute
