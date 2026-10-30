@@ -575,26 +575,52 @@ def _require_boolean(value: object, field: str) -> bool:
 def _question_resolution_drafts(
     answers: list[Mapping[str, object]],
 ) -> tuple[PacketQuestionResolutionDraft, ...]:
-    return tuple(
-        PacketQuestionResolutionDraft(
-            question_id=str(item.get("question_id") or ""),
-            answer_summary=str(item.get("answer_summary") or ""),
-            evidence_refs=tuple(
-                _require_string_list(item.get("evidence_refs") or [], "evidence_refs")
-            ),
-            linked_navigation_refs=tuple(
-                _require_string_list(
-                    item.get("linked_navigation_refs") or [],
-                    "linked_navigation_refs",
-                )
-            ),
-            waiver_rationale=str(item.get("waiver_rationale") or ""),
-            policy_ref=str(item.get("policy_ref") or ""),
-            blocker_reason=str(item.get("blocker_reason") or ""),
-            answer_source=str(item.get("answer_source") or "explicit"),
-        )
-        for item in answers[:64]
-    )
+    if not isinstance(answers, list) or len(answers) > 64:
+        raise InputValidationError("answers must be a complete list of at most 64 entries.",
+                                   field="answers", received_value=len(answers) if isinstance(answers, list) else type(answers).__name__)
+    allowed = {"question_id", "answer_summary", "evidence_refs", "linked_navigation_refs",
+               "waiver_rationale", "policy_ref", "blocker_reason", "answer_source"}
+    for index, item in enumerate(answers):
+        if not isinstance(item, Mapping) or set(item) - allowed:
+            raise InputValidationError("Each answer must use the exact question-resolution fields.",
+                                       field=f"answers[{index}]", received_value=item,
+                                       accepted_values=sorted(allowed))
+        for key, value in item.items():
+            is_list = key in {"evidence_refs", "linked_navigation_refs"}
+            if (is_list and (not isinstance(value, list) or not all(isinstance(ref, str) for ref in value))) or (not is_list and not isinstance(value, str)):
+                raise InputValidationError("Answer fields require text or a list of text references, as declared.",
+                                           field=f"answers[{index}].{key}", received_value=value)
+        if "answer_source" in item and item["answer_source"] not in {"explicit", "deterministic_evidence", "model_proposal"}:
+            raise InputValidationError("Unknown answer source.", field=f"answers[{index}].answer_source",
+                                       received_value=item["answer_source"],
+                                       accepted_values=("explicit", "deterministic_evidence", "model_proposal"))
+    drafts = []
+    for index, item in enumerate(answers):
+        try:
+            draft = PacketQuestionResolutionDraft(
+                question_id=str(item.get("question_id") or ""),
+                answer_summary=str(item.get("answer_summary") or ""),
+                evidence_refs=tuple(
+                    _require_string_list(item.get("evidence_refs") or [], "evidence_refs")
+                ),
+                linked_navigation_refs=tuple(
+                    _require_string_list(
+                        item.get("linked_navigation_refs") or [],
+                        "linked_navigation_refs",
+                    )
+                ),
+                waiver_rationale=str(item.get("waiver_rationale") or ""),
+                policy_ref=str(item.get("policy_ref") or ""),
+                blocker_reason=str(item.get("blocker_reason") or ""),
+                answer_source=str(item.get("answer_source") or "explicit"),
+            )
+        except (ValueError, TypeError) as exc:
+            raise InputValidationError(str(exc), field=f"answers[{index}]", received_value=item) from exc
+        if any(previous.question_id == draft.question_id for previous in drafts):
+            raise InputValidationError("Duplicate question_id in the complete answer batch.",
+                                       field="answers.question_id", received_value=draft.question_id)
+        drafts.append(draft)
+    return tuple(drafts)
 
 
 def _optional_source_anchor(value: object) -> SourceAnchor | None:
@@ -808,9 +834,9 @@ def _packet_start_input(value: object, field: str, validator: Callable[[Any], An
 
 
 def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
-    """Keep pure ref proof ahead of repair; guard unit revision's late failures."""
+    """Keep pure ref proof ahead of repair; late author failures stay unknown."""
     selected = str(arguments.get("operation") or "add_unit").strip().lower()
-    if selected not in {"revise_packet", "revise_unit"}:
+    if selected not in {"revise_packet", "revise_unit", "replace_plan", "resolve_questions"}:
         return _execute_packet_command(runtime, **arguments)
     refs = arguments.get("architecture_refs") if selected == "revise_packet" else None
     if refs is not None:
@@ -833,6 +859,11 @@ def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
             "project_id": arguments.get("project_id", ""), "request_id": arguments.get("request_id", "")}
         response = {**response, "audit_reference": correlation,
                     "result": {**response.get("result", {}), "original_request": correlation}}
+        if selected in {"replace_plan", "resolve_questions"} and arguments.get("packet_id"):
+            response["result"]["next_tool_call"] = {"tool": "fow_packet_inspect", "arguments": {
+                "project_id": arguments.get("project_id", ""), "change_id": arguments.get("change_id", ""),
+                "packet_id": arguments["packet_id"], "view": "history", "detail_level": "audit", "limit": 10,
+            }}
     return response
 
 
@@ -1044,6 +1075,7 @@ def _execute_packet_command(
     current_plan_revision = (
         int(current_plan.get("plan_revision") or 0) if current_plan else 0
     )
+    declared_plan_revision = expected_plan_revision
     expected_plan_revision = (
         expected_plan_revision
         if expected_plan_revision is not None
@@ -1542,16 +1574,20 @@ def _execute_packet_command(
             if result is None:
                 raise ChangeControlBlockedError("packet_work_plan_missing")
         elif operation == "replace_plan":
-            result = runtime.packet_work_plan.set_plan(
+            result = runtime.packet_work_plan.replace_plan(
                 project_id,
                 change_id,
                 packet_id,
                 _require_mapping(work_plan, "work_plan"),
+                answers=_question_resolution_drafts(answers if answers is not None else []),
                 expected_packet_revision=spec_revision,
                 expected_current_plan_revision=expected_plan_revision,
+                declared_spec_revision=expected_spec_revision,
+                declared_plan_revision=declared_plan_revision,
                 actor=actor,
                 request_id=request_id,
             )
+            answer_result = result.get("authoring_receipt") or {}
         else:
             if answers:
                 raise ValueError(
@@ -1571,34 +1607,12 @@ def _execute_packet_command(
                 unit_patch=unit_patch,
                 depends_on=depends_on,
             )
-        if answers and operation == "replace_plan" and not result.get("replayed", False):
-            audit = runtime.packet_construction.audit_for_packet(
-                project_id, change_id, packet_id
-            )
-            if audit is None:
-                audit = runtime.packet_construction.start_audit(
-                    project_id,
-                    PacketConstructionAuditDraft(
-                        change_id=change_id, packet_id=packet_id
-                    ),
-                    actor=actor,
-                    request_id=f"{request_id}:questions" if request_id else "",
-                )
-            audit_id = str(audit["construction_audit_id"])
-            answer_result = runtime.packet_construction.resolve_questions_batch(
-                project_id,
-                audit_id,
-                _question_resolution_drafts(answers),
-                expected_spec_revision=int(result["packet_revision"]),
-                actor=actor,
-                request_id=f"{request_id}:answers" if request_id else "",
-            )
         mutation_metadata = {
             key: result[key]
             for key in ("mutation_operation", "affected_unit_key", "replayed")
             if key in result
         }
-        if not result.get("replayed", False):
+        if not result.get("replayed", False) and operation != "replace_plan":
             result = {
                 **runtime.ledger.finalize_packet_authoring_revision(
                     project_id,

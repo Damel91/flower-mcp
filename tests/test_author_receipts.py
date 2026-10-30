@@ -327,10 +327,12 @@ def test_invalid_question_batch_does_not_resolve_earlier_answers_or_change_autho
     runtime, ids = authored
     audit = runtime.packet_construction.audit_for_packet(*ids)
     before = snapshot(runtime)
-    with pytest.raises(RequirementConflictError, match="unknown packet question"):
-        call(runtime, ids, "resolve_questions", "invalid-question-batch", answers=[
-            {"question_id": audit["questions"][0]["question_id"], "answer_summary": "This answer must roll back."},
-            {"question_id": "PQUESTION-999999", "answer_summary": "Unknown question."}], **current(runtime, ids))
+    response = call(runtime, ids, "resolve_questions", "invalid-question-batch", answers=[
+        {"question_id": audit["questions"][0]["question_id"], "answer_summary": "This answer must roll back."},
+        {"question_id": "PQUESTION-999999", "answer_summary": "Unknown question."}], **current(runtime, ids))
+    assert response["status"] == "rejected"
+    assert response["result"]["effect_state"] == "unknown"
+    assert response["result"]["diagnostics"][0]["field"] == "answers.question_id"
     assert snapshot(runtime) == before
 
 

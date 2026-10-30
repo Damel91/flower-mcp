@@ -281,6 +281,11 @@ class PacketLifecycleProjectionService:
             )
         elif view == "history":
             events = _history_events(work_plan, provider_receipts, provider_outbox)
+            # Completion receipts remain inspectable after a successor plan or a
+            # lost response. Current generic events do not duplicate this payload.
+            events = [event for event in events if event.get("event_type") != "work_plan_authoring_completed"]
+            events.extend(self._work_plans.authoring_history(project_id, change_id, packet_id))
+            events.sort(key=lambda item: str(item.get("occurred_at") or ""))
             result["events"] = events[offset : offset + limit]
             result["pagination"] = _pagination(len(events), offset, limit)
         elif view == "requirements":

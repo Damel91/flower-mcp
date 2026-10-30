@@ -1365,7 +1365,9 @@ _PACKET_AUTHOR = {
         ("project_id", "packet_id", "operation", "work_plan", "actor", "request_id"),
         ("answers", "expected_spec_revision", "expected_plan_revision"),
         guidance={"work_plan": {"required_fields": ["units"], "unit": dict(_PACKET_UNIT_GUIDANCE)},
-                  "replacement_rule": "Replace the complete plan only when intended. For a targeted correction read revise_unit help. Preserve existing units/dependencies and declarations; no plan edit grants execution or acceptance."},
+                  "replacement_rule": "Replace the complete plan only when intended. For a targeted correction read revise_unit help. Preserve existing units/dependencies and declarations; no plan edit grants execution or acceptance.",
+                  "answers": "Optional complete batch, at most 64 distinct current question IDs. Answers are recorded against the pre-replacement audit in the same transaction. The returned engineering_questions receipt distinguishes retained, reopened_by_changed_dependency and ceased_applicable answers; historical recording does not close changed or absent gates. Do not remap IDs.",
+                  "replay": "New receipts bind the normalized plan, full answer list, actor, scope and supplied revision conditions. Reuse the exact original command only for reconciliation. Historical plan-only receipts cannot verify supplied answers; inspect history/current gates read-only before an explicit decision. Never automatically retry with a new key."},
     ),
     "resolve_questions": _c(
         "fow_packet_author",

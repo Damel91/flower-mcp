@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from dataclasses import replace
 from typing import Any, Mapping
 
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
@@ -11,6 +12,7 @@ from flow_of_work_mcp.core.domain.architecture import applicability, selected_cl
 from flow_of_work_mcp.core.domain.external_work import normalize_declarations
 from flow_of_work_mcp.core.domain.change_control import validate_change_id, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_project_id
+from flow_of_work_mcp.core.domain.packet_construction import PacketQuestionResolutionDraft
 from flow_of_work_mcp.core.domain.packet_work_plan import (
     PacketWorkPlanDraft,
     PacketWorkPlanStatus,
@@ -20,7 +22,7 @@ from flow_of_work_mcp.core.domain.packet_work_plan import (
 from flow_of_work_mcp.core.domain.provider_surfaces import (
     codingcastle_provider_surface,
 )
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
 
 
 def _draft_fingerprint(draft: PacketWorkPlanDraft) -> str:
@@ -54,6 +56,135 @@ def _draft_fingerprint(draft: PacketWorkPlanDraft) -> str:
 
 
 class PacketWorkPlanStoreMixin:
+    def packet_work_plan_authoring_history(
+        self, project_id: str, change_id: str, packet_id: str,
+    ) -> list[Mapping[str, object]]:
+        project_id = validate_project_id(project_id)
+        change_id, packet_id = validate_change_id(change_id), validate_packet_id(packet_id)
+        with self._read_connection() as connection:
+            rows = connection.execute(
+                """SELECT events.* FROM packet_work_plan_events AS events
+                   JOIN packet_work_plans AS plans ON plans.project_id = events.project_id
+                     AND plans.work_plan_id = events.work_plan_id
+                   WHERE plans.project_id = ? AND plans.change_id = ? AND plans.packet_id = ?
+                     AND events.event_type = 'work_plan_authoring_completed'
+                   ORDER BY events.event_id""", (project_id, change_id, packet_id),
+            ).fetchall()
+            return [{**{key: row[key] for key in ("event_type", "actor", "request_id", "work_plan_id", "plan_revision", "occurred_at")},
+                     "kind": "work_plan_authoring", "authoring_receipt": json.loads(row["payload_json"])["authoring_receipt"]}
+                    for row in rows]
+
+    def replace_packet_work_plan(
+        self, project_id: str, draft: PacketWorkPlanDraft, *,
+        answers: tuple[PacketQuestionResolutionDraft, ...],
+        command: Mapping[str, object], request_fingerprint: str,
+        expected_current_plan_revision: int, actor: str, request_id: str,
+    ) -> Mapping[str, Any]:
+        """Record original-scope answers and replacement as one durable command."""
+        project_id = validate_project_id(project_id)
+        actor = required_text(actor, "actor")
+        request_id = required_text(request_id, "request_id")
+        with self._transaction() as connection:
+            replay = connection.execute(
+                """SELECT work_plan_id, plan_revision FROM packet_work_plan_revisions
+                   WHERE project_id = ? AND request_id = ?""",
+                (project_id, request_id),
+            ).fetchone()
+            if replay is not None:
+                value = self._work_plan_revision_value(
+                    connection, project_id, str(replay["work_plan_id"]), int(replay["plan_revision"])
+                )
+                if value["change_id"] != draft.change_id or value["packet_id"] != draft.packet_id:
+                    raise RequirementConflictError("packet_work_plan_request_scope_conflict")
+                receipt = value.get("authoring_receipt")
+                if receipt is not None:
+                    self._assert_work_plan_request_fingerprint(
+                        connection, project_id, str(value["work_plan_id"]),
+                        int(value["plan_revision"]), request_fingerprint,
+                    )
+                    return {**value, **receipt["mutation"], "replayed": True}
+                if answers:
+                    raise InputValidationError(
+                        "legacy_compound_receipt_unverifiable: the original receipt proves only the plan, not the supplied answers.",
+                        field="request_id", received_value=request_id,
+                        details={"code": "legacy_compound_receipt_unverifiable",
+                                 "resolution": "Inspect historical plan events and current questions read-only; reconcile explicitly. Do not automatically replay with a new key."},
+                    )
+                # Bounded historical plan-only identity remains unchanged.
+                return self.create_packet_work_plan(
+                    project_id, draft, actor=actor, request_id=request_id,
+                    expected_current_plan_revision=expected_current_plan_revision,
+                )
+
+            packet = self._packet_row(connection, project_id, draft.change_id, draft.packet_id)
+            if int(packet["spec_revision"]) != draft.packet_revision:
+                raise RequirementConflictError("stale spec_revision for compound plan authoring")
+            plan = self.packet_work_plan_state(project_id, draft.change_id, draft.packet_id)
+            current_plan_revision = int((plan or {}).get("plan_revision") or 0)
+            if current_plan_revision != expected_current_plan_revision:
+                raise RequirementConflictError("stale plan_revision for compound plan authoring")
+
+            audit = self.packet_construction_audit_for_packet(project_id, draft.change_id, draft.packet_id)
+            audit_id = str(audit["construction_audit_id"]) if audit else ""
+            answered = audit
+            if answers:
+                if audit is None:
+                    raise ChangeControlBlockedError("packet_construction_audit_missing")
+                # The parent receipt owns replay. Do not alias a caller's standalone
+                # batch request ID (or a manufactured suffix) to this sub-operation.
+                answered = self.resolve_packet_questions_batch(
+                    project_id, audit_id, answers, expected_spec_revision=draft.packet_revision,
+                    actor=actor, request_id="",
+                )
+            # The resolver may repair a derived basis before validating. Preserve
+            # the exact pre-plan basis it actually used, never a stale cached one.
+            original_questions = {q["question_id"]: q for q in (answered or {}).get("questions", [])}
+            packet = self._packet_row(connection, project_id, draft.change_id, draft.packet_id)
+            result = self.create_packet_work_plan(
+                project_id, replace(draft, packet_revision=int(packet["spec_revision"])),
+                actor=actor, request_id=request_id,
+                expected_current_plan_revision=expected_current_plan_revision,
+                request_fingerprint=request_fingerprint,
+            )
+            result = self.finalize_packet_authoring_revision(
+                project_id, str(result["work_plan_id"]), int(result["plan_revision"]),
+                construction_audit_id=audit_id,
+            )
+            current_audit = self.packet_construction_audit_for_packet(project_id, draft.change_id, draft.packet_id)
+            current_questions = {q["question_id"]: q for q in (current_audit or {}).get("questions", [])}
+            recorded_questions = {q["question_id"]: q for q in (answered or {}).get("questions", [])}
+            transitions = []
+            for answer, payload in zip(answers, command["answers"], strict=True):
+                original = original_questions[answer.question_id]
+                recorded = recorded_questions[answer.question_id]
+                current = current_questions.get(answer.question_id)
+                disposition = (
+                    "ceased_applicable" if current is None else
+                    "reopened_by_changed_dependency" if current["dependency_fingerprint"] != original["dependency_fingerprint"] else
+                    "retained"
+                )
+                transitions.append({
+                    "question": {key: original[key] for key in
+                                 ("question_id", "question_key", "prompt", "dependency_fingerprint")},
+                    "submitted_answer": payload, "recorded_status": recorded["status"],
+                    "disposition": disposition, "current_status": current["status"] if current else None,
+                })
+            receipt = {
+                "contract": "replace_plan.v1", "request_id": request_id,
+                "command_fingerprint": request_fingerprint,
+                "declared_expectations": {key: command[key] for key in
+                                          ("expected_spec_revision", "expected_plan_revision")},
+                "original_authority": {"spec_revision": draft.packet_revision, "plan_revision": current_plan_revision},
+                "construction_audit_id": audit_id, "answers": transitions,
+                "mutation": {key: result[key] for key in ("packet_revision", "plan_revision", "status")},
+            }
+            self._append_work_plan_event(
+                connection, project_id=project_id, work_plan_id=str(result["work_plan_id"]),
+                plan_revision=int(result["plan_revision"]), event_type="work_plan_authoring_completed",
+                actor=actor, request_id=request_id, payload={"authoring_receipt": receipt}, occurred_at=_utc_now(),
+            )
+            return {**self._work_plan_revision_value(connection, project_id, str(result["work_plan_id"]), int(result["plan_revision"])), "replayed": False}
+
     def save_packet_unit_authoring_intent(
         self,
         project_id: str,
@@ -1509,6 +1640,8 @@ class PacketWorkPlanStoreMixin:
             "request_id": str(row["request_id"]),
             "units": units,
             "events": events,
+            **next(({"authoring_receipt": event["payload"]["authoring_receipt"]}
+                    for event in events if event["event_type"] == "work_plan_authoring_completed"), {}),
             "engineering_cycle_version": next(
                 (event["payload"].get("engineering_cycle_version")
                  for event in reversed(events)

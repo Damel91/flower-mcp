@@ -16,7 +16,7 @@ from flow_of_work_mcp.core.domain.packet_construction import (
     validate_construction_audit_id,
     validate_packet_question_id,
 )
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
 from flow_of_work_mcp.core.domain.engineering_question_policy import (
     QUESTION_POLICY_VERSION,
     applicable_question_rules,
@@ -377,8 +377,12 @@ class PacketConstructionStoreMixin:
             for draft in drafts:
                 row = rows.get(draft.question_id)
                 if row is None:
-                    raise RequirementConflictError(
-                        f"unknown packet question: {draft.question_id}"
+                    raise InputValidationError(
+                        f"unknown packet question: {draft.question_id}",
+                        field="answers.question_id", received_value=draft.question_id,
+                        details={"construction_audit_id": construction_audit_id,
+                                 "change_id": str(audit["change_id"]), "packet_id": str(audit["packet_id"]),
+                                 "resolution": "Inspect this packet's current gates read-only and reconcile question identity before an explicit mutation. Do not remap old IDs or blindly retry."},
                     )
                 rule = rules.get(str(row["question_key"]))
                 if rule is None:

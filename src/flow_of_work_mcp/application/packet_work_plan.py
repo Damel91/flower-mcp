@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import asdict
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.external_work import normalize_declarations
@@ -13,6 +14,7 @@ from flow_of_work_mcp.core.domain.packet_work_plan import (
     WorkPlanUnit,
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
+from flow_of_work_mcp.core.domain.packet_construction import PacketQuestionResolutionDraft
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 from flow_of_work_mcp.core.ports.change_control import ChangeControlRepository
 from flow_of_work_mcp.core.ports.navigation_audit import NavigationAuditRepository
@@ -33,6 +35,9 @@ class PacketWorkPlanService:
         self._repository = repository
         self._changes = changes
         self._navigation = navigation
+
+    def authoring_history(self, project_id: str, change_id: str, packet_id: str) -> list[Mapping[str, object]]:
+        return self._repository.packet_work_plan_authoring_history(project_id, change_id, packet_id)
 
     def set_plan(
         self,
@@ -60,6 +65,40 @@ class PacketWorkPlanService:
             request_id=str(request_id or ""),
             expected_current_plan_revision=expected_current_plan_revision,
             request_fingerprint=str(request_fingerprint or ""),
+        )
+
+    def replace_plan(
+        self, project_id: str, change_id: str, packet_id: str,
+        work_plan: Mapping[str, object], *,
+        answers: tuple[PacketQuestionResolutionDraft, ...],
+        expected_packet_revision: int, expected_current_plan_revision: int,
+        declared_spec_revision: int, declared_plan_revision: int | None,
+        actor: str, request_id: str,
+    ) -> Mapping[str, object]:
+        """Bind replay to the complete normalized command, not current defaults."""
+        actor = required_text(actor, "actor")
+        request_id = required_text(request_id, "request_id")
+        draft = PacketWorkPlanDraft(
+            change_id=change_id, packet_id=packet_id,
+            packet_revision=expected_packet_revision,
+            units=tuple(_unit_from_payload(item) for item in _mapping_list(work_plan, "units")),
+        )
+        command = {
+            "contract": "replace_plan.v1", "project_id": project_id,
+            "change_id": draft.change_id, "packet_id": draft.packet_id,
+            "actor": actor, "expected_spec_revision": declared_spec_revision,
+            "expected_plan_revision": declared_plan_revision,
+            "units": [asdict(unit) for unit in draft.units],
+            "answers": [asdict(answer) for answer in answers],
+        }
+        fingerprint = "replace_plan.v1:" + hashlib.sha256(
+            json.dumps(command, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        return self._repository.replace_packet_work_plan(
+            project_id, draft, answers=answers, command=command,
+            request_fingerprint=fingerprint,
+            expected_current_plan_revision=expected_current_plan_revision,
+            actor=actor, request_id=request_id,
         )
 
     def mutate_plan(

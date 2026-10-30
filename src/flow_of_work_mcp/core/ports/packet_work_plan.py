@@ -4,9 +4,21 @@ from __future__ import annotations
 from typing import Mapping, Protocol
 
 from flow_of_work_mcp.core.domain.packet_work_plan import PacketWorkPlanDraft
+from flow_of_work_mcp.core.domain.packet_construction import PacketQuestionResolutionDraft
 
 
 class PacketWorkPlanRepository(Protocol):
+    def packet_work_plan_authoring_history(
+        self, project_id: str, change_id: str, packet_id: str,
+    ) -> list[Mapping[str, object]]: ...
+
+    def replace_packet_work_plan(
+        self, project_id: str, draft: PacketWorkPlanDraft, *,
+        answers: tuple[PacketQuestionResolutionDraft, ...],
+        command: Mapping[str, object], request_fingerprint: str,
+        expected_current_plan_revision: int, actor: str, request_id: str,
+    ) -> Mapping[str, object]: ...
+
     def save_packet_unit_authoring_intent(
         self,
         project_id: str,
