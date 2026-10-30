@@ -63,7 +63,7 @@ Per un **wheel locale 0.7.5 ottenuto dal sorgente o candidato**, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.5-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.6-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 è pubblicato al commit

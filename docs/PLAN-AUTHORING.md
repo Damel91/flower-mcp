@@ -1,6 +1,6 @@
 # Flower plan authoring repair descriptor v1
 
-**Status:** Flower 0.7.5 public reference
+**Status:** Flower 0.7.6 public reference
 **Scope:** additive observation metadata and ordinary existing plan-authoring operations
 
 ## Scope and invariants
@@ -121,3 +121,32 @@ snapshot gate uses `kind: intent_work`, `advisory: true` and
 `establishes_global_admission: false`, with a scoped `fow_traceability` read.
 It is not inserted in open stakeholder decisions merely because risk prose exists.
 Actual risk exception references, findings, campaigns and acceptance guards remain.
+
+## Replacing a plan with construction answers
+
+`fow_packet_author` with `operation: "replace_plan"` accepts an optional complete
+batch of at most 64 distinct current question IDs. Read the packet's current gates
+and exact operation help first. Flower validates the original specification/plan
+conditions, records the answers against that pre-replacement question basis and
+replaces the plan in one transaction. The ordinary applicability policy still
+removes inapplicable questions or reopens changed dependencies.
+
+The `engineering_questions` receipt preserves each original question and submitted
+answer, its recorded status, and disposition: `retained`,
+`reopened_by_changed_dependency` or `ceased_applicable`. A historical answer does
+not answer a new gate. Current continuation and historical mutation revisions are
+separate. Existing PVP fingerprints and admission predicates are unchanged.
+
+New replay identity covers the normalized plan, complete answers, actor, scope and
+supplied revision conditions. Keep the exact original request for reconciliation;
+a changed command with the same key conflicts. Legacy plan-only receipts cannot
+prove supplied answer identity: `legacy_compound_receipt_unverifiable` requires
+explicit inspection rather than backfill or an automatic retry under a new key.
+
+After a lost response or an unknown-effect error, use the existing read-only
+`fow_packet_inspect` with `view: "history"`, `detail_level: "audit"`, packet scope
+and pagination. Completion events retain full receipts, actor and revision even
+after a successor plan. Inspect current gates separately. Failure and rollback do
+not prove global absence of effects: lifecycle bookkeeping may precede the plan
+transaction. Preserve prior applied operations and original unknown history;
+reconcile deliberately. Upgrading does not replay or resolve old calls.
