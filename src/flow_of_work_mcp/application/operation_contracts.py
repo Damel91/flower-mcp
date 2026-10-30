@@ -2010,11 +2010,20 @@ _SIMPLE = {
     )
     for tool, (required, optional) in _SIMPLE_FIELDS.items()
 }
+_SIMPLE["fow_what_next"] = _c(
+    "fow_what_next", "call", *_SIMPLE_FIELDS["fow_what_next"],
+    enums=_SIMPLE_ENUMS["fow_what_next"],
+    guidance={
+        "actions": "Ordered primary and alternative actions are navigation, not conjunctive admission prerequisites. A narrative milestone risk review is orchestration/advisory and routes to current scoped fow_traceability, not human acceptance.",
+        "continuation": "Continue confirmed milestone scope when actual current entry/admission predicates allow. Human acceptance not attested by repository review does not itself require a new approval before each milestone. Honor explicit requires_milestone eligibility and all genuine governed decisions; never fabricate acceptance or consent.",
+    },
+)
 _SIMPLE["fow_promote_milestone"] = _c(
     "fow_promote_milestone", "call", *_SIMPLE_FIELDS["fow_promote_milestone"],
     guidance={
         "scope": "requirement_ids are realized here. prerequisite_requirement_ids are disjoint requirements realized by lower-ordinal milestones in this project. First/independent milestone uses []; no inferred transitive closure.",
         "predecessors": "Planning can refer to planned predecessors. Membership is not implementation, verification or acceptance. Explicit entry_policy.requires_milestone retains its accepted-predecessor gate; list only actual intended gates.",
+        "risk_disposition": "Declared free-text risk treatment is recorded engineering context, not proof of a pending human decision or accepted high-impact risk. Its advisory review uses scoped traceability and does not add an acceptance prerequisite. Genuine risk exceptions retain explicit canonical authority.",
         "retry": "Replay every original normalized input and actor, including initial evidence, with the same request_id. Later acceptance does not change that immutable request identity. Historical requests without original proof reject as milestone_request_replay_unverifiable; inspect the existing milestone before proceeding.",
         "effect_receipt": "Only a correlated flow.operation-effect.v1 pre_effect_validation receipt proves no mutation started. Check tool, operation=call, project_id and request_id in receipt and audit_reference. Generic rejection, timeout or lost response is not no-effect proof.",
         "successor_example": {
@@ -2277,7 +2286,7 @@ _EXTERNAL_WORK = {
             **({"durable_export": "export_plan records an immutable artifact generation and a durable receipt. Nonempty actor and request_id are required. Retry the identical operation, actor and payload with the same request_id to recover the original receipt, including after authority changes; changed request contents under that ID conflict. A new request uses current specification/plan revisions. The aggregate tool schema also serves pure criteria/validation/provider_validation/todo reads, which may omit identity; exact operation help defines the mutation requirements. Flower does not generate request IDs. The host saves returned Markdown with its file tools."} if op == "export_plan" else {}),
             **({"upgrade_recovery": "upgrade_validation initializes stable criterion identities once. An identical original request replays its historical receipt; changed contents under the same request ID conflict. A new request at current revisions for an already upgraded packet remains rejected with packet_validation_already_upgraded and read-only validation/criteria recovery. Stale revision failures take precedence. Read current validation and criteria before deciding whether actual criterion-authority drift requires explicit reconcile_criteria; never repeat initialization to rewrite identities or invent a mapping/rationale."} if op == "upgrade_validation" else {}),
             **({"history": "detail=full includes bounded original report_history and page completeness. history_offset defaults0 and must be a nonnegative integer, never bool; page size20. This read remains available outside guided execution admission. Authority composition failures retain original report provenance and an explicit diagnostic; currentness/readiness are not_evaluated, not success. Historical reports are not promoted and reading does not extend the confirmed roadmap."} if op == "validation" else {}),
-            "engineering_cycle": "Newly accepted plans require adopted architecture and current selected architecture_refs. Cycle1 external plans require bounded current repository_review at final closure and for affected dependencies. Unit implementation/local verification, review closure and human acceptance stay distinct; report_outcome records facts even while review is open. Historical issued plans are not silently upgraded.",
+            "engineering_cycle": "Newly accepted plans require adopted architecture and current selected architecture_refs. Cycle1 external plans require bounded current repository_review at final closure and for affected dependencies. Unit implementation/local verification, review closure and human acceptance stay distinct; human_acceptance=false is review non-attestation, not a new approval gate for each subsequent confirmed milestone. Secondary actions are options/context, not conjunctive prerequisites; follow actual scoped entry/admission and explicit human gates; report_outcome records facts even while review is open. Historical issued plans are not silently upgraded.",
         },
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
 }

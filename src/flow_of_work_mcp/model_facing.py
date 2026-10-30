@@ -16,7 +16,7 @@ from flow_of_work_mcp.application.operation_contracts import (
     parameter_help,
     public_tool_names,
 )
-from flow_of_work_mcp.application.external_plan_markdown import render_assurance_result, render_external_result, repository_review_summary
+from flow_of_work_mcp.application.external_plan_markdown import REVIEW_ACCEPTANCE_MEANING, render_assurance_result, render_external_result, repository_review_summary
 from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
 from flow_of_work_mcp.core.domain.artifacts import ArtifactKind
 from flow_of_work_mcp.markdown_adapter import (
@@ -308,21 +308,24 @@ def _guided_bootstrap_markdown(payload: Mapping[str, Any], operation: str, outpu
     )
 
 
-def _compact_repository_reviews(value: Any) -> Any:
-    """Render bounded review facts without changing the application envelope."""
+def _present_repository_reviews(value: Any, *, full_review: bool = False) -> Any:
+    """Explain review authority; preserve explicitly requested full coverage."""
     if isinstance(value, Mapping):
         if (value.get("contract_version") in (
                 "flow.repository-review-projection.v1", "flow.repository-review.v1")
                 and "coverage" in value):
             # An audit rejection can return this projection directly. Templates
             # share the raw contract name but have no observed coverage to trim.
-            return repository_review_summary(value)
+            presentation = dict(value) if full_review else repository_review_summary(value)
+            if "human_acceptance" in value:
+                presentation["human_acceptance_meaning"] = REVIEW_ACCEPTANCE_MEANING
+            return presentation
         return {
-            key: _compact_repository_reviews(item)
+            key: _present_repository_reviews(item, full_review=full_review)
             for key, item in value.items()
         }
     if isinstance(value, (list, tuple)):
-        return [_compact_repository_reviews(item) for item in value]
+        return [_present_repository_reviews(item, full_review=full_review) for item in value]
     return value
 
 
@@ -363,8 +366,8 @@ def project_markdown(
         tool_name == "fow_handover" and operation == "get_handover"
     )
     presentation_payload = (
-        _compact_repository_reviews(payload)
-        if not full_review and tool_name in {
+        _present_repository_reviews(payload, full_review=full_review)
+        if tool_name in {
             "fow_external_work", "fow_packet_inspect", "fow_interaction", "fow_handover", "fow_audit_phase", "fow_get_job"
         } else payload
     )

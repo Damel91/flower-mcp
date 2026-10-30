@@ -8,6 +8,14 @@ from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verific
 from flow_of_work_mcp.markdown_adapter import render_structured, safe_heading, safe_inline
 
 
+
+REVIEW_ACCEPTANCE_MEANING = (
+    'A false human_acceptance value means this review does not attest product acceptance. '
+    'It is not by itself a new human approval prerequisite for the next confirmed milestone. '
+    'Follow actual scoped entry/admission predicates and preserve explicit human gates.'
+)
+
+
 def _text(value: object) -> str:
     """Keep physical prose lines while applying the mechanical inline safety."""
     if value is None:
@@ -30,6 +38,8 @@ def repository_review_summary(review: Mapping[str, Any]) -> dict[str, Any]:
         'human_acceptance', 'diagnostic', 'next_gate', 'change_id', 'packet_id',
         'expected_basis_fingerprint', 'source_identity', 'source_revision',
     ) if key in review}
+    if 'human_acceptance' in review:
+        summary['human_acceptance_meaning'] = REVIEW_ACCEPTANCE_MEANING
     summary['coverage'] = [
         {key: row[key] for key in ('dimension', 'state') if key in row}
         for row in (review.get('coverage') or ()) if isinstance(row, Mapping)
@@ -63,6 +73,9 @@ def _list(lines: list[str], values: Sequence[object], *, ordered: bool = False) 
 def _record(lines: list[str], value: object, *, level: int = 3) -> None:
     """Render supplied semantic fields as labeled prose, never serialized objects."""
     if isinstance(value, Mapping):
+        if (value.get('contract_version') in {'flow.repository-review.v1', 'flow.repository-review-projection.v1'}
+                and 'human_acceptance' in value and 'human_acceptance_meaning' not in value):
+            lines.append(REVIEW_ACCEPTANCE_MEANING)
         # Parent facts must precede child headings. Otherwise a later parent
         # policy/rationale would appear to belong to the preceding child.
         for key, item in value.items():
@@ -315,6 +328,8 @@ def render_plan(
     _section(lines, 'Offline execution and reconciliation')
     lines.extend([
         'Follow the provider-agnostic engineering cycle: recover current authority, investigate the repository, use adopted architecture, execute authorized work, record outcomes and reconcile the affected scope. The host owns the loop; no internal model or technical provider is required.', '',
+        'Continue across confirmed milestone scope when actual entry/admission predicates allow it. Secondary actions are ordered options or context, not conjunctive prerequisites. Recorded technical risk treatment does not create a human decision; genuine intent, risk exceptions and explicitly required human review retain their ordinary gates.', '',
+        REVIEW_ACCEPTANCE_MEANING, '',
         'Flower is canonical for project components, interfaces and governing decisions. Repository Markdown may explain or export a named Flower revision; it is not replacement architecture authority. Investigate existing software before proposing new implementation. A planned requirement or absent current report alone does not establish missing code.', '',
         'At a packet/increment boundary, compare scoped requirements, selected architecture, grounding, verification and original outcomes with the observed repository. Preserve actual source identity/revision and original proof pins. Distinguish missing canonical data, historical evidence on its pin, compatibility needing review and an unmet current obligation. Record only demonstrated differences through ordinary canonical mutations; never rewrite intent to justify code or automatically relabel historical tests for new authority.', '',
     ])

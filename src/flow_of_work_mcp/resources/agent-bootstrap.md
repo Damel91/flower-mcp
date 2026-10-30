@@ -126,6 +126,18 @@ ordinary Flower authoring within confirmed intent. Clarify genuinely unknown
 product behavior or scope; never invent mappings or waive checks. Do not execute
 a draft export.
 
+
+### Continue confirmed milestone scope
+
+Continue within the confirmed roadmap when actual current entry and execution
+predicates permit. Do not ask for a fresh approval after every milestone merely
+because a repository review reports `human_acceptance: false`: the review does
+not attest product acceptance. Secondary actions are ordered options or context,
+not additional conjunctive admission gates. Narrative risk treatment is recorded
+engineering context; its advisory traceability review is not a stakeholder decision.
+Honor explicitly configured accepted-predecessor policies, real intent questions,
+risk exceptions and other genuine human decisions. Never infer consent or acceptance.
+
 ### Keep governing architecture and bounded reconciliation in Flower
 
 Keep governing components, interfaces and technical decisions canonical in

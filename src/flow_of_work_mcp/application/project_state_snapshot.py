@@ -256,6 +256,11 @@ class ProjectStateSnapshotService:
                if isinstance(repository_review, Mapping) else {}),
             "next_gate": next_gate,
             "secondary_actions": secondary_actions,
+            "secondary_actions_policy": {
+                "interpretation": "Ordered options or context, not conjunctive admission prerequisites.",
+                "admission_source": "Actual current named canonical predicates and explicit entry policy.",
+                "human_acceptance": "not_inferred",
+            },
             "blockers": blockers["items"],
             "blockers_scope": "current_gate_and_lifecycle_obligations",
             "execution_admission_source": "active_work.packet.readiness",
@@ -1107,6 +1112,10 @@ def _next_gate(
         or action.get("kind")
         or ""
     )
+    # The recorded risk kind governs its presentation, not operation metadata or
+    # words such as blocked/stale inside arbitrary narrative treatment.
+    if action.get("kind") == "review_milestone_risk":
+        action_kind = "review_milestone_risk"
     reason = str(action.get("reason") or action.get("rationale") or action_kind)
     gate_kind = _gate_kind(action_kind, reason, traceability)
     route = None
@@ -1130,6 +1139,8 @@ def _next_gate(
         }
     return {
         "kind": gate_kind,
+        **({"advisory": True, "establishes_global_admission": False}
+           if action_kind == "review_milestone_risk" else {}),
         "state": str(action.get("state") or "pending"),
         "action_id": _action_identity(action),
         "reason": reason,
@@ -1151,6 +1162,8 @@ def _gate_kind(
     reason: str,
     traceability: Mapping[str, object],
 ) -> str:
+    if action_kind == "review_milestone_risk":
+        return "intent_work"
     if action_kind == "repository_reconciliation":
         return "repository_reconciliation"
     if action_kind in {"architecture_required", "architecture_authority"}:
@@ -1219,7 +1232,7 @@ def _gate_kind(
         return "deterministic_verification"
     if action_kind == "run_verification_campaign":
         return "campaign_execution"
-    if action_kind in {"request_change_acceptance", "review_milestone_risk"}:
+    if action_kind == "request_change_acceptance":
         return "acceptance"
     if action_kind in {
         "implement_requirement",

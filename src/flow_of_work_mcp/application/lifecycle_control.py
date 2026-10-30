@@ -550,9 +550,12 @@ class LifecycleControlService:
                 self._action(
                     action_id=f"milestone-risk:{milestone['milestone_id']}",
                     kind=NextActionKind.REVIEW_MILESTONE_RISK,
-                    execution_class=ActionExecutionClass.GOVERNED_DECISION,
+                    execution_class=ActionExecutionClass.ORCHESTRATION,
                     priority=80,
-                    rationale=f"milestone retains risk disposition {risk_disposition}",
+                    rationale=f"Review recorded milestone risk treatment as engineering context, not a new human approval prerequisite: {risk_disposition}",
+                    tool="fow_traceability", operation="call",
+                    arguments={"project_id": project_id, "milestone_id": str(milestone["milestone_id"])},
+                    decision_class=ActionExecutionClass.ORCHESTRATION.value,
                     requirement_ids=tuple(
                         str(value) for value in milestone["requirement_ids"]
                     ),
