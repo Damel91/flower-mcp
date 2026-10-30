@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import WithJsonSchema
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
+from flow_of_work_mcp.application.architecture_input_contracts import architecture_refs_input_schema
 from flow_of_work_mcp.application.guided_bootstrap import validate_roadmap_selection
 
 from flow_of_work_mcp.application.jobs import JobBlockedError
@@ -290,6 +291,7 @@ def _guard_operation(
     operation: Callable[[], dict[str, object]],
     *,
     recovery: Callable[[], Mapping[str, object]] | None = None,
+    read_operation: str = "",
 ) -> dict[str, object]:
     try:
         return operation()
@@ -407,6 +409,15 @@ def _guard_operation(
             }]}),
         )
     except Exception:
+        if read_operation:
+            return envelope(tool=tool, status="failed", reason="internal_error", result={
+                "read_only": True,
+                "diagnostics": [{"code": "read_failed",
+                    "message": "The observation could not be completed; execution admission has not been established.",
+                    "resolution": "Inspect the exact read contract and current authority. This response does not authorize a mutation."}],
+                "next_tool_call": {"tool": "fow_capabilities", "arguments": {
+                    "view": "operation", "operation_tool": tool, "operation_name": read_operation}},
+            })
         return envelope(tool=tool, status="failed", reason="internal_error",
                         result=_uncertain_error_result(tool, {
                             "code": "internal_error",
@@ -796,7 +807,36 @@ def _packet_start_input(value: object, field: str, validator: Callable[[Any], An
         ) from exc
 
 
-def handle_packet_author(
+def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
+    """Keep the revision's pure proof boundary ahead of every ancillary repair."""
+    selected = str(arguments.get("operation") or "add_unit").strip().lower()
+    if selected != "revise_packet":
+        return _execute_packet_command(runtime, **arguments)
+    refs = arguments.get("architecture_refs")
+    if refs is not None:
+        from flow_of_work_mcp.core.domain.architecture import normalize_architecture_refs
+        try:
+            normalize_architecture_refs(refs)
+        except (ValueError, TypeError) as exc:
+            error = OperationPreEffectError("packet_architecture_refs_invalid", str(exc),
+                field="architecture_refs", received_value=refs,
+                rule="Each reference requires revision (positive integer), kind (component/interface/decision) and entity_id; no other fields.",
+                resolution="Read the exact revise_packet contract and select entities from one adopted architecture revision; id is not entity_id.",
+                details={"required_fields": ["revision", "kind", "entity_id"],
+                         "accepted_kinds": ["component", "interface", "decision"],
+                         "example": {"revision": 1, "kind": "component", "entity_id": "adapters"}})
+            return _pre_effect_rejection(error, tool="fow_packet_author", operation=selected,
+                project_id=arguments.get("project_id", ""), request_id=arguments.get("request_id", ""))
+    response = _guard("fow_packet_author", lambda: _execute_packet_command(runtime, **arguments))
+    if response.get("status") != "success":
+        correlation = {"tool": "fow_packet_author", "operation": selected,
+            "project_id": arguments.get("project_id", ""), "request_id": arguments.get("request_id", "")}
+        response = {**response, "audit_reference": correlation,
+                    "result": {**response.get("result", {}), "original_request": correlation}}
+    return response
+
+
+def _execute_packet_command(
     runtime: McpRuntime,
     *,
     project_id: str = "",
@@ -4806,12 +4846,24 @@ def handle_external_work(
     operation: str, payload: Mapping[str, object] | None = None,
     actor: str = "", request_id: str = "",
 ) -> dict[str, object]:
-    return _guard("fow_external_work", lambda: _standalone_receipt(
-        "fow_external_work", runtime.external_work.call(
-            project_id, change_id, packet_id, operation,
-            payload=payload, actor=actor, request_id=request_id,
-        ),
-    ))
+    from flow_of_work_mcp.application.external_work import READ_OPERATIONS
+    def execute():
+        return _standalone_receipt(
+            "fow_external_work", runtime.external_work.call(
+                project_id, change_id, packet_id, operation,
+                payload=payload, actor=actor, request_id=request_id,
+            ),
+        )
+    # Match the service's canonical text normalization, not the raw spelling.
+    read_operation = operation.strip() if isinstance(operation, str) else ""
+    if read_operation not in READ_OPERATIONS:
+        return _guard("fow_external_work", execute)
+    response = _guard_operation("fow_external_work", execute, read_operation=read_operation)
+    if response.get("reason") == "guided_roadmap_confirmation_required":
+        response = {**response, "result": {**response.get("result", {}),
+            "next_tool_call": {"tool": "fow_capabilities", "arguments": {
+                "view": "operation", "operation_tool": "fow_bootstrap", "operation_name": "guidance"}}}}
+    return response
 
 
 def handle_bindings(
@@ -5024,7 +5076,7 @@ def create_app(
         out_of_scope: list[str] | None = None,
         invariants: list[str] | None = None,
         unresolved_questions: list[str] | None = None,
-        architecture_refs: list[dict[str, object]] | None = None,
+        architecture_refs: Annotated[list[dict[str, object]] | None, WithJsonSchema(architecture_refs_input_schema())] = None,
         source_refs: list[str] | None = None,
         baseline_refs: list[str] | None = None,
         completion_criteria: list[str] | None = None,
@@ -5676,7 +5728,7 @@ def create_app(
         out_of_scope: list[str] | None = None,
         invariants: list[str] | None = None,
         unresolved_questions: list[str] | None = None,
-        architecture_refs: list[dict[str, object]] | None = None,
+        architecture_refs: Annotated[list[dict[str, object]] | None, WithJsonSchema(architecture_refs_input_schema())] = None,
         target_policy: str = "code_targets_required",
         active_provider: str = "",
         source_revision: str = "",

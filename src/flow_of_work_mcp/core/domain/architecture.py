@@ -12,7 +12,8 @@ ARCHITECTURE_CONTRACT = 'flow.architecture.v1'
 ARCHITECTURE_CONTEXT_CONTRACT = 'flow.architecture_context.v1'
 ENTITY_KINDS = ('component', 'interface', 'decision')
 ENTITY_LISTS = {'component': 'components', 'interface': 'interfaces', 'decision': 'decisions'}
-_IDENTITY = re.compile(r'^[A-Za-z][A-Za-z0-9_.-]{0,79}$')
+ENTITY_ID_PATTERN = r'^[A-Za-z][A-Za-z0-9_.-]{0,79}$'
+_IDENTITY = re.compile(ENTITY_ID_PATTERN)
 _ENTITY_FIELDS = {
     'component': {'id', 'name', 'responsibility', 'boundaries', 'invariants', 'links'},
     'interface': {'id', 'name', 'provider_component_id', 'consumer_component_ids', 'kind', 'clauses', 'failure_contract', 'compatibility', 'links'},

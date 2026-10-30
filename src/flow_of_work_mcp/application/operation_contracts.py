@@ -586,6 +586,9 @@ _R = ("request_id",)
 _PACKET = ("change_id", "packet_id")
 _ARCHITECTURE_REFS_GUIDANCE = {
     "shape": [{"revision": 1, "kind": "decision", "entity_id": "loop-owner"}],
+    "required_fields": ["revision", "kind", "entity_id"],
+    "field_types": "revision is a positive SQLite integer; kind is component, interface or decision; entity_id is the adopted entity identifier (not id). Unknown or missing item fields reject. Every ref selects the same adopted revision.",
+    "revision_effect_proof": "Malformed refs on revise_packet reject before address lookup or lifecycle repair. Only the correlated flow.operation-effect.v1 pre_effect_validation receipt proves this invocation started no mutation. Match tool/operation/project_id/request_id and audit_reference. Earlier work with the same identity is unchanged. Historical0.7.1 may have performed ancillary repair before rejection and cannot inherit this proof retroactively.",
     "authority": "Select at most128 unique component/interface/decision references from one adopted project architecture revision. Omission preserves existing references; explicit [] clears them through an ordinary spec revision. Proposals/mixed revisions are rejected; selected closure joins export/currentness and relevant drift requires ordinary re-pin/review.",
 }
 
@@ -2226,6 +2229,7 @@ _EXTERNAL_WORK = {
         effect_class="provider_probe_and_ledger_mutation" if op == "negotiate_provider" else "",
         guidance={
             "scope": "Standalone external-agent PVP remains independent. A bounded Flow-owned negotiated provider bridge requires exact consumer support; original full cross-server PVP/CC IMPL-67 and actual paired qualification remain deferred.",
+            "read_semantics": "criteria, validation, provider_validation and todo are observations. A blocked read preserves its authority gate and does not imply unknown mutation effects or grant execution. Read failures emit read diagnostics without mutation receipts. guided_roadmap_confirmation_required remains a human confirmation gate; read the bootstrap guidance contract and never fabricate confirmation.",
             "execution_ownership": "Select one executor for new work before an enriched plan can trigger delivery. executor=provider requires the actual configured adapter provider_kind (codingcastle), distinct from route category packet_execution; external_agent forbids provider_kind. Opposite explicit/legacy external selection, provider history, outcomes, started or completed work reject transfer. An unselected legacy provider default is not explicit selection; no timeout fallback or second writer.",
             "provider_negotiation": "negotiate_provider explicitly probes the selected configured provider and stores exact capability support bound to selection, canonical packet_execution binding, spec/plan revisions and authority fingerprint. No ordinary read probes a provider. Missing/malformed/unavailable support blocks enriched dispatch; route or authority change requires explicit re-negotiation. URLs/credentials/commands are not accepted.",
             "provider_validation": "provider_validation is a pure read of provider-scoped semantic closure, selected authority and current executor/capability admission; it never probes or compiles. Local unit checks and deferred campaign/Oracle/explicit-authority obligations remain separate. Consumer compilation acknowledgements do not prove acceptance or satisfy deferred verification.",
