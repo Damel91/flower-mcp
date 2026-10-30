@@ -1,6 +1,6 @@
 # Flower plan authoring repair descriptor v1
 
-**Status:** Flower 0.7.3 public reference
+**Status:** Flower 0.7.4 public reference
 **Scope:** additive observation metadata and ordinary existing plan-authoring operations
 
 ## Scope and invariants
@@ -78,3 +78,28 @@ repair can precede the failure; a structured rejection retains effect_state=unkn
 and original request correlation, with no no-effect receipt. Inspect current state
 before explicit reconciliation; never replay automatically. This adds no descriptor
 field and does not reclassify observational PVP blocks as uncertain mutations.
+
+## Read the execution decision and the preparation gate
+
+Current validation (standard or full) and blocked TODO expose
+`gate_context`, contract `flow.external-work-gates.v1`. Read its global
+`execution_allowed` first. `validation.next_gate` retains the PVP preparation
+route and incomplete repair descriptor even when the primary gate is roadmap
+confirmation. `admission` is only the first observed guard result; `not_evaluated`
+means TODO stopped earlier, not that admission passed. `engineer_gate` checks
+semantic findings only and cannot grant overall permission.
+
+For a local-check mismatch, `validation.diagnostic` preserves the original
+received and candidate strings. `expected_count: 1` means one distinct declared
+same-unit `kind=unit_check` comparison candidate. It does **not** mean a test ran
+or passed, or that the candidate is semantically correct. Compare exact canonical
+statements, investigate the intended criterion and revise legitimate declarations
+through ordinary current-authority mutations, review/accept and revalidation.
+Never copy a candidate blindly, infer criterion ownership or weaken obligations.
+
+A blocked read is an observation, not uncertain mutation effects. When current
+authority cannot be resolved, full history retains its provenance without inventing
+current context or repair. Actual roadmap consent/delegation may be recorded by
+the agent through canonical `confirm_roadmap`, with current roadmap fingerprint
+and an applicable confirmation reference. No separate native UI is required;
+missing consent must never be fabricated. This does not accept implementation.
