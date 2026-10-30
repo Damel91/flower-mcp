@@ -103,11 +103,30 @@ def test_bulk_work_plan_mcp_lifecycle_is_bounded_idempotent_and_restart_safe(tmp
             packet_id=bootstrap["packet_id"],
             operation="replace_plan",
             work_plan=_work_plan(binding_id),
-            expected_spec_revision=proposed["result"]["packet"]["spec_revision"],
+            expected_spec_revision=packet_revision,
             expected_plan_revision=0,
             actor="orchestrator",
             request_id="set-plan-v1",
         )
+        assert replay["status"] == "success"
+        assert replay["result"]["semantic_delta"]["replayed"] is True
+        assert replay["result"]["engineering_questions"] == proposed["result"]["engineering_questions"]
+        before_changed_replay = runtime.ledger.packet_work_plan_state(
+            "alpha", change["change_id"], bootstrap["packet_id"]
+        )
+        changed_replay = handle_packet_author(
+            runtime, project_id="alpha", change_id=change["change_id"],
+            packet_id=bootstrap["packet_id"], operation="replace_plan",
+            work_plan=_work_plan(binding_id),
+            expected_spec_revision=proposed["result"]["packet"]["spec_revision"],
+            expected_plan_revision=0, actor="orchestrator", request_id="set-plan-v1",
+        )
+        assert changed_replay["status"] == "rejected"
+        assert changed_replay["reason"] == "state_conflict"
+        assert changed_replay["result"]["effect_state"] == "unknown"
+        assert runtime.ledger.packet_work_plan_state(
+            "alpha", change["change_id"], bootstrap["packet_id"]
+        ) == before_changed_replay
         _select_provider(runtime, change["change_id"], bootstrap["packet_id"])
         standard = handle_packet_inspect(
             runtime,
