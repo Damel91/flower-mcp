@@ -339,9 +339,9 @@ def test_changed_mutation_replay_is_rejected_without_partial_authority(authored)
     revisions = current(runtime, ids)
     call(runtime, ids, "revise_unit", "changed-replay", **mutation_arguments("revise_unit"), **revisions)
     before = snapshot(runtime)
-    with pytest.raises(RequirementConflictError, match="does not match the original"):
-        call(runtime, ids, "revise_unit", "changed-replay", client_unit_key="consumer",
-             unit_patch={"instructions": ["Different work under the same request identity."]}, **revisions)
+    rejected = call(runtime, ids, "revise_unit", "changed-replay", client_unit_key="consumer",
+                    unit_patch={"instructions": ["Different work under the same request identity."]}, **revisions)
+    assert_unknown_rejection(rejected, reason="state_conflict", request_id="changed-replay")
     assert snapshot(runtime) == before
 
 
@@ -386,8 +386,12 @@ def test_affected_unit_identity_is_normalized_in_fresh_and_replay(authored):
 def test_failed_authoring_preserves_all_durable_authority(authored, operation, arguments):
     runtime, ids = authored
     before = snapshot(runtime)
-    with pytest.raises((ValueError, ChangeControlBlockedError, RequirementConflictError)):
-        call(runtime, ids, operation, "invalid-author-" + operation, **arguments, **current(runtime, ids))
+    if operation == "revise_unit":
+        rejected = call(runtime, ids, operation, "invalid-author-" + operation, **arguments, **current(runtime, ids))
+        assert_unknown_rejection(rejected, reason="invalid_input", request_id="invalid-author-revise_unit")
+    else:
+        with pytest.raises((ValueError, ChangeControlBlockedError, RequirementConflictError)):
+            call(runtime, ids, operation, "invalid-author-" + operation, **arguments, **current(runtime, ids))
     assert snapshot(runtime) == before
 
 
@@ -414,7 +418,17 @@ def test_cross_packet_request_reuse_rejects_before_ancillary_lifecycle_repair(au
     )
     assert runtime.packet_construction.audit_for_packet(*scoped) is None
     before = snapshot(runtime)
-    with pytest.raises(ChangeControlBlockedError, match="packet_work_plan_request_scope_conflict"):
-        call(runtime, scoped, "revise_unit", "project-scoped-author-request", **arguments, **current(runtime, scoped))
+    blocked = call(runtime, scoped, "revise_unit", "project-scoped-author-request", **arguments, **current(runtime, scoped))
+    assert_unknown_rejection(blocked, status="blocked", reason="packet_work_plan_request_scope_conflict",
+                             request_id="project-scoped-author-request")
     assert snapshot(runtime) == before
     assert runtime.packet_construction.audit_for_packet(*scoped) is None
+
+
+def assert_unknown_rejection(response, *, reason, request_id, status="rejected"):
+    assert response["status"] == status and response["reason"] == reason
+    result = response["result"]
+    assert result["effect_state"] == "unknown" and result["operation_state"] == "unknown"
+    assert "effect_receipt" not in result
+    assert result["original_request"]["operation"] == "revise_unit"
+    assert result["original_request"]["request_id"] == request_id
