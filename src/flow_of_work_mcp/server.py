@@ -4782,6 +4782,19 @@ def handle_architecture(
     runtime: McpRuntime, *, project_id: str, operation: str,
     payload: Mapping[str, object] | None = None, actor: str = "", request_id: str = "",
 ) -> dict[str, object]:
+    if operation in {"propose", "adopt"}:
+        from flow_of_work_mcp.application.architecture import prepare_architecture_mutation
+        # The proof belongs to this pure phase, not to an exception class or
+        # generic error wording. Nothing from service dispatch can enter it.
+        try:
+            prepare_architecture_mutation(project_id, operation,
+                payload={} if payload is None else payload, actor=actor, request_id=request_id)
+        except OperationPreEffectError as exc:
+            return _pre_effect_rejection(exc, tool="fow_architecture", operation=operation,
+                project_id=project_id, request_id=request_id)
+        except Exception:
+            return _operation_effect_unknown(tool="fow_architecture", operation=operation,
+                project_id=project_id, request_id=request_id)
     return _guard("fow_architecture", lambda: _standalone_receipt(
         "fow_architecture", runtime.architecture.call(project_id, operation,
             payload=payload, actor=actor, request_id=request_id),

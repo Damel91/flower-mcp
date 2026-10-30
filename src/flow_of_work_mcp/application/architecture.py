@@ -1,8 +1,52 @@
 """Public application boundary for ordinary engineering architecture authority."""
 from __future__ import annotations
 
-from flow_of_work_mcp.core.domain.architecture import ARCHITECTURE_CONTRACT, ENTITY_LISTS, nonnegative_integer
+from flow_of_work_mcp.core.domain.architecture import ARCHITECTURE_CONTRACT, ENTITY_LISTS, nonnegative_integer, normalize_definition
 from flow_of_work_mcp.core.domain.external_work import fields, number, text
+from flow_of_work_mcp.core.domain.identifiers import validate_project_id
+from flow_of_work_mcp.core.errors import OperationPreEffectError
+
+
+def prepare_architecture_mutation(project_id, operation, *, payload, actor, request_id):
+    """Validate pure input only; never consult a service or open a transaction.
+
+    Preserve the raw definition for the existing exact-request fingerprint.
+    Callers may trust this phase's rejection, never the same exception after
+    dispatch. Repository validation still protects direct ledger callers.
+    """
+    field, value = 'project_id', project_id
+    try:
+        validate_project_id(project_id)
+        field, value = 'actor', actor
+        actor = text(actor, field)
+        field, value = 'request_id', request_id
+        request_id = text(request_id, field)
+        field, value = 'payload', payload
+        if not isinstance(payload, dict):
+            raise ValueError('architecture payload must be an object')
+        if operation == 'propose':
+            fields(payload, {'definition', 'expected_revision'}, operation)
+        elif operation == 'adopt':
+            fields(payload, {'revision', 'expected_revision', 'rationale'}, operation)
+        else:
+            raise ValueError('unsupported architecture mutation')
+        field, value = 'payload.expected_revision', payload.get('expected_revision')
+        expected = nonnegative_integer(value, field)
+        result = {'project_id': project_id, 'expected_revision': expected,
+                  'actor': actor, 'request_id': request_id}
+        if operation == 'propose':
+            field, value = 'payload.definition', payload.get('definition')
+            normalize_definition(value)
+            return {**result, 'definition': value}
+        field, value = 'payload.revision', payload.get('revision')
+        revision = number(nonnegative_integer(value, field), field)
+        field, value = 'payload.rationale', payload.get('rationale')
+        return {**result, 'revision': revision, 'rationale': text(value, field)}
+    except (ValueError, TypeError) as exc:
+        raise OperationPreEffectError('architecture_input_invalid', str(exc),
+            field=field, received_value=value,
+            rule='Use the exact architecture operation contract, including array-valued collections.',
+            resolution='Read the named operation contract and correct the intended input. This invocation started no mutation; earlier work under the same ID is unchanged.') from exc
 
 
 class ArchitectureService:
@@ -11,18 +55,14 @@ class ArchitectureService:
 
     def call(self, project_id, operation, *, payload=None, actor='', request_id=''):
         payload = {} if payload is None else payload
+        if operation in {'propose', 'adopt'}:
+            prepared = prepare_architecture_mutation(project_id, operation,
+                payload=payload, actor=actor, request_id=request_id)
+            if operation == 'propose':
+                return self._ledger.propose_architecture(**prepared)
+            return self._ledger.adopt_architecture(**prepared)
         if not isinstance(payload, dict):
             raise ValueError('architecture payload must be an object')
-        if operation == 'propose':
-            fields(payload, {'definition', 'expected_revision'}, operation)
-            return self._ledger.propose_architecture(project_id, payload.get('definition'),
-                expected_revision=nonnegative_integer(payload.get('expected_revision'), 'expected_revision'),
-                actor=text(actor, 'actor'), request_id=text(request_id, 'request_id'))
-        if operation == 'adopt':
-            fields(payload, {'revision', 'expected_revision', 'rationale'}, operation)
-            return self._ledger.adopt_architecture(project_id, number(payload.get('revision'), 'revision'),
-                expected_revision=nonnegative_integer(payload.get('expected_revision'), 'expected_revision'),
-                rationale=text(payload.get('rationale'), 'rationale'), actor=text(actor, 'actor'), request_id=text(request_id, 'request_id'))
         if operation != 'inspect':
             raise ValueError('unsupported architecture operation')
         fields(payload, {'revision', 'kind', 'offset', 'limit'}, operation)

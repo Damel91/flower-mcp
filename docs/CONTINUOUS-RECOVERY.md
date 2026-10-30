@@ -285,3 +285,15 @@ Original reports/audits never become current semantic proof merely because they
 can be read. Preserve dates, revisions, declared provenance and unresolved gaps.
 The [engineering cycle guide](ENGINEERING-CYCLE.md) explains historical versus
 current coverage and bounded host grounding.
+
+## Architecture input rejection and retained historical uncertainty
+
+For `fow_architecture` propose/adopt, only a correlated
+`flow.operation-effect.v1` receipt with `basis=pre_effect_validation` and
+`mutation_started=false` proves that invocation started no mutation. Match tool,
+operation, project and request in both receipt and audit reference. Later failures,
+rollback, generic invalid_input and lost responses remain unknown. Earlier effects
+with a reused identity are unchanged. Read the exact operation help before an
+explicit corrected request. A retained070 malformed-boundaries response can use
+only the separate [source assessment](ARCHITECTURE-RECOVERY.md), preserving its
+original unknown and owner-declared provenance without replay.
