@@ -1172,6 +1172,27 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "with nonempty verifies containing exclusively deferred intents; "
             "do not invent a local check to satisfy authoring."
         ),
+        "verification_correspondence": (
+            "Each unit_checks statement needs an exact same-unit verifies statement "
+            "with kind=unit_check after canonical text normalization. It need not "
+            "equal criterion prose. implements does not determine the criterion; "
+            "choose active criterion numbers through investigation. Verification-only "
+            "coverage can be legitimate. Never delete, weaken or defer an obligation "
+            "merely to close PVP."
+        ),
+        "authoring_cycle": (
+            "Open PVP holds affected repository effects while technical investigation "
+            "and ordinary authoring continue within confirmed intent. Array patches "
+            "replace whole arrays: preserve applicable declarations. Use current "
+            "expected_spec_revision/expected_plan_revision and returned new revisions; "
+            "a successful edit creates a proposed plan requiring ordinary review, "
+            "accept_work_plan and revalidation before execution. Preserve old outcome pins."
+        ),
+        "example_rule": (
+            "Examples are illustrative shapes, not project authority. Read current "
+            "criteria, units and revisions; investigate mappings instead of copying "
+            "example IDs, declarations or acceptance decisions."
+        ),
         "standalone_validation_declarations": {
             "implements": [1],
             "provides": [{"name": "example-api", "kind": "api", "clauses": ["The API exposes the declared behavior."], "file_path": "src/example.py", "symbol": "example", "signature": "example(value)"}],
@@ -1343,6 +1364,8 @@ _PACKET_AUTHOR = {
         "replace_plan",
         ("project_id", "packet_id", "operation", "work_plan", "actor", "request_id"),
         ("answers", "expected_spec_revision", "expected_plan_revision"),
+        guidance={"work_plan": {"required_fields": ["units"], "unit": dict(_PACKET_UNIT_GUIDANCE)},
+                  "replacement_rule": "Replace the complete plan only when intended. For a targeted correction read revise_unit help. Preserve existing units/dependencies and declarations; no plan edit grants execution or acceptance."},
     ),
     "resolve_questions": _c(
         "fow_packet_author",
@@ -1405,6 +1428,9 @@ _PACKET_AUTHOR = {
             "expected_plan_revision",
         ),
         ("expected_spec_revision",),
+        guidance={"unit": dict(_PACKET_UNIT_GUIDANCE),
+                  "unit_patch": {"declaration_fields": ["unit_checks", "implements", "provides", "requires", "verifies"],
+                      "patch_rule": "Omitted fields remain unchanged; each provided array replaces the entire previous array. Preserve applicable existing declarations. Use current CAS, then review/accept the proposed revision and revalidate."}},
     ),
     "remove_unit": _c(
         "fow_packet_author",
@@ -2657,6 +2683,24 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
             ],
             "unit_checks": ["The required public contract is exported."],
         }
+    if contract.tool == "fow_packet_author" and contract.operation in {"replace_plan", "revise_unit"}:
+        check = "The required public contract is exported."
+        verification = {"criterion": 1, "kind": "unit_check", "statement": check}
+        result.update(expected_spec_revision=1, expected_plan_revision=1)
+        if contract.operation == "replace_plan":
+            result["work_plan"] = {"units": [{
+                "client_unit_key": "supporting-module", "operation_kind": "new_file",
+                "file_path": "src/supporting_module.py",
+                "instructions": ["Create the bounded supporting module.",
+                                 "Export the contract required by its declared consumers."],
+                "unit_checks": [check], "implements": [1],
+                "provides": [{"name": "supporting-api", "kind": "api",
+                              "clauses": [check], "file_path": "src/supporting_module.py"}],
+                "verifies": [verification],
+            }]}
+        else:
+            result["client_unit_key"] = "supporting-module"
+            result["unit_patch"] = {"verifies": [verification]}
     if contract.tool == "fow_promote_milestone":
         result.update(name="First milestone", requirement_ids=["REQ-000001"],
             prerequisite_requirement_ids=[], entry_policy={"requires_milestone": []},

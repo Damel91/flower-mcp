@@ -808,11 +808,11 @@ def _packet_start_input(value: object, field: str, validator: Callable[[Any], An
 
 
 def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
-    """Keep the revision's pure proof boundary ahead of every ancillary repair."""
+    """Keep pure ref proof ahead of repair; guard unit revision's late failures."""
     selected = str(arguments.get("operation") or "add_unit").strip().lower()
-    if selected != "revise_packet":
+    if selected not in {"revise_packet", "revise_unit"}:
         return _execute_packet_command(runtime, **arguments)
-    refs = arguments.get("architecture_refs")
+    refs = arguments.get("architecture_refs") if selected == "revise_packet" else None
     if refs is not None:
         from flow_of_work_mcp.core.domain.architecture import normalize_architecture_refs
         try:

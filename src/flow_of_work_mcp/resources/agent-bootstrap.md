@@ -120,8 +120,11 @@ work. Consumers reference their producers;
 planned future files or symbols are not evidence that those outputs exist.
 Local checks must be evaluable at the unit boundary. Deferred campaign, Oracle
 and explicit-authority verification remain separate obligations. Investigate and
-register missing technical decisions before closure; unknown intended behavior
-or unresolved semantic gaps stop affected work. Do not execute a draft export.
+register missing technical decisions before closure. Incomplete technical
+declarations hold affected repository execution; continue investigation and
+ordinary Flower authoring within confirmed intent. Clarify genuinely unknown
+product behavior or scope; never invent mappings or waive checks. Do not execute
+a draft export.
 
 ### Keep governing architecture and bounded reconciliation in Flower
 
@@ -149,7 +152,7 @@ is not current closure, and a host declaration is not server-attested truth.
 Do not review after every tool call or request unnecessary repeated testing.
 Keep interrupted handovers and original reports recoverable with open gaps.
 
-### Resolve semantic gaps before continuing
+### Resolve semantic gaps before repository execution
 
 Actively identify divergence from agreed behavior. Stop affected execution,
 reread current requirements, Goal/scenarios, milestone, change and packet intent,
@@ -190,7 +193,11 @@ and report outcomes against the issued plan revision and fingerprint. Exported
 Markdown supports authorized offline work; keep its contracts, checks and issued
 authority. Record actual outcomes for explicit reconciliation when Flower returns.
 If new intent, semantic gaps or missing mutation authority prevent continuation
-offline, stop affected effects and retain the unresolved obligation for recovery.
+offline, hold affected repository effects and retain observations, unresolved
+obligations and proposed technical declarations. Continue investigation within
+confirmed intent; use ordinary accepted Flower mutations and revalidation after
+reconnection before resuming the held effects. Offline Markdown edits never
+change canonical authority.
 
 Agent completion, verification and human acceptance are distinct. Host evidence
 keeps its declared provenance. Never invent receipts, approvals or capability

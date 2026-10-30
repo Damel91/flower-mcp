@@ -380,7 +380,7 @@ class ExternalWorkService:
                         **self._report_history(raw['reports'], history_offset=history_offset),
                         'next_gate': self._history_route(project_id, change_id, packet_id), 'acceptance': 'not_inferred'}
             projection = self._projection(snapshot)
-            gate = self._validation_gate(projection)
+            gate = self._validation_gate(projection, snapshot)
             inactive = snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
             if projection['status'] == 'closed' and snapshot['external']['consumption_mode'] != 'external_agent':
                 gate = {'tool': 'fow_external_work', 'operation': 'set_mode', 'reason': 'external_mode_not_selected'}
@@ -579,12 +579,54 @@ class ExternalWorkService:
             return closure
 
     @staticmethod
-    def _validation_gate(projection) -> dict[str, object]:
+    def _validation_gate(projection, snapshot) -> dict[str, object]:
         gap = projection['next_gap']
-        return {'operation': 'validation' if gap else 'todo', 'tool': 'fow_external_work',
+        gate = {'operation': 'validation' if gap else 'todo', 'tool': 'fow_external_work',
                 'action_kind': 'semantic_authority_repair' if gap else 'read_work_frontier',
                 'reason': gap['code'] if gap else 'validation_closed',
                 'obligation': gap or {}, 'authority_fingerprint': projection['authority_fingerprint']}
+        repair_codes = {
+            'unit_check_verification_missing', 'criterion_owner_missing',
+            'verification_intent_missing', 'planned_contract_missing',
+            'contract_not_in_dependency_closure',
+        }
+        if not gap or snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES:
+            return gate
+        # Acceptance is ordered before declaration gaps in the projection. Help
+        # repair those facts without changing that order or accepting the plan.
+        selected = (next((item for item in projection['gaps'] if item['code'] in repair_codes), None)
+                    if gap['code'] == 'work_plan_not_accepted' else gap)
+        if not selected or selected['code'] not in repair_codes:
+            return gate
+        arguments = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
+        arguments.update(operation='revise_unit', expected_spec_revision=projection['spec_revision'],
+                         expected_plan_revision=projection['plan_revision'])
+        # A missing contract does not identify which declaration is wrong.
+        key = selected.get('unit_key') if selected['code'] != 'planned_contract_missing' else None
+        known_keys = {unit['client_unit_key'] for unit in projection['units']}
+        if key in known_keys:
+            arguments['client_unit_key'] = key
+        guidance = {
+            'unit_check_verification_missing': 'Investigate which active criterion this local check verifies. Declare its exact statement in same-unit verifies with kind=unit_check, or ordinarily correct an erroneous obligation against confirmed intent. Criterion prose and implements do not determine this mapping; never remove or defer checks merely to close PVP.',
+            'criterion_owner_missing': 'Inspect the active criterion and current units. Choose its legitimate implementation or verification owner through engineering investigation; Flower does not select an owner or invent a criterion mapping.',
+            'verification_intent_missing': 'Inspect the active criterion and choose the responsible unit and appropriate verification kind/statement. Preserve the actual unit boundary and deferred obligations; Flower does not invent a verification intent.',
+            'planned_contract_missing': 'Inspect both producer provides and consumer requires. Decide whether the producer declaration is incomplete or the consumer reference is wrong before selecting a unit. Planned outputs are promises, not evidence that files exist.',
+            'contract_not_in_dependency_closure': 'Inspect the consumer requires and intended predecessor contract. Correct an erroneous reference with revise_unit, or explicitly use set_dependencies with the complete investigated depends_on list. No dependency edge is added automatically.',
+        }[selected['code']]
+        gate['repair'] = {
+            'contract_version': 'flow.plan-authoring-repair.v1', 'ready_to_call': False,
+            'execution_allowed': False, 'authoring_scope': 'confirmed_intent_only',
+            'obligation': deepcopy(selected),
+            'operation': {'tool': 'fow_packet_author', 'operation': 'revise_unit', 'arguments': arguments},
+            'required_input': ([] if 'client_unit_key' in arguments else ['client_unit_key'])
+                              + ['unit_patch', 'actor', 'request_id'],
+            'help_route': {'tool': 'fow_capabilities', 'arguments': {'view': 'operation',
+                'operation_tool': 'fow_packet_author', 'operation_name': 'revise_unit'}},
+            'inspection_route': ExternalWorkService._history_route(
+                snapshot['project_id'], snapshot['change_id'], snapshot['packet_id']),
+            'guidance': guidance + ' Continue technical preparation within confirmed intent while affected repository effects remain held. Array patches replace whole arrays: preserve applicable existing declarations. Use returned current revisions, review and ordinarily accept the proposed plan, then revalidate. Missing product intent requires clarification; no hint waives approval or authorizes execution.',
+        }
+        return gate
 
     @staticmethod
     def _expect(snapshot, payload, *, plan_required: bool = False) -> None:
@@ -767,7 +809,8 @@ class ExternalWorkService:
         if snapshot['external']['consumption_mode'] != 'external_agent':
             return {'status': 'blocked', 'reason': 'external_mode_not_selected', 'next_gate': {'tool': 'fow_external_work', 'operation': 'set_mode'}}
         if projection['status'] != 'closed':
-            return {'status': 'blocked', 'reason': projection['next_gap']['code'], 'next_gate': self._validation_gate(projection), 'validation': projection}
+            return {'status': 'blocked', 'reason': projection['next_gap']['code'], 'execution_allowed': False,
+                    'next_gate': self._validation_gate(projection, snapshot), 'validation': projection}
         try:
             self._assert_execution_allowed(snapshot)
         except ChangeControlBlockedError as exc:

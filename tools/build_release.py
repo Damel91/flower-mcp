@@ -115,7 +115,7 @@ def asset_names(project: dict) -> set[str]:
 
 
 def release_documentation(project: dict) -> set[str]:
-    return {"docs/PACKET-REVISION-RECOVERY.md", "docs/ARCHITECTURE-RECOVERY.md", "docs/ENGINEERING-CYCLE.md", "docs/BOOTSTRAP.md", "docs/CONTINUOUS-RECOVERY.md",
+    return {"docs/PLAN-AUTHORING.md", "docs/PACKET-REVISION-RECOVERY.md", "docs/ARCHITECTURE-RECOVERY.md", "docs/ENGINEERING-CYCLE.md", "docs/BOOTSTRAP.md", "docs/CONTINUOUS-RECOVERY.md",
             "docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/NATIVE-PROJECT-DELETION.md",
             "docs/LENS-CATALOG.md", "docs/readable-lifecycle-example.md",
             "docs/RELEASE-NOTES-0.6.0.md",

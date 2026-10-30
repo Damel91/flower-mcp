@@ -302,6 +302,12 @@ def render_plan(
         _record(lines, projection['gaps'], level=3)
     else:
         lines.append('Semantic plan closure is current. Implementation, verification and human acceptance are still separate obligations.')
+    _section(lines, 'Engineering authoring while execution is held')
+    lines.extend([
+        'An open PVP holds affected repository effects. Continue repository and authority investigation and ordinary plan authoring within confirmed intent to complete ownership, verification intent and producer/consumer declarations. Clarify genuinely unresolved product behavior or scope; technical realization and reuse are engineering responsibilities. Never invent intent, waive obligations or claim completion to clear a gate.', '',
+        'Use fow_external_work validation with detail=full and its next_gate.repair descriptor for exact authoring help. Use fow_packet_author revise_unit for an investigated targeted correction, or replace_plan when replacing the whole plan. Each unit_checks statement needs an exact same-unit verifies statement with kind=unit_check after canonical text normalization; it need not equal criterion prose, and implements does not choose its criterion. Preserve applicable declarations when replacing whole arrays, use returned current revisions, review and ordinarily accept the proposed plan, then revalidate. Keep deferred verification at its declared boundary.', '',
+        'Offline, retain observations and proposed technical declarations when a new gap is found, holding affected effects until ordinary accepted Flower mutations and revalidation on reconnection. Editing this Markdown never changes canonical authority. Draft exports remain nonexecutable.', '',
+    ])
     _section(lines, 'Offline execution and reconciliation')
     lines.extend([
         'Follow the provider-agnostic engineering cycle: recover current authority, investigate the repository, use adopted architecture, execute authorized work, record outcomes and reconcile the affected scope. The host owns the loop; no internal model or technical provider is required.', '',
@@ -323,7 +329,7 @@ def render_plan(
         'Save an interruption handover even when review remains open, with unresolved obligations visible. If new intent or missing mutation authority prevents continuation offline, stop affected effects and retain the observations for recovery. A completed review never verifies the filesystem automatically or grants human acceptance.', '',
     ])
     lines.extend([
-        'Execute with your own repository, coding, build and test tools. Flower can remain offline. Do not treat future paths/symbols as existing evidence. Finish a producer and its local checks before consuming its declared output.', '',
+        'Execute only a closed accepted issued plan under its included applicable authority, using your own repository, coding, build and test tools. Flower can remain offline. A draft or newly discovered blocker holds affected repository effects while engineering preparation continues as described above. Do not treat future paths/symbols as existing evidence. Finish a producer and its local checks before consuming its declared output.', '',
         'Retain this original authority fingerprint and revisions. On reconnection, use fow_external_work report_outcome for each unit in dependency order. A report contains report_key, expected_spec_revision, expected_plan_revision, authority_fingerprint, unit_key, outcome, summary, source_revision, artifacts, produced_contracts, verification and unresolved.', '',
         'Artifacts: reference, description, optional sha256. Produced contracts: name and included artifact_ref. Verification: exact declared criterion, kind and statement; status pass/fail/not_run; evidence_ref and provenance. A complete report requires every local check to pass, every produced contract to reference an artifact, and no unresolved unit obligations. Deferred campaign/Oracle checks remain deferred.', '',
         'Use the same report_key/request_id to recover a lost response. Conflicting reports require explicit reconcile_outcome with rationale. Old authority reports remain historical; changed plans require current reconciliation and never imply code replay. Host evidence remains host-reported. No agent report grants human acceptance.',
