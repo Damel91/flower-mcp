@@ -1,6 +1,6 @@
 # Flower plan authoring repair descriptor v1
 
-**Status:** Flower 0.7.4 public reference
+**Status:** Flower 0.7.5 public reference
 **Scope:** additive observation metadata and ordinary existing plan-authoring operations
 
 ## Scope and invariants
@@ -103,3 +103,21 @@ current context or repair. Actual roadmap consent/delegation may be recorded by
 the agent through canonical `confirm_roadmap`, with current roadmap fingerprint
 and an applicable confirmation reference. No separate native UI is required;
 missing consent must never be fabricated. This does not accept implementation.
+
+### Continue confirmed milestone scope
+
+Continue within the confirmed roadmap when actual current entry and execution
+predicates permit. Do not ask for a fresh approval after every milestone merely
+because a repository review reports `human_acceptance: false`: the review does
+not attest product acceptance. Secondary actions are ordered options or context,
+not additional conjunctive admission gates. Narrative risk treatment is recorded
+engineering context; its advisory traceability review is not a stakeholder decision.
+Honor explicitly configured accepted-predecessor policies, real intent questions,
+risk exceptions and other genuine human decisions. Never infer consent or acceptance.
+
+For current snapshots, `secondary_actions_policy` explains this boundary. A
+`review_milestone_risk` action keeps its identity but is `orchestration`; its
+snapshot gate uses `kind: intent_work`, `advisory: true` and
+`establishes_global_admission: false`, with a scoped `fow_traceability` read.
+It is not inserted in open stakeholder decisions merely because risk prose exists.
+Actual risk exception references, findings, campaigns and acceptance guards remain.

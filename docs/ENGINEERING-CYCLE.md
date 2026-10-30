@@ -128,3 +128,21 @@ its currentness comparison; it is not a whole-project completeness claim.
 Actual truncation remains visible. Other roles/internal execution reject this
 host-only scope field. Internal models are optional and configured separately in
 [advanced configuration](ADVANCED-CONFIGURATION.md).
+
+### Continue confirmed milestone scope
+
+Continue within the confirmed roadmap when actual current entry and execution
+predicates permit. Do not ask for a fresh approval after every milestone merely
+because a repository review reports `human_acceptance: false`: the review does
+not attest product acceptance. Secondary actions are ordered options or context,
+not additional conjunctive admission gates. Narrative risk treatment is recorded
+engineering context; its advisory traceability review is not a stakeholder decision.
+Honor explicitly configured accepted-predecessor policies, real intent questions,
+risk exceptions and other genuine human decisions. Never infer consent or acceptance.
+
+For current snapshots, `secondary_actions_policy` explains this boundary. A
+`review_milestone_risk` action keeps its identity but is `orchestration`; its
+snapshot gate uses `kind: intent_work`, `advisory: true` and
+`establishes_global_admission: false`, with a scoped `fow_traceability` read.
+It is not inserted in open stakeholder decisions merely because risk prose exists.
+Actual risk exception references, findings, campaigns and acceptance guards remain.
