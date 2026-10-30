@@ -380,7 +380,8 @@ class ExternalWorkService:
                         **self._report_history(raw['reports'], history_offset=history_offset),
                         'next_gate': self._history_route(project_id, change_id, packet_id), 'acceptance': 'not_inferred'}
             projection = self._projection(snapshot)
-            gate = self._validation_gate(projection, snapshot)
+            pvp_gate = self._validation_gate(projection, snapshot)
+            gate = pvp_gate
             inactive = snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
             if projection['status'] == 'closed' and snapshot['external']['consumption_mode'] != 'external_agent':
                 gate = {'tool': 'fow_external_work', 'operation': 'set_mode', 'reason': 'external_mode_not_selected'}
@@ -398,10 +399,48 @@ class ExternalWorkService:
                     'validation': projection if detail == 'full' else {k: projection[k] for k in ('contract_version', 'consumer_scope', 'status', 'authority_fingerprint', 'spec_revision', 'plan_revision', 'next_gap')},
                     'next_gate': self._inactive_gate(snapshot) if inactive else ((admission.get('next_gate') or {'tool': 'fow_handover', 'operation': 'project_state_snapshot', 'reason': admission['reason']}) if admission else gate), 'consumption_mode': snapshot['external']['consumption_mode'],
                     'plan_executable': plan_executable, 'execution_allowed': execution_allowed, 'execution_admission': admission,
+                    'gate_context': self._gate_context(snapshot, projection, execution_allowed=execution_allowed,
+                        admission_state='blocked' if admission else 'passed', admission=admission, validation_gate=pvp_gate),
                     'engineer_gate': snapshot.get('engineer_gate'),
                     'packet_dependencies': dependencies, 'repository_review': snapshot['repository_review'],
                     **(self._report_history(raw['reports'], snapshot=snapshot, projection=projection, history_offset=history_offset)
                        if detail == 'full' else {})}
+
+    @staticmethod
+    def _gate_context(snapshot, projection, *, execution_allowed=False,
+                      admission_state='not_evaluated', admission=None, validation_gate=None):
+        """Describe observed gates only; never re-evaluate guards or grant admission."""
+        gate = validation_gate if validation_gate is not None else ExternalWorkService._validation_gate(projection, snapshot)
+        gap = gate.get('repair', {}).get('obligation') or projection['next_gap']
+        diagnostic = None
+        if gap:
+            diagnostic = deepcopy(gap)
+            diagnostic.update(
+                message='The recorded plan or canonical authority has an unresolved obligation.',
+                resolution=gate.get('repair', {}).get('guidance') or
+                    'Inspect the named current canonical authority and resolve this obligation through ordinary engineering mutations and validation. Do not invent evidence or waive obligations.')
+            if gap['code'] == 'unit_check_verification_missing':
+                diagnostic.update(
+                    declaration_match=False,
+                    expected_source='same-unit verifies[kind=unit_check].statement',
+                    expected_count_meaning='Distinct declared comparison candidates; not test executions, passed checks or semantic endorsement.',
+                    rule='Exact statement equality after canonical text normalization in the same unit; criterion prose and implements do not determine the mapping.',
+                    message='This unit_checks statement has no exactly matching same-unit kind=unit_check verification declaration. The received and expected strings below are original declarations, not execution results.')
+        engineer = snapshot.get('engineer_gate') or {}
+        flag = engineer.get('execution_allowed')
+        return {
+            'contract_version': 'flow.external-work-gates.v1',
+            'execution_allowed': execution_allowed,
+            'validation': {'state': projection['status'], 'next_gap': deepcopy(projection['next_gap']),
+                           'next_gate': deepcopy(gate), 'diagnostic': diagnostic},
+            'admission': {'state': admission_state, 'reason': (admission or {}).get('reason', ''),
+                          'next_gate': deepcopy((admission or {}).get('next_gate')),
+                          'inspection_route': ExternalWorkService._history_route(
+                              snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])},
+            'engineer_gate': {'scope': 'semantic_findings_only',
+                              'state': 'passed' if flag is True else 'blocked' if flag is False else 'not_evaluated',
+                              'establishes_global_admission': False},
+        }
 
     @staticmethod
     def _history_route(project_id, change_id, packet_id):
@@ -807,22 +846,28 @@ class ExternalWorkService:
     def _todo(self, snapshot, *, unit_key='') -> Mapping[str, object]:
         projection = self._projection(snapshot)
         if snapshot['external']['consumption_mode'] != 'external_agent':
-            return {'status': 'blocked', 'reason': 'external_mode_not_selected', 'next_gate': {'tool': 'fow_external_work', 'operation': 'set_mode'}}
+            return {'status': 'blocked', 'reason': 'external_mode_not_selected',
+                    'gate_context': self._gate_context(snapshot, projection),
+                    'next_gate': {'tool': 'fow_external_work', 'operation': 'set_mode'}}
         if projection['status'] != 'closed':
             return {'status': 'blocked', 'reason': projection['next_gap']['code'], 'execution_allowed': False,
-                    'next_gate': self._validation_gate(projection, snapshot), 'validation': projection}
+                    'next_gate': self._validation_gate(projection, snapshot), 'validation': projection,
+                    'gate_context': self._gate_context(snapshot, projection)}
         try:
             self._assert_execution_allowed(snapshot)
         except ChangeControlBlockedError as exc:
             return {'status': 'blocked', 'reason': exc.reason, 'next_gate': self._inactive_gate(snapshot) if snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
                     else (dict(exc.details).get('next_gate') or {'action_kind': 'external_obligation', 'external_operation': 'resolve_guided_authority', 'details': exc.details}),
                     'engineer_gate': snapshot.get('engineer_gate'), 'execution_allowed': False,
+                    'gate_context': self._gate_context(snapshot, projection, admission_state='blocked',
+                        admission={'reason': exc.reason, 'next_gate': dict(exc.details).get('next_gate')}),
                     'repository_review': snapshot['repository_review'],
                     'history_route': self._history_route(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])}
         dependencies = self._packet_dependencies(snapshot)
         if not dependencies['ready']:
             first = next(row for row in dependencies['predecessors'] if not row['complete'])
             return {'status': 'blocked', 'reason': 'packet_dependencies_unresolved', 'packet_dependencies': dependencies,
+                'gate_context': self._gate_context(snapshot, projection, admission_state='passed'),
                 'authority_fingerprint': projection['authority_fingerprint'], 'spec_revision': projection['spec_revision'],
                 'plan_revision': projection['plan_revision'], 'next_gate': {'action_kind': 'external_obligation',
                     'external_operation': 'complete_predecessor_packet', 'packet_id': first['packet_id'],

@@ -68,7 +68,9 @@ def _record(lines: list[str], value: object, *, level: int = 3) -> None:
         for key, item in value.items():
             if not isinstance(item, (Mapping, list, tuple)):
                 physical = _text(item).splitlines() or ['']
-                lines.append(f'- **{_label(key)}:** {physical[0]}')
+                label = ('Declared comparison candidates (not passed checks)'
+                         if key == 'expected_count' and value.get('code') == 'unit_check_verification_missing' else _label(key))
+                lines.append(f'- **{label}:** {physical[0]}')
                 lines.extend('  ' + line for line in physical[1:])
         for key, item in value.items():
             if isinstance(item, Mapping):
@@ -253,9 +255,11 @@ def render_plan(
     for reference, authority in snapshot.get('resolved_authorities', {}).items():
         _section(lines, 'Referenced authority: ' + reference, 3)
         _record(lines, authority, level=4)
-    for key, title in (('engineer_gate', 'Current engineer gate'), ('remediation_context', 'Corrective lineage and reassessment context')):
+    for key, title in (('engineer_gate', 'Semantic findings subgate'), ('remediation_context', 'Corrective lineage and reassessment context')):
         if snapshot.get(key):
             _section(lines, title)
+            if key == 'engineer_gate':
+                lines.append('This subgate evaluates semantic findings only. Its execution_allowed flag does not establish global execution permission or roadmap confirmation.')
             if key == 'remediation_context':
                 lines.append('Context-only predecessors preserve historical intent and lineage. They do not promise materialization, add execution dependencies or authorize consuming undeclared future contracts.')
             _record(lines, snapshot[key], level=3)
@@ -385,6 +389,11 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
     _record(lines, {key: result[key] for key in identity_fields if key in result})
     lines.append('Agent completion, local verification, deferred verification and human acceptance are separate. Host reports do not provide provider attestation.')
     handled = set(identity_fields)
+    if isinstance(result.get('gate_context'), Mapping):
+        _section(lines, 'Execution decision and observed gates')
+        lines.append('This is a read-only observation. A blocked read describes held work, not uncertain mutation effects. Only the global execution decision establishes admission; individual subgates do not. Admission lists the first observed guard result, not an exhaustive blocker audit. The PVP preparation route can remain useful while execution is held.')
+        _record(lines, result['gate_context'])
+        handled.add('gate_context')
     if isinstance(result.get('repository_review'), Mapping):
         _section(lines, 'Repository and lifecycle reconciliation')
         review = result['repository_review']
@@ -462,17 +471,19 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
         ('packet_dependencies', 'Canonical predecessor readiness'), ('deferred_verification', 'Deferred verification'),
         ('criterion_traceability', 'Criterion evidence'), ('historical_reports', 'Historical reports'),
         ('report_history', 'Original report history'), ('history_page', 'Report history completeness'),
-        ('engineer_gate', 'Current engineer gate'), ('remediation_context', 'Corrective lineage and reassessment context'),
+        ('engineer_gate', 'Semantic findings subgate'), ('remediation_context', 'Corrective lineage and reassessment context'),
     ):
         if key in result:
             _section(lines, title)
+            if key == 'engineer_gate':
+                lines.append('This subgate evaluates semantic findings only. Its execution_allowed flag does not establish global execution permission or roadmap confirmation.')
             _record(lines, result[key])
             handled.add(key)
     if 'report_history' in result or result.get('historical_reports'):
         lines.append('Historical records describe their original pin and provenance. Compatibility review or missing current authority does not authorize replay, replacement fingerprints or reimplementation.')
     for key in ('next_gate', 'gate', 'next_action'):
         if key in result:
-            _section(lines, 'Next authorized operation' if key == 'next_gate' else _label(key))
+            _section(lines, ('Primary next authority gate' if 'gate_context' in result else 'Next authorized operation') if key == 'next_gate' else _label(key))
             _record(lines, result[key])
             handled.add(key)
     residual = {key: value for key, value in result.items() if key not in handled}
