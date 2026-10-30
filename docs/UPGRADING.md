@@ -2,8 +2,8 @@
 
 ## Preparing a 0.7.4 upgrade
 
-Flower 0.7.4 improves [PVP authoring guidance](PLAN-AUTHORING.md) and structured
-unit-revision errors; see the [release notes](RELEASE-NOTES-0.7.4.md). SQLite remains
+Flower 0.7.4 distinguishes global execution admission, PVP preparation and the
+semantic findings subgate, with exact declaration diagnostics; see the [release notes](RELEASE-NOTES-0.7.4.md). SQLite remains
 schema 55. Dependencies and installer behavior are unchanged. Keep the existing
 environment, profile, database, YAML and client configuration. Stop its owners,
 then use the ordinary installer with `--upgrade`; it backs up SQLite and YAML
@@ -18,6 +18,19 @@ profile. Keep the backup; failed pip is not an atomic rollback.
 This update does not change your plan, execute pending work or resolve uncertain
 historical calls automatically. Inspect current authority before deliberately
 repairing declarations; preserve existing outcome pins and human approval gates.
+
+<a id="preparing-a-073-upgrade"></a>
+
+## Historical 0.7.3 upgrade checkpoint
+
+Flower 0.7.3 improves [PVP authoring guidance](PLAN-AUTHORING.md) and structured
+unit-revision errors; its [release notes](RELEASE-NOTES-0.7.3.md) retain the original
+scope. Its official installer and `SHA256SUMS` remain on
+[release 0.7.3](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.3).
+Use `--version 0.7.3 --upgrade --dry-run` with the existing environment/profile;
+remove `--dry-run` to apply that historical version. Schema55, database/YAML/client
+paths and ordinary backup-before-pip behavior remain unchanged. The current
+operational examples below select 0.7.4 assets when available.
 
 <a id="preparing-a-072-upgrade"></a>
 
@@ -301,7 +314,7 @@ an actual client deployment or human acceptance.
 
 The following paragraphs retain the historical 0.6.0 compatibility checkpoint.
 The general preview, execution and manual-pip instructions later in this guide
-select published 0.7.4 assets.
+select selected 0.7.4 assets assets.
 
 **Flower MCP 0.6.0 is published.** Its
 [milestone compatibility change](RELEASE-NOTES-0.6.0.md#milestones-realized-work-and-prerequisites)
@@ -402,7 +415,7 @@ without an original fingerprint, inspect durable state before retrying; a new
 request key is not a substitute for that inspection. Retain original evidence
 and handover payloads while assessing current authority.
 
-The remaining operational commands select published **0.7.4**. See the
+The remaining operational commands select selected **0.7.4** assets. See the
 [current release notes](RELEASE-NOTES-0.7.4.md) and the retained
 [0.6.0 compatibility notes](RELEASE-NOTES-0.6.0.md).
 Native project deletion is never an upgrade step.

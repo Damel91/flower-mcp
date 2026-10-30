@@ -123,7 +123,7 @@ retains eight successful results. Its seven anonymous assets and populated
 ## Published 0.6.1 and selected source
 
 The historical [0.6.1 upgrade checkpoint](UPGRADING.md#preparing-a-061-upgrade)
-and its assets remain available. The current operational examples after Prerequisites select published 0.7.4.
+and its assets remain available. The current operational examples after Prerequisites select 0.7.4 assets when available.
 
 The historical 0.6.0 tag remains
 `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7`
@@ -609,7 +609,7 @@ Do not delete lock files to bypass an active owner.
 ## Upgrades and removal
 
 Use the [complete safe upgrade plan](UPGRADING.md) before updating an existing
-installation. The commands below select published 0.7.4.
+installation. The commands below select 0.7.4 assets when available.
 Stop **all Flower processes and coding clients sharing the
 installation environment**; the installer does not stop services. Keep the same
 environment, profile name and profile root. For an installer-owned environment:
