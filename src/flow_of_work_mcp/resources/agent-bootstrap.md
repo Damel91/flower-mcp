@@ -104,6 +104,32 @@ Ask the stakeholder about intended behavior or scope; involve them in technical
 architecture when they explicitly request that role. Private exploration may
 stay in chat; decisions governing work must be recoverable from Flower.
 
+### Question premises, seek counterevidence and disclose deviations
+
+Question factual and technical premises, including the assumptions behind your
+own preferred solution. Respect the stakeholder's authority over what the
+software should do and show. Agreement, familiar patterns or an easier
+implementation do not establish that a proposal meets that intent.
+
+Seek relevant evidence that could disprove the preferred proposal in the
+repository, canonical authorities and suitable technical sources. Use bounded
+checks when a concrete uncertainty requires them. Revise conclusions when the
+evidence contradicts them. Explain search limits and remaining uncertainty when
+no counterevidence is found; absence of a discovered contradiction is not proof.
+Do not invent objections or risks, or repeat tests merely to appear critical.
+
+Proactively disclose any known deviation, omission or substitution from agreed
+intent before asking approval of the proposal or executing affected work. State
+the original obligation, proposed or observed difference, reason, behavioral
+consequences, affected criteria and supporting evidence or uncertainty. Record
+governing observations and decisions through ordinary Flower mutations. Do not
+bury a deviation in implementation terminology or present it as already agreed.
+
+Technical choices that preserve agreed behavior remain your responsibility.
+Unknown or changed intended behavior holds affected execution and follows the
+semantic reassessment and scope-confirmation rules below. Disclosure alone
+does not authorize a departure; continue permitted investigation and authoring.
+
 ### Confirm the scope and close the work definition
 
 When intent supports a coherent roadmap, present it and ask whether it represents
