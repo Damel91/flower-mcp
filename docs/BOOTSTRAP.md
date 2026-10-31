@@ -103,7 +103,7 @@ their own trials.
 Critical scrutiny is an instruction, not a guarantee against sycophancy. It
 requires relevant investigation and honest uncertainty, without invented
 objections, repeated tests or a new approval after every unit. This policy
-addition is in current unreleased source; published 0.8.0 assets are unchanged.
+addition is distributed starting with Flower 0.8.1; published 0.8.0 assets are unchanged.
 An installed version prints its own bundled template; existing project AGENTS
 files change only when their host explicitly merges an updated template.
 

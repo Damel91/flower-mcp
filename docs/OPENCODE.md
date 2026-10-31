@@ -18,14 +18,14 @@ instructions before selecting this adapter.
 For a new installation on macOS or Linux, review the installer and run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash -s -- --platform opencode
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.1/install.sh | bash -s -- --platform opencode
 ```
 
 On Windows, from PowerShell:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.ps1' -OutFile '.\install.ps1'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.8.0' -Platform opencode
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.8.1/install.ps1' -OutFile '.\install.ps1'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.8.1' -Platform opencode
 ```
 
 The Python release backend also accepts `--platform opencode`. Check the
@@ -39,7 +39,7 @@ with the same environment/profile/database. Then run its returned installed
 command with `install --platform opencode` to add the registration, retaining
 the original `--profile` and `--profile-root` values. Do not combine client
 registration with `--upgrade`. If Flower
-0.8.0 is already installed, only registration is needed; no database replacement.
+0.8.0 or later is already installed, only registration is needed; no database replacement.
 
 ## Select the configuration and profile
 

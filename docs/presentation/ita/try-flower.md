@@ -59,11 +59,11 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:
 .venv/bin/python -m pip check
 ```
 
-Per un **wheel locale 0.8.0 ottenuto dal sorgente o candidato**, usa un ambiente
+Per un **wheel locale 0.8.1 ottenuto dal sorgente o candidato**, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.1-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 è pubblicato al commit
