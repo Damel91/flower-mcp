@@ -59,11 +59,11 @@ Use this source command only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
-For a **local 0.7.5 source/candidate wheel**, use a fresh/manual environment.
+For a **local 0.8.0 source/candidate wheel**, use a fresh/manual environment.
 This local-build example is separate from the verified published artifact:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.6-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.0-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 is published at commit
@@ -131,12 +131,11 @@ inferred from the owned fixture or CI.
 | macOS / Linux, Bash installer | Bash, curl, awk, sha256sum or shasum, shell utilities, HTTPS access and Internet. Suitable Python is reused or prepared by the installer. |
 | Windows, PowerShell launcher | Windows PowerShell 5.1+, HTTPS access and Internet. Suitable Python is reused or prepared by the launcher. |
 | Manual installation or Python installer | Python 3.11+ with ssl, venv and ensurepip; dependency access. Git is needed only to clone source. |
-| Agent connection | Codex, Claude Code, Cursor, Antigravity or Gemini CLI already installed; a writable user directory. |
+| Agent connection | Codex, Claude Code, Cursor, Antigravity, Gemini CLI or OpenCode V2 already installed; a writable user directory. |
 
-OpenCode V2 support is available in the development source; published 0.7.6
-installers retain their existing client choices. The adapter preserves direct
-Flower tools and uses the same project AGENTS bootstrap. See the
-[OpenCode candidate setup](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
+Flower 0.8.0 supports OpenCode V2 through the release installers. The adapter
+preserves direct Flower tools and uses the same project AGENTS bootstrap. See
+[OpenCode setup](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
 
 **The core requires no LM Studio, internal model, CodingCastle or VPN.** Inference
 normally remains with your chosen coding agent. Optional Flower internal inference
@@ -211,7 +210,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '
 
 Run the commands separately and stop if the download fails. You can inspect the
 script before starting it. `-Platform claude-code`, `-Platform cursor`,
-`-Platform antigravity` or `-Platform gemini-cli` selects another client;
+`-Platform antigravity`, `-Platform gemini-cli` or `-Platform opencode` selects another client;
 `-NoRegister` installs without registering one. The execution
 policy option applies only to that PowerShell process.
 

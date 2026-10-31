@@ -5,36 +5,41 @@ its coding tools; Flower supplies durable requirements, architecture, plans,
 evidence and continuation. No Flower-side model or optional inference package
 is required.
 
-**Availability:** this adapter is currently unreleased development source.
-Published Flower 0.7.6 packages and installers do not contain it. The commands
-below require a candidate built from the source containing the adapter; they do
-not upgrade an existing installation or reserve a future release version.
+**Availability:** included in Flower 0.8.0. Earlier 0.7.6 assets remain unchanged
+and do not contain this adapter.
 
-## Prerequisites and candidate installation
+## Prerequisites and installation
 
 Install OpenCode separately and use Python 3.11 or newer. Integration targets
 **OpenCode V2**, with native connection checks against 2.2.5 on macOS arm64.
 OpenCode V1 uses a different configuration; migrate it using OpenCode's own
 instructions before selecting this adapter.
 
-For a separate development installation, from this checkout:
+For a new installation on macOS or Linux, review the installer and run:
 
 ```sh
-python3 -m venv /absolute/path/to/flower-opencode-venv
-/absolute/path/to/flower-opencode-venv/bin/python -m pip install .
-/absolute/path/to/flower-opencode-venv/bin/flower-mcp install --platform opencode --dry-run
-/absolute/path/to/flower-opencode-venv/bin/flower-mcp install --platform opencode
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash -s -- --platform opencode
 ```
 
-On Windows, use the environment's `Scripts\python.exe` and
-`Scripts\flower-mcp.exe`. Python, Bash and PowerShell installer choices include
-OpenCode in this source; their pinned release defaults still point to 0.7.6.
-Use the local candidate route above until the new adapter has release assets.
-Windows native OpenCode execution requires its own qualification.
+On Windows, from PowerShell:
 
-If Flower with this adapter is already installed, run only its `install`
-registration command. There is no need to reinstall Python or replace the
-database just to connect another client.
+```powershell
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.ps1' -OutFile '.\install.ps1'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.8.0' -Platform opencode
+```
+
+The Python release backend also accepts `--platform opencode`. Check the
+[installation prerequisites](INSTALLATION.md#prerequisites) for your system.
+The source and wheel installation routes remain available in that guide.
+Native OpenCode execution on Windows/Linux requires its own qualification;
+installer CI and macOS connection checks are distinct from model usability.
+
+For an existing installation, first use the [ordinary upgrade](UPGRADING.md#preparing-a-080-upgrade)
+with the same environment/profile/database. Then run its returned installed
+command with `install --platform opencode` to add the registration, retaining
+the original `--profile` and `--profile-root` values. Do not combine client
+registration with `--upgrade`. If Flower
+0.8.0 is already installed, only registration is needed; no database replacement.
 
 ## Select the configuration and profile
 

@@ -59,11 +59,11 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:
 .venv/bin/python -m pip check
 ```
 
-Per un **wheel locale 0.7.5 ottenuto dal sorgente o candidato**, usa un ambiente
+Per un **wheel locale 0.8.0 ottenuto dal sorgente o candidato**, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.6-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.0-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 è pubblicato al commit
@@ -136,13 +136,12 @@ dedotta dalla fixture isolata o dalla CI.
 | macOS / Linux, installer Bash | Bash, curl, awk, sha256sum o shasum, utility shell, accesso HTTPS e Internet. Python adatto viene riutilizzato o preparato dall'installer. |
 | Windows, launcher PowerShell | Windows PowerShell 5.1+, accesso HTTPS e Internet. Python adatto viene riutilizzato o preparato dal launcher. |
 | Installazione manuale o installer Python | Python 3.11+ con ssl, venv ed ensurepip; accesso alle dipendenze. Git serve solo per clonare il sorgente. |
-| Collegamento all'agente | Codex, Claude Code, Cursor, Antigravity o Gemini CLI già installato; directory utente scrivibile. |
+| Collegamento all'agente | Codex, Claude Code, Cursor, Antigravity, Gemini CLI o OpenCode V2 già installato; directory utente scrivibile. |
 
 **Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.**
-Il sorgente di sviluppo include il supporto a OpenCode V2; gli installer pubblicati
-della 0.7.6 mantengono le scelte precedenti. L'adapter conserva i tool diretti di
-Flower e lo stesso bootstrap AGENTS del progetto. Vedi la
-[configurazione OpenCode del candidato](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
+Flower 0.8.0 supporta OpenCode V2 tramite gli installer della release. L'adapter
+conserva i tool diretti di Flower e lo stesso bootstrap AGENTS del progetto. Vedi
+la [configurazione OpenCode](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
 
 L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
@@ -218,7 +217,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '
 
 Esegui i due comandi separatamente e fermati se il download fallisce. Puoi
 leggere lo script prima di avviarlo. `-Platform claude-code`, `-Platform cursor`,
-`-Platform antigravity` o `-Platform gemini-cli` selezionano gli altri client;
+`-Platform antigravity`, `-Platform gemini-cli` o `-Platform opencode` selezionano gli altri client;
 `-NoRegister` installa senza registrarne uno.
 L'opzione di execution policy vale solo per quel processo PowerShell.
 

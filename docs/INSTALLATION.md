@@ -1,13 +1,13 @@
 # Install Flower MCP
 
-Install [Flower 0.7.6](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.6)
-from its versioned release assets. The [release notes](RELEASE-NOTES-0.7.6.md) and
+Install [Flower 0.8.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.8.0)
+from its versioned release assets. The [release notes](RELEASE-NOTES-0.8.0.md) and
 [engineering cycle](ENGINEERING-CYCLE.md) explain the current workflow.
-Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-076-upgrade),
+Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-080-upgrade),
 keeping their environment, profile, database and client configuration.
 
 Use the exact tagged release and its `SHA256SUMS` to verify downloaded assets.
-The [release page](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.6)
+The [release page](https://github.com/Damel91/flower-mcp/releases/tag/v0.8.0)
 identifies its immutable commit and the associated Release workflow.
 SQLite remains at schema 55. Use the ordinary upgrade in place; package installation
 and actual client adoption are separate operations.
@@ -123,7 +123,7 @@ retains eight successful results. Its seven anonymous assets and populated
 ## Published 0.6.1 and selected source
 
 The historical [0.6.1 upgrade checkpoint](UPGRADING.md#preparing-a-061-upgrade)
-and its assets remain available. The current operational examples after Prerequisites select 0.7.6 assets when available.
+and its assets remain available. The current operational examples after Prerequisites select 0.8.0 assets when available.
 
 The historical 0.6.0 tag remains
 `bb43b5a161ecc85e56f1d2dba2c69184da0a02b7`
@@ -150,7 +150,7 @@ These prerequisites cover core installation. Choose your route before installing
 | Manual downloaded wheel or source archive | Python 3.11+ with ssl, venv and ensurepip; downloaded files and Internet access for dependencies. Git and curl are not required. |
 | PowerShell release launcher, Windows | Windows PowerShell 5.1+, HTTPS trust and Internet access; suitable Python is reused or managed Python 3.11 is prepared. No Git or curl required. |
 | Python release installer, including Windows | Python 3.11+ with ssl, venv and ensurepip; public release download access. Git and curl are not required. |
-| Agent registration | The selected Codex, Claude Code, Cursor, Antigravity or Gemini CLI client must be installed to use the integration. Flower does not install it. |
+| Agent registration | The selected Codex, Claude Code, Cursor, Antigravity, Gemini CLI or OpenCode V2 client must be installed to use the integration. Flower does not install it. |
 
 Use a writable user directory for the environment, temporary downloads, Flower
 profiles and client configuration. Flower itself does not require a system-wide
@@ -292,28 +292,28 @@ workstation and client still require their own test, beyond the recorded CI scop
 On macOS or Linux, after prerequisite setup, with release assets publicly accessible:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash
 ```
 
-Choose Codex, Claude Code, Cursor, Antigravity, Gemini CLI, or installation without agent registration.
+Choose Codex, Claude Code, Cursor, Antigravity, Gemini CLI, OpenCode V2, or installation without agent registration.
 The installer creates a dedicated virtual environment, obtains Python 3.11 if
 no suitable interpreter is available, downloads the release wheel, checks its
 SHA-256 checksum and installs the declared dependencies. It then invokes
 Flower's agent registration and doctor commands. Reload the selected client
 and follow its connection/trust prompt.
 
-The `v0.7.6` release assets contain the Python installer, model `BOOTSTRAP.md`
+The `v0.8.0` release assets contain the Python installer, model `BOOTSTRAP.md`
 and `SHA256SUMS`. Anonymous download access is unavailable while the repository
 is private. Downloads and dependency installation need Internet access.
 
 For unattended use, select the destination explicitly:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.sh | bash -s -- --platform codex
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash -s -- --platform codex
 ```
 
 Use `--platform claude-code`, `--platform cursor`, `--platform antigravity`,
-`--platform gemini-cli` or `--no-register` as needed.
+`--platform gemini-cli`, `--platform opencode` or `--no-register` as needed.
 `--client-config`, `--profile`, `--profile-root` and `--venv` select custom paths.
 An existing environment requires explicit `--upgrade`. The installer prints
 the absolute command path; agent configuration uses the installed interpreter
@@ -326,14 +326,14 @@ checkout, invoke it in a dedicated process; no activation or global execution
 policy change is needed:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install.ps1 -Version 0.7.6 -Platform codex
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install.ps1 -Version 0.8.0 -Platform codex
 ```
 
 The launcher is available as a version-pinned release asset. Download it, then run it in
 an isolated PowerShell process with an explicit client or `-NoRegister`:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.ps1" -OutFile ".\install.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform codex
 ```
 
@@ -353,10 +353,10 @@ The default venv is `%LOCALAPPDATA%\Flower MCP Install\venv`.
 
 Options are PowerShell named parameters:
 
-- Fresh installation requires exactly one of `-Platform codex|claude-code|cursor|antigravity|gemini-cli` or `-NoRegister`.
+- Fresh installation requires exactly one of `-Platform codex|claude-code|cursor|antigravity|gemini-cli|opencode` or `-NoRegister`.
 - Upgrade implies no registration; omit `-Platform` and `-ClientConfig`.
-- The selected 0.7.6 launcher defaults to that version.
-  Use `-Version 0.7.6` explicitly when selecting the current release.
+- The selected 0.8.0 launcher defaults to that version.
+  Use `-Version 0.8.0` explicitly when selecting the current release.
 - `-Venv 'C:\Users\tester\Flower test\venv'` selects an installation location.
 - `-Upgrade` explicitly upgrades an environment already owned by the backend.
 - `-DryRun` previews an upgrade without package or lifecycle data changes;
@@ -367,7 +367,7 @@ Options are PowerShell named parameters:
 For installation without client registration:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.7.6 -NoRegister
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.8.0 -NoRegister
 ```
 
 The user/client controls connection and trust. Neither installation nor doctor
@@ -383,7 +383,7 @@ the client workflow. Use the absolute executable path printed by the installer
 if `flower-mcp` is not on PATH.
 
 The Windows script, Python backend and wheel above all refer to the same
-`v0.7.6` release. Source checkout installation is a separate route.
+`v0.8.0` release. Source checkout installation is a separate route.
 
 ## Python release installer on Windows
 
@@ -393,12 +393,12 @@ It does not install Python on Windows or authenticate GitHub downloads.
 With release assets publicly accessible, download it in PowerShell:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install_flower.py" -OutFile ".\install_flower.py"
-py -3 .\install_flower.py --version 0.7.6 --platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install_flower.py" -OutFile ".\install_flower.py"
+py -3 .\install_flower.py --version 0.8.0 --platform codex
 ```
 
 Use `--platform claude-code`, `--platform cursor`, `--platform antigravity`,
-`--platform gemini-cli` or `--no-register` as needed.
+`--platform gemini-cli`, `--platform opencode` or `--no-register` as needed.
 The default environment is `%LOCALAPPDATA%\Flower MCP Install\venv`; the installer
 checks the release wheel checksum, installs dependencies, and runs registration
 and diagnosis when selected. `--venv`, `--profile-root` and `--client-config`
@@ -414,11 +414,11 @@ For managed Python preparation, use the PowerShell release launcher above.
 
 Have Git and Python 3.11+ available, then clone with authorized access if private.
 These examples install the checked-out source revision. To use the exact
-official `v0.7.6` bytes, select the release wheel route instead.
+official `v0.8.0` bytes, select the release wheel route instead.
 No checkout configuration file needs to be copied.
 Record the selected commit with `git rev-parse HEAD` and retain build provenance.
 Source on `main` may differ from the immutable release; the published wheel
-route below installs exact 0.7.6 bytes verified against its `SHA256SUMS`.
+route below installs exact 0.8.0 bytes verified against its `SHA256SUMS`.
 
 **macOS/Linux:**
 
@@ -451,8 +451,8 @@ upstream runtime.
 
 ## Manual installation from a release wheel
 
-Download `flow_of_work_mcp-0.7.6-py3-none-any.whl` and `SHA256SUMS` from the
-[GitHub Release](https://github.com/Damel91/flower-mcp/releases/tag/v0.7.6), using
+Download `flow_of_work_mcp-0.8.0-py3-none-any.whl` and `SHA256SUMS` from the
+[GitHub Release](https://github.com/Damel91/flower-mcp/releases/tag/v0.8.0), using
 an authorized browser or GitHub CLI while it is private. Put both files in the
 same writable directory, then open a terminal there. Have Python 3.11+ ready;
 Git and curl are not needed.
@@ -461,9 +461,9 @@ Git and curl are not needed.
 
 ```sh
 # Linux
-sha256sum flow_of_work_mcp-0.7.6-py3-none-any.whl
+sha256sum flow_of_work_mcp-0.8.0-py3-none-any.whl
 # macOS
-shasum -a 256 flow_of_work_mcp-0.7.6-py3-none-any.whl
+shasum -a 256 flow_of_work_mcp-0.8.0-py3-none-any.whl
 ```
 
 Compare the hash with the wheel's exact entry in `SHA256SUMS`. Stop if it differs.
@@ -471,14 +471,14 @@ Then install:
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install ./flow_of_work_mcp-0.7.6-py3-none-any.whl
+.venv/bin/python -m pip install ./flow_of_work_mcp-0.8.0-py3-none-any.whl
 .venv/bin/python -m pip check
 ```
 
 **Windows, in PowerShell:** check the digest first:
 
 ```powershell
-Get-FileHash .\flow_of_work_mcp-0.7.6-py3-none-any.whl -Algorithm SHA256
+Get-FileHash .\flow_of_work_mcp-0.8.0-py3-none-any.whl -Algorithm SHA256
 Get-Content .\SHA256SUMS
 ```
 
@@ -487,7 +487,7 @@ Then install:
 
 ```powershell
 py -3 -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install .\flow_of_work_mcp-0.7.6-py3-none-any.whl
+& .\.venv\Scripts\python.exe -m pip install .\flow_of_work_mcp-0.8.0-py3-none-any.whl
 & .\.venv\Scripts\python.exe -m pip check
 ```
 
@@ -518,18 +518,15 @@ For the manual `.venv` used above:
 
 For a release installer environment, use its returned absolute `command` path
 instead. Run preflight first and stop on a conflict before actual registration.
-Supported platform names are `codex`, `claude-code`, `cursor`, `antigravity` and `gemini-cli`. Defaults target
+Supported platform names are `codex`, `claude-code`, `cursor`, `antigravity`, `gemini-cli` and `opencode`. Defaults target
 the user's Codex TOML, Claude Code user JSON, Cursor user JSON or the selected
 Google client's user JSON. See [Google clients](GOOGLE-CLIENTS.md) for the exact
 Antigravity/Gemini paths, environment override and connection steps. Use
 `--client-config /absolute/path` for another supported config file.
 Claude Code's nested local-scope config is unsupported. JSON must be strict JSON.
 
-The development source additionally supports `--platform opencode` for
-**OpenCode V2**. See [OpenCode setup](OPENCODE.md) for the selected-file path,
-JSONC handling, direct tools and project bootstrap. Published 0.7.6 assets retain
-their original platform choices; use a locally built candidate until a release
-containing this adapter is published.
+Use `--platform opencode` for **OpenCode V2**. See [OpenCode setup](OPENCODE.md)
+for selected-file paths, JSONC handling, direct tools and project bootstrap.
 
 The generated stdio entry uses absolute interpreter and profile paths. Reload
 the client after registration. `doctor` inspects files; connection and trust
@@ -615,13 +612,13 @@ Do not delete lock files to bypass an active owner.
 ## Upgrades and removal
 
 Use the [complete safe upgrade plan](UPGRADING.md) before updating an existing
-installation. The commands below select 0.7.6 assets when available.
+installation. The commands below select 0.8.0 assets when available.
 Stop **all Flower processes and coding clients sharing the
 installation environment**; the installer does not stop services. Keep the same
 environment, profile name and profile root. For an installer-owned environment:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Inspect the plan, then repeat without `--dry-run`. For custom paths, include
@@ -639,7 +636,7 @@ upgrade guide.
 On Windows, download and inspect the current `install.ps1`, then preview:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.7.6' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.8.0' -Upgrade -DryRun
 ```
 
 Repeat without `-DryRun` to execute; preserve custom `-Venv`, `-Profile` and
@@ -647,7 +644,7 @@ Repeat without `-DryRun` to execute; preserve custom `-Venv`, `-Profile` and
 
 Manual pip environments use the [manual backup and wheel upgrade
 procedure](UPGRADING.md#manual-pip-installations); they are not silently adopted
-by the release installer. Upgrading an existing schema 55 profile to 0.7.6
+by the release installer. Upgrading an existing schema 55 profile to 0.8.0
 adds no migration. An older 0.3.1/schema 52 ledger uses the existing
 additive migrations to schema 55 on first server start. Diagnosis alone does not
 start Flower or verify migration.

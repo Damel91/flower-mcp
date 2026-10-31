@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: da92b4cacaab5b7fef99485ed235bdaf342b4343214bac36c2c10c22f2174def. -->
+<!-- Generated from linked Markdown. Source digest: bba820ade9a8278ef4a3b81054178f230df75f8d730313a9886286cbf3380516. -->
 <a class="skip-link" href="#content">Vai al contenuto</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>Dal requisito al software</small></span></a>
@@ -568,9 +568,9 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>Per un <strong>wheel locale 0.7.5 ottenuto dal sorgente o candidato</strong>, usa un ambiente
+<p>Per un <strong>wheel locale 0.8.0 ottenuto dal sorgente o candidato</strong>, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:</p>
-<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.7.6-py3-none-any.whl[inference]'
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.0-py3-none-any.whl[inference]'
 </code></pre>
 <p>Flower 0.6.2 è pubblicato al commit
 <code>12ad69317dab92bdba06ae113ac22d107d259236</code>. Verifica il wheel ufficiale rispetto
@@ -653,15 +653,14 @@ dedotta dalla fixture isolata o dalla CI.</p>
 </tr>
 <tr>
 <td>Collegamento all'agente</td>
-<td>Codex, Claude Code, Cursor, Antigravity o Gemini CLI già installato; directory utente scrivibile.</td>
+<td>Codex, Claude Code, Cursor, Antigravity, Gemini CLI o OpenCode V2 già installato; directory utente scrivibile.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.</strong>
-Il sorgente di sviluppo include il supporto a OpenCode V2; gli installer pubblicati
-della 0.7.6 mantengono le scelte precedenti. L'adapter conserva i tool diretti di
-Flower e lo stesso bootstrap AGENTS del progetto. Vedi la
-<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md" rel="noopener noreferrer">configurazione OpenCode del candidato</a>.</p>
+Flower 0.8.0 supporta OpenCode V2 tramite gli installer della release. L'adapter
+conserva i tool diretti di Flower e lo stesso bootstrap AGENTS del progetto. Vedi
+la <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md" rel="noopener noreferrer">configurazione OpenCode</a>.</p>
 <p>L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
 configurato; vedi la <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md" rel="noopener noreferrer">guida all'inferenza</a>.
@@ -716,7 +715,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '
 </code></pre>
 <p>Esegui i due comandi separatamente e fermati se il download fallisce. Puoi
 leggere lo script prima di avviarlo. <code>-Platform claude-code</code>, <code>-Platform cursor</code>,
-<code>-Platform antigravity</code> o <code>-Platform gemini-cli</code> selezionano gli altri client;
+<code>-Platform antigravity</code>, <code>-Platform gemini-cli</code> o <code>-Platform opencode</code> selezionano gli altri client;
 <code>-NoRegister</code> installa senza registrarne uno.
 L'opzione di execution policy vale solo per quel processo PowerShell.</p>
 <p>Per installare manualmente, segui <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#manual-installation-from-a-release-wheel" rel="noopener noreferrer">la procedura corrente con wheel e checksum</a>.

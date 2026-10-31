@@ -68,13 +68,12 @@ evidence with current authority before dependent work advances. Read the
 
 ## Quick start
 
-Have a supported client installed: **Codex, Claude Code, Cursor, Antigravity or
-Gemini CLI**. Choose a writable user directory and check the
+Have a supported client installed: **Codex, Claude Code, Cursor, Antigravity,
+Gemini CLI or OpenCode V2**. Choose a writable user directory and check the
 [installation prerequisites](docs/INSTALLATION.md#prerequisites).
 
-**OpenCode V2:** integration is available in the development source. Follow the
-[OpenCode setup guide](docs/OPENCODE.md) for a local candidate; the published
-0.7.6 installers do not include this adapter yet.
+For OpenCode, follow the [setup guide](docs/OPENCODE.md), including project
+AGENTS instructions and configuration choices.
 
 ### macOS and Linux
 
@@ -83,10 +82,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -98,7 +97,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.7.6/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.8.0/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```

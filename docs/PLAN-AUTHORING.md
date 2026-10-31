@@ -1,6 +1,6 @@
 # Flower plan authoring repair descriptor v1
 
-**Status:** Flower 0.7.6 public reference
+**Status:** Flower 0.8.0 public reference
 **Scope:** additive observation metadata and ordinary existing plan-authoring operations
 
 ## Scope and invariants
