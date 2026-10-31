@@ -34,22 +34,22 @@ $temporary = Join-Path ([IO.Path]::GetTempPath()) ('flower-installer-check-' + [
 [void][IO.Directory]::CreateDirectory($temporary)
 try {
     Assert-Selection 'codex' $false '' '0.1.0'
-    foreach ($platform in @('antigravity', 'gemini-cli')) {
-        Assert-Selection $platform $false 'C:\Google config\settings.json' '0.1.0'
-        $googleArguments = Get-BackendArguments '0.1.0' $platform $false '' $false `
-            'C:\Google config\settings.json' 'default' 'C:\Flower profiles'
-        $expectedGoogle = @('--version', '0.1.0', '--profile', 'default', '--platform', $platform,
-            '--client-config', 'C:\Google config\settings.json', '--profile-root', 'C:\Flower profiles')
-        Assert-True ($googleArguments.Count -eq $expectedGoogle.Count) 'Google argument count changed.'
-        for ($index = 0; $index -lt $expectedGoogle.Count; $index++) {
-            Assert-True ($googleArguments[$index] -ceq $expectedGoogle[$index]) 'Google literal argument or ordering changed.'
+    foreach ($platform in @('antigravity', 'gemini-cli', 'opencode')) {
+        Assert-Selection $platform $false 'C:\Client config\settings.json' '0.1.0'
+        $clientArguments = Get-BackendArguments '0.1.0' $platform $false '' $false `
+            'C:\Client config\settings.json' 'default' 'C:\Flower profiles'
+        $expectedClient = @('--version', '0.1.0', '--profile', 'default', '--platform', $platform,
+            '--client-config', 'C:\Client config\settings.json', '--profile-root', 'C:\Flower profiles')
+        Assert-True ($clientArguments.Count -eq $expectedClient.Count) 'Client argument count changed.'
+        for ($index = 0; $index -lt $expectedClient.Count; $index++) {
+            Assert-True ($clientArguments[$index] -ceq $expectedClient[$index]) 'Client literal argument or ordering changed.'
         }
         Assert-Rejected { Assert-Selection $platform $true '' '0.1.0' } 'exactly one'
     }
     $platformParameter = $tree.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Platform' }
     $platformValues = $platformParameter.Attributes | Where-Object { $_.TypeName.FullName -eq 'ValidateSet' }
-    foreach ($platform in @('antigravity', 'gemini-cli')) {
-        Assert-True (($platformValues.PositionalArguments.Value) -contains $platform) 'Google platform missing from launcher validation.'
+    foreach ($platform in @('antigravity', 'gemini-cli', 'opencode')) {
+        Assert-True (($platformValues.PositionalArguments.Value) -contains $platform) 'Client platform missing from launcher validation.'
     }
     Assert-Selection '' $true '' '10.20.30'
     Assert-Rejected { Assert-Selection '' $false '' '0.1.0' } 'exactly one'

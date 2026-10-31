@@ -23,7 +23,7 @@ import tomlkit
 from flow_of_work_mcp.runtime_ownership import acquire_file_ownership
 
 
-PLATFORMS = ("codex", "claude-code", "cursor", "antigravity", "gemini-cli")
+PLATFORMS = ("codex", "claude-code", "cursor", "antigravity", "gemini-cli", "opencode")
 _RECEIPT_CONTRACT = "flower.client-registration.v1"
 _RESULT_CONTRACT = "flower.client-registration-result.v1"
 _MAX_CONFIG_BYTES = 4 * 1024 * 1024
@@ -78,6 +78,13 @@ def default_client_config(platform: str, home: Path | None = None) -> Path:
     """Compute one documented location; do not inspect other client settings."""
     _validate_platform(platform)
     user_home = Path.home() if home is None else Path(home)
+    if platform == "opencode":
+        directory = os.environ.get("OPENCODE_CONFIG_DIR") if home is None else None
+        xdg = os.environ.get("XDG_CONFIG_HOME") if home is None else None
+        config_root = Path(directory).expanduser() if directory else (Path(xdg).expanduser() if xdg else user_home / ".config") / "opencode"
+        if not config_root.is_absolute():
+            raise ClientRegistrationError("client_path_invalid", "OpenCode configuration directory must be absolute; select --client-config explicitly.")
+        return config_root / "opencode.json"
     if platform == "codex":
         codex_home = os.environ.get("CODEX_HOME") if home is None else None
         return (Path(codex_home).expanduser() if codex_home else user_home / ".codex") / "config.toml"
@@ -87,6 +94,14 @@ def default_client_config(platform: str, home: Path | None = None) -> Path:
         gemini_home = os.environ.get("GEMINI_CLI_HOME") if home is None else None
         return (Path(gemini_home).expanduser() if gemini_home else user_home) / ".gemini/settings.json"
     return user_home / (".claude.json" if platform == "claude-code" else ".cursor/mcp.json")
+
+
+def check_implicit_client_config(platform: str, client_config: Path) -> None:
+    """Install-only guard; inspection/removal must remain available afterward."""
+    if platform == "opencode":
+        sibling = client_config.with_suffix(".jsonc")
+        if sibling.exists() or sibling.is_symlink():
+            raise ClientRegistrationError("client_jsonc_conflict", "OpenCode has an opencode.jsonc configuration. Flower has changed nothing; merge the documented OpenCode V2 entry manually, or explicitly select a strict JSON file with --client-config after reviewing configuration precedence.")
 
 
 def registration_receipt_path(root: Path, platform: str, client_config: Path, server_name: str = "flower") -> Path:
@@ -109,13 +124,29 @@ def _entry_sha(entry: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(entry, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
+def _same_entry(actual: Any, expected: dict[str, Any]) -> bool:
+    # Python equality conflates False/0/0.0; ownership requires exact JSON types.
+    if not isinstance(actual, Mapping):
+        return False
+    try:
+        return _entry_sha(actual) == _entry_sha(expected)
+    except (TypeError, ValueError, RecursionError):
+        return False
+
+
 def _entry(platform: str, python_executable: Path, profile_config: Path) -> dict[str, Any]:
     entry: dict[str, Any] = {"command": str(python_executable), "args": [
         "-m", "flow_of_work_mcp.cli", "serve", "--config", str(profile_config), "--transport", "stdio",
     ]}
+    if platform == "opencode":
+        return {"type": "local", "command": [entry["command"], *entry["args"]], "disabled": False, "codemode": False}
     if platform in {"claude-code", "cursor"}:
         entry = {"type": "stdio", **entry}
     return entry
+
+
+def _server_key(platform: str) -> str:
+    return "mcp_servers" if platform == "codex" else "servers" if platform == "opencode" else "mcpServers"
 
 
 def _read(path: Path, limit: int) -> tuple[bytes | None, int]:
@@ -179,14 +210,23 @@ def _config(platform: str, path: Path, server_name: str) -> _Config:
             document = tomlkit.document() if raw is None else tomlkit.parse(raw.decode("utf-8"))
         except (UnicodeError, ValueError, RecursionError) as exc:
             raise ClientRegistrationError("client_toml_invalid", "Selected file must be valid UTF-8 TOML.") from exc
-        key = "mcp_servers"
     else:
         document = {} if raw is None else _strict_json(raw)
-        key = "mcpServers"
     if not isinstance(document, Mapping):
         raise ClientRegistrationError("client_config_invalid", "Client configuration must be an object or TOML document.")
-    servers = document.get(key) if key in document else None
-    if key in document and not isinstance(servers, Mapping):
+    parent = document.get("mcp", {}) if platform == "opencode" else document
+    if not isinstance(parent, Mapping):
+        raise ClientRegistrationError("client_config_invalid", "OpenCode MCP configuration must be an object.")
+    if platform == "opencode" and any(
+        isinstance(value, Mapping) and value.get("type") in ("local", "remote")
+        for key, value in parent.items() if key != "servers"
+    ):
+        raise ClientRegistrationError("client_opencode_v1_config", "OpenCode V1 server definitions require native V2 migration to mcp.servers before registration; Flower has not changed the selected file.")
+    key = _server_key(platform)
+    servers = parent.get(key) if key in parent else None
+    if platform == "opencode" and isinstance(servers, Mapping) and servers.get("type") in ("local", "remote"):
+        raise ClientRegistrationError("client_opencode_v1_config", "An OpenCode V1 server named servers requires native V2 migration; Flower has not changed the selected file.")
+    if key in parent and not isinstance(servers, Mapping):
         raise ClientRegistrationError("client_config_invalid", "Client server definitions must be an object or TOML table.")
     actual = _ABSENT if servers is None else servers.get(server_name, _ABSENT)
     if hasattr(actual, "unwrap"):
@@ -195,10 +235,11 @@ def _config(platform: str, path: Path, server_name: str) -> _Config:
 
 
 def _render(platform: str, config: _Config, server_name: str, entry: dict[str, Any] | None) -> bytes:
-    key = "mcp_servers" if platform == "codex" else "mcpServers"
+    key = _server_key(platform)
     if config.servers is None:
-        config.document[key] = tomlkit.table() if platform == "codex" else {}
-        config.servers = config.document[key]
+        parent = config.document.setdefault("mcp", {}) if platform == "opencode" else config.document
+        parent[key] = tomlkit.table() if platform == "codex" else {}
+        config.servers = parent[key]
     if entry is None:
         config.servers.pop(server_name, None)
     else:
@@ -228,7 +269,7 @@ def _receipt(path: Path, platform: str, client_config: Path, server_name: str) -
             if not isinstance(receipt[key], str) or not Path(receipt[key]).is_absolute():
                 raise ValueError("path")
         expected = _entry(platform, Path(receipt["python_executable"]), Path(receipt["profile_config_path"]))
-        if receipt["managed_entry"] != expected or receipt["managed_entry_sha256"] != _entry_sha(expected):
+        if not _same_entry(receipt["managed_entry"], expected) or receipt["managed_entry_sha256"] != _entry_sha(expected):
             raise ValueError("entry")
         for key in ("config_before_sha256", "config_after_sha256"):
             value = receipt[key]
@@ -323,13 +364,13 @@ def inspect_client_registration(*, platform: str, client_config: Path, receipt_p
     if receipt is None:
         state = "absent" if config.entry is _ABSENT else "unowned"
     elif receipt["state"] == "prepared":
-        state = "needs_recovery" if config.entry == receipt["managed_entry"] or _sha(config.raw) == receipt["config_before_sha256"] else "diverged"
+        state = "needs_recovery" if _same_entry(config.entry, receipt["managed_entry"]) or _sha(config.raw) == receipt["config_before_sha256"] else "diverged"
     elif receipt["state"] == "removing":
-        unchanged_before = config.entry == receipt["managed_entry"] and _sha(config.raw) == receipt["config_before_sha256"]
+        unchanged_before = _same_entry(config.entry, receipt["managed_entry"]) and _sha(config.raw) == receipt["config_before_sha256"]
         recorded_after = config.entry is _ABSENT and _sha(config.raw) == receipt["config_after_sha256"]
         state = "needs_recovery" if unchanged_before or recorded_after else "diverged"
     elif receipt["state"] == "installed":
-        state = "absent" if config.entry is _ABSENT else "registered" if config.entry == receipt["managed_entry"] else "diverged"
+        state = "absent" if config.entry is _ABSENT else "registered" if _same_entry(config.entry, receipt["managed_entry"]) else "diverged"
     else:
         state = "absent" if config.entry is _ABSENT else "unowned"
     return _result(platform, client_config, receipt_path, server_name, state, receipt=receipt)
@@ -354,9 +395,9 @@ def register_client(*, platform: str, client_config: Path, profile_config: Path,
         if receipt is not None and receipt["state"] == "removing":
             raise ClientRegistrationError("client_recovery_required", "Finish the recorded uninstall before registering a client.")
         if receipt is not None and receipt["state"] == "prepared":
-            if receipt["managed_entry"] != desired:
+            if not _same_entry(receipt["managed_entry"], desired):
                 raise ClientRegistrationError("client_recovery_required", "Finish the recorded registration before switching profiles or interpreters.")
-            if config.entry == desired:
+            if _same_entry(config.entry, desired):
                 if not dry_run:
                     _write_receipt(receipt_path, {**receipt, "state": "installed"})
                 return _result(platform, client_config, receipt_path, server_name, "registered", changed=not dry_run, dry_run=dry_run, receipt=receipt)
@@ -369,7 +410,7 @@ def register_client(*, platform: str, client_config: Path, profile_config: Path,
                 _replace_config(client_config, config.raw, payload, config.mode)
                 _write_receipt(receipt_path, {**receipt, "state": "installed"})
             return _result(platform, client_config, receipt_path, server_name, "registered", changed=not dry_run, dry_run=dry_run, receipt=receipt)
-        if receipt is not None and receipt["state"] == "installed" and receipt["managed_entry"] == desired and config.entry == desired:
+        if receipt is not None and receipt["state"] == "installed" and _same_entry(receipt["managed_entry"], desired) and _same_entry(config.entry, desired):
             return _result(platform, client_config, receipt_path, server_name, "registered", dry_run=dry_run, receipt=receipt)
         if config.entry is not _ABSENT and not replace:
             raise ClientRegistrationError("client_registration_conflict", "The selected server name is already defined; use explicit replacement after reviewing this conflict.")
@@ -423,7 +464,7 @@ def unregister_client(*, platform: str, client_config: Path, receipt_path: Path,
             if not dry_run:
                 _write_receipt(receipt_path, {**receipt, "state": "removed"})
             return _result(platform, client_config, receipt_path, server_name, "absent", changed=not dry_run, dry_run=dry_run, receipt=receipt)
-        if config.entry != receipt["managed_entry"]:
+        if not _same_entry(config.entry, receipt["managed_entry"]):
             raise ClientRegistrationError("client_registration_diverged", "Owned client entry changed or disappeared; removal is refused until ownership is reconciled.")
         payload = _render(platform, config, server_name, None)
         if receipt["state"] == "removing":

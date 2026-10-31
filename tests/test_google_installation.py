@@ -1,4 +1,4 @@
-"""Google installer routes forward literal arguments without native client effects."""
+"""Client installer routes forward literal arguments without native client effects."""
 from __future__ import annotations
 
 import hashlib
@@ -12,28 +12,28 @@ import unittest
 
 
 SOURCE = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("flower_google_installer", SOURCE / "tools/install_flower.py")
+spec = importlib.util.spec_from_file_location("flower_client_installer", SOURCE / "tools/install_flower.py")
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
 
-class GoogleInstallationTests(unittest.TestCase):
-    def test_python_installer_accepts_google_clients_with_explicit_selected_file(self):
-        for platform in ("antigravity", "gemini-cli"):
+class ClientInstallationTests(unittest.TestCase):
+    def test_python_installer_accepts_clients_with_explicit_selected_file(self):
+        for platform in ("antigravity", "gemini-cli", "opencode"):
             with self.subTest(platform=platform):
                 args = installer.build_parser().parse_args([
-                    "--platform", platform, "--client-config", "selected Google settings.json",
+                    "--platform", platform, "--client-config", "selected client settings.json",
                     "--profile-root", "Flower profiles",
                 ])
                 self.assertEqual(args.platform, platform)
-                self.assertEqual(args.client_config, Path("selected Google settings.json"))
+                self.assertEqual(args.client_config, Path("selected client settings.json"))
                 self.assertEqual(args.profile_root, Path("Flower profiles"))
                 self.assertFalse(args.no_register)
 
     @unittest.skipUnless(os.name == "posix" and shutil.which("bash"), "Bash frontend requires POSIX")
-    def test_bash_frontend_forwards_each_google_client_and_literal_paths(self):
-        for platform in ("antigravity", "gemini-cli"):
-            with self.subTest(platform=platform), tempfile.TemporaryDirectory(prefix="flower-google-frontend-") as temporary:
+    def test_bash_frontend_forwards_each_client_and_literal_paths(self):
+        for platform in ("antigravity", "gemini-cli", "opencode"):
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory(prefix="flower-client-frontend-") as temporary:
                 root = Path(temporary)
                 binaries = root / "bin"
                 binaries.mkdir()
@@ -66,7 +66,7 @@ printf '%s\\n' "$@" > "$FLOWER_TEST_CAPTURE"
                     executable = binaries / name
                     executable.write_text(content)
                     executable.chmod(0o755)
-                config = root / 'Google settings "selected".json'
+                config = root / 'Client settings "selected".json'
                 profiles = root / "Flower profiles"
                 environment = root / "Flower venv"
                 env = {**os.environ, "PATH": str(binaries) + os.pathsep + os.environ["PATH"],

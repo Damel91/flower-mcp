@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> None:
             serve_main(["--config", str(config_path), "--transport", args.transport, "--host", args.host, "--port", str(args.port)])
             return
         from flow_of_work_mcp.client_registration import (
-            default_client_config, inspect_client_registration,
+            check_implicit_client_config, default_client_config, inspect_client_registration,
             register_client, registration_receipt_path, unregister_client,
         )
         root = profile_root(args.profile_root)
@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> None:
             client_path = args.client_config if args.client_config is not None else default_client_config(args.platform)
             receipt = registration_receipt_path(root, args.platform, client_path)
         if args.operation == "install":
+            if args.client_config is None:
+                check_implicit_client_config(args.platform, client_path)
             # Preflight both documents before creating a profile. All dry-run
             # validation uses prospective absolute paths without writes.
             prepare_profile(root, args.profile, import_root=args.import_root, dry_run=True)

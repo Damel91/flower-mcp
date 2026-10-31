@@ -1,4 +1,4 @@
-"""Qualify installed Google client entries through isolated CLI and public MCP."""
+"""Qualify selected installed client entries through isolated CLI and public MCP."""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +14,7 @@ import tempfile
 from smoke_mcp import StdioServerParameters, qualify_parameters
 
 
-PLATFORMS = ("antigravity", "gemini-cli")
+PLATFORMS = ("antigravity", "gemini-cli", "opencode")
 IDENTITY_SCRIPT = """
 from importlib.metadata import version
 import json
@@ -100,6 +100,10 @@ async def qualify_platform(python: Path, platform: str, root: Path, environment:
         "mcp": {"allowed": ["foreign"], "excluded": ["blocked-fixture"]},
         "mcpServers": {"foreign": {"command": "synthetic-foreign-do-not-execute", "args": ["--fixture"]}},
     }
+    if platform == "opencode":
+        original = {"instructions": ["existing.md"], "mcp": {
+            "timeout": {"startup": 30000}, "servers": {
+                "foreign": {"type": "local", "command": ["synthetic-foreign-do-not-execute"], "disabled": True}}}}
     config.write_text(json.dumps(original, indent=2) + "\n", encoding="utf-8")
     cli = InstalledCLI(python, root, environment)
     result.update(platform=platform, status="running", cli_receipts=cli.receipts)
@@ -115,15 +119,25 @@ async def qualify_platform(python: Path, platform: str, root: Path, environment:
     require(installed["state"] == "registered" and installed["changed"] is True,
             "Fresh selected-file registration did not install")
     document = read_json(config)
-    entry = document["mcpServers"].pop("flower")
+    servers = document["mcp"]["servers"] if platform == "opencode" else document["mcpServers"]
+    entry = servers.pop("flower")
     require(document == original, "Registration changed foreign settings, server or policy")
-    require(isinstance(entry, dict) and set(entry) == {"command", "args"},
-            "Google registration must contain only the generated command and arguments")
-    require(isinstance(entry["command"], str) and Path(entry["command"]).is_absolute(),
+    if platform == "opencode":
+        require(set(entry) == {"type", "command", "disabled", "codemode"}
+                and entry["type"] == "local" and entry["disabled"] is False and entry["codemode"] is False,
+                "OpenCode V2 must retain direct local tools")
+        command = entry["command"]
+        require(isinstance(command, list) and len(command) > 1 and all(isinstance(value, str) for value in command),
+                "OpenCode command must be a string array")
+    else:
+        require(isinstance(entry, dict) and set(entry) == {"command", "args"},
+                "Google registration must contain only the generated command and arguments")
+        require(isinstance(entry["args"], list) and all(isinstance(value, str) for value in entry["args"]),
+                "Generated command arguments must be strings")
+        command = [entry["command"], *entry["args"]]
+    require(isinstance(command[0], str) and Path(command[0]).is_absolute(),
             "Generated interpreter must be absolute")
-    require(isinstance(entry["args"], list) and all(isinstance(value, str) for value in entry["args"]),
-            "Generated command arguments must be strings")
-    require(os.path.normcase(entry["command"]) == os.path.normcase(str(python)),
+    require(os.path.normcase(command[0]) == os.path.normcase(str(python)),
             "Registration did not preserve the selected installed interpreter")
     ownership_path = Path(installed["receipt_path"])
     require(ownership_path.is_relative_to(profile_root), "Ownership receipt escaped the isolated profile root")
@@ -141,7 +155,7 @@ async def qualify_platform(python: Path, platform: str, root: Path, environment:
     require(profile.is_relative_to(profile_root) and ledger.is_relative_to(profile.parent),
             "Generated runtime paths escaped the isolated profile")
     require(not ledger.exists(), "Registration or doctor created a lifecycle ledger")
-    require(entry["args"] == ["-m", "flow_of_work_mcp.cli", "serve", "--config", str(profile),
+    require(command[1:] == ["-m", "flow_of_work_mcp.cli", "serve", "--config", str(profile),
                               "--transport", "stdio"], "Generated entry differs from the canonical stdio CLI")
     replay = cli.no_write(root, ["install", *location])
     require(replay["state"] == "registered" and replay["changed"] is False,
@@ -149,7 +163,7 @@ async def qualify_platform(python: Path, platform: str, root: Path, environment:
 
     # Execute exactly the persisted entry, without substituting a console path,
     # synthesized server arguments or direct calls to Flower's Python services.
-    parameters = StdioServerParameters(command=entry["command"], args=entry["args"],
+    parameters = StdioServerParameters(command=command[0], args=command[1:],
                                        cwd=str(root), env=environment)
     result["generated_entry"] = entry
     result["public_mcp"] = await asyncio.wait_for(qualify_parameters(parameters), timeout=120)
@@ -177,7 +191,7 @@ async def qualify_platform(python: Path, platform: str, root: Path, environment:
                   profile_ledger_evidence="retained", retained_state_sha256=snapshot_hash(retained))
 
 
-async def qualify(python: Path, result: dict) -> None:
+async def qualify(python: Path, result: dict, platforms: list[str]) -> None:
     require(python.is_absolute() and python.is_file(), "--python must name an absolute installed interpreter")
     environment = {key: value for key, value in os.environ.items()
                    if key not in {"PYTHONPATH", "PYTHONHOME", "FLOWER_HOME"}}
@@ -185,7 +199,7 @@ async def qualify(python: Path, result: dict) -> None:
     with tempfile.TemporaryDirectory(prefix="flower-installed-clients-") as directory:
         root = Path(directory).resolve()
         result["installed"] = InstalledCLI(python, root, environment).execute([], identity=True)
-        for platform in PLATFORMS:
+        for platform in platforms:
             record: dict = {}
             result["platforms"].append(record)
             await qualify_platform(python, platform, root / platform, environment, record)
@@ -197,12 +211,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--python", required=True, type=Path, help="absolute interpreter containing the installed Flower wheel")
     parser.add_argument("--output", required=True, type=Path, help="retained JSON qualification receipt")
+    parser.add_argument("--platform", action="append", choices=PLATFORMS,
+                        help="qualify only selected clients; default: all supported smoke clients")
     args = parser.parse_args()
     result: dict = {"contract": "flower.installed-client-qualification.v1", "status": "running", "platforms": [],
-                    "scope": "Synthetic selected-file installation and generated stdio MCP mechanics; native Google client trust, precedence, usability and acceptance are not qualified"}
+                    "scope": "Synthetic selected-file installation and generated stdio MCP mechanics; native client trust, precedence, usability and acceptance are not qualified"}
     failure = None
     try:
-        asyncio.run(qualify(args.python, result))
+        asyncio.run(qualify(args.python, result, args.platform or list(PLATFORMS)))
     except Exception as exc:
         result.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         failure = exc

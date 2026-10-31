@@ -5,7 +5,7 @@ Install a pinned Flower MCP release on Windows.
 .DESCRIPTION
 Reuses the canonical Python installer. Existing Python 3.11+ is preferred;
 otherwise managed Python is prepared without persistent PATH or registry changes.
-Choose -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.
+Choose -Platform codex|claude-code|cursor|antigravity|gemini-cli|opencode or -NoRegister.
 The Python backend owns
 installation receipts, explicit upgrades and client registration.
 Upgrade skips client registration. -DryRun and -BackupRoot require -Upgrade.
@@ -18,7 +18,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Platform 
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('codex', 'claude-code', 'cursor', 'antigravity', 'gemini-cli')][string]$Platform,
+    [ValidateSet('codex', 'claude-code', 'cursor', 'antigravity', 'gemini-cli', 'opencode')][string]$Platform,
     [switch]$NoRegister,
     [string]$Version = '0.7.6',
     [string]$Venv,
@@ -44,7 +44,7 @@ function Assert-Selection {
         throw '-DryRun and -BackupRoot require -Upgrade.'
     }
     if (-not $DoUpgrade -and ([bool]$SelectedPlatform -eq $WithoutRegistration)) {
-        throw 'Choose exactly one of -Platform codex|claude-code|cursor|antigravity|gemini-cli or -NoRegister.'
+        throw 'Choose exactly one of -Platform codex|claude-code|cursor|antigravity|gemini-cli|opencode or -NoRegister.'
     }
     if ($WithoutRegistration -and $SelectedClientConfig) {
         throw '-ClientConfig requires -Platform.'

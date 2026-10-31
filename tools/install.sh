@@ -16,11 +16,11 @@ fail() { printf 'Flower installation failed: %s\n' "$*" >&2; exit 1; }
 usage() {
     cat <<'HELP'
 Flower MCP release installer for macOS and Linux.
-With no agent flag, choose Codex, Claude Code, Cursor, Antigravity, Gemini CLI
-or installation only.
+With no agent flag, choose Codex, Claude Code, Cursor, Antigravity, Gemini CLI,
+OpenCode V2 or installation only.
 
 Options:
-  --platform codex|claude-code|cursor|antigravity|gemini-cli
+  --platform codex|claude-code|cursor|antigravity|gemini-cli|opencode
                                        Register this agent without a menu
   --no-register                       Install without registering an agent
   --version MAJOR.MINOR.PATCH          Pinned release (default: 0.7.6)
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
         --platform)
             [[ $# -ge 2 ]] || fail "--platform requires an agent name"
             [[ -z "$selection" ]] || fail "choose only one agent or --no-register"
-            case "$2" in codex|claude-code|cursor|antigravity|gemini-cli) selection="$2" ;; *) fail "unsupported agent: $2" ;; esac
+            case "$2" in codex|claude-code|cursor|antigravity|gemini-cli|opencode) selection="$2" ;; *) fail "unsupported agent: $2" ;; esac
             shift 2 ;;
         --no-register)
             [[ -z "$selection" ]] || fail "choose only one agent or --no-register"
@@ -84,11 +84,11 @@ case "$(uname -s)" in
 esac
 
 if [[ -z "$selection" ]]; then
-    printf 'Install Flower MCP %s\n1) Codex\n2) Claude Code\n3) Cursor\n4) Install only\n5) Antigravity\n6) Gemini CLI\n' "$FLOWER_VERSION" >&2
+    printf 'Install Flower MCP %s\n1) Codex\n2) Claude Code\n3) Cursor\n4) Install only\n5) Antigravity\n6) Gemini CLI\n7) OpenCode V2\n' "$FLOWER_VERSION" >&2
     while [[ -z "$selection" ]]; do
-        printf 'Select an agent [1-6]: ' >&2
+        printf 'Select an agent [1-7]: ' >&2
         if ! IFS= read -r answer 2>/dev/null </dev/tty; then
-            fail "no terminal is available; pass --platform codex|claude-code|cursor|antigravity|gemini-cli or --no-register"
+            fail "no terminal is available; pass --platform codex|claude-code|cursor|antigravity|gemini-cli|opencode or --no-register"
         fi
         case "$answer" in
             1) selection="codex" ;;
@@ -97,7 +97,8 @@ if [[ -z "$selection" ]]; then
             4) selection="none" ;;
             5) selection="antigravity" ;;
             6) selection="gemini-cli" ;;
-            *) printf 'Enter 1, 2, 3, 4, 5 or 6.\n' >&2 ;;
+            7) selection="opencode" ;;
+            *) printf 'Enter 1, 2, 3, 4, 5, 6 or 7.\n' >&2 ;;
         esac
     done
 fi
