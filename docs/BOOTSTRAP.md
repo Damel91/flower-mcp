@@ -70,6 +70,13 @@ The printed bootstrap contains one complete, marked template for the project's
 - Investigate technical architecture, implementation and reusable patterns or
   libraries, then register governing decisions through Flower. Stakeholder
   participation in architecture is explicit.
+- Question factual and technical premises, including the agent's own proposal;
+  seek evidence that could refute it and revise unsupported conclusions.
+- Disclose known deviations, omissions or substitutions before seeking approval
+  of the proposal or executing affected work: original obligation, difference,
+  reason, behavioral consequences, affected criteria and evidence/uncertainty.
+  Use ordinary Flower reassessment and authority revision when needed. Technical
+  choices within agreed intent remain the engineer's responsibility.
 - Present and record actual roadmap confirmation; complete the milestones in
   that scope without introducing approval after each bounded unit.
 - Require a complete accepted plan, closed Packet Validation Projection (PVP)
@@ -92,6 +99,13 @@ repository's overlay, implementation indexes or campaign administration.
 Printing the template and preserving its package bytes qualify distribution
 mechanics. Actual model adherence, cognitive fit and novice usability require
 their own trials.
+
+Critical scrutiny is an instruction, not a guarantee against sycophancy. It
+requires relevant investigation and honest uncertainty, without invented
+objections, repeated tests or a new approval after every unit. This policy
+addition is in current unreleased source; published 0.8.0 assets are unchanged.
+An installed version prints its own bundled template; existing project AGENTS
+files change only when their host explicitly merges an updated template.
 
 `AGENTS.md` stores stable project locators and operating rules. Requests, cursors,
 plan revisions, fingerprints, runtime history and credentials belong outside it.
