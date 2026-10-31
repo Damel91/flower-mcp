@@ -139,6 +139,11 @@ dedotta dalla fixture isolata o dalla CI.
 | Collegamento all'agente | Codex, Claude Code, Cursor, Antigravity o Gemini CLI già installato; directory utente scrivibile. |
 
 **Il core non richiede LM Studio, un modello interno, CodingCastle o una VPN.**
+Il sorgente di sviluppo include il supporto a OpenCode V2; gli installer pubblicati
+della 0.7.6 mantengono le scelte precedenti. L'adapter conserva i tool diretti di
+Flower e lo stesso bootstrap AGENTS del progetto. Vedi la
+[configurazione OpenCode del candidato](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
+
 L'inferenza normalmente rimane quella del coding agent scelto. L'inferenza interna
 opzionale di Flower richiede un runtime installato esplicitamente e un endpoint
 configurato; vedi la [guida all'inferenza](https://github.com/Damel91/flower-mcp/tree/main/docs/INFERENCE.md).

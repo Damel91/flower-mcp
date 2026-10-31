@@ -72,6 +72,10 @@ Have a supported client installed: **Codex, Claude Code, Cursor, Antigravity or
 Gemini CLI**. Choose a writable user directory and check the
 [installation prerequisites](docs/INSTALLATION.md#prerequisites).
 
+**OpenCode V2:** integration is available in the development source. Follow the
+[OpenCode setup guide](docs/OPENCODE.md) for a local candidate; the published
+0.7.6 installers do not include this adapter yet.
+
 ### macOS and Linux
 
 You need a terminal with `curl`, Internet access and trusted HTTPS certificates.

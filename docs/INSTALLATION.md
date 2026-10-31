@@ -525,6 +525,12 @@ Antigravity/Gemini paths, environment override and connection steps. Use
 `--client-config /absolute/path` for another supported config file.
 Claude Code's nested local-scope config is unsupported. JSON must be strict JSON.
 
+The development source additionally supports `--platform opencode` for
+**OpenCode V2**. See [OpenCode setup](OPENCODE.md) for the selected-file path,
+JSONC handling, direct tools and project bootstrap. Published 0.7.6 assets retain
+their original platform choices; use a locally built candidate until a release
+containing this adapter is published.
+
 The generated stdio entry uses absolute interpreter and profile paths. Reload
 the client after registration. `doctor` inspects files; connection and trust
 remain controlled by the selected client.

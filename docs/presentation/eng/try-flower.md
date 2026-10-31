@@ -133,6 +133,11 @@ inferred from the owned fixture or CI.
 | Manual installation or Python installer | Python 3.11+ with ssl, venv and ensurepip; dependency access. Git is needed only to clone source. |
 | Agent connection | Codex, Claude Code, Cursor, Antigravity or Gemini CLI already installed; a writable user directory. |
 
+OpenCode V2 support is available in the development source; published 0.7.6
+installers retain their existing client choices. The adapter preserves direct
+Flower tools and uses the same project AGENTS bootstrap. See the
+[OpenCode candidate setup](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
+
 **The core requires no LM Studio, internal model, CodingCastle or VPN.** Inference
 normally remains with your chosen coding agent. Optional Flower internal inference
 requires an explicitly installed runtime and configured endpoint; see the
