@@ -13,6 +13,33 @@ the already published 0.3.0 assets remain unchanged. Installed distribution meta
 identifies the package version; it does not establish that a development checkout
 matches a published release or that a client is attached to the intended ledger.
 
+## Campaign Oracle questions
+
+Read `fow_campaign_inspect(view="summary")` for the existing project and campaign.
+Its gate identifies the current case, Oracle, question, scope and Oracle revision.
+Supply the returned `oracle_id` and `question_id` to `answer_question`, together
+with your investigated answer, declared authority and provenance. Optional
+`expected_fingerprint` binds a new answer to the current campaign fingerprint;
+exact replay of the original semantic request is checked first.
+
+Source questions across the campaign precede optional deterministic Oracle IR
+refinement. A source-complete live Oracle does not require conversion to the
+unit-contract IR profile. `view="oracle_ir"` retains unsupported residuals and
+shows only a currently admissible answer route; constructing an Oracle is not
+evidence of a test run or human acceptance.
+
+On a known question conflict, compare the bounded `expected` and `received`
+identities and use the exact read-only `next_tool_call`. Its current-authority
+snapshot describes rejection time; a later recovery read may see a newer
+revision. Preserve original request IDs for reconciliation. A rejected mutation
+without an invocation-wide effect receipt remains uncertain; do not infer that
+no effects occurred. Invalid campaign views instead return observation errors
+with accepted choices, without mutation effect fields.
+
+No automatic replay, Oracle type change, waiver or campaign acceptance is
+performed by recovery. Provider-dependent execution still needs its configured
+provider; source construction alone does not satisfy that prerequisite.
+
 ## Select the intended instance
 
 Use the endpoint configured for the existing Flower instance. Identify the
