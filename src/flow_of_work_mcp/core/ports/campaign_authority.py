@@ -200,6 +200,7 @@ class CampaignAuthorityRepository(Protocol):
         waiver_scope: str,
         actor: str,
         request_id: str = "",
+        expected_fingerprint: str = "",
     ) -> Mapping[str, object]: ...
 
     def create_campaign_attestation_intent(

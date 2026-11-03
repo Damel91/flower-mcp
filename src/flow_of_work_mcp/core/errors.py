@@ -62,6 +62,22 @@ class RequirementConflictError(LifecycleError):
     """Raised for deterministic duplicate or conflicting requirement input."""
 
 
+class OracleQuestionConflictError(RequirementConflictError):
+    """Known question admission failure carrying safe identity facts, not answers."""
+
+    def __init__(self, reason: str, *, details: Mapping[str, object]) -> None:
+        self.reason = reason
+        self.details = dict(details)
+        received = dict(self.details.get("received") or {})
+        question_id = received.get("question_id")
+        if isinstance(question_id, str) and len(question_id) > 160:
+            received["question_id"] = question_id[:157] + "..."
+            received["question_id_length"] = len(question_id)
+            received["question_id_truncated"] = True
+        self.details["received"] = received
+        super().__init__(reason)
+
+
 class ChangeNotFoundError(RequirementConflictError):
     """An exact project-scoped change lookup found no such change."""
 

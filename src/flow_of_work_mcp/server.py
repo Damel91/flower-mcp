@@ -99,6 +99,7 @@ from flow_of_work_mcp.core.errors import (
     MilestonePreEffectError,
     OperationPreEffectError,
     PacketValidationAlreadyUpgradedError,
+    OracleQuestionConflictError,
     ProjectNotFoundError,
     RequirementConflictError,
     RequirementMutationBlockedError,
@@ -309,6 +310,16 @@ def _guard_operation(
             reason=exc.reason,
             result=dict(exc.details),
         )
+    except OracleQuestionConflictError as exc:
+        return envelope(tool=tool, status="rejected", reason=exc.reason,
+            result=_recovery_result(recovery, {
+                "diagnostics": [{"code": exc.reason,
+                    "message": "The requested Oracle question is not the current answer authority.",
+                    **exc.details}],
+                "next_tool_call": {"tool": "fow_campaign_inspect", "arguments": {
+                    "project_id": exc.details["project_id"], "campaign_id": exc.details["campaign_id"],
+                    "view": "oracles"}},
+            }))
     except RequirementConflictError:
         return envelope(
             tool=tool,
@@ -3021,6 +3032,7 @@ def handle_campaign_author(
                 waiver_scope=waiver_scope,
                 actor=actor,
                 request_id=request_id,
+                expected_fingerprint=expected_fingerprint,
             )
         elif selected == "attest_source":
             files = _require_mapping(source_files or {}, "source_files")
@@ -3110,7 +3122,7 @@ def handle_campaign_author(
         )
 
     recovery_change_id = str((scope or {}).get("change_id") or "")
-    return _guard(
+    response = _guard(
         "fow_campaign_author",
         operation_fn,
         recovery=lambda: _campaign_recovery_projection(
@@ -3120,6 +3132,18 @@ def handle_campaign_author(
             change_id=recovery_change_id,
         ),
     )
+
+    if response.get("status") != "success":
+        body = response["result"]
+        body["original_request"] = {"tool": "fow_campaign_author", "operation": _bounded_problem_value(operation),
+            "project_id": project_id, "campaign_id": campaign_id, "request_id": _bounded_problem_value(request_id)}
+        if isinstance(request_id, str) and len(request_id) > 160:
+            body["original_request"]["request_id_length"] = len(request_id)
+            body["original_request"]["request_id_truncated"] = True
+        if campaign_id and body.get("next_tool_call", {}).get("tool") == "fow_capabilities":
+            body["next_tool_call"] = {"tool": "fow_campaign_inspect", "arguments": {
+                "project_id": project_id, "campaign_id": campaign_id, "view": "summary"}}
+    return response
 
 
 def handle_campaign_inspect(
@@ -3148,7 +3172,7 @@ def handle_campaign_inspect(
             audit_reference={"campaign_id": campaign_id},
         )
 
-    return _guard(
+    response = _guard_operation(
         "fow_campaign_inspect",
         operation_fn,
         recovery=lambda: _campaign_recovery_projection(
@@ -3157,7 +3181,15 @@ def handle_campaign_inspect(
             campaign_id=campaign_id,
             change_id=change_id,
         ),
+        read_operation=view if view in operation_names("fow_campaign_inspect") else "summary",
     )
+
+    if response.get("status") != "success":
+        response["result"]["read_only"] = True
+        response["result"].setdefault("next_tool_call", {"tool": "fow_capabilities", "arguments": {
+            "view": "operation", "operation_tool": "fow_campaign_inspect",
+            "operation_name": view if view in operation_names("fow_campaign_inspect") else "summary"}})
+    return response
 
 
 def handle_campaign_advance(

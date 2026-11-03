@@ -1767,8 +1767,13 @@ _CAMPAIGN_AUTHOR = {
             "answer_authority",
             "provenance",
         ),
-        ("waiver_scope",),
+        ("waiver_scope", "expected_fingerprint"),
         enums={"answer_authority": tuple(item.value for item in OracleAnswerAuthority)},
+        guidance={
+            "current_question": "Use the exact case/Oracle/question/scope and Oracle revision projected by the current gate. All source questions precede optional deterministic IR refinement across the campaign. Inspect oracle_ir for the currently actionable optional refinement; live/unsupported profiles retain the source-authored path.",
+            "currentness": "Optional expected_fingerprint is the current campaign fingerprint returned by inspection. A new stale request is blocked; exact original semantic replay is checked first. Omission preserves sequential authoring and does not prove a remembered question revision is current.",
+            "recovery": "On a question conflict, read the exact campaign using next_tool_call; preserve original request identity for reconciliation. Host evidence, source construction, IR materialization and human acceptance remain distinct.",
+        },
     ),
     "attest_source": _c(
         "fow_campaign_author",

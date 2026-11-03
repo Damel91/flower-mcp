@@ -17,7 +17,10 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
 from flow_of_work_mcp.core.domain.oracle_ir_projection import compile_oracle_ir
-from flow_of_work_mcp.core.errors import AssuranceBlockedError
+from flow_of_work_mcp.core.domain.oracle_questions import (
+    current_oracle_question, oracle_ir_refinement_applicable, oracle_source_repair,
+)
+from flow_of_work_mcp.core.errors import AssuranceBlockedError, InputValidationError
 from flow_of_work_mcp.core.ports.campaign_authority import CampaignAuthorityRepository
 from flow_of_work_mcp.application.test_provider_socket import TestProviderSocketService
 
@@ -260,6 +263,7 @@ class CampaignAuthorityService:
         waiver_scope: str,
         actor: str,
         request_id: str,
+        expected_fingerprint: str = "",
     ) -> Mapping[str, object]:
         before = self._repository.campaign_authority_state(project_id, campaign_id)
         state = self._repository.answer_oracle_question(
@@ -273,6 +277,7 @@ class CampaignAuthorityService:
             waiver_scope=waiver_scope,
             actor=required_text(actor, "actor"),
             request_id=required_text(request_id, "request_id"),
+            expected_fingerprint=expected_fingerprint,
         )
         return self._mutation_projection("answer_question", before, state)
 
@@ -489,20 +494,6 @@ class CampaignAuthorityService:
         offset: int = 0,
         limit: int = 20,
     ) -> Mapping[str, object]:
-        if not campaign_id:
-            active = self._repository.active_campaign_authority(
-                project_id, change_id=change_id
-            )
-            if active is None:
-                return {
-                    "campaign": None,
-                    "lifecycle_gate": _empty_gate(project_id, change_id),
-                }
-            state = active
-        else:
-            state = self._repository.campaign_authority_state(
-                project_id, campaign_id, history_limit=max(limit, 1)
-            )
         selected_view = str(view or "summary").strip()
         if selected_view not in {
             "summary",
@@ -517,7 +508,24 @@ class CampaignAuthorityService:
             "residuals",
             "history",
         }:
-            raise ValueError("campaign inspect view is invalid")
+            raise InputValidationError("campaign inspect view is invalid", field="view",
+                received_value=selected_view, accepted_values=("summary", "working_sheet", "cases",
+                    "obligations", "oracles", "constructibility", "oracle_ir", "attestation",
+                    "evidence", "residuals", "history"))
+        if not campaign_id:
+            active = self._repository.active_campaign_authority(
+                project_id, change_id=change_id
+            )
+            if active is None:
+                return {
+                    "campaign": None,
+                    "lifecycle_gate": _empty_gate(project_id, change_id),
+                }
+            state = active
+        else:
+            state = self._repository.campaign_authority_state(
+                project_id, campaign_id, history_limit=max(limit, 1)
+            )
         gate = _campaign_gate(state)
         if selected_view == "oracle_ir":
             return {
@@ -835,55 +843,43 @@ def _working_sheet(state: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def _question_action(state: Mapping[str, object], question: Mapping[str, object]) -> dict[str, object]:
+    return {"tool": "fow_campaign_author", "operation": "answer_question", "arguments": {
+        "campaign_id": state["campaign_id"], "oracle_id": question["oracle_id"],
+        "question_id": question["question_id"], "expected_fingerprint": state["fingerprint"],
+    }}
+
+
 def _oracle_ir_projections(state: Mapping[str, object]) -> list[dict[str, object]]:
-    oracles = {
-        str(item.get("oracle_id") or ""): item
-        for item in state.get("oracles", [])
-        if isinstance(item, Mapping)
-    }
-    result: list[dict[str, object]] = []
+    oracles = {item["oracle_id"]: item for item in state.get("oracles", [])}
+    selected = current_oracle_question(state)
+    source_pending = selected is not None and selected["scope"] == "source"
+    gate = _campaign_gate(state)
+    result = []
     for binding in state.get("oracle_bindings", []):
-        if not isinstance(binding, Mapping):
-            continue
-        oracle = oracles.get(str(binding.get("oracle_id") or ""))
+        oracle = oracles.get(binding["oracle_id"])
         if oracle is None:
             continue
         projection = compile_oracle_ir(oracle)
         value = dict(projection.as_payload())
-        value["case_id"] = str(binding.get("case_id") or "")
-        current_question = projection.next_residual
-        ir_questions = {
-            str(item.get("question_id") or ""): item
-            for item in oracle.get("oracle_ir_questions", [])
-            if isinstance(item, Mapping)
-        }
-        if projection.constructible:
-            value["next_action"] = {
-                "tool": "fow_campaign_author",
-                "operation": "authorize_materialization",
-                "arguments": {"case_id": value["case_id"]},
-            }
-        elif (
-            current_question is not None
-            and current_question.question_id in ir_questions
-        ):
-            value["next_action"] = {
-                "tool": "fow_campaign_author",
-                "operation": "answer_question",
-                "arguments": {
-                    "oracle_id": projection.oracle_id,
-                    "question_id": current_question.question_id,
-                },
-            }
+        value["case_id"] = binding["case_id"]
+        value["refinement_applicable"] = oracle_ir_refinement_applicable(oracle)
+        # Residuals describe this Oracle; only the shared current selection is
+        # actionable. Never suggest a different local question to a global writer.
+        value["next_question"] = None
+        exact_binding = (oracle.get("current") and oracle["revision"] == binding["oracle_revision"]
+                         and oracle["fingerprint"] == binding["oracle_fingerprint"])
+        if source_pending or oracle_source_repair(state) or not exact_binding or not value["refinement_applicable"]:
+            value["next_action"] = dict(gate["next_action"])
+        elif projection.constructible:
+            value["next_action"] = {"tool": "fow_campaign_author", "operation": "authorize_materialization",
+                "arguments": {"case_id": binding["case_id"]}}
+        elif selected is not None and selected["scope"] == "oracle_ir":
+            if selected["oracle_id"] == oracle["oracle_id"] and selected["case_id"] == binding["case_id"]:
+                value["next_question"] = dict(selected)
+            value["next_action"] = _question_action(state, selected)
         else:
-            value["next_action"] = {
-                "tool": "fow_campaign_author",
-                "operation": "author_oracle",
-                "arguments": {
-                    "case_id": value["case_id"],
-                    "oracle_id": projection.oracle_id,
-                },
-            }
+            value["next_action"] = dict(gate["next_action"])
         result.append(value)
     return result[:20]
 
@@ -904,6 +900,7 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
     gate_state = "semantic_decision"
     next_action: dict[str, object]
     status = str(state.get("status") or "")
+    source_repair = oracle_source_repair(state)
     if status in {"cancelled", "accepted_exception"}:
         gate_state = "inactive"
         next_action = {"tool": "fow_campaign_inspect", "operation": "summary"}
@@ -960,17 +957,12 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
             "missing_fact": str(residual.get("missing_fact") or ""),
         }
         effect = "add or bind one falsifiable required case"
-    elif constructibility == CampaignConstructibility.NEEDS_ORACLE.value:
+    elif constructibility == CampaignConstructibility.NEEDS_ORACLE.value or source_repair:
         residual = next(iter(state.get("residuals", [])), {})
         operation = str(
             (residual.get("next_action") or {}).get("operation") or "author_oracle"
         )
-        current_question = None
-        for oracle in oracles:
-            questions = list(oracle.get("questions", []))
-            if questions:
-                current_question = questions[0]
-                break
+        current_question = current_oracle_question(state)
         decision_required = (
             {"kind": "oracle_answer", **dict(current_question)}
             if current_question is not None
@@ -991,7 +983,15 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
             )
         ]
         effect = "author or complete one immutable behavioral-oracle revision"
-        next_action = {"tool": "fow_campaign_author", "operation": operation}
+        if current_question is not None:
+            next_action = _question_action(state, current_question)
+        elif source_repair:
+            arguments = {key: source_repair[key] for key in ("case_id", "oracle_id") if key in source_repair}
+            next_action = {"tool": "fow_campaign_author", "operation": "author_oracle", "arguments": arguments}
+            decision_required = {"kind": "oracle_source_repair", **source_repair}
+        else:
+            next_action = {"tool": "fow_campaign_inspect", "operation": "oracles",
+                "arguments": {"campaign_id": campaign_id, "view": "oracles"}}
     else:
         required_cases = [item for item in cases if bool(item.get("required"))]
         oracle_by_case = {

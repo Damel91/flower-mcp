@@ -41,7 +41,8 @@ from flow_of_work_mcp.core.domain.change_control import (
     validate_packet_id,
 )
 from flow_of_work_mcp.core.domain.oracle_ir_projection import compile_oracle_ir
-from flow_of_work_mcp.core.errors import AssuranceBlockedError, RequirementConflictError
+from flow_of_work_mcp.core.domain.oracle_questions import current_oracle_question, oracle_ir_refinement_applicable
+from flow_of_work_mcp.core.errors import AssuranceBlockedError, RequirementConflictError, OracleQuestionConflictError
 
 
 _ORACLE_REQUIRED_FIELDS = (
@@ -1452,6 +1453,7 @@ class CampaignAuthorityStoreMixin:
         waiver_scope: str,
         actor: str,
         request_id: str = "",
+        expected_fingerprint: str = "",
     ) -> Mapping[str, Any]:
         project_id = validate_project_id(project_id)
         campaign_id = validate_campaign_id(campaign_id)
@@ -1492,37 +1494,27 @@ class CampaignAuthorityStoreMixin:
             )
             if replay is not None:
                 return replay
+            campaign_head = self._qualified_campaign_head(connection, project_id, campaign_id)
+            self._guard_campaign_fingerprint(campaign_head, expected_fingerprint)
+            state = self._campaign_authority_value(connection, project_id, campaign_id)
+            current_question = current_oracle_question(state)
+            expected = ({key: current_question[key] for key in (
+                "case_id", "oracle_id", "oracle_revision", "question_id", "scope", "field_name")}
+                if current_question is not None else None)
+            conflict_details = {
+                "project_id": project_id, "campaign_id": campaign_id,
+                "received": {"oracle_id": oracle_id, "question_id": question_id},
+                "expected": expected,
+                "current_authority": {"revision": state["revision"], "fingerprint": state["fingerprint"]},
+            }
+            if current_question is None:
+                raise OracleQuestionConflictError("oracle_question_unavailable", details=conflict_details)
+            if oracle_id != current_question["oracle_id"] or question_id != current_question["question_id"]:
+                raise OracleQuestionConflictError("oracle_question_not_current", details=conflict_details)
             head = self._oracle_head(connection, project_id, oracle_id)
             revision = int(head["current_revision"])
-            current_question = connection.execute(
-                """
-                SELECT q.*
-                FROM campaign_case_oracle_bindings b
-                JOIN oracle_questions q
-                  ON q.project_id = b.project_id
-                 AND q.oracle_id = b.oracle_id
-                 AND q.oracle_revision = b.oracle_revision
-                WHERE b.project_id = ? AND b.campaign_id = ? AND b.active = 1
-                ORDER BY b.case_id, b.oracle_id,
-                         CASE q.question_scope WHEN 'source' THEN 0 ELSE 1 END,
-                         q.ordinal
-                LIMIT 1
-                """,
-                (project_id, campaign_id),
-            ).fetchone()
-            if current_question is None:
-                raise RequirementConflictError(
-                    "campaign has no current oracle question"
-                )
-            expected_oracle_id = str(current_question["oracle_id"])
-            expected_question_id = str(current_question["question_id"])
-            if oracle_id != expected_oracle_id or question_id != expected_question_id:
-                raise RequirementConflictError(
-                    "oracle_question_not_current: "
-                    f"expected {expected_oracle_id}/{expected_question_id}"
-                )
             if int(current_question["oracle_revision"]) != revision:
-                raise RequirementConflictError("oracle_question_revision_not_current")
+                raise OracleQuestionConflictError("oracle_question_revision_not_current", details=conflict_details)
             question = current_question
             current_revision = self._oracle_revision_row(
                 connection, project_id, oracle_id, revision
@@ -3455,6 +3447,8 @@ class CampaignAuthorityStoreMixin:
         if missing:
             return
         source = self._oracle_value(connection, project_id, oracle_id, revision=revision)
+        if not oracle_ir_refinement_applicable(source):
+            return
         projection = compile_oracle_ir(source)
         for ordinal, residual in enumerate(projection.residuals, start=1):
             if residual.field_name not in _ORACLE_IR_ANSWERABLE_FIELDS:
