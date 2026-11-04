@@ -55,11 +55,11 @@ fotografia di prodotto su cui è basata questa edizione.
 
 ## Il lettore dei documenti in Flower
 
-Flower 0.9.0 include anche un lettore Markdown nella dashboard locale. Quello
+Flower 0.9.1 include anche un lettore Markdown nella dashboard locale. Quello
 legge evidenze già conservate nel profilo del server in esecuzione, con indice,
-formattazione, sorgente originale e download. Richiede streamable HTTP e una
-sessione locale. Questa presentazione HTML rimane un archivio offline autonomo.
-Le due interfacce non condividono sessioni o decisioni di accettazione.
+formattazione, sorgente originale e download. Richiede il server in streamable HTTP e si apre direttamente
+all’indirizzo locale `/dashboard`, senza attivazione o login. Questa presentazione
+HTML rimane un archivio offline autonomo e non genera decisioni di accettazione.
 Vedi [il progetto nel browser](06-operate.md#il-progetto-nel-browser) e la
 [guida operativa](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md).
 

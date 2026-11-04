@@ -2,7 +2,7 @@
 
 Flower works with an external coding agent and a persistent SQLite ledger without
 an internal model or technical provider. Add an integration only for the operation
-you need. The current operational examples target **Flower 0.9.0**. Its
+you need. The current operational examples target **Flower 0.9.1**. Its
 [browser dashboard](DASHBOARD.md) and retained Markdown reader need no model or
 provider. The optional runtime remains `runtime-llama` 0.5.0.
 
@@ -69,7 +69,7 @@ route or change an endpoint.
 ## Enable internal inference explicitly
 
 For a fresh/manual environment, install the selected Flower source or reviewed
-0.9.0 release wheel with its `inference` extra. Published 0.5.2 remains an
+0.9.1 release wheel with its `inference` extra. Published 0.5.2 remains an
 available separate artifact with its older optional pin. An installer-owned environment must
 first complete its normal core upgrade, preserving its installation receipt;
 then add inference from the exact verified Flower wheel/build recorded in its
@@ -82,7 +82,7 @@ wheel, or an owned 0.6.1 installation with a 0.6.2 wheel through pip alone. Foll
 offline acquisition and an explicit optional-runtime upgrade. Core installers
 omit this extra. Enabling YAML does not install it.
 
-Flower 0.9.0 and its matching source select the independently published `runtime-llama` 0.5.0 library
+Flower 0.9.1 and its matching source select the independently published `runtime-llama` 0.5.0 library
 with backend `llamacpp`; historical Flower 0.6.1 and 0.6.0 selected the same pin, and
 Flower 0.5.2 still pins runtime 0.4.1. A targeted
 SDK-only update preserves its Flower artifact and receipt; re-requesting the old

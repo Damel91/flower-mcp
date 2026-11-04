@@ -4,7 +4,7 @@ Flower's dashboard lets you inspect registered projects and their engineering
 state from a browser on the computer running Flower. It also provides explicit
 project deletion under whole-instance maintenance.
 
-The dashboard is included in Flower 0.9.0. It uses the selected Flower ledger
+The dashboard is included in Flower 0.9.1. It uses the selected Flower ledger
 and leaves the MCP tool catalog unchanged.
 
 ## Start Flower and open the dashboard
@@ -29,25 +29,23 @@ An installed CLI can also select an existing profile with `--profile default`
 instead of `--config`. Use `--profile-root` with that profile when its location is
 explicit. Keep the same selected ledger as the clients that own your projects.
 
-The console prints a line beginning `Flower dashboard (local operator link)`.
-Open that complete link in your browser. Flower serves the dashboard and `/mcp`
-from the same HTTP process, selected ledger and port. Opening the dashboard does
-not start another Flower instance. The stdio entry point continues to serve MCP.
+The console prints `Flower dashboard: <local-url>`. Open that stable `/dashboard`
+address directly, for example `http://127.0.0.1:8010/dashboard` for the command
+above. Flower serves the dashboard and `/mcp` from the same HTTP process,
+selected ledger and port. Opening the dashboard does not start another instance.
+The stdio entry point continues to serve MCP.
 
-The link contains a one-time local activation capability. It expires after
-600 seconds and is consumed when the browser establishes its session. The page
-clears the activation fragment after reading it. Keep the link private and avoid
-sharing console output containing it.
+Flower 0.9.1 requires no activation link, access code, login, browser session cookie
+or access expiry. Return to the same address later or open another browser while
+Flower is running. A desktop launcher can open the address for convenience; it
+is not required for access. After a restart, the same URL works again.
 
-The operator session lasts 24 hours and uses a browser cookie. Within that
-session you can reopen `/dashboard` directly. Restarting Flower revokes the
-session and prints a new activation link. If a link was consumed in another
-browser or has expired, return to the browser with the active session, or use a
-new link after an operator-managed restart.
-
-Dashboard access is restricted to the same computer and local origin. Project
-reads require the operator session, and administrative requests also have CSRF
-protection. Browser navigation has its own project selection and leaves chat
+Dashboard requests remain restricted to the same computer and local origin.
+Administrative requests retain automatic CSRF protection; the browser obtains
+its request token from current server status without asking the operator.
+This token is request protection, not authentication or proof that a worker
+stopped. Network errors offer connection retry without an access-code form.
+Browser navigation has its own project selection and leaves chat
 project contexts and capability lenses alone.
 
 ## Inspect a project

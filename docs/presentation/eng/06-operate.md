@@ -41,9 +41,9 @@ gate guides work; it does not guarantee every semantic decision will be correct.
 
 ## The project in the browser
 
-The person can inspect the projects in their profile directly. When Flower 0.9.0
-runs with streamable HTTP, the local link printed at startup opens a dashboard
-on the same computer. Its sections show requirements, roadmap, packets,
+The person can inspect the projects in their profile directly. When Flower 0.9.1
+runs with streamable HTTP, its local `/dashboard` address opens the project
+in the browser, without access codes or expiry. Its sections show requirements, roadmap, packets,
 verification and Oracles, architecture and retained evidence. Browser project
 selection leaves chat contexts unchanged.
 

@@ -85,10 +85,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -100,7 +100,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -151,8 +151,9 @@ project; it does not repeat first-project setup.
 ## Open your project in the browser
 
 When Flower runs with streamable HTTP, it also serves a dashboard on the same
-computer. Open the private, one-time operator link printed at startup to browse
-your projects and their registered state. Read retained Markdown with an outline,
+computer. Open `/dashboard` on its configured local address to browse your
+projects and their registered state. No activation link or login is required.
+Read retained Markdown with an outline,
 formatted tables and code, or switch to its original source and download it.
 Choose system, light or dark appearance.
 

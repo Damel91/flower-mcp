@@ -54,11 +54,11 @@ The [sources page](sources.md) records the product snapshot behind this edition.
 
 ## Flower's retained-document reader
 
-Flower 0.9.0 also includes a Markdown reader in its local dashboard. It reads
+Flower 0.9.1 also includes a Markdown reader in its local dashboard. It reads
 evidence already retained in the running server profile, with an outline,
-formatting, original source and download. It requires streamable HTTP and a
-local session. This HTML presentation remains a separate offline publication.
-The interfaces share neither sessions nor acceptance decisions. See
+formatting, original source and download. It requires the server in streamable HTTP and opens directly
+at the local `/dashboard` address, without activation or login. This HTML
+presentation remains a separate offline publication and creates no acceptance decisions. See
 [the project in the browser](06-operate.md#the-project-in-the-browser) and the
 [operator guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md).
 
