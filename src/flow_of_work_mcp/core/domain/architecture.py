@@ -1,6 +1,7 @@
 """Bounded architecture definitions and selected, provider-neutral closure."""
 from __future__ import annotations
 
+from copy import deepcopy
 import re
 from typing import Mapping
 
@@ -21,6 +22,16 @@ _ENTITY_FIELDS = {
 }
 _LINK_FIELDS = {'requirement': {'kind', 'requirement_id'}, 'goal': {'kind', 'goal_node_id'},
                 'packet': {'kind', 'change_id', 'packet_id'}, 'evidence': {'kind', 'evidence_id'}}
+
+
+def architecture_authority_context(context: Mapping[str, object]) -> dict[str, object]:
+    """Keep progress visible while hashing only linked requirement meaning."""
+    authority = deepcopy(context)
+    for entry in authority['selected_context']['canonical_links']:
+        if entry['link']['kind'] == 'requirement':
+            content = entry['content']
+            content['retired'] = content.pop('lifecycle_status') == 'removed'
+    return authority
 
 
 def nonnegative_integer(value: object, field: str) -> int:

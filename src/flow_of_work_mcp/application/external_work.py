@@ -9,6 +9,7 @@ from flow_of_work_mcp.application.change_control import ChangeControlService
 from flow_of_work_mcp.application.external_plan_markdown import render_plan
 from flow_of_work_mcp.application.engineering_cycle import repository_review_projection, engineering_cycle_version
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
+from flow_of_work_mcp.core.domain.architecture import architecture_authority_context
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
@@ -307,7 +308,7 @@ class ExternalWorkService:
         architecture = self._ledger.resolve_architecture_refs(project_id, packet.get('architecture_refs', []))
         if architecture is not None:
             basis_packet['architecture_refs'] = packet['architecture_refs']
-            authority_basis['architecture'] = architecture
+            authority_basis['architecture'] = architecture_authority_context(architecture)
         if milestone_id:
             authority_basis['milestone'] = milestone
         snapshot = {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id, 'packet': packet, 'change': basis_change,

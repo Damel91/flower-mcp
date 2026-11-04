@@ -3377,7 +3377,7 @@ class CampaignAuthorityStoreMixin:
                     "kind": "requirement",
                     "ref": value,
                     "revision": int(requirement["current_revision"]),
-                    "status": str(requirement["lifecycle_status"]),
+                    "retired": str(requirement["lifecycle_status"]) == "removed",
                 }
             goal = connection.execute(
                 """
