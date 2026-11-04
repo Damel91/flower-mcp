@@ -1,5 +1,6 @@
 """Safety and startup regressions for the uv public qualifier; actual uv is separate."""
 import importlib.util
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,7 +11,63 @@ uv = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(uv)
 
 
+def source_fixture(root):
+    source = root / "source"
+    package = source / "src/flow_of_work_mcp"
+    package.mkdir(parents=True)
+    for name in ("pyproject.toml", "README.md", "LICENSE", "NOTICE"):
+        (source / name).write_text("fixture")
+    (package / "__init__.py").write_text("fixture")
+    return source, package
+
+
 class UvQualifierTests(unittest.TestCase):
+    def test_source_copy_preserves_exact_dashboard_bytes_and_manifest_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, package = source_fixture(root)
+            assets = {"resources/dashboard/index.html": b"<main>document</main>",
+                      "resources/dashboard/app.css": b"body { color: blue; }",
+                      "resources/dashboard/app.js": b"document.title = 'Flower';"}
+            for name, content in assets.items():
+                path = package / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            copied = uv.copy_source(source, root / "copy")
+            self.assertEqual(len(copied), 8)
+            for name, content in assets.items():
+                relative = "src/flow_of_work_mcp/" + name
+                self.assertEqual((root / "copy" / relative).read_bytes(), content)
+                self.assertEqual(copied[relative], hashlib.sha256(content).hexdigest())
+
+    def test_dashboard_extensions_do_not_admit_unlisted_package_paths(self):
+        for name in ("resources/dashboard/extra.html", "resources/dashboard/extra.css",
+                     "resources/dashboard/extra.js", "resources/elsewhere/app.js",
+                     "resources/dashboard/nested/app.js"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source, package = source_fixture(root)
+                path = package / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"private unapproved bytes")
+                with self.assertRaisesRegex(ValueError, "unapproved package input"):
+                    uv.copy_source(source, root / "copy")
+                self.assertFalse((root / "copy/src/flow_of_work_mcp" / name).exists())
+
+    def test_exact_dashboard_asset_symlink_is_refused_before_copying_target(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, package = source_fixture(root)
+            private = root / "private.js"
+            private.write_bytes(b"private target bytes")
+            asset = package / "resources/dashboard/app.js"
+            asset.parent.mkdir(parents=True)
+            asset.symlink_to(private)
+            with self.assertRaisesRegex(ValueError, "must not be symlinks"):
+                uv.copy_source(source, root / "copy")
+            self.assertFalse((root / "copy/src/flow_of_work_mcp/resources/dashboard/app.js").exists())
+            self.assertEqual(private.read_bytes(), b"private target bytes")
+
     def test_existing_state_is_rejected_before_source_or_command_access(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

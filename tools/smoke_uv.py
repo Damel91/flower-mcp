@@ -15,6 +15,13 @@ import subprocess
 import sys
 
 
+DASHBOARD_RESOURCES = frozenset({
+    "resources/dashboard/index.html",
+    "resources/dashboard/app.css",
+    "resources/dashboard/app.js",
+})
+
+
 def copy_source(source: Path, destination: Path) -> dict[str, str]:
     """Copy only package build inputs; never copy an existing environment/state."""
     inputs = [source / name for name in ("pyproject.toml", "README.md", "LICENSE", "NOTICE")]
@@ -30,8 +37,9 @@ def copy_source(source: Path, destination: Path) -> dict[str, str]:
             continue
         if not path.is_file():
             raise ValueError("source build inputs must be regular files")
-        if path.is_relative_to(package) and path.suffix not in {".py", ".yaml", ".md"}:
-            raise ValueError("unapproved package input; only Python/YAML/Markdown are selected")
+        if (path.is_relative_to(package) and path.suffix not in {".py", ".yaml", ".md"}
+                and path.relative_to(package).as_posix() not in DASHBOARD_RESOURCES):
+            raise ValueError("unapproved package input; only Python/YAML/Markdown and the three bundled dashboard assets are selected")
         relative = path.relative_to(source)
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
