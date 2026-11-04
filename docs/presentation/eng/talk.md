@@ -1,6 +1,23 @@
-# A talk outline
+# Flower at Linux Day: a 20-minute outline
 
 [Index](README.md) · [Scenario](scenario.md) · [Sources and limits](sources.md)
+
+## Audience and timing
+
+This outline addresses a mixed Linux audience and focuses on practical Flower
+use. These timings need an aloud rehearsal, with a dedicated demonstration
+project ready before the talk.
+
+| Minutes | Topic |
+| --- | --- |
+| 0–2 | Conflicting bookings and lost project context |
+| 2–5 | Require and Plan: expected behavior and defined work |
+| 5–8 | Build: recovering a plan and the agent's responsibilities |
+| 8–12 | Verify: reported results, evidence and acceptance |
+| 12–14 | Deploy and Operate: delivery and correction within scope |
+| 14–17 | Local dashboard: project, packets and retained Markdown |
+| 17–19 | Installation, bootstrap and the first project |
+| 19–20 | Closing and the first question |
 
 ## Opening
 
@@ -22,12 +39,26 @@ Show the logo after the question: the petals name the perspectives, not the answ
 | [Operate](06-operate.md) | A bug or a recurring booking? | Correction and new intent require different paths. |
 
 A short talk can use just the six pages. Concepts, tools and sources remain
-detours for questions: there is no need to read a catalog on stage. Actual duration
-must be rehearsed aloud; this is not a timed script.
+detours for questions: there is no need to read a catalog on stage. The outline above reserves three minutes for the dashboard without reading the tool catalog.
 
 To discuss the project's origins, open [How I built it](method.md): distinguish
 agent-written code from the author's design and decisions. The crops show the
 method, not certification of test outcomes.
+
+## Three minutes in the dashboard
+
+Open the local Flower 0.9.0 link in advance, using streamable HTTP and a dedicated
+demo profile. During the talk, show a project, its next gate, a packet and
+already retained Markdown: **Lettura**, its outline, then **Sorgente**. Switch
+the theme to show light/dark preference and the system default without changing
+the project.
+
+Explain that deletion requires instance-wide maintenance and explicit
+confirmation. Showing its entry point is enough for the talk. Actual deletion
+requires a disposable project, verified stop of owned workers and the ordinary
+guards. A filled field does not prove that a host stopped. The live dashboard
+reads the ledger. The HTML presenting these chapters is the separate offline
+presentation reader.
 
 ## If we want a real demonstration
 

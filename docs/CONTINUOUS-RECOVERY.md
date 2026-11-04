@@ -280,6 +280,20 @@ it. Technical investigation does not automatically require human approval.
    with the current revisions and grounded rationale when ordinary reconciliation
    is appropriate; do not rewrite old report provenance or relabel it as current.
 
+Requirement progress through `planned`, `partial` and `implemented` preserves
+executable authority, including linked architecture and Oracle dependencies.
+Requirement revisions and retirement still invalidate affected authority.
+Architecture views retain the actual lifecycle status for inspection.
+
+A fingerprint-basis correction can change existing affected packet pins once.
+Keep issued pins and historical reports, reassess the current plan, verify the
+existing implementation and record a new current-authority outcome. Reconciliation
+cannot promote an old stale report. Legacy Oracle dependency hashes remain stored
+and can be stale under the corrected basis. Inspect the Oracle, review its current
+bindings and author a fresh Oracle identity with `fow_campaign_author`, operation
+`author_oracle`, omitting `oracle_id`. Retain the historical Oracle and evidence.
+An identical payload under the old Oracle ID remains a semantic duplicate.
+
 For a rejected verification report, inspect the returned diagnostic's field,
 unit, criterion, expected and received declarations and its public recovery call.
 Copy the exact criterion/kind/statement from the unit's authoritative obligations;

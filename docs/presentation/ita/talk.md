@@ -1,6 +1,23 @@
-# Una traccia per raccontarlo
+# Flower al Linux Day: traccia per 20 minuti
 
 [Indice](README.md) · [Scenario](scenario.md) · [Fonti e limiti](sources.md)
+
+## Pubblico e tempi
+
+Il percorso si rivolge a un pubblico Linux misto e concentra gli esempi sull'uso
+pratico di Flower. I tempi sono una proposta da provare a voce, con un progetto
+di dimostrazione dedicato già pronto prima del talk.
+
+| Minuti | Argomento |
+| --- | --- |
+| 0–2 | Il conflitto tra prenotazioni e il problema del contesto perso |
+| 2–5 | Require e Plan: comportamento atteso e lavoro definito |
+| 5–8 | Build: ripresa del piano e responsabilità dell'agente |
+| 8–12 | Verify: risultato riportato, prova e accettazione |
+| 12–14 | Deploy e Operate: consegna e correzione entro lo scope |
+| 14–17 | Dashboard locale: progetto, pacchetti e Markdown conservato |
+| 17–19 | Installazione, bootstrap e primo progetto |
+| 19–20 | Chiusura e prima domanda |
 
 ## Apertura
 
@@ -23,11 +40,26 @@ il logo dopo la domanda: i petali danno i nomi alle prospettive, non la risposta
 
 Per un intervento breve si possono usare solo le sei pagine. Concetti, tool e
 fonti restano deviazioni per le domande: non bisogna leggere un catalogo dal palco.
-La durata effettiva andrà provata a voce; questa non è una scaletta cronometrata.
+La scaletta sopra riserva tre minuti alla dashboard, senza leggere il catalogo dei tool.
 
 Per raccontare l'origine del progetto, aprire [Come l'ho costruito](method.md):
 separare il codice scritto dagli agenti dalla progettazione e dalle decisioni
 dell'autore. I ritagli mostrano il metodo, non certificano i risultati dei test.
+
+## Tre minuti nella dashboard
+
+Aprire in anticipo il link locale di Flower 0.9.0, avviato in streamable HTTP su
+un profilo dimostrativo. Durante il talk mostrare un progetto, il prossimo gate,
+un packet e un Markdown già conservato: **Lettura**, indice, poi **Sorgente**.
+Cambiare tema consente di mostrare la preferenza chiara/scura e il default di
+sistema senza modificare il progetto.
+
+Spiegare che l'eliminazione richiede manutenzione dell'intera istanza e conferma
+esplicita. Per il talk basta mostrarne l'accesso: una cancellazione reale richiede
+un progetto sacrificabile, l'arresto verificato dei worker posseduti e le normali
+guardie. Non presentare un campo compilato come prova di arresto di un host.
+La dashboard live legge il ledger. L'HTML usato per raccontare questi capitoli è
+invece il reader offline della presentazione.
 
 ## Se vogliamo una dimostrazione reale
 

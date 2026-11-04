@@ -39,6 +39,29 @@ Another session selects the project and recovers a snapshot. It can read current
 state and history without treating the model as the system of record. The next
 gate guides work; it does not guarantee every semantic decision will be correct.
 
+## The project in the browser
+
+The person can inspect the projects in their profile directly. When Flower 0.9.0
+runs with streamable HTTP, the local link printed at startup opens a dashboard
+on the same computer. Its sections show requirements, roadmap, packets,
+verification and Oracles, architecture and retained evidence. Browser project
+selection leaves chat contexts unchanged.
+
+Retained Markdown opens in **Lettura**, with a heading outline, formatted tables
+and code. **Sorgente** and download preserve the original document. HTML and
+images remain inert. The view identifies limits and partial content without
+turning them into completeness or acceptance. Its theme follows the system,
+with a manual light or dark preference stored in the browser.
+
+Project deletion is a separate operation: preparation, explicit instance-wide
+maintenance, inventory review and exact project-ID confirmation. The operator
+must possess an actual declaration that their workers stopped. The page does
+not stop external hosts or delete repositories, chats or backups. An uncertain
+outcome requires inspecting the same intent instead of automatically repeating
+the command. The [current dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
+explains access and recovery. This live interface is separate from the
+[offline presentation reader](reader.md), which never queries Flower.
+
 ## The problem behind the mechanism
 
 The lifecycle does not end at first delivery. We must preserve the reason for

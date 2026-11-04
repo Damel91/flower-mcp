@@ -19,17 +19,33 @@ Una capacità del motore CodingCastle non viene attribuita a Flower.
 Le fonti pubbliche di Flower sotto sono fissate al sorgente
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, versione dichiarata `0.4.1`.
 Questi riferimenti di implementazione e installazione conservano quel checkpoint
-sorgente storico. La [release corrente 0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
+sorgente storico. La [release storica 0.5.2](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
 al commit `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corregge il costo del recupero completo. La precedente 0.5.1 al commit
 `a87a52f87f16d48a609e304f85b53cc6b221fe66` resta immutabile. La precedente 0.5.0 al commit
 `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c` resta immutabile. La
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
-I download Flower puntano alla release pubblicata immutabile `0.5.2`. La storica
+I vecchi download di questo checkpoint puntavano alla release `0.5.2`.
+I comandi operativi in [Ora prova Flower](try-flower.md) selezionano ora 0.9.0. La storica
 `0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
 binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1`, `0.5.0` e `0.5.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
+
+## Integrazione corrente: dashboard 0.9.0
+
+Il capitolo Operate descrive anche la dashboard locale e il lettore Markdown
+aggiunti in 0.9.0. Queste fonti seguono il ramo mutabile `main`, separatamente dai
+riferimenti storici congelati sopra:
+
+- [Guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): avvio, sessione locale, temi, lettura e manutenzione.
+- [Release notes 0.9.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.9.0.md): scope, dipendenze e limiti della release.
+- [Recupero della currentness](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprint e valutazione degli snapshot precedenti.
+
+Il reader della presentazione rimane offline. La dashboard usa il profilo del
+server in esecuzione e non modifica accettazione o contesto delle chat con una
+semplice lettura. Le misure storiche nella pagina sul metodo conservano data,
+perimetro e provenienza originari.
 
 ## Require
 

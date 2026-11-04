@@ -32,6 +32,9 @@ evidence connected, even when the conversation changes.
   verification and a decision to accept the result remain distinct.
 - **Keep progress when plans change.** Requirements, decisions and results
   retain their revisions and history, so earlier work stays understandable.
+- **Inspect the project yourself.** Open the local browser dashboard to see
+  requirements, roadmap, packets and verification, and read retained Markdown
+  without asking an agent to summarize it.
 - **Hand work over, including offline.** Export a self-contained Markdown
   plan, carry out its authorized work and reconcile outcomes when Flower is
   available again.
@@ -82,10 +85,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.8.2/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.8.2/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -97,7 +100,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.8.2/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -145,6 +148,19 @@ executable with `bootstrap`, using its absolute path. The
 An upgrade preserves the existing profile and guides the agent to recover its
 project; it does not repeat first-project setup.
 
+## Open your project in the browser
+
+When Flower runs with streamable HTTP, it also serves a dashboard on the same
+computer. Open the private, one-time operator link printed at startup to browse
+your projects and their registered state. Read retained Markdown with an outline,
+formatted tables and code, or switch to its original source and download it.
+Choose system, light or dark appearance.
+
+The dashboard uses your existing profile. It keeps chat project selection and
+lifecycle decisions separate. Project deletion requires explicit instance-wide
+maintenance, inventory review and confirmation. See the [dashboard guide](docs/DASHBOARD.md)
+for startup, access and recovery. A stdio connection alone has no browser dashboard.
+
 ## Optional LLMs and providers
 
 Your coding agent can use Flower's core without installing an internal model.
@@ -161,6 +177,7 @@ See [advanced configuration](docs/ADVANCED-CONFIGURATION.md) and
 | --- | --- |
 | Follow a complete project scenario | [English walkthrough](docs/presentation/eng/README.md) · [Italiano](docs/presentation/ita/README.md) |
 | Understand plans, verification and handovers | [Essential concepts](docs/presentation/eng/concepts.md) |
+| Browse projects and read retained documents | [Local browser dashboard](docs/DASHBOARD.md) |
 | Explore the public tools | [Tool map](docs/presentation/eng/tools.md) |
 | Resume work or reconcile offline results | [Continuous work and recovery](docs/CONTINUOUS-RECOVERY.md) |
 | Connect project architecture and technical providers | [Integration guide](docs/NOXI-INTEGRATION.md) |

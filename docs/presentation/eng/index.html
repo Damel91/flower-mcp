@@ -11,7 +11,7 @@
 <script src="../assets/reader.js" defer></script>
 </head>
 <body>
-<!-- Generated from linked Markdown. Source digest: 88d45de3527e5af7920846ebc2fcc3eb889a47786565e1bf780a13f208b179b5. -->
+<!-- Generated from linked Markdown. Source digest: 9c3544bfb6a17aeea004747b16ee18a6c75d3b18a102145bf4c8b686cec4c7c1. -->
 <a class="skip-link" href="#content">Skip to content</a>
 <header class="site-header">
 <a class="brand" href="#page=README.md" data-page="README.md"><img src="../assets/flower-mcp-logo.png" alt="" width="48" height="48"><span><strong>Flower MCP</strong><small>From requirements to software</small></span></a>
@@ -99,7 +99,8 @@ has value for its user.</p>
 <li><a href="#page=method.md" data-page="method.md">How I built it</a>: agents, the documentary plane, time and source size.</li>
 <li><a href="#page=sources.md" data-page="sources.md">Sources and limits</a>: the basis of the claims and what we do not promise.</li>
 <li><a href="#page=talk.md" data-page="talk.md">The talk outline</a>: a short path, questions and useful detours.</li>
-<li><a href="#page=reader.md" data-page="reader.md">The local reader</a>: offline access to the same Markdown.</li>
+<li><a href="#page=06-operate.md&amp;section=the-project-in-the-browser" data-page="06-operate.md" data-section="the-project-in-the-browser">The project dashboard</a>: current state and retained Flower documents.</li>
+<li><a href="#page=reader.md" data-page="reader.md">The presentation reader</a>: offline access to this story, separate from the dashboard.</li>
 </ul>
 <p>This is not a one-way chain. A test can take us back to requirements; an issue in
 use can open a change. The petals tell the lifecycle story, not six automatic
@@ -470,6 +471,25 @@ justify two incorrect confirmations.</p>
 <p>Another session selects the project and recovers a snapshot. It can read current
 state and history without treating the model as the system of record. The next
 gate guides work; it does not guarantee every semantic decision will be correct.</p>
+<h2 id="doc-eba200274d73--the-project-in-the-browser">The project in the browser</h2>
+<p>The person can inspect the projects in their profile directly. When Flower 0.9.0
+runs with streamable HTTP, the local link printed at startup opens a dashboard
+on the same computer. Its sections show requirements, roadmap, packets,
+verification and Oracles, architecture and retained evidence. Browser project
+selection leaves chat contexts unchanged.</p>
+<p>Retained Markdown opens in <strong>Lettura</strong>, with a heading outline, formatted tables
+and code. <strong>Sorgente</strong> and download preserve the original document. HTML and
+images remain inert. The view identifies limits and partial content without
+turning them into completeness or acceptance. Its theme follows the system,
+with a manual light or dark preference stored in the browser.</p>
+<p>Project deletion is a separate operation: preparation, explicit instance-wide
+maintenance, inventory review and exact project-ID confirmation. The operator
+must possess an actual declaration that their workers stopped. The page does
+not stop external hosts or delete repositories, chats or backups. An uncertain
+outcome requires inspecting the same intent instead of automatically repeating
+the command. The <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md" rel="noopener noreferrer">current dashboard guide</a>
+explains access and recovery. This live interface is separate from the
+<a href="#page=reader.md" data-page="reader.md">offline presentation reader</a>, which never queries Flower.</p>
 <h2 id="doc-eba200274d73--the-problem-behind-the-mechanism">The problem behind the mechanism</h2>
 <p>The lifecycle does not end at first delivery. We must preserve the reason for
 a change, the authority admitting it and the distinction between old evidence
@@ -490,51 +510,33 @@ unfulfilled promise or design a new one?</p>
 that method into your project: <strong>install Flower and connect your coding agent</strong>.
 Spazio Comune remains an educational scenario; the download is the Flower MCP
 server, the public name of Flow of Work MCP.</p>
-<h2 id="doc-d92560641e4a--public-repository-and-downloads">Public repository and downloads</h2>
+<h2 id="doc-d92560641e4a--flower-090-the-current-route">Flower 0.9.0: the current route</h2>
+<p><a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.9.0" rel="noopener noreferrer">Release 0.9.0</a>
+combines the local dashboard, retained-Markdown reader and packet-currentness
+corrections. Verify every asset against its <code>SHA256SUMS</code>. Core retains schema55
+and 37 MCP tools. The dashboard and reader need no model or provider. The
+deferred witness remains outside this release.</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh" rel="noopener noreferrer">macOS/Linux installer</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1" rel="noopener noreferrer">Windows launcher</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install_flower.py" rel="noopener noreferrer">Python installer</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/flow_of_work_mcp-0.9.0-py3-none-any.whl" rel="noopener noreferrer">Wheel</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/flow_of_work_mcp-0.9.0.tar.gz" rel="noopener noreferrer">Packaged source</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/SHA256SUMS" rel="noopener noreferrer">Checksums</a></li>
+<li><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/BOOTSTRAP.md" rel="noopener noreferrer">Bootstrap</a></li>
+</ul>
+<p>The <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md" rel="noopener noreferrer">current installation guide</a>
+and <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md" rel="noopener noreferrer">dashboard guide</a>
+follow <code>main</code>. Operational commands below select 0.9.0. The following historical
+checkpoints retain their own pins and results. They do not qualify the new
+release.</p>
+<h2 id="doc-d92560641e4a--historical-checkpoint-062-repository-and-downloads">Historical checkpoint: 0.6.2 repository and downloads</h2>
 <ul>
 <li><a href="https://github.com/Damel91/flower-mcp" rel="noopener noreferrer">GitHub repository</a>: code, README and current documentation.</li>
 <li><a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2" rel="noopener noreferrer">Flower MCP 0.6.2 release</a>: seven published release assets.</li>
 <li><a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md" rel="noopener noreferrer">Current installation guide</a>: procedures, configuration and removal.</li>
 <li><a href="https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#prerequisites" rel="noopener noreferrer">Operating-system prerequisites</a>: what to prepare before downloading.</li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh" rel="noopener noreferrer">install.sh</a></td>
-<td>Guided installation on macOS and Linux.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1" rel="noopener noreferrer">install.ps1</a></td>
-<td>Windows PowerShell launcher from the same release.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install_flower.py" rel="noopener noreferrer">install_flower.py</a></td>
-<td>Release Python installer; requires Python 3.11+.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2-py3-none-any.whl" rel="noopener noreferrer">Python wheel</a></td>
-<td>Manual installation of the Python package.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2.tar.gz" rel="noopener noreferrer">Source archive</a></td>
-<td>Packaged release source.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/SHA256SUMS" rel="noopener noreferrer">SHA256SUMS</a></td>
-<td>Checksums for release-file verification.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/BOOTSTRAP.md" rel="noopener noreferrer">BOOTSTRAP.md</a></td>
-<td>Public instructions for starting agent work with Flower.</td>
-</tr>
-</tbody>
-</table>
 <p>The published <code>v0.6.2</code> release contains seven Flower assets and no runtime wheel.
 Verify downloads against its <code>SHA256SUMS</code>. The Windows launcher installs 0.6.2.
 Historical <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.4.1" rel="noopener noreferrer">0.4.1</a> retains eight historical assets,
@@ -545,7 +547,7 @@ Current operational guide links follow mutable <code>main</code>. The
 <a href="https://github.com/Damel91/flower-mcp/blob/d82eb9f15f5a77961d06012fc25ecde3c5c8f18a/docs/INSTALLATION.md#prerequisites" rel="noopener noreferrer">historical prerequisites</a>
 retain their frozen source checkpoint. The immutable 0.6.0 archive keeps its
 preparation-era guides; later current documentation does not replace those bytes.</p>
-<h2 id="doc-d92560641e4a--current-source-and-optional-runtime">Current source and optional runtime</h2>
+<h2 id="doc-d92560641e4a--historical-checkpoint-source-and-optional-runtime">Historical checkpoint: source and optional runtime</h2>
 <p>Flower <code>0.6.2</code> contains seven Flower assets: wheel, source archive,
 three installers, <code>BOOTSTRAP.md</code> and <code>SHA256SUMS</code>. It does not bundle a runtime
 wheel or replace the historical 0.4.1 assets.</p>
@@ -563,9 +565,9 @@ Use this source command only in a fresh/manual Flower environment:</p>
 <pre><code class="language-sh">.venv/bin/python -m pip install '.[inference]'
 .venv/bin/python -m pip check
 </code></pre>
-<p>For a <strong>local 0.8.2 source/candidate wheel</strong>, use a fresh/manual environment.
+<p>For a <strong>local 0.9.0 source/candidate wheel</strong>, use a fresh/manual environment.
 This local-build example is separate from the verified published artifact:</p>
-<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.2-py3-none-any.whl[inference]'
+<pre><code class="language-sh">.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.9.0-py3-none-any.whl[inference]'
 </code></pre>
 <p>Flower 0.6.2 is published at commit
 <code>12ad69317dab92bdba06ae113ac22d107d259236</code>. Verify its official wheel against
@@ -647,7 +649,7 @@ inferred from the owned fixture or CI.</p>
 </tr>
 </tbody>
 </table>
-<p>Flower 0.8.0 supports OpenCode V2 through the release installers. The adapter
+<p>Flower 0.8.0 introduced OpenCode V2 support through the release installers. The adapter
 preserves direct Flower tools and uses the same project AGENTS bootstrap. See
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md" rel="noopener noreferrer">OpenCode setup</a>.</p>
 <p><strong>The core requires no LM Studio, internal model, CodingCastle or VPN.</strong> Inference
@@ -661,17 +663,17 @@ The reader works offline, while a fresh installation downloads packages and depe
 using the original environment, profile and profile root. Stop all Flower processes
 and coding clients sharing that environment. For an installer-owned installation,
 preview the upgrade before changing packages:</p>
-<pre><code class="language-sh">curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash -s -- --upgrade --dry-run
+<pre><code class="language-sh">curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash -s -- --upgrade --dry-run
 </code></pre>
 <p>On Windows download the new <code>install.ps1</code> shown below, then preview without a
 client-registration option:</p>
-<pre><code class="language-powershell">powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Upgrade -DryRun
+<pre><code class="language-powershell">powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.9.0' -Upgrade -DryRun
 </code></pre>
 <p>Add your original <code>--venv</code>, <code>--profile</code> and <code>--profile-root</code> options for custom
 paths; Windows uses <code>-Venv</code>, <code>-Profile</code> and <code>-ProfileRoot</code>. Inspect the plan, then
 repeat without <code>--dry-run</code> / <code>-DryRun</code>. The upgrade backs up the selected SQLite
 ledger and exact YAML before pip, preserves client registration and applies
-no new migration when upgrading a schema 55 profile to 0.6.2.
+no new migration when upgrading a schema 55 profile to 0.9.0.
 An older 0.3.1/schema 52 installation still uses the existing additive migrations
 52 to 55 at the next server start. Keep the reported backup paths. The upgrade
 never resets the ledger or automatically restores a backup; a failed pip operation
@@ -690,16 +692,16 @@ for source/candidate trials. Preserve the original endpoint and profile.</p>
 <h3 id="doc-d92560641e4a--macos-and-linux">macOS and Linux</h3>
 <p>After checking prerequisites, the public command starts the guided installer
 and lets you choose a client or installation only:</p>
-<pre><code class="language-sh">curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash
+<pre><code class="language-sh">curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash
 </code></pre>
 <p>The script prepares an isolated Python environment and verifies backend and
-wheel checksums. You can download and inspect <a href="https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh" rel="noopener noreferrer">the script</a>
+wheel checksums. You can download and inspect <a href="https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh" rel="noopener noreferrer">the script</a>
 before running it. Options and manual procedures are in the complete guide.</p>
 <h3 id="doc-d92560641e4a--windows">Windows</h3>
 <p>In a writable directory, download the public launcher and choose a client.
 This example uses Codex:</p>
-<pre><code class="language-powershell">Invoke-WebRequest -UseBasicParsing -Uri &quot;https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1&quot; -OutFile &quot;.\install.ps1&quot;
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Platform codex
+<pre><code class="language-powershell">Invoke-WebRequest -UseBasicParsing -Uri &quot;https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1&quot; -OutFile &quot;.\install.ps1&quot;
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.9.0' -Platform codex
 </code></pre>
 <p>Run the commands separately and stop if the download fails. You can inspect the
 script before starting it. <code>-Platform claude-code</code>, <code>-Platform cursor</code>,
@@ -1575,17 +1577,30 @@ A CodingCastle engine capability is not attributed to Flower.</p>
 <p>The public Flower sources below are pinned to
 <code>d82eb9f15f5a77961d06012fc25ecde3c5c8f18a</code>, declared version <code>0.4.1</code>.
 These implementation and installation references retain that historical source
-checkpoint. The <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2" rel="noopener noreferrer">current 0.5.2 release</a>
+checkpoint. The <a href="https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2" rel="noopener noreferrer">historical 0.5.2 release</a>
 at <code>73cb74497e4ae65c509eb4ac8acf1026cbb0fd30</code> corrects complete recovery cost. Earlier 0.5.1 at
 <code>a87a52f87f16d48a609e304f85b53cc6b221fe66</code> remains immutable. Earlier 0.5.0 at
 <code>a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c</code> remains immutable. The mutable
 <a href="https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md" rel="noopener noreferrer">advanced configuration guide</a>
-is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target immutable published <code>0.5.2</code>. Historical <code>0.4.1</code> retains runtime
+is operational documentation, not a claim that it existed at the frozen pin. That checkpoint
+linked to published <code>0.5.2</code> downloads. Operational commands in
+<a href="#page=try-flower.md" data-page="try-flower.md">Now try Flower</a> now select 0.9.0. Historical <code>0.4.1</code> retains runtime
 <code>0.4.0</code>; this editorial snapshot does not qualify binaries. Published <code>0.3.1</code>,
 <code>0.4.0</code>, <code>0.4.1</code>, <code>0.5.0</code> and <code>0.5.1</code> remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.</p>
+<h2 id="doc-9f8babe31a3f--current-supplement-the-090-dashboard">Current supplement: the 0.9.0 dashboard</h2>
+<p>The Operate chapter also describes the local dashboard and Markdown reader
+added in 0.9.0. These sources follow mutable <code>main</code>, separately from the frozen
+historical references above:</p>
+<ul>
+<li><a href="https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md" rel="noopener noreferrer">Dashboard guide</a>: startup, local session, themes, reading and maintenance.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.9.0.md" rel="noopener noreferrer">0.9.0 release notes</a>: release scope, dependencies and limits.</li>
+<li><a href="https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md" rel="noopener noreferrer">Currentness recovery</a>: fingerprints and review of earlier snapshots.</li>
+</ul>
+<p>The presentation reader remains offline. The dashboard uses a running server's
+profile. Reading it does not change acceptance or chat contexts. Historical
+measurements on the method page retain their original date, scope and provenance.</p>
 <h2 id="doc-9f8babe31a3f--require">Require</h2>
 <p>Original problem: do not confuse conversation, proposals and current intent.</p>
 <ul>
@@ -1709,8 +1724,54 @@ used only to build the reader, with raw HTML disabled.</li>
 <li>The logo comes from the Flower repository; fonts come from the system.</li>
 </ul>
 <p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=reader.md" data-page="reader.md">Open and rebuild the reader</a></p>
-</article><article class="markdown-body" data-document="talk.md" data-title="A talk outline" data-prefix="doc-ccff7643a5d6" hidden><h1 id="doc-ccff7643a5d6--a-talk-outline">A talk outline</h1>
+</article><article class="markdown-body" data-document="talk.md" data-title="Flower at Linux Day: a 20-minute outline" data-prefix="doc-ccff7643a5d6" hidden><h1 id="doc-ccff7643a5d6--flower-at-linux-day-a-20-minute-outline">Flower at Linux Day: a 20-minute outline</h1>
 <p><a href="#page=README.md" data-page="README.md">Index</a> · <a href="#page=scenario.md" data-page="scenario.md">Scenario</a> · <a href="#page=sources.md" data-page="sources.md">Sources and limits</a></p>
+<h2 id="doc-ccff7643a5d6--audience-and-timing">Audience and timing</h2>
+<p>This outline addresses a mixed Linux audience and focuses on practical Flower
+use. These timings need an aloud rehearsal, with a dedicated demonstration
+project ready before the talk.</p>
+<table>
+<thead>
+<tr>
+<th>Minutes</th>
+<th>Topic</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–2</td>
+<td>Conflicting bookings and lost project context</td>
+</tr>
+<tr>
+<td>2–5</td>
+<td>Require and Plan: expected behavior and defined work</td>
+</tr>
+<tr>
+<td>5–8</td>
+<td>Build: recovering a plan and the agent's responsibilities</td>
+</tr>
+<tr>
+<td>8–12</td>
+<td>Verify: reported results, evidence and acceptance</td>
+</tr>
+<tr>
+<td>12–14</td>
+<td>Deploy and Operate: delivery and correction within scope</td>
+</tr>
+<tr>
+<td>14–17</td>
+<td>Local dashboard: project, packets and retained Markdown</td>
+</tr>
+<tr>
+<td>17–19</td>
+<td>Installation, bootstrap and the first project</td>
+</tr>
+<tr>
+<td>19–20</td>
+<td>Closing and the first question</td>
+</tr>
+</tbody>
+</table>
 <h2 id="doc-ccff7643a5d6--opening">Opening</h2>
 <p>&quot;Two people book the same room. The code compiled, the tests were green and the
 screen looked good. What had we actually asked the software to do?&quot;</p>
@@ -1759,11 +1820,22 @@ Show the logo after the question: the petals name the perspectives, not the answ
 </tbody>
 </table>
 <p>A short talk can use just the six pages. Concepts, tools and sources remain
-detours for questions: there is no need to read a catalog on stage. Actual duration
-must be rehearsed aloud; this is not a timed script.</p>
+detours for questions: there is no need to read a catalog on stage. The outline above reserves three minutes for the dashboard without reading the tool catalog.</p>
 <p>To discuss the project's origins, open <a href="#page=method.md" data-page="method.md">How I built it</a>: distinguish
 agent-written code from the author's design and decisions. The crops show the
 method, not certification of test outcomes.</p>
+<h2 id="doc-ccff7643a5d6--three-minutes-in-the-dashboard">Three minutes in the dashboard</h2>
+<p>Open the local Flower 0.9.0 link in advance, using streamable HTTP and a dedicated
+demo profile. During the talk, show a project, its next gate, a packet and
+already retained Markdown: <strong>Lettura</strong>, its outline, then <strong>Sorgente</strong>. Switch
+the theme to show light/dark preference and the system default without changing
+the project.</p>
+<p>Explain that deletion requires instance-wide maintenance and explicit
+confirmation. Showing its entry point is enough for the talk. Actual deletion
+requires a disposable project, verified stop of owned workers and the ordinary
+guards. A filled field does not prove that a host stopped. The live dashboard
+reads the ledger. The HTML presenting these chapters is the separate offline
+presentation reader.</p>
 <h2 id="doc-ccff7643a5d6--if-we-want-a-real-demonstration">If we want a real demonstration</h2>
 <p>The written story is not a transcript. A later demo should select an isolated
 project, use current contracts and preserve real receipts:</p>
@@ -1833,11 +1905,18 @@ python docs/presentation/build_reader.py --check
 python -m unittest discover -s docs/presentation/tests
 </code></pre>
 <p>On macOS/Linux use <code>python3</code> if needed; on Windows you can use <code>py -3.11</code>.
-The commands use Python and relative paths, not Bash scripts. No editorial
-dependency is added to the server installation.</p>
+The commands use Python and relative paths, not Bash scripts. Rebuilding the presentation does not install or change the Flower server.</p>
 <p><code>--check</code> validates local links, anchors and generated-HTML consistency without
 updating files. Tool names are compared with repository source when available.
 The <a href="#page=sources.md" data-page="sources.md">sources page</a> records the product snapshot behind this edition.</p>
+<h2 id="doc-71625a889437--flowers-retained-document-reader">Flower's retained-document reader</h2>
+<p>Flower 0.9.0 also includes a Markdown reader in its local dashboard. It reads
+evidence already retained in the running server profile, with an outline,
+formatting, original source and download. It requires streamable HTTP and a
+local session. This HTML presentation remains a separate offline publication.
+The interfaces share neither sessions nor acceptance decisions. See
+<a href="#page=06-operate.md&amp;section=the-project-in-the-browser" data-page="06-operate.md" data-section="the-project-in-the-browser">the project in the browser</a> and the
+<a href="https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md" rel="noopener noreferrer">operator guide</a>.</p>
 <h2 id="doc-71625a889437--the-readers-boundary">The reader's boundary</h2>
 <p>This is a publication to read, not an MCP client: it does not call Flower,
 execute code, write the ledger or generate acceptance evidence. Markdown

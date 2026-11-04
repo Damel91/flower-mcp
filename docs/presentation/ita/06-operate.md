@@ -41,6 +41,29 @@ stato corrente e storia senza considerare il modello il sistema di record.
 Il prossimo gate orienta il lavoro; non garantisce che l'agente prenderà ogni
 decisione semantica correttamente.
 
+## Il progetto nel browser
+
+La persona può consultare direttamente i progetti del proprio profilo. Con
+Flower 0.9.0 avviato in streamable HTTP, il link locale stampato all'avvio apre
+la dashboard sullo stesso computer. Le sezioni mostrano requisiti, roadmap,
+pacchetti, verifiche e oracoli, architettura ed evidenze conservate. La scelta del
+progetto nel browser lascia invariato il contesto delle chat.
+
+Un Markdown conservato si apre in **Lettura**, con indice dei titoli, tabelle e
+codice formattati. **Sorgente** e download mantengono il documento originale.
+HTML e immagini restano inerti. La vista distingue limiti e contenuti parziali
+senza trasformarli in completezza o accettazione. Il tema segue il sistema,
+con una scelta manuale chiara o scura memorizzata nel browser.
+
+L'eliminazione di un progetto è un'operazione separata: preparazione, manutenzione
+esplicita dell'intera istanza, inventario e conferma dell'ID esatto. L'operatore
+deve possedere una dichiarazione reale dell'arresto dei propri worker. La pagina
+non ferma host esterni e non elimina repository, chat o backup. Un esito incerto
+richiede ispezione dello stesso intento, senza ripetere automaticamente il comando.
+La [guida corrente della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
+spiega accesso e recupero. Questa interfaccia live è distinta dal
+[reader offline della presentazione](reader.md), che non interroga Flower.
+
 ## Il problema da cui nasce il meccanismo
 
 Il ciclo di vita non termina con la prima consegna. Serve conservare il motivo

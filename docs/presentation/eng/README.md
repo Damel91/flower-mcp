@@ -53,7 +53,8 @@ has value for its user.
 - [How I built it](method.md): agents, the documentary plane, time and source size.
 - [Sources and limits](sources.md): the basis of the claims and what we do not promise.
 - [The talk outline](talk.md): a short path, questions and useful detours.
-- [The local reader](reader.md): offline access to the same Markdown.
+- [The project dashboard](06-operate.md#the-project-in-the-browser): current state and retained Flower documents.
+- [The presentation reader](reader.md): offline access to this story, separate from the dashboard.
 
 This is not a one-way chain. A test can take us back to requirements; an issue in
 use can open a change. The petals tell the lifecycle story, not six automatic

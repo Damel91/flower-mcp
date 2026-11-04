@@ -53,7 +53,8 @@ abbia valore per l'utente.
 - [Come l'ho costruito](method.md): agenti, plane documentale, tempo e dimensione del sorgente.
 - [Fonti e limiti](sources.md): da dove vengono le affermazioni e cosa non promettiamo.
 - [La traccia per il talk](talk.md): percorso breve, domande e deviazioni utili.
-- [Il reader locale](reader.md): consultazione offline degli stessi Markdown.
+- [La dashboard del progetto](06-operate.md#il-progetto-nel-browser): stato corrente e documenti conservati in Flower.
+- [Il reader della presentazione](reader.md): consultazione offline di questo racconto, separata dalla dashboard.
 
 Non è una catena a senso unico. Un test può riportarci ai requisiti; un problema
 in uso può aprire un cambiamento. I petali raccontano il ciclo, non impongono sei

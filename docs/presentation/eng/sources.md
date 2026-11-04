@@ -18,17 +18,32 @@ A CodingCastle engine capability is not attributed to Flower.
 The public Flower sources below are pinned to
 `d82eb9f15f5a77961d06012fc25ecde3c5c8f18a`, declared version `0.4.1`.
 These implementation and installation references retain that historical source
-checkpoint. The [current 0.5.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
+checkpoint. The [historical 0.5.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.5.2)
 at `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corrects complete recovery cost. Earlier 0.5.1 at
 `a87a52f87f16d48a609e304f85b53cc6b221fe66` remains immutable. Earlier 0.5.0 at
 `a46e0ec0efa335e655f3b5b8d7ecdc3843a0fa3c` remains immutable. The mutable
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
-is operational documentation, not a claim that it existed at the frozen pin. Flower download
-links target immutable published `0.5.2`. Historical `0.4.1` retains runtime
+is operational documentation, not a claim that it existed at the frozen pin. That checkpoint
+linked to published `0.5.2` downloads. Operational commands in
+[Now try Flower](try-flower.md) now select 0.9.0. Historical `0.4.1` retains runtime
 `0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
 `0.4.0`, `0.4.1`, `0.5.0` and `0.5.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.
+
+## Current supplement: the 0.9.0 dashboard
+
+The Operate chapter also describes the local dashboard and Markdown reader
+added in 0.9.0. These sources follow mutable `main`, separately from the frozen
+historical references above:
+
+- [Dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): startup, local session, themes, reading and maintenance.
+- [0.9.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.9.0.md): release scope, dependencies and limits.
+- [Currentness recovery](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprints and review of earlier snapshots.
+
+The presentation reader remains offline. The dashboard uses a running server's
+profile. Reading it does not change acceptance or chat contexts. Historical
+measurements on the method page retain their original date, scope and provenance.
 
 ## Require
 

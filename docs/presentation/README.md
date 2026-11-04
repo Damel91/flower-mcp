@@ -31,3 +31,15 @@ Open [index.html](index.html), or go directly to the
 
 Nessun server o accesso alla rete è necessario per leggere il percorso.
 No server or network access is needed to read the presentation.
+
+## Dashboard del progetto / Project dashboard
+
+Il reader offline racconta Flower senza collegarsi al server. La dashboard di
+Flower 0.9.0 mostra invece i progetti del profilo in esecuzione: consultazione,
+lettura dei Markdown conservati ed eliminazione con manutenzione esplicita.
+Il capitolo Operate di ciascuna lingua spiega questo percorso locale.
+
+The offline reader presents Flower without a server connection. Flower 0.9.0's
+dashboard shows the projects in a running profile, including retained Markdown
+and explicit deletion under maintenance. Each edition's Operate chapter explains
+that local workflow.

@@ -14,6 +14,17 @@ It preserves other projects, global sequences, configuration, source repositorie
 imports/exports, shared logs and external backups. It creates no archive or
 backup of the deleted project's contents.
 
+## Browser administration and offline CLI
+
+Flower 0.9.0 also exposes explicit project deletion through its local
+[browser dashboard](DASHBOARD.md). That route enters whole-instance maintenance,
+drains admitted work, fences idle jobs and retains the running owner's ledger
+lease. The operator still owns real host-stop declarations and external cleanup.
+
+The commands below describe the separate **offline CLI**. Its owner-stop
+requirement remains in force. Do not run this CLI alongside a live Flower owner
+or treat a browser session as permission to bypass native guards.
+
 ## Before deletion
 
 The native host must stop its chat/Pi/Bash workers and its Flow process, prevent

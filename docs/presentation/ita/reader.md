@@ -46,13 +46,22 @@ python -m unittest discover -s docs/presentation/tests
 ```
 
 Su macOS/Linux usa `python3` se necessario; su Windows puoi usare `py -3.11`.
-I comandi usano Python e percorsi relativi, non script Bash. Nessuna dipendenza
-editoriale viene aggiunta all'installazione del server.
+I comandi usano Python e percorsi relativi, non script Bash. La rigenerazione editoriale non installa o modifica il server Flower.
 
 `--check` verifica link locali, ancore e corrispondenza dell'HTML generato;
 non aggiorna file. Il catalogo dei tool viene confrontato con il sorgente del
 repository quando disponibile. Il documento [fonti](sources.md) conserva la
 fotografia di prodotto su cui è basata questa edizione.
+
+## Il lettore dei documenti in Flower
+
+Flower 0.9.0 include anche un lettore Markdown nella dashboard locale. Quello
+legge evidenze già conservate nel profilo del server in esecuzione, con indice,
+formattazione, sorgente originale e download. Richiede streamable HTTP e una
+sessione locale. Questa presentazione HTML rimane un archivio offline autonomo.
+Le due interfacce non condividono sessioni o decisioni di accettazione.
+Vedi [il progetto nel browser](06-operate.md#il-progetto-nel-browser) e la
+[guida operativa](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md).
 
 ## Il confine del reader
 

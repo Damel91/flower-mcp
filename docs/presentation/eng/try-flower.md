@@ -7,22 +7,34 @@ that method into your project: **install Flower and connect your coding agent**.
 Spazio Comune remains an educational scenario; the download is the Flower MCP
 server, the public name of Flow of Work MCP.
 
-## Public repository and downloads
+## Flower 0.9.0: the current route
+
+[Release 0.9.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.9.0)
+combines the local dashboard, retained-Markdown reader and packet-currentness
+corrections. Verify every asset against its `SHA256SUMS`. Core retains schema55
+and 37 MCP tools. The dashboard and reader need no model or provider. The
+deferred witness remains outside this release.
+
+- [macOS/Linux installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh)
+- [Windows launcher](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1)
+- [Python installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install_flower.py)
+- [Wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/flow_of_work_mcp-0.9.0-py3-none-any.whl)
+- [Packaged source](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/flow_of_work_mcp-0.9.0.tar.gz)
+- [Checksums](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/SHA256SUMS)
+- [Bootstrap](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/BOOTSTRAP.md)
+
+The [current installation guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md)
+and [dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
+follow `main`. Operational commands below select 0.9.0. The following historical
+checkpoints retain their own pins and results. They do not qualify the new
+release.
+
+## Historical checkpoint: 0.6.2 repository and downloads
 
 - [GitHub repository](https://github.com/Damel91/flower-mcp): code, README and current documentation.
 - [Flower MCP 0.6.2 release](https://github.com/Damel91/flower-mcp/releases/tag/v0.6.2): seven published release assets.
 - [Current installation guide](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md): procedures, configuration and removal.
 - [Operating-system prerequisites](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md#prerequisites): what to prepare before downloading.
-
-| File | Purpose |
-| --- | --- |
-| [install.sh](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh) | Guided installation on macOS and Linux. |
-| [install.ps1](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1) | Windows PowerShell launcher from the same release. |
-| [install_flower.py](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install_flower.py) | Release Python installer; requires Python 3.11+. |
-| [Python wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2-py3-none-any.whl) | Manual installation of the Python package. |
-| [Source archive](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/flow_of_work_mcp-0.6.2.tar.gz) | Packaged release source. |
-| [SHA256SUMS](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/SHA256SUMS) | Checksums for release-file verification. |
-| [BOOTSTRAP.md](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/BOOTSTRAP.md) | Public instructions for starting agent work with Flower. |
 
 The published `v0.6.2` release contains seven Flower assets and no runtime wheel.
 Verify downloads against its `SHA256SUMS`. The Windows launcher installs 0.6.2.
@@ -35,7 +47,7 @@ Current operational guide links follow mutable `main`. The
 retain their frozen source checkpoint. The immutable 0.6.0 archive keeps its
 preparation-era guides; later current documentation does not replace those bytes.
 
-## Current source and optional runtime
+## Historical checkpoint: source and optional runtime
 
 Flower `0.6.2` contains seven Flower assets: wheel, source archive,
 three installers, `BOOTSTRAP.md` and `SHA256SUMS`. It does not bundle a runtime
@@ -59,11 +71,11 @@ Use this source command only in a fresh/manual Flower environment:
 .venv/bin/python -m pip check
 ```
 
-For a **local 0.8.2 source/candidate wheel**, use a fresh/manual environment.
+For a **local 0.9.0 source/candidate wheel**, use a fresh/manual environment.
 This local-build example is separate from the verified published artifact:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.8.2-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.9.0-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 is published at commit
@@ -133,7 +145,7 @@ inferred from the owned fixture or CI.
 | Manual installation or Python installer | Python 3.11+ with ssl, venv and ensurepip; dependency access. Git is needed only to clone source. |
 | Agent connection | Codex, Claude Code, Cursor, Antigravity, Gemini CLI or OpenCode V2 already installed; a writable user directory. |
 
-Flower 0.8.0 supports OpenCode V2 through the release installers. The adapter
+Flower 0.8.0 introduced OpenCode V2 support through the release installers. The adapter
 preserves direct Flower tools and uses the same project AGENTS bootstrap. See
 [OpenCode setup](https://github.com/Damel91/flower-mcp/tree/main/docs/OPENCODE.md).
 
@@ -152,21 +164,21 @@ and coding clients sharing that environment. For an installer-owned installation
 preview the upgrade before changing packages:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 On Windows download the new `install.ps1` shown below, then preview without a
 client-registration option:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.9.0' -Upgrade -DryRun
 ```
 
 Add your original `--venv`, `--profile` and `--profile-root` options for custom
 paths; Windows uses `-Venv`, `-Profile` and `-ProfileRoot`. Inspect the plan, then
 repeat without `--dry-run` / `-DryRun`. The upgrade backs up the selected SQLite
 ledger and exact YAML before pip, preserves client registration and applies
-no new migration when upgrading a schema 55 profile to 0.6.2.
+no new migration when upgrading a schema 55 profile to 0.9.0.
 An older 0.3.1/schema 52 installation still uses the existing additive migrations
 52 to 55 at the next server start. Keep the reported backup paths. The upgrade
 never resets the ledger or automatically restores a backup; a failed pip operation
@@ -191,11 +203,11 @@ After checking prerequisites, the public command starts the guided installer
 and lets you choose a client or installation only:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh | bash
 ```
 
 The script prepares an isolated Python environment and verifies backend and
-wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.sh)
+wheel checksums. You can download and inspect [the script](https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.sh)
 before running it. Options and manual procedures are in the complete guide.
 
 ### Windows
@@ -204,8 +216,8 @@ In a writable directory, download the public launcher and choose a client.
 This example uses Codex:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.6.2/install.ps1" -OutFile ".\install.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.6.2' -Platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.9.0/install.ps1" -OutFile ".\install.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.9.0' -Platform codex
 ```
 
 Run the commands separately and stop if the download fails. You can inspect the
