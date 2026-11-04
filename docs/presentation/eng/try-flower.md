@@ -113,7 +113,7 @@ schema: `prerequisite_requirement_ids` replaces `dependency_closure_ids`; use `[
 when none apply. Native deletion is never an MCP tool or upgrade step; see its
 [limits](https://github.com/Damel91/flower-mcp/tree/main/docs/NATIVE-PROJECT-DELETION.md).
 Windows native purge durability remains unqualified. The writer witness remains
-deferred. The commands below install published 0.6.2;
+deferred. The operational commands below select 0.9.0;
 installation mechanics and provider/client usability remain separate evidence.
 
 Version 0.6.1 introduced a complete read-only lens operation catalog so a host can
