@@ -11,6 +11,107 @@ from flow_of_work_mcp.core.domain.interaction_projection import CapabilityLensBi
 
 
 class ProjectContextStoreMixin:
+    def dashboard_projects(self, *, search: str, offset: int, limit: int) -> Mapping[str, object]:
+        """Read one literal-search catalog page without hydrating project state."""
+        where = "instr(lower(project_id || ' ' || name), lower(?)) > 0"
+        with self._read_connection() as connection:
+            total = int(connection.execute(
+                "SELECT COUNT(*) FROM projects WHERE " + where, (search,)
+            ).fetchone()[0])
+            rows = connection.execute(
+                "SELECT project_id, name, created_at, "
+                "(SELECT COALESCE(MAX(event_id), 0) FROM requirement_events e "
+                " WHERE e.project_id = projects.project_id) AS source_ledger_version "
+                "FROM projects WHERE " + where + " ORDER BY project_id LIMIT ? OFFSET ?",
+                (search, limit, offset),
+            ).fetchall()
+            return {"items": [dict(row) for row in rows], "total": total}
+
+    def dashboard_project(self, project_id: str) -> Mapping[str, object]:
+        project_id = validate_project_id(project_id)
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            return dict(connection.execute(
+                "SELECT project_id, name, created_at FROM projects WHERE project_id = ?",
+                (project_id,),
+            ).fetchone())
+
+    def dashboard_items(self, project_id: str, section: str, *, offset: int, limit: int) -> Mapping[str, object]:
+        """Read selected metadata only; section names never become SQL identifiers."""
+        project_id = validate_project_id(project_id)
+        queries = {
+            "overview": ("requirements", "requirement_id, title, statement, category, lifecycle_status, current_revision, source_anchor", "ordinal"),
+            "roadmap": ("milestones", "milestone_id, name, status", "ordinal"),
+            "packets": ("implementation_packets", "packet_id, change_id, title, status, spec_revision", "ordinal"),
+            "verification": ("verification_campaigns", "campaign_id, change_id, title, status", "ordinal"),
+        }
+        if section == "evidence":
+            return self._dashboard_evidence_items(project_id, offset=offset, limit=limit)
+        if section not in queries:
+            raise ValueError("unsupported dashboard metadata section")
+        table, columns, ordering = queries[section]
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            total = int(connection.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE project_id = ?", (project_id,)
+            ).fetchone()[0])
+            rows = connection.execute(
+                f"SELECT {columns} FROM {table} WHERE project_id = ? ORDER BY {ordering} LIMIT ? OFFSET ?",
+                (project_id, limit, offset),
+            ).fetchall()
+            return {"items": [dict(row) for row in rows], "total": total}
+
+    def _dashboard_evidence_items(self, project_id: str, *, offset: int, limit: int) -> Mapping[str, object]:
+        query = """
+            SELECT 'artifact' AS kind, CAST(a.artifact_id AS TEXT) AS identity,
+                   a.artifact_kind AS title, g.generated_at AS recorded_at,
+                   g.created_by AS actor, 'retained_artifact' AS provenance
+            FROM generated_artifacts a JOIN artifact_generations g USING(generation_id)
+            WHERE g.project_id = ?
+            UNION ALL
+            SELECT 'handover', handover_id, handover_id, created_at, actor, 'retained_handover'
+            FROM handover_snapshots WHERE project_id = ?
+            UNION ALL
+            SELECT 'verification', CAST(evidence_id AS TEXT), verification_kind,
+                   recorded_at, actor, 'recorded_verification_evidence'
+            FROM verification_evidence WHERE project_id = ?
+        """
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            parameters = (project_id, project_id, project_id)
+            total = int(connection.execute("SELECT COUNT(*) FROM (" + query + ")", parameters).fetchone()[0])
+            rows = connection.execute(
+                query + " ORDER BY recorded_at DESC, kind, identity LIMIT ? OFFSET ?",
+                (*parameters, limit, offset),
+            ).fetchall()
+            return {"items": [dict(row) for row in rows], "total": total}
+
+    def dashboard_retained_evidence(self, project_id: str, kind: str, identity: str, *, maximum_bytes: int) -> Mapping[str, object]:
+        """Retrieve an exact same-project retained value, without file or URL access."""
+        project_id = validate_project_id(project_id)
+        queries = {
+            "artifact": ("SELECT a.content AS content, a.content_sha256, a.artifact_kind, a.generation_id "
+                         "FROM generated_artifacts a JOIN artifact_generations g USING(generation_id) "
+                         "WHERE g.project_id = ? AND a.artifact_id = ?"),
+            "handover": ("SELECT payload_json AS content, profile_version FROM handover_snapshots "
+                         "WHERE project_id = ? AND handover_id = ?"),
+            "verification": ("SELECT metadata_json AS content, requirement_id, verification_kind, outcome, reference, actor, recorded_at "
+                             "FROM verification_evidence WHERE project_id = ? AND evidence_id = ?"),
+        }
+        if kind not in queries:
+            raise ValueError("unsupported dashboard evidence kind")
+        query = queries[kind]
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            row = connection.execute(
+                "SELECT length(CAST(content AS BLOB)) FROM (" + query + ")", (project_id, identity)
+            ).fetchone()
+            if row is None:
+                raise ValueError("dashboard evidence was not found in the selected project")
+            if int(row[0]) > maximum_bytes:
+                raise ValueError("dashboard evidence exceeds the 2 MiB read limit")
+            return dict(connection.execute(query, (project_id, identity)).fetchone())
+
     def list_projects_for_interaction(self) -> list[Mapping[str, object]]:
         with self._read_connection() as connection:
             rows = connection.execute(

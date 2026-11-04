@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import math
 import signal
+import sys
 import threading
 from pathlib import Path
 from dataclasses import asdict
@@ -4972,6 +4973,7 @@ def create_app(
     *,
     host: str = "127.0.0.1",
     port: int = 8010,
+    dashboard=None,
 ) -> FastMCP:
     """Build a compact MCP catalog over an already initialized runtime."""
 
@@ -6032,12 +6034,17 @@ def create_app(
         )
     for descriptor in public_tool_catalog():
         name = str(descriptor["name"])
+        handler = model_facing_tool(tools_by_name[name], tool_name=name)
+        if dashboard is not None:
+            handler = dashboard.maintenance.wrap_tool(handler, name)
         mcp.add_tool(
-            model_facing_tool(tools_by_name[name], tool_name=name),
+            handler,
             name=name,
             description=str(descriptor["description"]),
             annotations=ToolAnnotations(**tool_annotations(name)),
         )
+    if dashboard is not None:
+        dashboard.mount(mcp)
     return mcp
 
 
@@ -6119,7 +6126,13 @@ def main(argv: list[str] | None = None) -> None:
             # Flower's outer cleanup reachable, including interrupted install.
             restore_sigterm = True
             signal.signal(signal.SIGTERM, stop_http)
-        app = create_app(runtime, host=args.host, port=args.port)
+        dashboard = None
+        if args.transport == "streamable-http":
+            from flow_of_work_mcp.dashboard_http import DashboardHTTP
+            dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port)
+        app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
+        if dashboard is not None:
+            print("Flower dashboard (local operator link): " + dashboard.activation_url(args.host), file=sys.stderr)
         logger.info(
             "MCP server ready transport=%s host=%s port=%d",
             args.transport, args.host, args.port,

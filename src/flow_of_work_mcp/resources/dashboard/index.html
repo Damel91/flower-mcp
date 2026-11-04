@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="referrer" content="no-referrer">
+    <title>Flower MCP · Progetti</title>
+    <link rel="stylesheet" href="/dashboard/assets/app.css">
+    <script src="/dashboard/assets/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Vai al contenuto</a>
+    <header class="app-header">
+      <a class="wordmark" href="/dashboard" aria-label="Flower MCP, progetti">
+        <span>Flower</span><span class="wordmark-suffix">MCP</span>
+      </a>
+      <div class="header-controls">
+        <span class="local-label"><span id="connection-dot" class="local-dot" aria-hidden="true"></span><span id="connection-status">Connessione locale…</span></span>
+        <label class="theme-control" for="theme-select">
+          <span>Tema</span>
+          <select id="theme-select" aria-label="Tema dell’interfaccia">
+            <option value="system">Sistema</option>
+            <option value="light">Chiaro</option>
+            <option value="dark">Scuro</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <div id="maintenance-banner" class="maintenance-banner" role="status" hidden></div>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section id="unlock-panel" class="unlock-panel" aria-labelledby="unlock-title" hidden>
+      <div class="unlock-heading"><span class="section-rule" aria-hidden="true"></span><span>Il tuo spazio di lavoro</span></div>
+      <h1 id="unlock-title">Apri Flower nel browser.</h1>
+      <p>Usa il collegamento locale mostrato da Flower all’avvio. Se hai copiato il codice di accesso, puoi inserirlo qui.</p>
+      <form id="unlock-form" class="unlock-form">
+        <label for="access-token">Codice di accesso</label>
+        <input id="access-token" name="token" type="password" autocomplete="off" spellcheck="false" required>
+        <button id="unlock-button" class="button button-primary" type="submit">Apri dashboard</button>
+      </form>
+      <p id="unlock-message" class="form-message" role="status"></p>
+      <p class="muted small">Il collegamento è personale per questa istanza locale e ha una durata limitata.</p>
+    </section>
+
+    <div id="workspace" class="workspace" hidden>
+      <aside class="sidebar" aria-label="Navigazione">
+        <button id="home-button" class="home-link" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/></svg>
+          Tutti i progetti
+        </button>
+        <div id="project-navigation" hidden>
+          <div class="sidebar-project">
+            <span class="muted small">Progetto aperto</span>
+            <strong id="sidebar-project-name"></strong>
+            <span id="sidebar-project-id" class="identifier"></span>
+          </div>
+          <nav id="section-navigation" class="section-navigation" aria-label="Sezioni del progetto"></nav>
+        </div>
+        <div class="sidebar-note">
+          <span class="note-line" aria-hidden="true"></span>
+          <p>Segui il lavoro, le verifiche e le decisioni nel loro contesto.</p>
+          <p class="small muted">La selezione riguarda questa finestra.</p>
+        </div>
+      </aside>
+
+      <main id="main-content" class="main-content" tabindex="-1">
+        <section id="catalog-view" aria-labelledby="catalog-title">
+          <div class="page-heading">
+            <div><span class="section-label">Il lavoro in corso</span><h1 id="catalog-title">Progetti</h1><p>Apri un progetto per vedere roadmap, pacchetti e verifiche.</p></div>
+            <button id="catalog-refresh" class="button button-secondary" type="button">Aggiorna</button>
+          </div>
+          <div class="catalog-toolbar">
+            <label class="search-field" for="project-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg>
+              <input id="project-search" type="search" placeholder="Cerca per nome o ID" autocomplete="off" maxlength="256">
+            </label>
+            <span id="catalog-count" class="muted small" aria-live="polite"></span>
+          </div>
+          <div id="catalog-content" aria-live="polite"></div>
+          <div class="pagination">
+            <span id="catalog-observed" class="observation"></span>
+            <div><button id="projects-previous" class="button button-quiet" type="button" disabled>Precedenti</button><button id="projects-next" class="button button-quiet" type="button" disabled>Successivi</button></div>
+          </div>
+        </section>
+
+        <section id="project-view" aria-labelledby="project-title" hidden>
+          <div class="page-heading project-heading">
+            <div><span id="project-identity" class="section-label identifier"></span><h1 id="project-title"></h1><p id="project-subtitle"></p></div>
+            <div class="project-actions"><button id="project-refresh" class="button button-secondary" type="button">Aggiorna</button><button id="project-delete" class="button button-danger-quiet" type="button">Elimina progetto</button></div>
+          </div>
+          <div class="section-heading"><h2 id="section-title"></h2><span id="section-observed" class="observation"></span></div>
+          <div id="section-content" aria-live="polite"></div>
+          <div class="pagination"><span id="section-bounds" class="muted small"></span><div><button id="section-previous" class="button button-quiet" type="button" disabled>Precedenti</button><button id="section-next" class="button button-quiet" type="button" disabled>Successivi</button></div></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="initial-loading" class="initial-loading" role="status"><span class="loader" aria-hidden="true"></span>Connessione a Flower…</div>
+
+    <dialog id="delete-dialog" class="dialog delete-dialog" aria-labelledby="delete-title">
+      <div class="dialog-heading"><div><span class="section-label">Gestione del progetto</span><h2 id="delete-title">Elimina progetto</h2></div><button id="delete-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button></div>
+      <div id="delete-content" class="dialog-content"></div>
+      <div id="delete-actions" class="dialog-actions"></div>
+    </dialog>
+
+    <dialog id="evidence-dialog" class="dialog evidence-dialog" aria-labelledby="evidence-title">
+      <div class="dialog-heading"><div><span class="section-label">Evidenza conservata</span><h2 id="evidence-title">Dettaglio</h2></div><button id="evidence-close" class="icon-button" type="button" aria-label="Chiudi evidenza">×</button></div>
+      <div id="evidence-content" class="dialog-content"></div>
+    </dialog>
+  </body>
+</html>

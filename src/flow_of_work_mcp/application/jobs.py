@@ -28,6 +28,7 @@ class DurableJobService:
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="fow-job")
         self._futures: dict[tuple[str, str], Future[None]] = {}
         self._lock = Lock()
+        self._paused = False
         self._repository.recover_interrupted_jobs()
 
     def submit(
@@ -39,20 +40,34 @@ class DurableJobService:
         request_id: str,
         operation: Callable[[], Mapping[str, object]],
     ) -> JobRecord:
-        job = self._repository.create_job(
-            JobRecord(
-                project_id=project_id,
-                kind=kind,
-                created_by=actor,
-                request_id=str(request_id or ""),
+        with self._lock:
+            if self._paused:
+                raise JobBlockedError("server_maintenance")
+            job = self._repository.create_job(
+                JobRecord(
+                    project_id=project_id,
+                    kind=kind,
+                    created_by=actor,
+                    request_id=str(request_id or ""),
+                )
             )
-        )
-        key = (job.project_id, job.job_id)
-        if job.status == JobStatus.QUEUED:
-            with self._lock:
+            key = (job.project_id, job.job_id)
+            if job.status == JobStatus.QUEUED:
                 if key not in self._futures:
                     self._futures[key] = self._executor.submit(self._run, job, operation)
         return job
+
+    def pause_if_idle(self) -> bool:
+        """Fence submissions before their first write, without stopping live work."""
+        with self._lock:
+            if self._futures:
+                return False
+            self._paused = True
+            return True
+
+    def resume(self) -> None:
+        with self._lock:
+            self._paused = False
 
     def get(self, project_id: str, job_id: str) -> JobRecord:
         return self._repository.get_job(project_id, job_id)

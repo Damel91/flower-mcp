@@ -7,7 +7,7 @@ an intent/continuation record, not a copy of the deleted project.
 from __future__ import annotations
 
 from collections import defaultdict
-from contextlib import closing
+from contextlib import closing, nullcontext
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -19,6 +19,7 @@ import stat
 import tempfile
 from typing import Any
 from uuid import UUID
+from types import SimpleNamespace
 
 import yaml
 
@@ -27,7 +28,7 @@ from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.native_purge_schema import SCHEMA55_TABLE_HASHES
 from flow_of_work_mcp.profiles import profile_config_path
 from flow_of_work_mcp.runtime_ownership import (
-    RuntimeOwnershipError, acquire_runtime_ownership,
+    RuntimeOwnership, RuntimeOwnershipError, acquire_runtime_ownership,
 )
 
 CONTRACT = "flower.project-purge.v1"
@@ -435,6 +436,40 @@ def _delete_rows(connection: sqlite3.Connection, columns: dict, project_id: str)
             connection.execute(f"DELETE FROM {name} WHERE {where}", parameters)
 
 
+def _decode_journal(content: bytes) -> dict:
+    try:
+        journal = json.loads(content)
+        if not isinstance(journal, dict) or set(journal) != _JOURNAL_KEYS or journal["contract"] != CONTRACT or journal["stage"] not in {"prepared", "deleting", "ledger_deleted", "scrubbed"}:
+            raise ValueError()
+        if not isinstance(journal["project_id"], str) or validate_project_id(journal["project_id"]) != journal["project_id"]:
+            raise ValueError()
+        if not isinstance(journal["deletion_id"], str) or str(UUID(journal["deletion_id"])) != journal["deletion_id"]:
+            raise ValueError()
+        for field, keys in (("database_identity", {"path", "device", "inode"}),
+                            ("config_identity", {"path", "device", "inode", "sha256"})):
+            identity = journal[field]
+            if not isinstance(identity, dict) or set(identity) != keys:
+                raise ValueError()
+            if not isinstance(identity["path"], str) or not Path(identity["path"]).is_absolute() or "\0" in identity["path"]:
+                raise ValueError()
+            if any(type(identity[key]) is not int or identity[key] < 0 for key in ("device", "inode")):
+                raise ValueError()
+        config_hash = journal["config_identity"]["sha256"]
+        if not isinstance(config_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", config_hash):
+            raise ValueError()
+        if journal["schema_version"] != 55 or journal["schema_fingerprint"] != _digest(SCHEMA55_TABLE_HASHES) or not re.fullmatch(r"[0-9a-f]{64}", journal["prepared_fingerprint"]) or not re.fullmatch(r"[0-9a-f]{64}", journal["project_identity"]):
+            raise ValueError()
+        if not isinstance(journal["counts"], dict) or set(journal["counts"]) != set(SCHEMA55_TABLE_HASHES) - {"schema_migrations"} or any(type(value) is not int or value < 0 for value in journal["counts"].values()):
+            raise ValueError()
+        if journal["provenance"] not in {"", "host_declared"} or not isinstance(journal["host_quiescence_ref"], str) or len(journal["host_quiescence_ref"]) > 256 or not isinstance(journal["host_stopped_run_ids"], list) or len(journal["host_stopped_run_ids"]) > 64:
+            raise ValueError()
+    except _Problem:
+        raise
+    except (ValueError, TypeError, KeyError):
+        raise _Problem("purge_journal_invalid", "The minimal native intent journal is invalid or unsupported.", "Preserve it and inspect native recovery state; never replace it with an inferred success.", status="blocked") from None
+    return journal
+
+
 class _Gateway:
     def __init__(self, args: Any) -> None:
         self.args = args
@@ -528,22 +563,9 @@ class _Gateway:
             self.result["project_effect_state"] = "none"
             return
         content, _ = _read_regular(self.journal_path, private=True)
-        try:
-            journal = json.loads(content)
-            if not isinstance(journal, dict) or set(journal) != _JOURNAL_KEYS or journal["contract"] != CONTRACT or journal["stage"] not in {"prepared", "deleting", "ledger_deleted", "scrubbed"}:
-                raise ValueError()
-            if journal["database_identity"] != self.database_identity or journal["config_identity"] != self.config_identity or journal["project_id"] != self.args.project_id or journal["deletion_id"] != self.args.deletion_id:
-                raise _Problem("purge_intent_conflict", "The deletion ID is bound to a different project/config/ledger identity.", "Inspect the original intent; use a new ID only for a genuinely new native preparation.", status="blocked")
-            if journal["schema_version"] != 55 or journal["schema_fingerprint"] != _digest(SCHEMA55_TABLE_HASHES) or not re.fullmatch(r"[0-9a-f]{64}", journal["prepared_fingerprint"]) or not re.fullmatch(r"[0-9a-f]{64}", journal["project_identity"]):
-                raise ValueError()
-            if not isinstance(journal["counts"], dict) or set(journal["counts"]) != set(SCHEMA55_TABLE_HASHES) - {"schema_migrations"} or any(type(value) is not int or value < 0 for value in journal["counts"].values()):
-                raise ValueError()
-            if journal["provenance"] not in {"", "host_declared"} or not isinstance(journal["host_quiescence_ref"], str) or len(journal["host_quiescence_ref"]) > 256 or not isinstance(journal["host_stopped_run_ids"], list) or len(journal["host_stopped_run_ids"]) > 64:
-                raise ValueError()
-        except _Problem:
-            raise
-        except (ValueError, TypeError, KeyError):
-            raise _Problem("purge_journal_invalid", "The minimal native intent journal is invalid or unsupported.", "Preserve it and inspect native recovery state; never replace it with an inferred success.", status="blocked") from None
+        journal = _decode_journal(content)
+        if journal["database_identity"] != self.database_identity or journal["config_identity"] != self.config_identity or journal["project_id"] != self.args.project_id or journal["deletion_id"] != self.args.deletion_id:
+            raise _Problem("purge_intent_conflict", "The deletion ID is bound to a different project/config/ledger identity.", "Inspect the original intent; use a new ID only for a genuinely new native preparation.", status="blocked")
         self.journal = journal
         self._project_journal()
 
@@ -703,10 +725,12 @@ class _Gateway:
         self._stage("ledger_deleted")
         self._scrub(connection, columns)
 
-    def execute(self) -> dict:
+    def execute(self, *, ownership: RuntimeOwnership | None = None) -> dict:
         self._validate_arguments()
         self._select_database()
-        with acquire_runtime_ownership(self.database) as lease:
+        lease_context = nullcontext(ownership) if ownership is not None else acquire_runtime_ownership(self.database)
+        with lease_context as lease:
+            lease.assert_resource(self.database)
             self._assert_identity()
             self._read_journal()
             self._validate_operation_arguments()
@@ -780,11 +804,11 @@ class _Gateway:
         return self.result
 
 
-def run_project_purge(args: Any) -> tuple[dict, int]:
+def run_project_purge(args: Any, *, ownership: RuntimeOwnership | None = None) -> tuple[dict, int]:
     """Produce one safe JSON-ready result for the native CLI invocation."""
     gateway = _Gateway(args)
     try:
-        result = gateway.execute()
+        result = gateway.execute(ownership=ownership)
     except _Problem as exc:
         result = gateway.result
         result.update(status=exc.status, diagnostics=[{"code": exc.code, "message": exc.message, "resolution": exc.resolution}],
@@ -803,3 +827,39 @@ def run_project_purge(args: Any) -> tuple[dict, int]:
             "resolution": "Inspect/reconcile the same deletion ID and selected ledger; a failed response is not proof of no effect."}],
             next_action="Inspect/reconcile this same native intent before any destructive retry.")
     return result, _EXIT_CODES[result["status"]]
+
+
+def pending_project_purges(config_path: Path, ownership: RuntimeOwnership) -> list[dict[str, str]]:
+    """Observe unfinished native intents under the caller's continuously held lease."""
+    args = SimpleNamespace(config=config_path, profile=None, profile_root=None,
+        project_id="dashboard-recovery", deletion_id="00000000-0000-0000-0000-000000000000",
+        purge_operation="inspect", expected_fingerprint="", confirm_project_id="",
+        host_quiescence_ref="", host_stopped_run_id=[], acknowledge_host_cleanup=False)
+    gateway = _Gateway(args)
+    gateway._validate_arguments()
+    gateway._select_database()
+    ownership.assert_resource(gateway.database)
+    directory = gateway.journal_directory
+    if not directory.exists() and not directory.is_symlink():
+        return []
+    _safe_path(directory, directory=True, private=True)
+    pending = []
+    for index, path in enumerate(sorted(directory.glob("*.json"))):
+        if index >= 4096:
+            raise ValueError("native_purge_journal_inventory_exceeds_limit")
+        if str(UUID(path.stem)) != path.stem:
+            raise ValueError("native_purge_journal_identity_invalid")
+        raw, _ = _read_regular(path, private=True)
+        value = _decode_journal(raw)
+        if value["deletion_id"] != path.stem:
+            raise ValueError("native_purge_journal_identity_invalid")
+        if value["stage"] in {"prepared", "scrubbed"}:
+            continue
+        args.project_id = validate_project_id(value["project_id"])
+        args.deletion_id = path.stem
+        gateway.journal_path = path
+        gateway._read_journal()
+        if gateway.journal["stage"] in {"deleting", "ledger_deleted"}:
+            pending.append({"project_id": args.project_id, "deletion_id": path.stem,
+                            "deletion_state": gateway.journal["stage"]})
+    return pending
