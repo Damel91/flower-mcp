@@ -29,6 +29,11 @@ RUNTIME_REQUIREMENT = f"runtime-llama @ {RUNTIME_URL}"
 ASSET_SOURCES = {"install.sh": "tools/install.sh", "install.ps1": "tools/install.ps1",
                  "install_flower.py": "tools/install_flower.py",
                  "BOOTSTRAP.md": "src/flow_of_work_mcp/resources/agent-bootstrap.md"}
+DASHBOARD_RESOURCES = {
+    "src/flow_of_work_mcp/resources/dashboard/index.html",
+    "src/flow_of_work_mcp/resources/dashboard/app.css",
+    "src/flow_of_work_mcp/resources/dashboard/app.js",
+}
 
 
 class ReleaseAssetsTests(unittest.TestCase):
@@ -48,6 +53,7 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.project["optional-dependencies"]["inference"] = [RUNTIME_REQUIREMENT]
         self.release_docs = release.release_documentation(self.project)
         sources = {"pyproject.toml", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                   *DASHBOARD_RESOURCES,
                    *release.CONTAINER_SOURCES,
                    *self.release_docs, *self.presentation}
         for relative in sources:
@@ -75,7 +81,7 @@ class ReleaseAssetsTests(unittest.TestCase):
     def packages(self, *, omit: str | None = None, replace: dict[str, bytes] | None = None,
                  nonregular: str | None = None, wheel_members: dict[str, bytes] | None = None,
                  sdist_members: dict[str, bytes] | None = None, wheel_metadata: bytes | None = None,
-                 sdist_metadata: bytes | None = None):
+                 sdist_metadata: bytes | None = None, wheel_omit: str | None = None):
         """Write minimal package fixtures at the release metadata/asset seam."""
         name = self.project["name"].replace("-", "_")
         version = self.project["version"]
@@ -87,10 +93,16 @@ class ReleaseAssetsTests(unittest.TestCase):
                 archive.writestr(f"{distinfo}/licenses/{relative}", (self.root / relative).read_bytes())
             archive.writestr(release.BOOTSTRAP_RESOURCE.removeprefix("src/"),
                              (self.root / release.BOOTSTRAP_RESOURCE).read_bytes())
-            for relative, payload in (wheel_members or {}).items():
+            wheel_payloads = {relative.removeprefix("src/"): (self.root / relative).read_bytes()
+                              for relative in DASHBOARD_RESOURCES}
+            wheel_payloads.update(wheel_members or {})
+            if wheel_omit:
+                wheel_payloads.pop(wheel_omit)
+            for relative, payload in wheel_payloads.items():
                 archive.writestr(relative, payload)
         payloads = {relative: (self.root / relative).read_bytes()
                     for relative in ("LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                                     *sorted(DASHBOARD_RESOURCES),
                                      *sorted(release.CONTAINER_SOURCES),
                                      *sorted(self.release_docs), *sorted(self.presentation))}
         payloads["PKG-INFO"] = sdist_metadata or metadata
@@ -344,6 +356,48 @@ class ReleaseAssetsTests(unittest.TestCase):
                 self.packages(omit=source)
                 with self.assertRaisesRegex(ValueError, f"source distribution omits required source {source}"):
                     release.prepare(self.root, self.dist)
+
+    def test_wheel_must_include_each_dashboard_resource_with_checked_source_bytes(self):
+        for source in sorted(DASHBOARD_RESOURCES):
+            member = source.removeprefix("src/")
+            with self.subTest(source=source, defect="missing"):
+                self.packages(wheel_omit=member)
+                with self.assertRaisesRegex(ValueError, "exactly one dashboard resource"):
+                    release.prepare(self.root, self.dist)
+            with self.subTest(source=source, defect="altered"):
+                self.packages(wheel_members={member: b"stale dashboard resource"})
+                with self.assertRaisesRegex(ValueError, "wheel dashboard resource .* differs"):
+                    release.prepare(self.root, self.dist)
+
+    def test_sdist_must_include_each_dashboard_resource_with_checked_source_bytes(self):
+        for source in sorted(DASHBOARD_RESOURCES):
+            with self.subTest(source=source, defect="missing"):
+                self.packages(omit=source)
+                with self.assertRaisesRegex(ValueError, "source distribution omits required source"):
+                    release.prepare(self.root, self.dist)
+            with self.subTest(source=source, defect="altered"):
+                self.packages(replace={source: b"stale dashboard resource"})
+                with self.assertRaisesRegex(ValueError, "source distribution .* differs"):
+                    release.prepare(self.root, self.dist)
+
+    def test_dashboard_resource_sources_and_sdist_members_must_be_regular_files(self):
+        for source in sorted(DASHBOARD_RESOURCES):
+            with self.subTest(source=source, defect="nonregular archive member"):
+                self.packages(nonregular=source)
+                with self.assertRaisesRegex(ValueError, "sources must be regular files"):
+                    release.prepare(self.root, self.dist)
+            with self.subTest(source=source, defect="nonregular checked source"):
+                self.packages()
+                path = self.root / source
+                original = path.read_bytes()
+                path.unlink()
+                path.mkdir()
+                try:
+                    with self.assertRaisesRegex(ValueError, "dashboard resource source must be a regular file"):
+                        release.prepare(self.root, self.dist)
+                finally:
+                    path.rmdir()
+                    path.write_bytes(original)
 
     def test_sdist_upgrade_instructions_must_match_the_checked_source(self):
         self.packages(replace={"docs/UPGRADING.md": b"Unexpected stale upgrade instructions.\n"})

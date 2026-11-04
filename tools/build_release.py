@@ -22,6 +22,11 @@ APACHE_LICENSE_SHA256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb00341
 STABLE_VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)")
 INSTALLERS = {"install.sh", "install.ps1", "install_flower.py"}
 BOOTSTRAP_RESOURCE = "src/flow_of_work_mcp/resources/agent-bootstrap.md"
+DASHBOARD_RESOURCES = {
+    "src/flow_of_work_mcp/resources/dashboard/index.html",
+    "src/flow_of_work_mcp/resources/dashboard/app.css",
+    "src/flow_of_work_mcp/resources/dashboard/app.js",
+}
 PRESENTATION_SUFFIXES = {".md", ".html", ".json", ".css", ".js", ".png", ".txt", ".py"}
 CONTAINER_SOURCES = {"Dockerfile", ".dockerignore", "glama.json"}
 RUNTIME_URL = (
@@ -116,7 +121,7 @@ def asset_names(project: dict) -> set[str]:
 
 def release_documentation(project: dict) -> set[str]:
     return {"docs/OPENCODE.md", "docs/PLAN-AUTHORING.md", "docs/PACKET-REVISION-RECOVERY.md", "docs/ARCHITECTURE-RECOVERY.md", "docs/ENGINEERING-CYCLE.md", "docs/BOOTSTRAP.md", "docs/CONTINUOUS-RECOVERY.md",
-            "docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/NATIVE-PROJECT-DELETION.md",
+            "docs/INSTALLATION.md", "docs/UPGRADING.md", "docs/NATIVE-PROJECT-DELETION.md", "docs/DASHBOARD.md",
             "docs/LENS-CATALOG.md", "docs/readable-lifecycle-example.md",
             "docs/RELEASE-NOTES-0.6.0.md",
             "docs/INFERENCE.md", "docs/ADVANCED-CONFIGURATION.md", "docs/glama-build-spec.example.json",
@@ -183,6 +188,12 @@ def check_metadata(payload: bytes, project: dict) -> None:
 
 
 def check_packages(root: Path, files: list[Path], project: dict) -> None:
+    dashboard_sources = {}
+    for name in sorted(DASHBOARD_RESOURCES):
+        source = root / name
+        if source.is_symlink() or not source.is_file():
+            raise ValueError(f"dashboard resource source must be a regular file: {name}")
+        dashboard_sources[name] = source.read_bytes()
     normalized_name = re.sub(r"[-_.]+", "_", project["name"])
     wheel_name = f"{normalized_name}-{project['version']}-py3-none-any.whl"
     wheel = next(path for path in files if path.name == wheel_name)
@@ -200,6 +211,12 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
                 raise ValueError(f"wheel {name} differs from the public source")
         if archive.read(BOOTSTRAP_RESOURCE.removeprefix("src/")) != (root / BOOTSTRAP_RESOURCE).read_bytes():
             raise ValueError("wheel agent bootstrap differs from the canonical source")
+        for name, source_bytes in dashboard_sources.items():
+            member = name.removeprefix("src/")
+            if archive.namelist().count(member) != 1:
+                raise ValueError(f"wheel must contain exactly one dashboard resource {member}")
+            if archive.read(member) != source_bytes:
+                raise ValueError(f"wheel dashboard resource {member} differs from the public source")
     sdist = next(path for path in files if path.name.endswith(".tar.gz"))
     with tarfile.open(sdist) as archive:
         members = archive.getmembers()
@@ -215,6 +232,7 @@ def check_packages(root: Path, files: list[Path], project: dict) -> None:
             if path.is_file() and path.suffix in PRESENTATION_SUFFIXES
         )
         for name in ("PKG-INFO", "LICENSE", "NOTICE", *ASSET_SOURCES.values(),
+                     *sorted(DASHBOARD_RESOURCES),
                      *sorted(CONTAINER_SOURCES),
                      *sorted(release_documentation(project)), *presentation):
             try:
