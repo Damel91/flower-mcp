@@ -1,15 +1,12 @@
 """Same-instance local browser adapter, independent of MCP transport security."""
 from __future__ import annotations
 
-import hashlib
 import hmac
 import ipaddress
 import json
 from importlib.resources import files
 from pathlib import Path
 import secrets
-from threading import Lock
-import time
 
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse, Response
@@ -24,18 +21,11 @@ class DashboardHTTP:
         self.projection = DashboardProjectionService(runtime)
         self.maintenance = DashboardMaintenance(runtime, config_path)
         self.port = port
-        self._lock = Lock()
-        self._activation = secrets.token_urlsafe(32)
-        self._activation_until = time.monotonic() + 600
-        self._session = ''
-        self._csrf = ''
-        self._session_until = 0.0
-        identity = str(runtime.ledger.database_path) + ':' + str(port)
-        self._cookie = 'flower_dashboard_' + hashlib.sha256(identity.encode()).hexdigest()[:12]
+        self._csrf = secrets.token_urlsafe(32)
 
-    def activation_url(self, host: str) -> str:
+    def local_url(self, host: str) -> str:
         local = '[::1]' if ':' in host else '127.0.0.1'
-        return f'http://{local}:{self.port}/dashboard#connect={self._activation}'
+        return f'http://{local}:{self.port}/dashboard'
 
     def _security(self, request):
         try:
@@ -54,11 +44,6 @@ class DashboardHTTP:
         if origin is not None and origin != expected:
             return False
         return request.method != 'POST' or origin == expected
-
-    def _authenticated(self, request):
-        with self._lock:
-            return bool(self._session and time.monotonic() < self._session_until
-                        and hmac.compare_digest(request.cookies.get(self._cookie, ''), self._session))
 
     @staticmethod
     def _headers():
@@ -102,39 +87,16 @@ class DashboardHTTP:
             return self._json(status=403, reason='dashboard_local_access_required', message='Use the dashboard on its local origin.')
         path = request.path_params['path'].strip('/').split('/')
         try:
-            authenticated = self._authenticated(request)
-            if path == ['session']:
-                if request.method == 'GET':
-                    result = {'authenticated': authenticated}
-                    if authenticated:
-                        result.update(csrf_token=self._csrf, maintenance=self.maintenance.status())
-                    return self._json(result)
-                body = await self._body(request)
-                if set(body) != {'token'} or not isinstance(body['token'], str):
-                    raise ValueError('dashboard_activation_invalid')
-                with self._lock:
-                    if not self._activation or time.monotonic() >= self._activation_until or not hmac.compare_digest(body['token'], self._activation):
-                        return self._json(status=401, reason='dashboard_activation_expired', message='The link was consumed or expired. Reopen your active browser session, or restart Flower for a new local link.')
-                    self._activation = ''
-                    self._session = secrets.token_urlsafe(32)
-                    self._csrf = secrets.token_urlsafe(32)
-                    self._session_until = time.monotonic() + 86400
-                    session, csrf = self._session, self._csrf
-                response = self._json({'authenticated': True, 'csrf_token': csrf, 'maintenance': self.maintenance.status()})
-                response.set_cookie(self._cookie, session, httponly=True, samesite='strict', path='/dashboard', max_age=86400)
-                return response
-            if not authenticated:
-                return self._json(status=401, reason='dashboard_session_required', message='Open the local dashboard activation link printed by Flower.')
             if request.method == 'POST':
                 if not hmac.compare_digest(request.headers.get('x-flower-csrf', ''), self._csrf):
-                    return self._json(status=403, reason='dashboard_csrf_invalid', message='Refresh your operator session before continuing.')
+                    return self._json(status=403, reason='dashboard_csrf_invalid', message='Refresh the dashboard before continuing. Inspect any uncertain operation before retrying it.')
                 body = await self._body(request)
                 if len(path) == 4 and path[0] == 'projects' and path[2] == 'deletion':
                     result = await run_in_threadpool(self.maintenance.operate, path[1], path[3], body)
                     return self._json(result)
                 return self._json(status=404, reason='dashboard_route_not_found', message='Unknown dashboard action.')
             if path == ['status']:
-                return self._json(self.maintenance.status())
+                return self._json({**self.maintenance.status(), 'csrf_token': self._csrf})
             offset = int(request.query_params.get('offset', '0'))
             limit = int(request.query_params.get('limit', '25'))
             if path == ['projects']:

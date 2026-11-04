@@ -1,4 +1,4 @@
-"""Browser routes need their own local session and request protections."""
+"""Direct local browser routes retain request and destructive-operation guards."""
 import asyncio
 from uuid import uuid4
 
@@ -21,29 +21,31 @@ def fixture(tmp_path):
     return runtime, dashboard, mcp
 
 
-def activate(client, dashboard):
-    token = dashboard.activation_url('127.0.0.1').split('#connect=')[1]
-    response = client.post('/dashboard/api/session', json={'token': token}, headers={'Origin': 'http://127.0.0.1:18760'})
+def request_csrf(client):
+    response = client.get('/dashboard/api/status')
     assert response.status_code == 200
+    assert 'set-cookie' not in response.headers
     return response.json()['result']['csrf_token']
 
 
-def test_authentication_origin_and_csrf_protect_browser_data_and_commands(tmp_path):
+def test_direct_reads_keep_origin_and_csrf_protection_for_commands(tmp_path):
     runtime, dashboard, mcp = fixture(tmp_path)
     try:
+        assert dashboard.local_url('127.0.0.1') == 'http://127.0.0.1:18760/dashboard'
+        assert dashboard.local_url('::1') == 'http://[::1]:18760/dashboard'
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
-            assert client.get('/dashboard/api/projects').status_code == 401
-            assert client.get('/dashboard/api/session').json()['result'] == {'authenticated': False}
-            token = dashboard.activation_url('127.0.0.1').split('#connect=')[1]
-            assert client.post('/dashboard/api/session', json={'token': token}).status_code == 403
-            assert client.get('/dashboard/api/session', headers={'Origin': 'null'}).status_code == 403
-            assert client.get('/dashboard/api/session', headers={'Host': 'evil.example:18760'}).status_code == 403
-            csrf = activate(client, dashboard)
             assert client.get('/dashboard/api/projects').status_code == 200
+            assert client.get('/dashboard/api/session').status_code == 404
+            assert not client.cookies
+            assert client.get('/dashboard/api/status', headers={'Origin': 'null'}).status_code == 403
+            assert client.get('/dashboard/api/status', headers={'Host': 'evil.example:18760'}).status_code == 403
+            csrf = request_csrf(client)
             assert client.get('/dashboard/api/projects', headers={'Origin': 'https://evil.example'}).status_code == 403
             endpoint = '/dashboard/api/projects/project-a/deletion/prepare'
             body = {'deletion_id': str(uuid4())}
+            assert client.post(endpoint, json=body).status_code == 403
             assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760'}).status_code == 403
+            assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': 'wrong'}).status_code == 403
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': csrf}
             prepared = client.post(endpoint, json=body, headers=headers)
             assert prepared.status_code == 200
@@ -53,7 +55,21 @@ def test_authentication_origin_and_csrf_protect_browser_data_and_commands(tmp_pa
             cancelled = client.post('/dashboard/api/projects/project-a/deletion/cancel', json=body, headers=headers)
             assert cancelled.json()['result']['maintenance']['state'] == 'ready'
             assert client.get('/dashboard/api/projects').status_code == 200
-            assert client.post('/dashboard/api/session', json={'token': token}, headers=headers).status_code == 401
+            assert client.post('/dashboard/api/session', json={'token': 'removed'}, headers=headers).status_code == 404
+    finally:
+        runtime.close()
+
+
+def test_new_browser_needs_no_activation_or_session_cookie(tmp_path):
+    runtime, dashboard, _ = fixture(tmp_path)
+    try:
+        for _ in range(2):
+            fresh_app = create_app(runtime, host='127.0.0.1', port=18760, dashboard=dashboard)
+            with TestClient(fresh_app.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+                assert client.get('/dashboard').status_code == 200
+                assert client.get('/dashboard/api/projects').status_code == 200
+                assert request_csrf(client)
+                assert not client.cookies
     finally:
         runtime.close()
 
@@ -62,21 +78,19 @@ def test_remote_peer_is_rejected_even_with_local_host(tmp_path):
     runtime, _, mcp = fixture(tmp_path)
     try:
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('192.0.2.10', 12345)) as client:
-            assert client.get('/dashboard/api/session').status_code == 403
+            assert client.get('/dashboard/api/status').status_code == 403
     finally:
         runtime.close()
 
 
-def test_expired_activation_closed_fields_and_bounded_body(tmp_path):
-    runtime, dashboard, mcp = fixture(tmp_path)
+def test_administration_keeps_closed_fields_and_bounded_body(tmp_path):
+    runtime, _, mcp = fixture(tmp_path)
     try:
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
-            token = dashboard.activation_url('127.0.0.1').split('#connect=')[1]
-            dashboard._activation_until = 0
-            headers = {'Origin': 'http://127.0.0.1:18760'}
-            assert client.post('/dashboard/api/session', json={'token': token}, headers=headers).status_code == 401
-            assert client.post('/dashboard/api/session', json={'token': 'x' * 17000}, headers=headers).status_code == 400
-            assert client.post('/dashboard/api/session', json={'token': token, 'project': 'other'}, headers=headers).status_code == 400
+            headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
+            endpoint = '/dashboard/api/projects/project-a/deletion/prepare'
+            assert client.post(endpoint, json={'deletion_id': 'x' * 17000}, headers=headers).status_code == 400
+            assert client.post(endpoint, json={'deletion_id': str(uuid4()), 'project': 'other'}, headers=headers).status_code == 400
             assert client.get('/dashboard/assets/../config.yaml').status_code != 200
     finally:
         runtime.close()
@@ -97,7 +111,6 @@ def test_missing_project_read_returns_specific_not_found_recovery(tmp_path):
     runtime, dashboard, mcp = fixture(tmp_path)
     try:
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
-            activate(client, dashboard)
             response = client.get('/dashboard/api/projects/no-longer-present/sections/overview')
             assert response.status_code == 404
             assert response.json()['reason'] == 'dashboard_project_not_found'
@@ -118,7 +131,6 @@ def test_oversized_evidence_read_returns_specific_limit_rejection(tmp_path):
             artifact_id = connection.execute('SELECT artifact_id FROM generated_artifacts WHERE generation_id=?',
                                              (generation.generation_id,)).fetchone()[0]
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
-            activate(client, dashboard)
             response = client.get(f'/dashboard/api/projects/project-a/evidence/artifact/{artifact_id}')
             assert response.status_code == 413
             assert response.json()['reason'] == 'dashboard_evidence_too_large'

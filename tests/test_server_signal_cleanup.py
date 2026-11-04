@@ -90,7 +90,7 @@ def cli(monkeypatch, tmp_path):
 
     def dashboard(runtime, config_path, *, port):
         assert runtime is state.runtime
-        return SimpleNamespace(activation_url=lambda host: f"http://{host}:{port}/dashboard#signal-test")
+        return SimpleNamespace(local_url=lambda host: f"http://{host}:{port}/dashboard")
 
     monkeypatch.setattr(server.signal, "getsignal", getsignal)
     monkeypatch.setattr(server.signal, "signal", install)

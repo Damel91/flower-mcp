@@ -68,6 +68,7 @@
     visible_milestones: "Milestone visibili in questa pagina",
   };
   const errorMessages = {
+    dashboard_csrf_invalid: "Flower è stato riavviato o lo stato della richiesta è cambiato. Aggiorna la vista e controlla lo stato dell’operazione prima di riprovare.",
     dashboard_project_not_found: "Il progetto non è più presente in questo profilo. Torna ai progetti e aggiorna l’elenco.",
     dashboard_evidence_too_large: "L’evidenza supera il limite di 2 MiB di questa vista. Il suo riferimento rimane visibile nel progetto.",
   };
@@ -80,7 +81,7 @@
     reader_response_limit: "La vista di lettura supera il limite della risposta. Il sorgente completo e il download restano disponibili.",
   };
   const state = {
-    authenticated: false, csrf: "", maintenance: { state: "ready" }, project: null,
+    ready: false, initializing: false, csrf: "", maintenance: { state: "ready" }, project: null,
     section: "overview", projectOffset: 0, sectionOffset: 0, projects: null, sectionData: null,
     loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false, rememberedIntent: null,
   };
@@ -145,7 +146,7 @@
   async function request(path, body) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    const options = { credentials: "same-origin", cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" } };
+    const options = { cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" } };
     if (body !== undefined) {
       options.method = "POST";
       options.headers["Content-Type"] = "application/json";
@@ -156,13 +157,10 @@
       const response = await fetch(`/dashboard/api/${path}`, options);
       const envelope = await response.json();
       connection(true);
-      if (response.status === 401) {
-        showUnlock();
-        throw Object.assign(new Error("L’accesso è scaduto. Apri il nuovo collegamento locale di Flower."), { reason: envelope.reason, envelope });
-      }
       if (!response.ok || envelope.status !== "success") {
         throw Object.assign(new Error(errorMessages[envelope.reason] || envelope.message || display(envelope.reason) || "La richiesta richiede attenzione."), { reason: envelope.reason, envelope });
       }
+      if (path === "status") state.csrf = envelope.result.csrf_token;
       return envelope.result;
     } catch (error) {
       if (error.name === "AbortError") {
@@ -179,36 +177,10 @@
     }
   }
 
-  function showUnlock() {
-    state.authenticated = false;
-    state.csrf = "";
-    $("workspace").hidden = true;
-    $("unlock-panel").hidden = false;
-    $("initial-loading").hidden = true;
-    if ($("delete-dialog").open) $("delete-dialog").close();
-    if ($("evidence-dialog").open) $("evidence-dialog").close();
-  }
-
   function showWorkspace() {
-    state.authenticated = true;
-    $("unlock-panel").hidden = true;
+    state.ready = true;
     $("workspace").hidden = false;
     $("initial-loading").hidden = true;
-  }
-
-  async function activate(token) {
-    $("unlock-button").disabled = true;
-    $("unlock-message").textContent = "Apertura della sessione locale…";
-    try {
-      await request("session", { token });
-      $("access-token").value = "";
-      await startSession();
-    } catch (error) {
-      showUnlock();
-      $("unlock-message").textContent = error.message;
-    } finally {
-      $("unlock-button").disabled = false;
-    }
   }
 
   function route() {
@@ -334,7 +306,7 @@
       table.append(head, body);
       $("catalog-content").append(table);
     } catch (error) {
-      if (epoch === state.loadingEpoch && state.authenticated) $("catalog-content").replaceChildren(errorPanel(error, loadProjects));
+      if (epoch === state.loadingEpoch && state.ready) $("catalog-content").replaceChildren(errorPanel(error, loadProjects));
     }
   }
 
@@ -672,7 +644,7 @@
       document.title = `${state.project.name} · Flower MCP`;
       renderSection(result);
     } catch (error) {
-      if (epoch === state.loadingEpoch && state.authenticated) $("section-content").replaceChildren(errorPanel(error, loadSection));
+      if (epoch === state.loadingEpoch && state.ready) $("section-content").replaceChildren(errorPanel(error, loadSection));
     }
   }
 
@@ -707,7 +679,8 @@
   }
 
   async function checkMaintenance() {
-    if (!state.authenticated || document.visibilityState !== "visible" || state.adminBusy) return;
+    if (document.visibilityState !== "visible" || state.adminBusy) return;
+    if (!state.ready) { await startDashboard(); return; }
     try {
       const result = await request("status");
       updateMaintenance(result.maintenance || result);
@@ -915,19 +888,28 @@
     }
   }
 
-  async function startSession() {
-    const session = await request("session");
-    if (!session.authenticated) { showUnlock(); return; }
-    state.csrf = session.csrf_token;
-    showWorkspace();
-    restoreIntent();
-    updateMaintenance(session.maintenance);
-    $("unlock-message").textContent = "";
-    notice("");
-    route();
+  async function startDashboard() {
+    if (state.initializing) return;
+    state.initializing = true;
+    loading($("initial-loading"), "Connessione a Flower…");
+    $("initial-loading").hidden = false;
+    try {
+      const status = await request("status");
+      showWorkspace();
+      restoreIntent();
+      updateMaintenance(status);
+      notice("");
+      route();
+    } catch (error) {
+      state.ready = false;
+      $("workspace").hidden = true;
+      $("initial-loading").replaceChildren(errorPanel(error, startDashboard));
+      $("initial-loading").hidden = false;
+    } finally {
+      state.initializing = false;
+    }
   }
 
-  $("unlock-form").addEventListener("submit", (event) => { event.preventDefault(); activate($("access-token").value.trim()); });
   $("home-button").addEventListener("click", () => navigate(null));
   $("catalog-refresh").addEventListener("click", loadProjects);
   $("project-refresh").addEventListener("click", loadSection);
@@ -939,14 +921,11 @@
   $("delete-close").addEventListener("click", () => $("delete-dialog").close());
   $("delete-dialog").addEventListener("cancel", (event) => { if (state.adminBusy) event.preventDefault(); });
   $("evidence-close").addEventListener("click", () => $("evidence-dialog").close());
-  window.addEventListener("popstate", () => { if (state.authenticated) route(); });
+  window.addEventListener("popstate", () => { if (state.ready) route(); });
   let searchTimer;
   $("project-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.projectOffset = 0; loadProjects(); }, 250); });
   document.addEventListener("visibilitychange", checkMaintenance);
   setInterval(checkMaintenance, 15000);
 
-  const activation = new URLSearchParams(location.hash.slice(1)).get("connect");
-  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
-  if (activation) activate(activation);
-  else startSession().catch((error) => { showUnlock(); $("unlock-message").textContent = error.message; });
+  startDashboard();
 })();

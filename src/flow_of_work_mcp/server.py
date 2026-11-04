@@ -6132,7 +6132,7 @@ def main(argv: list[str] | None = None) -> None:
             dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port)
         app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
         if dashboard is not None:
-            print("Flower dashboard (local operator link): " + dashboard.activation_url(args.host), file=sys.stderr)
+            print("Flower dashboard: " + dashboard.local_url(args.host), file=sys.stderr)
         logger.info(
             "MCP server ready transport=%s host=%s port=%d",
             args.transport, args.host, args.port,

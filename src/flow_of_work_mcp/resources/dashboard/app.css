@@ -218,16 +218,6 @@ input::placeholder { color: var(--subtle); }
 .initial-loading { padding: 100px 30px; display: flex; justify-content: center; align-items: center; gap: 12px; color: var(--muted); }
 .loader { display: inline-block; width: 17px; height: 17px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 .loading-panel { display: flex; align-items: center; gap: 10px; padding: 50px 26px; color: var(--muted); }
-.unlock-panel { max-width: 620px; margin: 11vh auto 40px; padding: 34px; }
-.unlock-heading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin-bottom: 26px; }
-.section-rule { height: 3px; width: 26px; background: var(--accent); border-radius: 2px; }
-.unlock-panel h1 { font-size: clamp(32px, 5vw, 44px); }
-.unlock-panel > p { color: var(--muted); margin: 18px 0 25px; }
-.unlock-form { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.unlock-form label { font-size: 13px; font-weight: 600; }
-.unlock-form input { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 11px 13px; width: 100%; color: var(--ink); }
-.unlock-form .button { margin-top: 4px; }
-.form-message { margin-top: 14px; color: var(--danger); font-size: 13px; }
 .dialog { color: var(--ink); width: min(660px, calc(100% - 32px)); max-height: min(86vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); box-shadow: var(--dialog-shadow); }
 .dialog::backdrop { background: #0b172b73; backdrop-filter: blur(3px); }
 .dialog-heading { display: flex; justify-content: space-between; align-items: flex-start; padding: 25px 27px 20px; border-bottom: 1px solid var(--line); gap: 20px; }
@@ -347,7 +337,6 @@ input::placeholder { color: var(--subtle); }
   .badge { max-width: 100%; font-size: 11px; }
   .maintenance-banner { padding: 13px 19px; flex-wrap: wrap; }
   .notice { padding: 12px 19px; }
-  .unlock-panel { margin-top: 5vh; padding: 24px; }
   .dialog-heading, .dialog-content { padding: 20px; }
   .dialog-actions { padding: 15px 20px; }
 }
