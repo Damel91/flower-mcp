@@ -88,6 +88,10 @@ def cli(monkeypatch, tmp_path):
         step("app")
         return state.app
 
+    def dashboard(runtime, config_path, *, port):
+        assert runtime is state.runtime
+        return SimpleNamespace(activation_url=lambda host: f"http://{host}:{port}/dashboard#signal-test")
+
     monkeypatch.setattr(server.signal, "getsignal", getsignal)
     monkeypatch.setattr(server.signal, "signal", install)
     monkeypatch.setattr(profiles, "prepare_profile", lambda *args: step("profile") or "test.yaml")
@@ -98,6 +102,7 @@ def cli(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "log_bootstrap_error", lambda message: step("bootstrap.error"))
     monkeypatch.setattr(server, "build_runtime_from_config", build)
     monkeypatch.setattr(server, "create_app", app)
+    monkeypatch.setattr("flow_of_work_mcp.dashboard_http.DashboardHTTP", dashboard)
     state.step, state.term = step, term
     state.main = lambda transport="streamable-http": server.main(["--transport", transport])
     return state
