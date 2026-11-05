@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import math
 from pathlib import Path
 from types import MappingProxyType
@@ -210,14 +211,26 @@ _TEST_PROVIDER_BINDING_KEYS = {
 
 def load_config(path: str | Path) -> FlowConfig:
     """Load and validate a v1 YAML configuration without runtime side effects."""
+    config, _ = load_config_with_revision(path)
+    return config
+
+
+def load_config_with_revision(path: str | Path) -> tuple[FlowConfig, str]:
+    """Validate the same bytes that identify the loaded configuration revision."""
 
     source_path = Path(path).expanduser().resolve()
     if not source_path.is_file():
         raise FlowConfigError(f"configuration file not found: {source_path}")
     try:
-        raw = yaml.safe_load(source_path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+        payload = source_path.read_bytes()
+        raw = yaml.safe_load(payload.decode("utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as exc:
         raise FlowConfigError("configuration file is not valid YAML") from exc
+    return parse_config_mapping(raw, source_path=source_path), hashlib.sha256(payload).hexdigest()
+
+
+def parse_config_mapping(raw: object, *, source_path: Path) -> FlowConfig:
+    """Use canonical field validation for a selected YAML's parsed mapping."""
     root = _mapping(raw, "configuration")
     _reject_unknown(root, _ROOT_KEYS, "configuration")
     schema_version = _integer(root.get("schema_version"), "schema_version", minimum=1)

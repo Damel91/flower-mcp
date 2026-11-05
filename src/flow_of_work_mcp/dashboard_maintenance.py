@@ -1,6 +1,7 @@
 """Local operator maintenance under the running Flower ledger lease."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
@@ -123,7 +124,8 @@ class DashboardMaintenance:
             self._intent = None
             self._message = ''
 
-    def operate(self, project_id: str, operation: str, body: dict) -> dict:
+    def operate(self, project_id: str, operation: str, body: dict, *,
+                authorize_delete: Callable[[], None] | None = None) -> dict:
         project_id = validate_project_id(project_id)
         common = {'deletion_id'}
         extra = {'delete': {'expected_fingerprint', 'confirm_project_id', 'host_quiescence_ref', 'host_stopped_run_ids'},
@@ -145,6 +147,10 @@ class DashboardMaintenance:
         with self._administration:
             if self._state != 'ready' and self._intent != identity:
                 raise MaintenanceUnavailable('maintenance_other_intent_or_journal_recovery')
+            if operation == 'delete':
+                if authorize_delete is None:
+                    raise ValueError('dashboard_delete_authorization_required')
+                authorize_delete()
             if self._state == 'ready':
                 self._begin()
                 with self._condition:

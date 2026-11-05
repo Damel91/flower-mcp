@@ -68,9 +68,36 @@
     visible_milestones: "Milestone visibili in questa pagina",
   };
   const errorMessages = {
+    dashboard_delete_password_required: "Inserisci la password dell’account locale per confermare l’eliminazione.",
+    dashboard_delete_password_denied: "La password dell’account locale non è stata accettata. Inseriscila di nuovo per riprovare.",
+    dashboard_login_denied: "Nome utente o password non validi per l’account locale proprietario dei dati.",
+    dashboard_session_required: "Accedi con il tuo account locale per aprire Flower.",
+    dashboard_session_changed: "L’accesso è cambiato. Accedi di nuovo per continuare.",
+    dashboard_owner_changed: "La proprietà dei dati è cambiata. Controlla configurazione e permessi prima di riprovare.",
+    dashboard_auth_rate_limited: "Troppi tentativi di accesso. Attendi prima di riprovare.",
+    dashboard_auth_busy: "È già in corso una verifica dell’account. Attendi e riprova.",
+    dashboard_auth_unavailable: "La verifica dell’account locale non è disponibile. Controlla i prerequisiti di autenticazione del tuo sistema operativo nella guida di Flower, poi riprova.",
     dashboard_csrf_invalid: "Flower è stato riavviato o lo stato della richiesta è cambiato. Aggiorna la vista e controlla lo stato dell’operazione prima di riprovare.",
+    dashboard_project_conflict: "Questo ID è già in uso. Scegli un altro identificativo.",
+    settings_configuration_changed: "Il file del profilo è cambiato. Riavvia Flower per rileggerlo.",
+    settings_draft_changed: "La bozza è cambiata. Rileggi il profilo prima di salvare.",
     dashboard_project_not_found: "Il progetto non è più presente in questo profilo. Torna ai progetti e aggiorna l’elenco.",
     dashboard_evidence_too_large: "L’evidenza supera il limite di 2 MiB di questa vista. Il suo riferimento rimane visibile nel progetto.",
+    dashboard_archive_busy: "È già in corso la preparazione o il download di un archivio. Attendi che finisca e riprova.",
+    dashboard_archive_failed: "Flower non ha potuto preparare l’archivio. Controlla lo spazio disponibile e riprova.",
+    dashboard_backup_failed: "Flower non ha potuto completare l’operazione sui backup. Rileggi l’elenco prima di riprovare.",
+    archive_backup_not_found: "Il backup non è più presente. Aggiorna l’elenco.",
+    archive_backup_id_invalid: "L’identificativo del backup non è valido. Aggiorna l’elenco e seleziona un backup.",
+    archive_backup_changed: "Il backup è cambiato. Aggiorna l’elenco prima di riprovare.",
+    archive_backup_limit: "Hai raggiunto il limite dei backup conservati. Scarica le copie che ti servono e rimuovine una prima di crearne un’altra.",
+    archive_backup_inventory_limit: "Flower non può mostrare tutti i backup conservati. Controlla la cartella dei backup del profilo.",
+    archive_project_not_found: "Il progetto non è più presente. Aggiorna l’elenco prima di esportarlo.",
+    archive_size_exceeded: "I dati superano il limite di dimensione dell’archivio.",
+    archive_scope_invalid: "Non è possibile esportare il progetto senza i riferimenti necessari. Controlla i dati del profilo.",
+    archive_schema_unsupported: "Il formato del registro non è supportato da questa versione di Flower.",
+    archive_source_unavailable: "Il registro non è disponibile. Controlla il profilo e riprova.",
+    archive_io_failure: "Flower non ha potuto leggere o scrivere l’archivio. Controlla lo spazio disponibile e i permessi del profilo.",
+    archive_invalid: "L’archivio non ha superato il controllo di integrità.",
   };
   const markdownTags = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote",
     "pre", "code", "strong", "em", "s", "hr", "br", "a", "table", "thead", "tbody", "tr", "th", "td", "span"]);
@@ -80,9 +107,33 @@
     reader_node_limit: "Il documento supera il limite di 25.000 nodi della vista di lettura. Il sorgente completo e il download restano disponibili.",
     reader_response_limit: "La vista di lettura supera il limite della risposta. Il sorgente completo e il download restano disponibili.",
   };
+  const upgradePhases = {
+    queued: "Richiesta registrata", stopping: "Arresto del servizio",
+    installing: "Backup e installazione in corso", restarting: "Verifica del riavvio",
+    complete: "Aggiornamento completato", preflight_failed: "Controlli preliminari non superati",
+    failed: "Aggiornamento interrotto",
+  };
+  const upgradeErrors = {
+    dashboard_upgrade_password_required: "Inserisci la password dell’account locale.",
+    dashboard_upgrade_password_denied: "La password dell’account locale non è stata accettata.",
+    upgrade_version_invalid: "Inserisci una versione stabile nel formato X.Y.Z.",
+    upgrade_version_not_newer: "Scegli una versione successiva a quella installata.",
+    upgrade_asset_unavailable: "Gli asset della versione scelta non sono raggiungibili.",
+    upgrade_already_pending: "Il servizio ha già un aggiornamento da completare o verificare.",
+    upgrade_platform_unsupported: "L’aggiornamento automatico del servizio è disponibile su macOS.",
+    upgrade_service_not_ready: "Avvia il servizio gestito e controlla di nuovo lo stato.",
+    upgrade_preview_expired: "L’anteprima è scaduta. Verifica di nuovo la versione.",
+    upgrade_selection_changed: "Il servizio o la configurazione sono cambiati. Verifica di nuovo la versione.",
+    upgrade_dispatch_failed: "Flower non ha potuto avviare il processo di aggiornamento.",
+    upgrade_worker_unconfirmed: "Flower non riesce a confermare che l’aggiornamento sia ancora in corso. Leggi la ricevuta con flower-mcp service upgrade-status usando lo stesso profilo e la stessa porta.",
+  };
   const state = {
-    ready: false, initializing: false, csrf: "", maintenance: { state: "ready" }, project: null,
+    ready: false, initializing: false, authBusy: false, authGeneration: 0, availability: "unavailable", retryUntil: 0, retryTimer: null, csrf: "", maintenance: { state: "ready" }, project: null,
     section: "overview", projectOffset: 0, sectionOffset: 0, projects: null, sectionData: null,
+    createBusy: false, createUncertain: "", createIdEdited: false,
+    settings: null, settingsBusy: false, settingsEpoch: 0,
+    upgradeStatus: null, upgradePreview: null, upgradeBusy: false, upgradeReading: false, upgradeEpoch: 0, rememberedUpgrade: null,
+    archive: null, archiveBusy: false, backupDeletion: null,
     loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false, rememberedIntent: null,
   };
   const $ = (id) => document.getElementById(id);
@@ -143,10 +194,12 @@
   applyTheme(initialTheme);
   $("theme-select").addEventListener("change", (event) => applyTheme(event.target.value));
 
-  async function request(path, body) {
+  async function request(path, body, { timeoutMs = 15000, archive = false } = {}) {
+    const generation = state.authGeneration;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    const options = { cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" } };
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const options = { credentials: "same-origin", cache: "no-store", signal: controller.signal,
+      headers: { Accept: archive ? "application/zip, application/json" : "application/json" } };
     if (body !== undefined) {
       options.method = "POST";
       options.headers["Content-Type"] = "application/json";
@@ -155,12 +208,28 @@
     }
     try {
       const response = await fetch(`/dashboard/api/${path}`, options);
-      const envelope = await response.json();
+      const isZip = archive && response.ok && response.headers.get("Content-Type")?.split(";", 1)[0].trim() === "application/zip";
+      const payload = isZip ? await response.blob() : await response.json();
       connection(true);
-      if (!response.ok || envelope.status !== "success") {
-        throw Object.assign(new Error(errorMessages[envelope.reason] || envelope.message || display(envelope.reason) || "La richiesta richiede attenzione."), { reason: envelope.reason, envelope });
+      if (generation !== state.authGeneration && path !== "logout") {
+        throw Object.assign(new Error(errorMessages.dashboard_session_changed), { reason: "dashboard_session_changed", stale: true });
       }
-      if (path === "status") state.csrf = envelope.result.csrf_token;
+      if (isZip) return payload;
+      const envelope = payload;
+      if (!response.ok || envelope.status !== "success") {
+        const retryAfter = Number(response.headers.get("Retry-After"));
+        const message = response.status === 429 && retryAfter > 0 && retryAfter <= 60
+          ? `Attendi ${Math.ceil(retryAfter)} secondi prima di riprovare.`
+          : errorMessages[envelope.reason] || envelope.message || display(envelope.reason) || "La richiesta richiede attenzione.";
+        const error = Object.assign(new Error(message), { reason: envelope.reason, status: response.status, retryAfter, envelope });
+        if (path !== "auth" && path !== "login" && (response.status === 401 || envelope.reason === "dashboard_owner_changed")) {
+          showLogin(error.message);
+          try { applyAuth(await request("auth")); } catch (_) { /* The login panel retains the original failure. */ }
+        }
+        throw error;
+      }
+      if (archive) throw new Error("Flower non ha restituito il file ZIP richiesto.");
+      if (["auth", "status", "login"].includes(path)) state.csrf = envelope.result.csrf_token;
       return envelope.result;
     } catch (error) {
       if (error.name === "AbortError") {
@@ -177,16 +246,766 @@
     }
   }
 
+  function loginMessage(text, information = false) {
+    $("login-message").textContent = text || "";
+    $("login-message").dataset.kind = information ? "information" : "error";
+    $("login-message").hidden = !text;
+  }
+
+  function updateLoginControls() {
+    const unavailable = state.availability !== "ready";
+    $("login-username").disabled = unavailable || state.authBusy;
+    $("login-password").disabled = unavailable || state.authBusy;
+    $("login-button").disabled = unavailable || state.authBusy || state.initializing || Date.now() < state.retryUntil;
+    $("login-button").textContent = state.authBusy ? "Verifica in corso…" : "Accedi";
+    $("login-retry").disabled = state.authBusy || state.initializing;
+    $("logout-button").disabled = state.authBusy;
+    $("login-form").setAttribute("aria-busy", String(state.authBusy));
+  }
+
+  function applyAuth(auth) {
+    state.csrf = auth.csrf_token;
+    state.availability = auth.availability;
+    const availability = $("login-availability");
+    availability.hidden = auth.availability === "ready";
+    availability.textContent = auth.reason === "pam_policy_missing"
+      ? "Il login su Linux richiede la configurazione PAM di Flower. Segui la guida di configurazione per Linux, poi riprova."
+      : errorMessages.dashboard_auth_unavailable;
+    updateLoginControls();
+  }
+
+  function formMessage(id, message, error = false) {
+    const node = $(id);
+    node.textContent = message;
+    node.dataset.error = String(error);
+    node.hidden = !message;
+  }
+
+  const projectIdPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+  const archiveTimeoutMs = 120000;
+
+  function updateArchiveControls() {
+    const disabled = state.archiveBusy || state.maintenance.state !== "ready";
+    $("backup-create").disabled = disabled;
+    $("backups-refresh").disabled = state.archiveBusy;
+    $("export-open").disabled = disabled || !state.project;
+    $("archive-download").disabled = disabled;
+    $("backup-delete-submit").disabled = disabled || !$("backup-delete-password").value;
+    $("backup-delete-password").readOnly = state.archiveBusy;
+    $("backup-delete-close").disabled = state.archiveBusy;
+    for (const item of $("backups-content").querySelectorAll("button[data-backup-action]")) item.disabled = disabled;
+  }
+
+  function openArchive(project) {
+    if (!project || !state.ready || state.archiveBusy || state.maintenance.state !== "ready") return;
+    const projectId = project.project_id;
+    state.archive = { projectId };
+    $("archive-scope").textContent = project.name === projectId ? projectId : `${project.name} (${projectId})`;
+    $("archive-restore-guide").querySelector("details").open = false;
+    formMessage("archive-message", "");
+    $("archive-dialog").showModal();
+  }
+
+  function downloadBlob(blob, filename) {
+    const link = element("a");
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
+  async function archiveTask(action) {
+    if (!state.ready || state.authBusy || state.archiveBusy || state.maintenance.state !== "ready") return;
+    state.archiveBusy = true;
+    updateArchiveControls();
+    try { await action(); }
+    finally {
+      state.archiveBusy = false;
+      updateArchiveControls();
+    }
+  }
+
+  function archiveError(error, changesBackups = false) {
+    if (error.reason === "server_maintenance") return "Flower è in manutenzione. Riprova al termine.";
+    if (error.reason === "dashboard_input_invalid") return "Flower non ha riconosciuto la richiesta. Aggiorna la vista e riprova.";
+    if (changesBackups && (!error.status || error.status >= 500)) {
+      return "L’esito non è confermato. Aggiorna l’elenco dei backup prima di riprovare.";
+    }
+    if (error.reason === "response_timeout") return "Il download ha richiesto troppo tempo. Riprova fra poco.";
+    if (error instanceof SyntaxError) return "Flower non ha restituito il file ZIP richiesto.";
+    return error.message;
+  }
+
+  function downloadArchive() {
+    const selection = state.archive;
+    const dialog = $("archive-dialog");
+    if (!selection || !dialog.open) return;
+    return archiveTask(async () => {
+      formMessage("archive-message", "Preparazione dell’archivio in corso…");
+      try {
+        const blob = await request("archive", { project_id: selection.projectId }, { archive: true, timeoutMs: archiveTimeoutMs });
+        if (state.authBusy || state.archive !== selection || !dialog.open) return;
+        downloadBlob(blob, "flower-project.flower.zip");
+        formMessage("archive-message", "Archivio pronto. Controlla i download del browser.");
+      } catch (error) {
+        if (state.archive === selection && dialog.open && !error.stale) formMessage("archive-message", archiveError(error), true);
+      }
+    });
+  }
+
+  function backupDate(backup) {
+    const value = new Date(backup.created_at);
+    return Number.isNaN(value.getTime()) ? "Data non disponibile" : value.toLocaleString("it-IT", { dateStyle: "short", timeStyle: "medium" });
+  }
+
+  function backupSize(bytes) {
+    const units = ["B", "KiB", "MiB", "GiB"];
+    let unit = 0;
+    while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit += 1; }
+    return `${bytes.toLocaleString("it-IT", { maximumFractionDigits: 1 })} ${units[unit]}`;
+  }
+
+  async function loadBackups() {
+    if ($("backups-view").hidden) return;
+    const epoch = ++state.loadingEpoch;
+    const content = $("backups-content");
+    loading(content, "Lettura dei backup…");
+    try {
+      const result = await request("backups");
+      if (epoch !== state.loadingEpoch) return;
+      if (!result.backups.length) {
+        content.replaceChildren(empty("Nessun backup conservato", "Usa Crea backup per salvare una copia del registro."));
+        return;
+      }
+      const list = element("ul", "backup-list");
+      for (const backup of result.backups) {
+        const row = element("li", "backup-row");
+        const identity = element("div", "backup-identity");
+        const date = element("time", "", backupDate(backup));
+        date.dateTime = backup.created_at;
+        identity.id = `backup-${encodeURIComponent(backup.id)}`;
+        identity.append(date, element("span", "muted identifier", backup.id));
+        const actions = element("div", "project-actions");
+        actions.append(button("Scarica", "button-secondary", () => downloadBackup(backup)),
+          button("Elimina", "button-danger-quiet", () => openBackupDeletion(backup)));
+        for (const item of actions.children) {
+          item.dataset.backupAction = "true";
+          item.setAttribute("aria-describedby", identity.id);
+        }
+        row.append(identity, element("span", "backup-size muted small", backupSize(backup.size)), actions);
+        list.append(row);
+      }
+      content.replaceChildren(list);
+      updateArchiveControls();
+    } catch (error) {
+      if (!error.stale && epoch === state.loadingEpoch && state.ready) content.replaceChildren(errorPanel(error, loadBackups));
+    }
+  }
+
+  function createBackup() {
+    return archiveTask(async () => {
+      notice("Creazione del backup in corso…");
+      try {
+        await request("backups", {}, { timeoutMs: archiveTimeoutMs });
+        notice("Backup creato. Puoi scaricarlo dall’elenco.");
+        await loadBackups();
+      } catch (error) {
+        if (state.ready && !error.stale) notice(archiveError(error, true), true);
+      }
+    });
+  }
+
+  function downloadBackup(backup) {
+    return archiveTask(async () => {
+      notice("Preparazione del download in corso…");
+      try {
+        const blob = await request(`backups/${encodeURIComponent(backup.id)}/download`, {}, { archive: true, timeoutMs: archiveTimeoutMs });
+        if (state.authBusy) return;
+        downloadBlob(blob, "flower-backup.flower.zip");
+        notice("Archivio pronto. Controlla i download del browser.");
+      } catch (error) {
+        if (state.ready && !error.stale) notice(archiveError(error), true);
+      }
+    });
+  }
+
+  function openBackupDeletion(backup) {
+    if (!state.ready || state.archiveBusy || state.maintenance.state !== "ready") return;
+    state.backupDeletion = backup;
+    $("backup-delete-selection").textContent = `${backupDate(backup)} · ${backupSize(backup.size)} · ${backup.id}`;
+    $("backup-delete-password").value = "";
+    formMessage("backup-delete-message", "");
+    updateArchiveControls();
+    $("backup-delete-dialog").showModal();
+  }
+
+  function deleteBackup(event) {
+    event.preventDefault();
+    const selected = state.backupDeletion;
+    const input = $("backup-delete-password");
+    if (!selected || $("backup-delete-submit").disabled) return;
+    return archiveTask(async () => {
+      const password = input.value;
+      input.value = "";
+      formMessage("backup-delete-message", "Verifica e rimozione in corso…");
+      try {
+        const result = await request(`backups/${encodeURIComponent(selected.id)}/delete`, { password });
+        if (result.deleted !== true) throw new Error("Eliminazione non confermata.");
+        $("backup-delete-dialog").close();
+        notice("Backup eliminato.");
+        await loadBackups();
+        if (state.ready && !$("backups-view").hidden) $("backups-title").focus();
+      } catch (error) {
+        if ($("backup-delete-dialog").open && !error.stale) {
+          formMessage("backup-delete-message", archiveError(error, true), true);
+          input.readOnly = false;
+          input.focus();
+        }
+      }
+    });
+  }
+
+  function updateCreateControls() {
+    const waiting = state.createBusy || !!state.createUncertain;
+    const available = state.maintenance.state === "ready";
+    $("create-open").disabled = !available;
+    $("create-name").readOnly = waiting;
+    $("create-id").readOnly = waiting;
+    $("create-submit").disabled = waiting || !available || !$("create-name").value.trim() ||
+      !projectIdPattern.test($("create-id").value.trim());
+    $("create-check").hidden = !state.createUncertain;
+    $("create-check").disabled = state.createBusy || !available;
+    $("create-close").disabled = state.createBusy;
+  }
+
+  function openCreateProject() {
+    if (!state.createUncertain) {
+      $("create-form").reset();
+      state.createIdEdited = false;
+      formMessage("create-message", "");
+    }
+    updateCreateControls();
+    $("create-dialog").showModal();
+  }
+
+  async function createProject(event) {
+    event.preventDefault();
+    if ($("create-submit").disabled) return;
+    const projectId = $("create-id").value.trim();
+    const name = $("create-name").value.trim();
+    state.createBusy = true;
+    updateCreateControls();
+    formMessage("create-message", "Creazione in corso…");
+    try {
+      const result = await request("projects", { project_id: projectId, name });
+      $("create-dialog").close();
+      navigate(result.project_id);
+      notice("Progetto creato.");
+    } catch (error) {
+      if (error.stale || !state.ready) return;
+      if (!error.status || error.status >= 500 && !["server_maintenance", "maintenance_requests_busy"].includes(error.reason)) {
+        state.createUncertain = projectId;
+        formMessage("create-message", "Controlla l’ID nel catalogo prima di riprovare.", true);
+      } else {
+        formMessage("create-message", error.message, true);
+      }
+    } finally {
+      state.createBusy = false;
+      updateCreateControls();
+    }
+  }
+
+  async function checkCreatedProject() {
+    if ($("create-check").disabled || !state.createUncertain) return;
+    const projectId = state.createUncertain;
+    state.createBusy = true;
+    updateCreateControls();
+    try {
+      await request(`projects/${encodeURIComponent(projectId)}/sections/overview?limit=1`);
+      state.createUncertain = "";
+      $("create-dialog").close();
+      navigate(projectId);
+      notice("L’ID è presente nel catalogo.");
+    } catch (error) {
+      if (error.stale || !state.ready) return;
+      if (error.reason === "dashboard_project_not_found") {
+        state.createUncertain = "";
+        formMessage("create-message", "Il progetto non è presente. Puoi riprovare.");
+      } else {
+        formMessage("create-message", error.message, true);
+      }
+    } finally {
+      state.createBusy = false;
+      updateCreateControls();
+    }
+  }
+
+  const settingsGroups = {
+    runtime: "Esecuzione", logging: "Log", model: "Modello",
+    "providers.implementation_graph": "Provider del grafo di implementazione",
+    "providers.bootstrap_behavior": "Provider del bootstrap",
+    "providers.packet_evidence": "Provider delle evidenze",
+    packet_provider: "Provider dei pacchetti", test_provider: "Provider dei test",
+  };
+  const settingLabels = {
+    import_root: "Cartella di importazione", job_workers: "Worker concorrenti",
+    backend: "Backend del modello", kind: "Tipo di provider", level: "Livello di log", enable_console: "Log in console", logs_path: "Cartella dei log",
+    enabled: "Abilitato", model: "Nome del modello", base_url: "Endpoint del modello",
+    context_length: "Lunghezza del contesto", api_key_env: "Variabile d’ambiente della chiave API",
+    idle_timeout_sec: "Attesa di inattività (secondi)", verify_ssl: "Verifica certificato TLS",
+    temperature: "Temperatura", reasoning: "Ragionamento", url: "Endpoint", endpoint: "Endpoint",
+    tool: "Tool", invocation: "Tipo di invocazione", session_id: "ID sessione",
+    domain: "Dominio", operation: "Operazione", mode: "Modalità", timeout_seconds: "Timeout (secondi)",
+  };
+
+  function showSettingsSection(section) {
+    for (const name of ["basic", "advanced"]) {
+      $(`settings-${name}`).setAttribute("aria-pressed", String(name === section));
+      $(`settings-${name}-fields`).hidden = name !== section;
+    }
+  }
+
+  function updateSettingsControls() {
+    const available = state.maintenance.state === "ready";
+    $("settings-refresh").disabled = state.settingsBusy || !available;
+    $("settings-save").disabled = state.settingsBusy || !available;
+    $("settings-discard").disabled = state.settingsBusy || !available;
+    for (const input of $("settings-form").querySelectorAll("[data-setting]")) {
+      input.disabled = state.settingsBusy || !available || input.dataset.readonly === "true";
+    }
+  }
+
+  function renderSettings(snapshot) {
+    state.settings = snapshot;
+    const info = element("div", "summary-block settings-meta");
+    const profileInfo = { "File del profilo": snapshot.config_path, "Ledger": snapshot.database_path,
+      "Revisione del file": snapshot.revision.slice(0, 12) };
+    if (snapshot.loaded_revision) profileInfo["Revisione caricata"] = snapshot.loaded_revision.slice(0, 12);
+    info.append(fields(profileInfo));
+    const draft = snapshot.draft;
+    if (draft?.state === "pending") {
+      info.append(element("p", "", "Bozza validata. Arresta Flower, usa il percorso indicato sopra nel comando e riavvia dopo l’applicazione."));
+      info.append(element("pre", "", `flower-mcp settings apply --draft-id ${draft.id} --config "<file del profilo>"`));
+    } else if (draft?.state === "stale") {
+      info.append(element("p", "", "La bozza appartiene a una revisione precedente. Puoi scartarla o salvare una nuova bozza."));
+    } else if (draft?.state === "applied") {
+      info.append(element("p", "", "La bozza risulta applicata al profilo."));
+    } else {
+      info.append(element("p", "muted small", "Nessuna bozza salvata."));
+    }
+    $("settings-content").replaceChildren(info);
+
+    for (const section of ["basic", "advanced"]) {
+      const container = $(`settings-${section}-fields`);
+      container.replaceChildren();
+      const groups = new Map();
+      for (const field of snapshot.fields.filter((item) => item.section === section)) {
+        const parts = field.key.split(".");
+        const key = parts.slice(0, -1).join(".");
+        if (!groups.has(key)) {
+          const fieldset = element("fieldset", "settings-group");
+          const grid = element("div", "settings-grid");
+          fieldset.append(element("legend", "", settingsGroups[key] || key), grid);
+          groups.set(key, grid);
+          container.append(fieldset);
+        }
+        const value = draft?.state === "pending" && Object.hasOwn(draft.changes, field.key)
+          ? draft.changes[field.key] : field.value;
+        const wrapper = element("div", "settings-field");
+        const input = element(field.type === "select" ? "select" : "input");
+        input.id = `setting-${field.key}`;
+        input.dataset.setting = field.key;
+        input.dataset.readonly = String(!!field.readonly);
+        if (field.type === "select") {
+          for (const option of field.options) {
+            const choice = element("option", "", option);
+            choice.value = option;
+            input.append(choice);
+          }
+        } else if (field.type === "boolean") {
+          input.type = "checkbox";
+          input.checked = value === true;
+        } else if (field.type === "number" || field.type === "integer") {
+          input.type = "number";
+          input.step = field.type === "integer" ? "1" : "any";
+        } else {
+          input.type = "text";
+          input.autocomplete = "off";
+          input.spellcheck = false;
+        }
+        if (field.type !== "boolean") input.value = value ?? "";
+        if (field.readonly && value == null) input.placeholder = "Valore protetto";
+        const title = element("label", "", settingLabels[parts.at(-1)] || parts.at(-1));
+        title.htmlFor = input.id;
+        wrapper.append(title, input);
+        groups.get(key).append(wrapper);
+      }
+    }
+    $("settings-discard").hidden = !draft || draft.state === "applied";
+    $("settings-form").hidden = false;
+    updateSettingsControls();
+  }
+
+  async function loadSettings() {
+    if ($("settings-view").hidden || state.settingsBusy) return;
+    const epoch = ++state.settingsEpoch;
+    state.settings = null;
+    $("settings-form").hidden = true;
+    formMessage("settings-message", "");
+    loading($("settings-content"), "Lettura del profilo…");
+    try {
+      const snapshot = await request("settings");
+      if (epoch === state.settingsEpoch && !$("settings-view").hidden) renderSettings(snapshot);
+    } catch (error) {
+      if (!error.stale && epoch === state.settingsEpoch && !$("settings-view").hidden) {
+        $("settings-content").replaceChildren(errorPanel(error, loadSettings));
+      }
+    }
+  }
+
+  async function saveSettings(discard = false) {
+    if (!state.settings || state.settingsBusy || state.maintenance.state !== "ready") return;
+    const snapshot = state.settings;
+    const changes = {};
+    if (!discard) {
+      for (const field of snapshot.fields) {
+        if (field.readonly) continue;
+        const input = $(`setting-${field.key}`);
+        let value = field.nullable && !input.value && !input.validity.badInput ? null : input.value;
+        if (field.type === "boolean") value = input.checked;
+        if (value !== null && (field.type === "number" || field.type === "integer")) {
+          if (input.validity.badInput || input.validity.stepMismatch || !Number.isFinite(input.valueAsNumber)) {
+            showSettingsSection(field.section);
+            input.focus();
+            formMessage("settings-message", "Inserisci un valore numerico valido.", true);
+            return;
+          }
+          value = input.valueAsNumber;
+        }
+        if (value !== field.value) changes[field.key] = value;
+      }
+      if (!Object.keys(changes).length) {
+        formMessage("settings-message", snapshot.draft?.state === "pending"
+          ? "I valori corrispondono al profilo. Usa Scarta bozza per rimuovere le modifiche in attesa."
+          : "I valori corrispondono al profilo salvato.");
+        return;
+      }
+    }
+    const epoch = state.settingsEpoch;
+    state.settingsBusy = true;
+    updateSettingsControls();
+    formMessage("settings-message", discard ? "Rimozione in corso…" : "Validazione in corso…");
+    try {
+      const result = await request("settings/draft", { revision: snapshot.revision, draft_id: snapshot.draft?.id ?? null, changes });
+      if (epoch === state.settingsEpoch && !$("settings-view").hidden) {
+        renderSettings(result);
+        formMessage("settings-message", discard ? "Bozza scartata." : "Bozza salvata.");
+      }
+    } catch (error) {
+      if (!error.stale && epoch === state.settingsEpoch && !$("settings-view").hidden) {
+        const message = !error.status ? "Rileggi il profilo per verificare se la bozza è stata salvata." : error.message;
+        formMessage("settings-message", message, true);
+      }
+    } finally {
+      state.settingsBusy = false;
+      updateSettingsControls();
+      if (state.ready && epoch !== state.settingsEpoch && !$("settings-view").hidden) loadSettings();
+    }
+  }
+
+  const upgradeStorageKey = "flower.dashboard.upgrade";
+  const terminalUpgradePhases = new Set(["complete", "preflight_failed", "failed"]);
+
+  function rememberUpgrade(id) {
+    state.rememberedUpgrade = id;
+    try {
+      if (id) sessionStorage.setItem(upgradeStorageKey, id);
+      else sessionStorage.removeItem(upgradeStorageKey);
+    } catch (_) { /* Flower also retains the operation receipt. */ }
+  }
+
+  function restoreUpgrade() {
+    try {
+      const saved = sessionStorage.getItem(upgradeStorageKey);
+      if (saved && /^[A-Za-z0-9_-]{1,128}$/.test(saved)) state.rememberedUpgrade = saved;
+    } catch (_) { /* Read the service receipt when browser storage is unavailable. */ }
+  }
+
+  function upgradeInProgress() {
+    const operation = state.upgradeStatus?.operation;
+    return Boolean(operation && !terminalUpgradePhases.has(operation.phase));
+  }
+
+  function canPreviewUpgrade() {
+    return state.ready && state.maintenance.state === "ready" && state.upgradeStatus?.available === true
+      && !state.upgradeBusy && !state.rememberedUpgrade && !upgradeInProgress();
+  }
+
+  function updateUpgradeControls() {
+    const available = state.upgradeStatus?.available === true;
+    const enabled = canPreviewUpgrade();
+    $("upgrade-preview-form").hidden = !available;
+    $("upgrade-version").disabled = !enabled;
+    $("upgrade-preview-submit").disabled = !enabled;
+    $("upgrade-open").disabled = !enabled;
+    $("upgrade-refresh").disabled = state.upgradeBusy || state.upgradeReading;
+    $("upgrade-preview").hidden = !state.upgradePreview || !available;
+    $("upgrade-password").readOnly = state.upgradeBusy;
+    $("upgrade-apply-submit").disabled = !enabled || !state.upgradePreview || !$("upgrade-password").value;
+    $("upgrade-close").disabled = state.upgradeBusy;
+  }
+
+  function renderUpgradeStatus(snapshot) {
+    const previous = state.upgradeStatus?.operation;
+    state.upgradeStatus = snapshot;
+    $("upgrade-installed").textContent = snapshot.installed_version ? `Versione installata ${snapshot.installed_version}` : "";
+    $("upgrade-availability").textContent = snapshot.available === false
+      ? upgradeErrors[snapshot.reason] || "L’aggiornamento automatico richiede un servizio Flower compatibile e un’installazione dedicata."
+      : "";
+    const receipt = $("upgrade-receipt");
+    const operation = snapshot.operation;
+    receipt.hidden = !operation;
+    if (JSON.stringify(previous) !== JSON.stringify(operation)) {
+      receipt.replaceChildren();
+      if (operation) {
+        receipt.append(element("p", "archive-scope", upgradePhases[operation.phase] || "Stato da verificare"));
+        const versions = operation.previous_version ? `Da ${operation.previous_version} a ${operation.version}` : `Versione ${operation.version}`;
+        receipt.append(element("p", "small", `${versions}. Operazione ${operation.id}.`));
+        if (operation.backup_directory) {
+          const backup = element("p", "small", "Backup ");
+          backup.append(element("code", "", operation.backup_directory));
+          receipt.append(backup);
+        }
+        if (operation.reason) {
+          receipt.append(element("p", "small", upgradeErrors[operation.reason] || operation.reason));
+        }
+      }
+    }
+    if (!snapshot.available || upgradeInProgress()
+        || (state.upgradePreview && state.upgradePreview.installed_version !== snapshot.installed_version)) {
+      state.upgradePreview = null;
+    }
+    updateUpgradeControls();
+  }
+
+  async function loadUpgrade() {
+    if (!state.ready || $("settings-view").hidden || state.upgradeBusy || state.upgradeReading) return;
+    const epoch = state.upgradeEpoch;
+    const expected = state.rememberedUpgrade;
+    state.upgradeReading = true;
+    updateUpgradeControls();
+    try {
+      const snapshot = await request("upgrade");
+      if (epoch !== state.upgradeEpoch) return;
+      if (expected && expected === state.rememberedUpgrade) {
+        if (snapshot.operation?.id !== expected) {
+          formMessage("upgrade-message", "Flower non riporta una ricevuta per questa richiesta. Verifica lo stato prima di un nuovo aggiornamento.", true);
+          state.upgradePreview = null;
+          rememberUpgrade(null);
+        } else {
+          formMessage("upgrade-message", "");
+          if (terminalUpgradePhases.has(snapshot.operation.phase)) rememberUpgrade(null);
+        }
+      }
+      renderUpgradeStatus(snapshot);
+    } catch (error) {
+      if (!error.stale && epoch === state.upgradeEpoch) {
+        formMessage("upgrade-message", state.rememberedUpgrade
+          ? "La ricevuta sarà disponibile al ritorno del servizio. Se il servizio resta fermo, usa flower-mcp service upgrade-status con lo stesso profilo e la stessa porta." : error.message, true);
+      }
+    } finally {
+      state.upgradeReading = false;
+      updateUpgradeControls();
+    }
+  }
+
+  function changeUpgradeVersion() {
+    state.upgradePreview = null;
+    formMessage("upgrade-message", "");
+    updateUpgradeControls();
+  }
+
+  async function previewUpgrade(event) {
+    event.preventDefault();
+    if (!canPreviewUpgrade()) return;
+    changeUpgradeVersion();
+    const version = $("upgrade-version").value.trim();
+    if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)) {
+      formMessage("upgrade-message", upgradeErrors.upgrade_version_invalid, true);
+      return;
+    }
+    const epoch = ++state.upgradeEpoch;
+    state.upgradeBusy = true;
+    updateUpgradeControls();
+    try {
+      const preview = await request("upgrade/preview", { version });
+      if (epoch !== state.upgradeEpoch) return;
+      state.upgradePreview = preview;
+      $("upgrade-preview-version").textContent = `Da ${preview.installed_version} a ${preview.version}`;
+    } catch (error) {
+      if (!error.stale && epoch === state.upgradeEpoch) {
+        formMessage("upgrade-message", upgradeErrors[error.reason] || error.message, true);
+      }
+    } finally {
+      state.upgradeBusy = false;
+      updateUpgradeControls();
+    }
+  }
+
+  function openUpgrade() {
+    if (!canPreviewUpgrade() || !state.upgradePreview) return;
+    $("upgrade-dialog-version").textContent = `Versione ${state.upgradePreview.version}`;
+    $("upgrade-password").value = "";
+    formMessage("upgrade-dialog-message", "");
+    $("upgrade-dialog").showModal();
+    $("upgrade-password").focus();
+    updateUpgradeControls();
+  }
+
+  async function applyUpgrade(event) {
+    event.preventDefault();
+    if ($("upgrade-apply-submit").disabled) return;
+    const { id } = state.upgradePreview;
+    const input = $("upgrade-password");
+    const password = input.value;
+    input.value = "";
+    const epoch = ++state.upgradeEpoch;
+    state.upgradeBusy = true;
+    rememberUpgrade(id);
+    updateUpgradeControls();
+    let refresh = false;
+    try {
+      const result = await request("upgrade/apply", { id, password });
+      if (epoch !== state.upgradeEpoch) return;
+      renderUpgradeStatus({ ...state.upgradeStatus, operation: result.operation });
+      $("upgrade-dialog").close();
+      state.upgradePreview = null;
+      if (result.operation.phase === "preflight_failed") {
+        rememberUpgrade(null);
+        formMessage("upgrade-message", "Il servizio è ancora disponibile. Consulta la ricevuta prima di riprovare.", true);
+      } else {
+        formMessage("upgrade-message", "Richiesta registrata. Accedi di nuovo dopo il riavvio per vedere il risultato.");
+      }
+    } catch (error) {
+      if (error.stale || epoch !== state.upgradeEpoch) return;
+      const rejected = error.status >= 400 && error.status < 500 && error.status !== 401;
+      if (rejected) {
+        rememberUpgrade(null);
+        formMessage("upgrade-dialog-message", upgradeErrors[error.reason] || error.message, true);
+        if (error.status === 409) {
+          state.upgradePreview = null;
+          $("upgrade-dialog").close();
+          formMessage("upgrade-message", upgradeErrors[error.reason] || error.message, true);
+          refresh = true;
+        }
+      } else {
+        $("upgrade-dialog").close();
+        state.upgradePreview = null;
+        formMessage("upgrade-message", "La conferma non è arrivata. Consulta lo stato prima di una nuova richiesta.", true);
+      }
+    } finally {
+      state.upgradeBusy = false;
+      updateUpgradeControls();
+      if (state.rememberedUpgrade || refresh) loadUpgrade();
+    }
+  }
+
+  function closePrivateDialogs() {
+    if (state.deletion) rememberIntent();
+    for (const name of ["create-dialog", "delete-dialog", "evidence-dialog", "archive-dialog", "backup-delete-dialog", "upgrade-dialog"]) {
+      if ($(name).open) $(name).close();
+    }
+  }
+
+  function showLogin(message) {
+    const changed = state.ready || $("login-panel").hidden;
+    closePrivateDialogs();
+    if (changed) {
+      state.authGeneration += 1;
+      state.loadingEpoch += 1;
+      state.csrf = "";
+      state.project = null;
+      state.projects = null;
+      state.sectionData = null;
+      state.archive = null;
+      state.backupDeletion = null;
+      $("backup-delete-password").value = "";
+      state.createUncertain = "";
+      $("create-form").reset();
+      formMessage("create-message", "");
+      state.settingsEpoch += 1;
+      state.upgradeEpoch += 1;
+      state.upgradePreview = null;
+      $("upgrade-version").value = "";
+      $("upgrade-password").value = "";
+      formMessage("upgrade-message", "");
+      renderUpgradeStatus({});
+      state.settings = null;
+      $("settings-form").hidden = true;
+      for (const name of ["settings-content", "settings-basic-fields", "settings-advanced-fields"]) $(name).replaceChildren();
+      formMessage("settings-message", "");
+      state.deletion = null;
+      state.maintenance = { state: "ready" };
+      for (const name of ["catalog-content", "section-content", "evidence-content", "delete-content", "delete-actions", "section-navigation", "backups-content"]) $(name).replaceChildren();
+      for (const name of ["sidebar-project-name", "sidebar-project-id", "project-title", "section-title", "section-observed", "catalog-count", "catalog-observed", "section-bounds", "archive-scope", "backup-delete-selection"]) $(name).textContent = "";
+      formMessage("archive-message", "");
+      formMessage("backup-delete-message", "");
+      $("login-password").value = "";
+      notice("");
+    }
+    state.ready = false;
+    $("workspace").hidden = true;
+    $("logout-button").hidden = true;
+    $("maintenance-banner").hidden = true;
+    $("login-panel").hidden = false;
+    $("initial-loading").hidden = true;
+    $("skip-link").href = "#login-panel";
+    document.title = "Flower MCP · Accesso";
+    if (message !== undefined) loginMessage(message);
+    updateLoginControls();
+  }
+
   function showWorkspace() {
     state.ready = true;
+    $("login-panel").hidden = true;
+    $("logout-button").hidden = false;
     $("workspace").hidden = false;
     $("initial-loading").hidden = true;
+    $("skip-link").href = "#main-content";
+    loginMessage("");
   }
 
   function route() {
     const parameters = new URLSearchParams(location.search);
     const projectId = parameters.get("project");
-    state.section = Object.hasOwn(sections, parameters.get("view")) ? parameters.get("view") : "overview";
+    const view = parameters.get("view");
+    const settings = !projectId && view === "settings";
+    const backups = !projectId && view === "backups";
+    state.settingsEpoch += 1;
+    $("settings-view").hidden = !settings;
+    $("backups-view").hidden = !backups;
+    $("settings-button").removeAttribute("aria-current");
+    $("backups-button").removeAttribute("aria-current");
+    if (settings || backups) {
+      state.project = null;
+      state.loadingEpoch += 1;
+      $("catalog-view").hidden = true;
+      $("project-view").hidden = true;
+      $("project-navigation").hidden = true;
+      $("home-button").removeAttribute("aria-current");
+      $(settings ? "settings-button" : "backups-button").setAttribute("aria-current", "page");
+      document.title = settings ? "Flower MCP · Impostazioni" : "Flower MCP · Backup";
+      if (settings) {
+        loadSettings();
+        loadUpgrade();
+      }
+      else loadBackups();
+      return;
+    }
+    state.section = Object.hasOwn(sections, view) ? view : "overview";
     state.sectionOffset = 0;
     state.sectionData = null;
     if (projectId) {
@@ -202,6 +1021,7 @@
       document.title = "Flower MCP · Progetti";
       loadProjects();
     }
+    updateArchiveControls();
   }
 
   function navigate(projectId, section = "overview") {
@@ -211,6 +1031,7 @@
       url.searchParams.set("project", projectId);
       url.searchParams.set("view", section);
     }
+    if (!projectId && (section === "settings" || section === "backups")) url.searchParams.set("view", section);
     history.pushState(null, "", url);
     route();
   }
@@ -271,7 +1092,7 @@
       $("projects-next").disabled = result.next_offset === null || result.next_offset === undefined;
       if (!result.projects.length) {
         $("catalog-content").append(empty($("project-search").value ? "Nessun progetto corrispondente" : "Questo profilo è pronto per il primo progetto",
-          $("project-search").value ? "Prova un altro nome o ID." : "I progetti registrati dall’agente in Flower compariranno qui."));
+          $("project-search").value ? "Prova un altro nome o ID." : "Usa Nuovo progetto per iniziare."));
         return;
       }
       const table = element("table", "project-table");
@@ -575,17 +1396,12 @@
         $("evidence-content").append(evidenceDocument(result));
         $("evidence-content").append(button("Scarica documento", "button-secondary evidence-action", () => {
           const extension = result.content_type === "text/markdown" ? "md" : "json";
-          const download = element("a");
-          const objectUrl = URL.createObjectURL(new Blob([result.content], { type: result.content_type || "text/plain" }));
-          download.href = objectUrl;
-          download.download = `flower-${address.kind}-${String(address.identity).replace(/[^A-Za-z0-9_-]/g, "_")}.${extension}`;
-          document.body.append(download);
-          download.click();
-          download.remove();
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          downloadBlob(new Blob([result.content], { type: result.content_type || "text/plain" }),
+            `flower-${address.kind}-${String(address.identity).replace(/[^A-Za-z0-9_-]/g, "_")}.${extension}`);
         }));
       } else $("evidence-content").append(fields(result));
     } catch (error) {
+      if (!state.ready || error.stale) return;
       $("evidence-content").replaceChildren(errorPanel(error, () => loadEvidence(address)));
     }
   }
@@ -650,6 +1466,10 @@
 
   function updateMaintenance(maintenance) {
     state.maintenance = maintenance || { state: "ready" };
+    updateCreateControls();
+    updateSettingsControls();
+    updateArchiveControls();
+    updateUpgradeControls();
     const banner = $("maintenance-banner");
     banner.replaceChildren();
     banner.hidden = state.maintenance.state === "ready" && !state.rememberedIntent;
@@ -679,11 +1499,13 @@
   }
 
   async function checkMaintenance() {
-    if (document.visibilityState !== "visible" || state.adminBusy) return;
+    if (document.visibilityState !== "visible" || state.adminBusy || state.authBusy) return;
     if (!state.ready) { await startDashboard(); return; }
     try {
       const result = await request("status");
       updateMaintenance(result.maintenance || result);
+      if (state.upgradeStatus?.operation?.reason !== "upgrade_worker_unconfirmed"
+          && (state.rememberedUpgrade || upgradeInProgress())) loadUpgrade();
       if (state.connectionWarning) { notice(""); state.connectionWarning = false; }
     } catch (error) {
       notice(error.message, true);
@@ -693,7 +1515,7 @@
 
   function rememberIntent() {
     if (!state.deletion) return;
-    state.rememberedIntent = { project: state.deletion.project, deletion_id: state.deletion.deletion_id,
+    state.rememberedIntent = { project: { project_id: state.deletion.project.project_id, name: state.deletion.project.project_id }, deletion_id: state.deletion.deletion_id,
       prepared_fingerprint: state.deletion.result?.prepared_fingerprint };
     try {
       sessionStorage.setItem("flower.dashboard.deletion", JSON.stringify(state.rememberedIntent));
@@ -710,7 +1532,10 @@
     try {
       const saved = JSON.parse(sessionStorage.getItem("flower.dashboard.deletion") || "null");
       if (saved && typeof saved.deletion_id === "string" && saved.deletion_id.length <= 64 &&
-          typeof saved.project?.project_id === "string" && saved.project.project_id.length <= 128) state.rememberedIntent = saved;
+          typeof saved.project?.project_id === "string" && saved.project.project_id.length <= 128) {
+        state.rememberedIntent = { project: { project_id: saved.project.project_id, name: saved.project.project_id }, deletion_id: saved.deletion_id,
+          prepared_fingerprint: saved.prepared_fingerprint };
+      }
     } catch (_) { /* Server status remains the authority when local UI state is unavailable. */ }
   }
 
@@ -732,16 +1557,16 @@
     if (!$("delete-dialog").open) $("delete-dialog").showModal();
   }
 
-  function deleteField(id, title, value, description, handler) {
+  function deleteField(id, title, value, description, handler, type = "text") {
     const field = element("div", "delete-form-field");
     const labelElement = element("label", "", title);
     labelElement.htmlFor = id;
     const input = element("input");
     input.id = id;
-    input.type = "text";
+    input.type = type;
     input.autocomplete = "off";
     input.spellcheck = false;
-    input.maxLength = id === "host-stop-reference" ? 256 : 2048;
+    input.maxLength = type === "password" ? 8192 : id === "host-stop-reference" ? 256 : 2048;
     input.value = value || "";
     input.addEventListener("input", (event) => handler(event.target.value));
     field.append(labelElement, input);
@@ -827,6 +1652,8 @@
       content.append(deleteField("host-stopped-runs", "Run dell’host arrestati, se presenti", deletion.stoppedRuns,
         "ID esatti separati da virgola. Compila soltanto per esecuzioni realmente arrestate dal tuo host.",
         (value) => { deletion.stoppedRuns = value; }));
+      content.append(deleteField("delete-password", "Password dell’account locale", "",
+        "Conferma l’eliminazione con la password usata per accedere a Flower.", updateDeleteButton, "password"));
     }
     actions.append(button("Annulla e riprendi Flower", "button-secondary", () => adminAction("cancel")), button("Ispeziona stato", "button-quiet", () => adminAction("inspect")));
     if (canConfirm) {
@@ -839,7 +1666,8 @@
 
   function updateDeleteButton() {
     const confirm = $("confirm-delete-button");
-    if (confirm) confirm.disabled = state.deletion.confirm !== state.deletion.project.project_id || !state.deletion.hostRef.trim();
+    if (confirm) confirm.disabled = state.deletion.confirm !== state.deletion.project.project_id ||
+      !state.deletion.hostRef.trim() || !$("delete-password").value;
   }
 
   async function adminAction(operation) {
@@ -848,6 +1676,10 @@
     const deletion = state.deletion;
     const body = { deletion_id: deletion.deletion_id };
     if (operation === "delete") {
+      const password = $("delete-password");
+      if (!password?.value) return;
+      body.password = password.value;
+      password.value = "";
       body.expected_fingerprint = deletion.result.prepared_fingerprint;
       body.confirm_project_id = deletion.confirm;
       body.host_quiescence_ref = deletion.hostRef.trim();
@@ -859,7 +1691,9 @@
     rememberIntent();
     renderDeletion();
     try {
-      const result = await request(`projects/${encodeURIComponent(deletion.project.project_id)}/deletion/${operation}`, body);
+      // Final deletion adds the native verifier budget to the ordinary request timeout.
+      const result = await request(`projects/${encodeURIComponent(deletion.project.project_id)}/deletion/${operation}`, body,
+        operation === "delete" ? { timeoutMs: 27000 } : undefined);
       if (result.deletion) {
         deletion.result = result.deletion;
         deletion.unknown = false;
@@ -873,13 +1707,20 @@
         notice("Preparazione annullata; il journal dell’intento è conservato.");
       }
     } catch (error) {
+      if (error.stale) return;
       deletion.error = error.message;
       deletion.reason = error.reason;
       const result = error.envelope?.result;
       if (result?.deletion) {
         deletion.result = result.deletion;
         deletion.unknown = false;
-      } else deletion.unknown = true;
+      } else {
+        const passwordRefused = operation === "delete" && [
+          "dashboard_delete_password_required", "dashboard_delete_password_denied",
+          "dashboard_auth_busy", "dashboard_auth_rate_limited", "dashboard_auth_unavailable",
+        ].includes(error.reason);
+        deletion.unknown = !passwordRefused;
+      }
       if (result?.maintenance) updateMaintenance(result.maintenance);
     } finally {
       state.adminBusy = false;
@@ -888,30 +1729,150 @@
     }
   }
 
-  async function startDashboard() {
-    if (state.initializing) return;
+  async function startDashboard({ clearMessage = false } = {}) {
+    if (state.initializing || state.authBusy) return;
     state.initializing = true;
-    loading($("initial-loading"), "Connessione a Flower…");
-    $("initial-loading").hidden = false;
+    updateLoginControls();
+    if (!state.ready && $("login-panel").hidden) {
+      loading($("initial-loading"), "Connessione a Flower…");
+      $("initial-loading").hidden = false;
+    }
     try {
+      const auth = await request("auth");
+      if (!auth.authenticated) showLogin(clearMessage ? "" : undefined);
+      applyAuth(auth);
+      if (!auth.authenticated) return;
       const status = await request("status");
       showWorkspace();
       restoreIntent();
+      restoreUpgrade();
       updateMaintenance(status);
       notice("");
       route();
     } catch (error) {
-      state.ready = false;
-      $("workspace").hidden = true;
-      $("initial-loading").replaceChildren(errorPanel(error, startDashboard));
-      $("initial-loading").hidden = false;
+      if (error.stale) return;
+      state.availability = "unavailable";
+      showLogin(error.message);
     } finally {
       state.initializing = false;
+      updateLoginControls();
     }
   }
 
+  async function signIn(event) {
+    event.preventDefault();
+    if (state.authBusy || state.initializing || state.availability !== "ready" || Date.now() < state.retryUntil) return;
+    state.authBusy = true;
+    loginMessage("Verifica dell’account locale…", true);
+    updateLoginControls();
+    const generation = state.authGeneration;
+    try {
+      const result = await request("login", { username: $("login-username").value, password: $("login-password").value });
+      $("login-password").value = "";
+      if (generation !== state.authGeneration) return;
+      const status = await request("status");
+      showWorkspace();
+      restoreIntent();
+      restoreUpgrade();
+      updateMaintenance(status);
+      route();
+      if (result.evicted_session) notice("La sessione meno recente è stata chiusa perché è stato raggiunto il limite delle sessioni aperte.");
+    } catch (error) {
+      $("login-password").value = "";
+      if (error.stale) return;
+      loginMessage(error.message);
+      if (error.status === 429 && error.retryAfter > 0 && error.retryAfter <= 60) {
+        state.retryUntil = Date.now() + error.retryAfter * 1000;
+        clearTimeout(state.retryTimer);
+        state.retryTimer = setTimeout(updateLoginControls, error.retryAfter * 1000 + 50);
+      }
+      if (error.status === 403 || error.status === 503) {
+        try { applyAuth(await request("auth")); } catch (_) { /* Keep the failed attempt visible; never resubmit its password. */ }
+      }
+    } finally {
+      $("login-password").value = "";
+      state.authBusy = false;
+      updateLoginControls();
+    }
+  }
+
+  async function signOut() {
+    if (state.authBusy) return;
+    state.authBusy = true;
+    closePrivateDialogs();
+    updateLoginControls();
+    try {
+      await request("logout", {});
+      showLogin();
+      $("login-username").value = "";
+      loginMessage("Sei uscito da Flower.", true);
+      try { applyAuth(await request("auth")); } catch (_) { /* Connection retry remains explicit in the login panel. */ }
+    } catch (error) {
+      if (state.ready) notice(error.message, true);
+      else loginMessage(error.message);
+    } finally {
+      state.authBusy = false;
+      updateLoginControls();
+    }
+  }
+
+  $("login-form").addEventListener("submit", signIn);
+  $("login-retry").addEventListener("click", () => startDashboard({ clearMessage: true }));
+  $("logout-button").addEventListener("click", signOut);
   $("home-button").addEventListener("click", () => navigate(null));
+  $("settings-button").addEventListener("click", () => {
+    notice("");
+    navigate(null, "settings");
+  });
+  $("settings-refresh").addEventListener("click", loadSettings);
+  $("settings-basic").addEventListener("click", () => showSettingsSection("basic"));
+  $("settings-advanced").addEventListener("click", () => showSettingsSection("advanced"));
+  $("settings-form").addEventListener("submit", (event) => { event.preventDefault(); saveSettings(); });
+  $("settings-discard").addEventListener("click", () => saveSettings(true));
+  $("upgrade-refresh").addEventListener("click", loadUpgrade);
+  $("upgrade-version").addEventListener("input", changeUpgradeVersion);
+  $("upgrade-preview-form").addEventListener("submit", previewUpgrade);
+  $("upgrade-open").addEventListener("click", openUpgrade);
+  $("upgrade-apply-form").addEventListener("submit", applyUpgrade);
+  $("upgrade-password").addEventListener("input", updateUpgradeControls);
+  $("upgrade-close").addEventListener("click", () => $("upgrade-dialog").close());
+  $("upgrade-dialog").addEventListener("cancel", (event) => { if (state.upgradeBusy) event.preventDefault(); });
+  $("upgrade-dialog").addEventListener("close", () => { $("upgrade-password").value = ""; });
+  for (const id of ["backups-restore-guide", "archive-restore-guide"]) {
+    $(id).append($("archive-restore-template").content.cloneNode(true));
+  }
+  $("backups-button").addEventListener("click", () => {
+    notice("");
+    navigate(null, "backups");
+  });
+  $("backups-refresh").addEventListener("click", loadBackups);
+  $("backup-create").addEventListener("click", createBackup);
+  $("backup-delete-form").addEventListener("submit", deleteBackup);
+  $("backup-delete-password").addEventListener("input", updateArchiveControls);
+  $("backup-delete-close").addEventListener("click", () => $("backup-delete-dialog").close());
+  $("backup-delete-dialog").addEventListener("cancel", (event) => { if (state.archiveBusy) event.preventDefault(); });
+  $("backup-delete-dialog").addEventListener("close", () => {
+    state.backupDeletion = null;
+    $("backup-delete-password").value = "";
+  });
+  $("create-open").addEventListener("click", openCreateProject);
+  $("create-name").addEventListener("input", () => {
+    if (!state.createIdEdited) {
+      $("create-id").value = $("create-name").value.trim().toLowerCase().normalize("NFKD")
+        .replace(/\p{Mark}/gu, "").replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z0-9]+|-+$/g, "").slice(0, 64);
+    }
+    updateCreateControls();
+  });
+  $("create-id").addEventListener("input", () => { state.createIdEdited = true; updateCreateControls(); });
+  $("create-form").addEventListener("submit", createProject);
+  $("create-check").addEventListener("click", checkCreatedProject);
+  $("create-close").addEventListener("click", () => $("create-dialog").close());
+  $("create-dialog").addEventListener("cancel", (event) => { if (state.createBusy) event.preventDefault(); });
   $("catalog-refresh").addEventListener("click", loadProjects);
+  $("export-open").addEventListener("click", () => { if (state.project) openArchive(state.project); });
+  $("archive-close").addEventListener("click", () => $("archive-dialog").close());
+  $("archive-dialog").addEventListener("close", () => { state.archive = null; });
+  $("archive-download").addEventListener("click", downloadArchive);
   $("project-refresh").addEventListener("click", loadSection);
   $("project-delete").addEventListener("click", () => openDeletion(state.project));
   $("projects-previous").addEventListener("click", () => { state.projectOffset = Math.max(0, state.projectOffset - 25); loadProjects(); });
@@ -919,6 +1880,10 @@
   $("section-previous").addEventListener("click", () => { state.sectionOffset = Math.max(0, state.sectionOffset - 25); loadSection(); });
   $("section-next").addEventListener("click", () => { state.sectionOffset = state.sectionData.bounds.next_offset; loadSection(); });
   $("delete-close").addEventListener("click", () => $("delete-dialog").close());
+  $("delete-dialog").addEventListener("close", () => {
+    const password = $("delete-password");
+    if (password) password.value = "";
+  });
   $("delete-dialog").addEventListener("cancel", (event) => { if (state.adminBusy) event.preventDefault(); });
   $("evidence-close").addEventListener("click", () => $("evidence-dialog").close());
   window.addEventListener("popstate", () => { if (state.ready) route(); });

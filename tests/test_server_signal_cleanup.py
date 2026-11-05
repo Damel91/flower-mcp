@@ -88,14 +88,17 @@ def cli(monkeypatch, tmp_path):
         step("app")
         return state.app
 
-    def dashboard(runtime, config_path, *, port):
+    def dashboard(runtime, config_path, *, port, host, loaded_config_revision):
         assert runtime is state.runtime
-        return SimpleNamespace(local_url=lambda host: f"http://{host}:{port}/dashboard")
+        assert host == "127.0.0.1"
+        return SimpleNamespace(local_url=lambda host: f"http://{host}:{port}/dashboard", close=lambda: None)
 
     monkeypatch.setattr(server.signal, "getsignal", getsignal)
     monkeypatch.setattr(server.signal, "signal", install)
     monkeypatch.setattr(profiles, "prepare_profile", lambda *args: step("profile") or "test.yaml")
     monkeypatch.setattr(server, "load_config", lambda path: step("config") or state.config)
+    monkeypatch.setattr(server, "load_config_with_revision",
+                        lambda path: (step("config.reload") or state.config, "test-revision"))
     monkeypatch.setattr(runtime_ownership, "acquire_runtime_ownership", lambda path: step("lease") or state.ownership)
     monkeypatch.setattr(server, "LoggerManager", lambda: step("manager") or state.manager)
     monkeypatch.setattr(server, "get_logger", lambda *args, **kwargs: step("logger") or state.logger)
@@ -106,6 +109,17 @@ def cli(monkeypatch, tmp_path):
     state.step, state.term = step, term
     state.main = lambda transport="streamable-http": server.main(["--transport", transport])
     return state
+
+
+def test_startup_refuses_changed_database_after_acquiring_lease(cli, tmp_path):
+    changed = SimpleNamespace(runtime=SimpleNamespace(database_path=tmp_path / "another.sqlite3"))
+    cli.hooks["config.reload"] = lambda: changed
+    with pytest.raises(SystemExit) as error:
+        cli.main("stdio")
+    assert error.value.code == 2
+    assert cli.events.index("lease") < cli.events.index("config.reload")
+    assert "build" not in cli.events
+    assert cli.events.count("ownership.close") == 1
 
 
 def _raise(error):

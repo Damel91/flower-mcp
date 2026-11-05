@@ -98,12 +98,13 @@ def _assert_sidecar_identity(lock_path: Path, descriptor: int) -> None:
         raise _unsafe(f"Ownership lock path changed: {lock_path}")
 
 
-def _lock_descriptor(descriptor: int) -> None:
+def _lock_descriptor(descriptor: int, *, shared: bool = False) -> None:
     if os.name == "posix":
         import fcntl
 
-        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    elif os.name == "nt":
+        mode = fcntl.LOCK_SH if shared else fcntl.LOCK_EX
+        fcntl.flock(descriptor, mode | fcntl.LOCK_NB)
+    elif os.name == "nt" and not shared:
         import msvcrt
 
         # Windows permits a locked range beyond EOF. Do not write or truncate
@@ -118,9 +119,9 @@ def _lock_descriptor(descriptor: int) -> None:
 
 
 def acquire_file_ownership(
-    resource_path: str | Path, *, suffix: str = ".runtime.lock"
+    resource_path: str | Path, *, suffix: str = ".runtime.lock", shared: bool = False
 ) -> RuntimeOwnership:
-    """Own the canonical resource without waiting or using PID heuristics.
+    """Lease the canonical resource without waiting or using PID heuristics.
 
     Only the selected resource's parent is created. Native editors need not
     honor this advisory lock; callers still must recheck before replacing data.
@@ -149,7 +150,10 @@ def acquire_file_ownership(
         os.set_inheritable(descriptor, False)
         _assert_sidecar_identity(lock_path, descriptor)
         try:
-            _lock_descriptor(descriptor)
+            if shared:
+                _lock_descriptor(descriptor, shared=True)
+            else:
+                _lock_descriptor(descriptor)
         except OSError as exc:
             if exc.errno in {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLK}:
                 raise RuntimeOwnershipError(

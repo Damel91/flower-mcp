@@ -43,7 +43,7 @@ def test_prepare_cancel_and_delete_keep_lease_other_project_and_native_journal(t
         again = maintenance.operate('project-a', 'prepare', {'deletion_id': deletion})
         result = maintenance.operate('project-a', 'delete', {'deletion_id': deletion,
             'expected_fingerprint': again['deletion']['prepared_fingerprint'], 'confirm_project_id': 'project-a',
-            'host_quiescence_ref': 'test-owner:external-workers-stopped'})
+            'host_quiescence_ref': 'test-owner:external-workers-stopped'}, authorize_delete=lambda: None)
         assert result['deletion']['deletion_state'] == 'scrubbed'
         assert result['maintenance']['state'] == 'ready'
         assert journal.exists()
@@ -130,7 +130,7 @@ def test_committed_deletion_with_failed_scrub_stays_fenced_until_same_intent_rec
         monkeypatch.setattr(native_project_purge._Gateway, '_scrub', fail_scrub)
         result = maintenance.operate('project-a', 'delete', {'deletion_id': deletion,
             'expected_fingerprint': prepared['deletion']['prepared_fingerprint'], 'confirm_project_id': 'project-a',
-            'host_quiescence_ref': 'test-owner:external-workers-stopped'})
+            'host_quiescence_ref': 'test-owner:external-workers-stopped'}, authorize_delete=lambda: None)
         assert result['deletion']['project_effect_state'] == 'applied'
         assert result['deletion']['deletion_state'] == 'ledger_deleted'
         assert result['maintenance']['state'] == 'recovery_required'
@@ -189,7 +189,7 @@ def test_finished_journal_does_not_turn_later_config_changes_into_recovery(tmp_p
         prepared = maintenance.operate('project-a', 'prepare', {'deletion_id': deletion})
         maintenance.operate('project-a', 'delete', {'deletion_id': deletion,
             'expected_fingerprint': prepared['deletion']['prepared_fingerprint'], 'confirm_project_id': 'project-a',
-            'host_quiescence_ref': 'test-owner:external-workers-stopped'})
+            'host_quiescence_ref': 'test-owner:external-workers-stopped'}, authorize_delete=lambda: None)
         config.write_text(config.read_text() + '\n# A later legitimate configuration edit.\n')
         reopened = DashboardMaintenance(runtime, config)
         assert reopened.status()['state'] == 'ready'

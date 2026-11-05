@@ -10,7 +10,7 @@
     <script src="/dashboard/assets/app.js" defer></script>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">Vai al contenuto</a>
+    <a id="skip-link" class="skip-link" href="#main-content">Vai al contenuto</a>
     <header class="app-header">
       <a class="wordmark" href="/dashboard" aria-label="Flower MCP, progetti">
         <span>Flower</span><span class="wordmark-suffix">MCP</span>
@@ -25,17 +25,48 @@
             <option value="dark">Scuro</option>
           </select>
         </label>
+        <button id="logout-button" class="button button-quiet" type="button" hidden>Esci</button>
       </div>
     </header>
 
     <div id="maintenance-banner" class="maintenance-banner" role="status" hidden></div>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
 
+    <main id="login-panel" class="login-panel" aria-labelledby="login-title" tabindex="-1" hidden>
+      <h1 id="login-title">Accedi a Flower</h1>
+      <p class="login-intro">Usa nome utente e password del tuo account locale.</p>
+      <p class="muted small">I dati appartengono all’account locale che ha configurato Flower.</p>
+      <p id="login-availability" class="login-availability" role="status" hidden></p>
+      <form id="login-form" class="login-form" autocomplete="off">
+        <div class="login-field">
+          <label for="login-username">Nome utente locale</label>
+          <input id="login-username" name="username" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </div>
+        <div class="login-field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="off" required>
+        </div>
+        <p id="login-message" class="login-message" role="status" aria-live="polite" hidden></p>
+        <div class="login-actions">
+          <button id="login-button" class="button button-primary" type="submit">Accedi</button>
+          <button id="login-retry" class="button button-quiet" type="button">Verifica connessione</button>
+        </div>
+      </form>
+    </main>
+
     <div id="workspace" class="workspace" hidden>
       <aside class="sidebar" aria-label="Navigazione">
         <button id="home-button" class="home-link" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/></svg>
           Tutti i progetti
+        </button>
+        <button id="settings-button" class="home-link" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 3v6m6 0v6m-6 0v6"/></svg>
+          Impostazioni Flower
+        </button>
+        <button id="backups-button" class="home-link" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v12H4zM3 4h18v4H3zM9 12h6"/></svg>
+          Backup
         </button>
         <div id="project-navigation" hidden>
           <div class="sidebar-project">
@@ -56,7 +87,10 @@
         <section id="catalog-view" aria-labelledby="catalog-title">
           <div class="page-heading">
             <div><span class="section-label">Il lavoro in corso</span><h1 id="catalog-title">Progetti</h1><p>Apri un progetto per vedere roadmap, pacchetti e verifiche.</p></div>
-            <button id="catalog-refresh" class="button button-secondary" type="button">Aggiorna</button>
+            <div class="project-actions">
+              <button id="catalog-refresh" class="button button-secondary" type="button">Aggiorna</button>
+              <button id="create-open" class="button button-primary" type="button">Nuovo progetto</button>
+            </div>
           </div>
           <div class="catalog-toolbar">
             <label class="search-field" for="project-search">
@@ -75,16 +109,172 @@
         <section id="project-view" aria-labelledby="project-title" hidden>
           <div class="page-heading project-heading">
             <div><span id="project-identity" class="section-label identifier"></span><h1 id="project-title"></h1><p id="project-subtitle"></p></div>
-            <div class="project-actions"><button id="project-refresh" class="button button-secondary" type="button">Aggiorna</button><button id="project-delete" class="button button-danger-quiet" type="button">Elimina progetto</button></div>
+            <div class="project-actions">
+              <button id="project-refresh" class="button button-secondary" type="button">Aggiorna</button>
+              <button id="export-open" class="button button-secondary" type="button">Esporta progetto</button>
+              <button id="project-delete" class="button button-danger-quiet" type="button">Elimina progetto</button>
+            </div>
           </div>
           <div class="section-heading"><h2 id="section-title"></h2><span id="section-observed" class="observation"></span></div>
           <div id="section-content" aria-live="polite"></div>
           <div class="pagination"><span id="section-bounds" class="muted small"></span><div><button id="section-previous" class="button button-quiet" type="button" disabled>Precedenti</button><button id="section-next" class="button button-quiet" type="button" disabled>Successivi</button></div></div>
         </section>
+        <section id="backups-view" aria-labelledby="backups-title" hidden>
+          <div class="page-heading">
+            <div><span class="section-label">Profilo locale</span><h1 id="backups-title" tabindex="-1">Backup</h1><p>Crea e conserva una copia dell’intero registro SQLite del profilo.</p></div>
+            <div class="project-actions">
+              <button id="backups-refresh" class="button button-secondary" type="button">Aggiorna</button>
+              <button id="backup-create" class="button button-primary" type="button">Crea backup</button>
+            </div>
+          </div>
+          <p class="muted small">I backup includono tutti i progetti, la cronologia e lo stato dei client salvato nel registro. File esterni, configurazione del profilo e credenziali esterne al registro non vengono copiati.</p>
+          <div id="backups-content" aria-live="polite"></div>
+          <p class="muted small">Scarica una copia e conservala in un luogo privato, separato da questo profilo.</p>
+          <p class="muted small">Se il browser non riesce a gestire un archivio grande, ferma il profilo e usa il terminale: <code>flower-mcp data backup --help</code>.</p>
+          <div id="backups-restore-guide"></div>
+        </section>
+        <section id="settings-view" aria-labelledby="settings-title" hidden>
+          <div class="page-heading">
+            <div><span class="section-label">Profilo locale</span><h1 id="settings-title">Impostazioni Flower</h1><p>Prepara le impostazioni del profilo per il prossimo avvio.</p></div>
+            <button id="settings-refresh" class="button button-secondary" type="button">Rileggi profilo</button>
+          </div>
+          <div id="settings-content"></div>
+          <form id="settings-form" novalidate hidden>
+            <div class="settings-switch markdown-mode-control" role="group" aria-label="Vista impostazioni">
+              <button id="settings-basic" class="button button-quiet" type="button" aria-pressed="true">Base</button>
+              <button id="settings-advanced" class="button button-quiet" type="button" aria-pressed="false">Avanzate</button>
+            </div>
+            <div id="settings-basic-fields"></div>
+            <div id="settings-advanced-fields" hidden></div>
+            <p id="settings-message" class="form-message" role="status" hidden></p>
+            <div class="project-actions settings-actions">
+              <button id="settings-save" class="button button-primary" type="submit">Salva bozza</button>
+              <button id="settings-discard" class="button button-secondary" type="button" hidden>Scarta bozza</button>
+            </div>
+          </form>
+          <section class="upgrade-panel" aria-labelledby="upgrade-title">
+            <div class="section-heading">
+              <div><h2 id="upgrade-title">Aggiornamento del servizio</h2><p id="upgrade-installed" class="muted small"></p></div>
+              <button id="upgrade-refresh" class="button button-secondary" type="button">Controlla lo stato</button>
+            </div>
+            <p id="upgrade-availability" class="muted" role="status"></p>
+            <div id="upgrade-receipt" class="upgrade-receipt" aria-live="polite" hidden></div>
+            <form id="upgrade-preview-form" hidden>
+              <div class="settings-field">
+                <label for="upgrade-version">Versione da installare</label>
+                <input id="upgrade-version" type="text" maxlength="64" placeholder="X.Y.Z" autocapitalize="none" spellcheck="false" required>
+              </div>
+              <button id="upgrade-preview-submit" class="button button-secondary" type="submit">Verifica versione</button>
+            </form>
+            <div id="upgrade-preview" class="upgrade-receipt" hidden>
+              <p id="upgrade-preview-version"></p>
+              <p class="muted small">Flower ferma il servizio, salva una copia del database SQLite e della configurazione, installa la versione scelta e verifica il riavvio.</p>
+              <button id="upgrade-open" class="button button-primary" type="button">Apri conferma</button>
+            </div>
+            <p id="upgrade-message" class="form-message" role="status" hidden></p>
+          </section>
+        </section>
       </main>
     </div>
 
     <div id="initial-loading" class="initial-loading" role="status"><span class="loader" aria-hidden="true"></span>Connessione a Flower…</div>
+
+    <dialog id="create-dialog" class="dialog" aria-labelledby="create-title">
+      <form id="create-form" autocomplete="off" novalidate>
+        <div class="dialog-heading">
+          <div><span class="section-label">Progetti</span><h2 id="create-title">Nuovo progetto</h2></div>
+          <button id="create-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="dialog-content">
+          <div class="login-field">
+            <label for="create-name">Nome del progetto</label>
+            <input id="create-name" type="text" maxlength="256" required autofocus>
+          </div>
+          <div class="login-field">
+            <label for="create-id">ID progetto</label>
+            <input id="create-id" type="text" maxlength="64" autocapitalize="none" spellcheck="false" aria-describedby="create-id-help" required>
+            <small id="create-id-help" class="muted">Inizia con una lettera minuscola o un numero. Puoi usare anche trattini e underscore.</small>
+          </div>
+          <p id="create-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="create-check" class="button button-secondary" type="button" hidden>Verifica ID</button>
+          <button id="create-submit" class="button button-primary" type="submit">Crea progetto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="archive-dialog" class="dialog" aria-labelledby="archive-title" aria-describedby="archive-scope archive-includes">
+      <div class="dialog-heading">
+        <h2 id="archive-title">Esporta progetto</h2>
+        <button id="archive-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+      </div>
+      <div class="dialog-content">
+        <p id="archive-scope" class="archive-scope"></p>
+        <p id="archive-includes">Include la cronologia, le verifiche e le evidenze salvate per questo progetto. Esclude le sessioni dei client e il loro stato di navigazione e ripresa.</p>
+        <p class="muted small">Conserva l’archivio in un luogo privato. Non copia i file di lavoro, la configurazione o le credenziali esterne al registro. I riferimenti esterni restano riferimenti.</p>
+        <p class="muted small">Se il browser non riesce a gestire un archivio grande, ferma il profilo e usa il terminale: <code>flower-mcp data export --help</code>.</p>
+        <div id="archive-restore-guide"></div>
+        <p id="archive-message" class="form-message" role="status" hidden></p>
+      </div>
+      <div class="dialog-actions">
+        <button id="archive-download" class="button button-primary" type="button">Scarica progetto</button>
+      </div>
+    </dialog>
+
+    <dialog id="backup-delete-dialog" class="dialog" aria-labelledby="backup-delete-title" aria-describedby="backup-delete-selection backup-delete-help">
+      <form id="backup-delete-form" autocomplete="off">
+        <div class="dialog-heading">
+          <h2 id="backup-delete-title">Elimina backup</h2>
+          <button id="backup-delete-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="dialog-content">
+          <p id="backup-delete-selection" class="archive-scope"></p>
+          <p id="backup-delete-help">Elimini solo questa copia conservata da Flower. Il registro, gli altri backup e le copie già scaricate restano intatti.</p>
+          <div class="login-field">
+            <label for="backup-delete-password">Password dell’account locale</label>
+            <input id="backup-delete-password" type="password" autocomplete="off" required>
+          </div>
+          <p id="backup-delete-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="backup-delete-submit" class="button button-danger" type="submit">Elimina backup</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="upgrade-dialog" class="dialog" aria-labelledby="upgrade-dialog-title" aria-describedby="upgrade-dialog-version upgrade-dialog-help">
+      <form id="upgrade-apply-form" autocomplete="off">
+        <div class="dialog-heading">
+          <h2 id="upgrade-dialog-title">Conferma l’aggiornamento</h2>
+          <button id="upgrade-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="dialog-content">
+          <p id="upgrade-dialog-version" class="archive-scope"></p>
+          <p id="upgrade-dialog-help">La dashboard si disconnette durante l’aggiornamento. Accedi di nuovo per vedere il risultato.</p>
+          <div class="login-field">
+            <label for="upgrade-password">Password dell’account locale</label>
+            <input id="upgrade-password" type="password" autocomplete="off" required>
+          </div>
+          <p id="upgrade-dialog-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="upgrade-apply-submit" class="button button-primary" type="submit">Avvia aggiornamento</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="archive-restore-template">
+      <details class="archive-guide">
+        <summary>Come ripristinare l’archivio</summary>
+        <p>Usa un archivio di cui ti fidi. Nel terminale, sostituisci i percorsi degli esempi con i tuoi.</p>
+        <ol>
+          <li>Controlla l’archivio:<pre><code>flower-mcp data inspect --archive "/percorso/archivio.flower.zip"</code></pre></li>
+          <li>Ripristina in una cartella che non esiste:<pre><code>flower-mcp data restore --archive "/percorso/archivio.flower.zip" --restore-dir "/percorso/nuovo-profilo"</code></pre></li>
+        </ol>
+        <p>Il ripristino prepara un profilo separato con una nuova configurazione, senza avviarlo. I profili esistenti restano intatti.</p>
+      </details>
+    </template>
 
     <dialog id="delete-dialog" class="dialog delete-dialog" aria-labelledby="delete-title">
       <div class="dialog-heading"><div><span class="section-label">Gestione del progetto</span><h2 id="delete-title">Elimina progetto</h2></div><button id="delete-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button></div>

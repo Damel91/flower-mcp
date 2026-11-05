@@ -40,7 +40,7 @@ from flow_of_work_mcp.application.lifecycle_recipes import (
     list_recipes,
     recipe_names,
 )
-from flow_of_work_mcp.config import FlowConfigError, load_config
+from flow_of_work_mcp.config import FlowConfigError, load_config, load_config_with_revision
 from flow_of_work_mcp.core.domain.packet_advancement import (
     PacketAdvanceMode, validate_advancement_mode,
 )
@@ -6062,8 +6062,9 @@ def build_cli_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> None:
-    from flow_of_work_mcp.profiles import ProfileError, prepare_profile
+def main(argv: list[str] | None = None, *, dashboard_created=None, managed_restart: str | None = None) -> None:
+    from flow_of_work_mcp.installation_fence import InstallationFenceError, startup_lease
+    from flow_of_work_mcp.profiles import ProfileError, prepare_profile, profile_config_path
     from flow_of_work_mcp.runtime_ownership import RuntimeOwnershipError, acquire_runtime_ownership
 
     parser = build_cli_parser()
@@ -6077,22 +6078,47 @@ def main(argv: list[str] | None = None) -> None:
         previous_sigterm = signal.getsignal(signal.SIGTERM)
         if previous_sigterm is None:
             parser.error("streamable-http transport requires a restorable SIGTERM handler")
+    installation = None
+    ownership = None
     try:
+        installation = startup_lease(transport=args.transport, host=args.host, port=args.port,
+                                     managed_restart=managed_restart)
         if args.config is not None and args.profile_root is not None:
             raise ProfileError("--config and --profile-root cannot be combined")
-        config_path = args.config if args.config is not None else prepare_profile(args.profile_root, args.profile or "default")
+        if args.config is not None:
+            config_path = args.config
+        elif installation is not None and installation.binding is not None:
+            config_path = profile_config_path(args.profile_root, args.profile or "default")
+        else:
+            config_path = prepare_profile(args.profile_root, args.profile or "default")
+        if installation is not None:
+            installation.assert_config(config_path)
         config = load_config(config_path)
-    except (FlowConfigError, ProfileError, OSError) as exc:
-        log_bootstrap_error(str(exc))
-        parser.error(str(exc))
-    try:
-        ownership = acquire_runtime_ownership(config.runtime.database_path)
-    except RuntimeOwnershipError as exc:
-        parser.error(f"{exc.code}: {exc}")
+        selected_database = config.runtime.database_path
+        if installation is not None:
+            installation.assert_database(selected_database)
+        ownership = acquire_runtime_ownership(selected_database)
+        if installation is not None:
+            # The serving owner can queue an upgrade while a contender is
+            # opening its profile. Read the durable fence again with the ledger held.
+            installation.assert_admitted(transport=args.transport, host=args.host, port=args.port,
+                                         managed_restart=managed_restart)
+    except BaseException as exc:
+        if ownership is not None:
+            ownership.close()
+        if installation is not None:
+            installation.close()
+        if isinstance(exc, (InstallationFenceError, RuntimeOwnershipError)):
+            parser.error(f"{exc.code}: {exc}")
+        if isinstance(exc, (FlowConfigError, ProfileError, OSError)):
+            log_bootstrap_error(str(exc))
+            parser.error(str(exc))
+        raise
 
     manager = LoggerManager()
     logger = None
     runtime: McpRuntime | None = None
+    dashboard = None
     composition_cleanup_incomplete = False
     closing = False
     restore_sigterm = False
@@ -6104,6 +6130,14 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(0)
 
     try:
+        # Settings can be published between the first read and lease acquisition.
+        try:
+            config, loaded_config_revision = load_config_with_revision(config_path)
+            if config.runtime.database_path != selected_database:
+                raise FlowConfigError("configuration selected a different database during startup")
+        except (FlowConfigError, OSError) as exc:
+            log_bootstrap_error(str(exc))
+            parser.error(str(exc))
         manager.setup(config.logging)
         logger = get_logger("server", session_id="server")
         summary = config.safe_summary()
@@ -6129,9 +6163,12 @@ def main(argv: list[str] | None = None) -> None:
         dashboard = None
         if args.transport == "streamable-http":
             from flow_of_work_mcp.dashboard_http import DashboardHTTP
-            dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port)
+            dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port, host=args.host,
+                                      loaded_config_revision=loaded_config_revision)
         app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
         if dashboard is not None:
+            if dashboard_created is not None:
+                dashboard_created(dashboard.auth.instance_id)
             print("Flower dashboard: " + dashboard.local_url(args.host), file=sys.stderr)
         logger.info(
             "MCP server ready transport=%s host=%s port=%d",
@@ -6158,16 +6195,22 @@ def main(argv: list[str] | None = None) -> None:
                     runtime.close()
                     runtime_stopped = True
             finally:
-                # Failed shutdown may leave live workers. Keep the OS lease until
-                # successful close or process exit rather than admitting a rival.
-                if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
-                    ownership.close()
-                if logger is not None:
+                try:
+                    if dashboard is not None:
+                        dashboard.close()
+                finally:
+                    # Failed shutdown may leave live workers. Keep the OS lease until
+                    # successful close or process exit rather than admitting a rival.
                     if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
-                        logger.info("MCP server stopped")
-                    else:
-                        logger.error("MCP server shutdown incomplete; runtime ownership retained")
-                manager.close()
+                        ownership.close()
+                        if installation is not None:
+                            installation.close()
+                    if logger is not None:
+                        if (runtime is None and not composition_cleanup_incomplete) or runtime_stopped:
+                            logger.info("MCP server stopped")
+                        else:
+                            logger.error("MCP server shutdown incomplete; runtime ownership retained")
+                    manager.close()
         finally:
             if restore_sigterm:
                 signal.signal(signal.SIGTERM, previous_sigterm)
