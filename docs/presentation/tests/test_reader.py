@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # not change when the current source dependency or Flower version changes.
 PUBLISHED_FLOWER_VERSION = "0.4.1"
 PUBLISHED_FLOWER_RUNTIME = "0.4.0"
-CURRENT_PUBLISHED_FLOWER_VERSION = "0.9.1"
+CURRENT_FLOWER_VERSION = tomllib.loads((ROOT.parents[1] / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
 UPSTREAM_RUNTIME_URL = (
     "https://github.com/Damel91/llama-runtime/releases/download/v0.5.0/"
     "runtime_llama-0.5.0-py3-none-any.whl"
@@ -220,7 +220,7 @@ class ReaderChecks(unittest.TestCase):
                 self.assertEqual(len(re.findall(r"^#{1,6} ", editions[0], re.MULTILINE)), len(re.findall(r"^#{1,6} ", editions[1], re.MULTILINE)))
 
     def test_installation_closes_the_story_with_current_published_flower_release_assets(self):
-        version = CURRENT_PUBLISHED_FLOWER_VERSION
+        version = CURRENT_FLOWER_VERSION
         expected_assets = {
             "install.sh", "install.ps1", "install_flower.py",
             f"flow_of_work_mcp-{version}-py3-none-any.whl",

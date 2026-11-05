@@ -47,8 +47,8 @@ method, not certification of test outcomes.
 
 ## Three minutes in the dashboard
 
-Open Flower 0.9.1 at its local `/dashboard` address in advance, with streamable HTTP and a dedicated
-demo profile. During the talk, show a project, its next gate, a packet and
+Open Flower 0.10.0 at its local `/dashboard` address in advance, with streamable HTTP and a dedicated
+demo profile. Sign in with the local account before the talk. During the talk, show a project, its next gate, a packet and
 already retained Markdown: **Lettura**, its outline, then **Sorgente**. Switch
 the theme to show light/dark preference and the system default without changing
 the project.

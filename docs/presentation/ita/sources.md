@@ -26,20 +26,20 @@ al commit `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corregge il costo del recup
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
 I vecchi download di questo checkpoint puntavano alla release `0.5.2`.
-I comandi operativi in [Ora prova Flower](try-flower.md) selezionano ora 0.9.1. La storica
+I comandi operativi in [Ora prova Flower](try-flower.md) selezionano ora 0.10.0. La storica
 `0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
 binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1`, `0.5.0` e `0.5.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
 
-## Integrazione corrente: dashboard 0.9.1
+## Integrazione corrente: dashboard 0.10.0
 
 Il capitolo Operate descrive anche la dashboard locale e il lettore Markdown
-introdotti nella 0.9.0, con accesso locale diretto nella 0.9.1. Queste fonti seguono il ramo mutabile `main`, separatamente dai
+introdotti nella 0.9.0, con accesso tramite account locale nella 0.10.0. Queste fonti seguono il ramo mutabile `main`, separatamente dai
 riferimenti storici congelati sopra:
 
-- [Guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): avvio, accesso locale diretto, temi, lettura e manutenzione.
-- [Release notes 0.9.1](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.9.1.md): scope, dipendenze e limiti della release.
+- [Guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): avvio, accesso del proprietario, temi, lettura e manutenzione.
+- [Release notes 0.10.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.10.0.md): scope, dipendenze e limiti della release.
 - [Recupero della currentness](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprint e valutazione degli snapshot precedenti.
 
 Il reader della presentazione rimane offline. La dashboard usa il profilo del
