@@ -85,10 +85,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -100,7 +100,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.9.1/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -151,16 +151,14 @@ project; it does not repeat first-project setup.
 ## Open your project in the browser
 
 When Flower runs with streamable HTTP, it also serves a dashboard on the same
-computer. Open `/dashboard` on its configured local address to browse your
-projects and their registered state. No activation link or login is required.
-Read retained Markdown with an outline,
-formatted tables and code, or switch to its original source and download it.
-Choose system, light or dark appearance.
+computer. Open `/dashboard` and sign in with the local operating-system account
+that owns your Flower profile. Create and browse projects, read retained documents,
+or prepare profile settings. Use **Backup** to save and manage SQLite copies,
+or export a single project for [restoration into a separate profile](docs/DATA-BACKUP-AND-RECOVERY.md).
 
-The dashboard uses your existing profile. It keeps chat project selection and
-lifecycle decisions separate. Project deletion requires explicit instance-wide
-maintenance, inventory review and confirmation. See the [dashboard guide](docs/DASHBOARD.md)
-for startup, access and recovery. A stdio connection alone has no browser dashboard.
+Project deletion requires a review and a fresh password confirmation. See the
+[dashboard guide](docs/DASHBOARD.md) for startup, access and recovery. A stdio
+connection alone has no browser dashboard.
 
 ## Optional LLMs and providers
 
@@ -182,7 +180,7 @@ See [advanced configuration](docs/ADVANCED-CONFIGURATION.md) and
 | Explore the public tools | [Tool map](docs/presentation/eng/tools.md) |
 | Resume work or reconcile offline results | [Continuous work and recovery](docs/CONTINUOUS-RECOVERY.md) |
 | Connect project architecture and technical providers | [Integration guide](docs/NOXI-INTEGRATION.md) |
-| Install, update or recover a profile | [Installation](docs/INSTALLATION.md) · [Upgrading](docs/UPGRADING.md) |
+| Install, update or recover a profile | [Installation](docs/INSTALLATION.md) · [Upgrading](docs/UPGRADING.md) · [Backups and recovery](docs/DATA-BACKUP-AND-RECOVERY.md) |
 | See changes and compatibility notes | [Releases](https://github.com/Damel91/flower-mcp/releases) |
 | Read the walkthrough offline | [Local readers](docs/presentation/README.md) |
 
