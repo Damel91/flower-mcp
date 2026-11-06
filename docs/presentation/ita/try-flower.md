@@ -7,25 +7,25 @@ portare questo metodo nel tuo progetto: **installare Flower e collegarlo al tuo
 coding agent**. Spazio Comune resta uno scenario didattico; il download è il
 server Flower MCP, nome pubblico di Flow of Work MCP.
 
-## Flower 0.10.0: il percorso corrente
+## Flower 0.11.0: il percorso corrente
 
-La [release 0.10.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.10.0)
+La [release 0.11.0](https://github.com/Damel91/flower-mcp/releases/tag/v0.11.0)
 aggiunge accesso del proprietario, impostazioni, creazione dei progetti, backup
 e trasferimento dei progetti. Verifica ogni asset con il suo `SHA256SUMS`. Il core
 mantiene schema55 e 37 tool MCP. Dashboard e reader non richiedono un modello o
 un provider. Il witness differito rimane fuori da questa release.
 
-- [Installer macOS/Linux](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh)
-- [Launcher Windows](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.ps1)
-- [Installer Python](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install_flower.py)
-- [Wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/flow_of_work_mcp-0.10.0-py3-none-any.whl)
-- [Sorgente confezionato](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/flow_of_work_mcp-0.10.0.tar.gz)
-- [Checksum](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/SHA256SUMS)
-- [Bootstrap](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/BOOTSTRAP.md)
+- [Installer macOS/Linux](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.sh)
+- [Launcher Windows](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.ps1)
+- [Installer Python](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install_flower.py)
+- [Wheel](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/flow_of_work_mcp-0.11.0-py3-none-any.whl)
+- [Sorgente confezionato](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/flow_of_work_mcp-0.11.0.tar.gz)
+- [Checksum](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/SHA256SUMS)
+- [Bootstrap](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/BOOTSTRAP.md)
 
 Le [istruzioni correnti](https://github.com/Damel91/flower-mcp/tree/main/docs/INSTALLATION.md)
 e la [guida dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
-seguono `main`. I comandi operativi più sotto selezionano 0.10.0. I checkpoint
+seguono `main`. I comandi operativi più sotto selezionano 0.11.0. I checkpoint
 storici seguenti conservano i propri pin e risultati e non qualificano la nuova
 release.
 
@@ -71,11 +71,11 @@ restano immutabili. Usa questo comando solo in un ambiente nuovo/manuale:
 .venv/bin/python -m pip check
 ```
 
-Per un **wheel locale 0.10.0 ottenuto dal sorgente o candidato**, usa un ambiente
+Per un **wheel locale 0.11.0 ottenuto dal sorgente o candidato**, usa un ambiente
 nuovo/manuale. Questo esempio locale è distinto dall’artefatto pubblicato e verificato:
 
 ```sh
-.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.10.0-py3-none-any.whl[inference]'
+.venv/bin/python -m pip install './dist/flow_of_work_mcp-0.11.0-py3-none-any.whl[inference]'
 ```
 
 Flower 0.6.2 è pubblicato al commit
@@ -116,7 +116,7 @@ quando non ci sono prerequisiti. La cancellazione non è un tool MCP né un pass
 di aggiornamento; leggi i suoi
 [limiti](https://github.com/Damel91/flower-mcp/tree/main/docs/NATIVE-PROJECT-DELETION.md).
 La durabilità della cancellazione nativa su Windows resta non qualificata.
-Il witness resta differito. I comandi operativi sotto selezionano 0.10.0;
+Il witness resta differito. I comandi operativi sotto selezionano 0.11.0;
 le modalità di installazione e l'usabilità del provider/client restano evidenze distinte.
 
 La versione 0.6.1 ha introdotto un catalogo completo e di sola lettura delle operazioni
@@ -169,14 +169,14 @@ Flower e i coding client che condividono quell'ambiente. Per un'installazione
 creata dall'installer, visualizza il piano prima di modificare i pacchetti:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh | bash -s -- --upgrade --dry-run
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.sh | bash -s -- --upgrade --dry-run
 ```
 
 Su Windows scarica il nuovo `install.ps1` mostrato sotto, poi visualizza il piano
 senza opzioni per la registrazione del client:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.10.0' -Upgrade -DryRun
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.11.0' -Upgrade -DryRun
 ```
 
 Per percorsi personalizzati aggiungi le opzioni originali `--venv`, `--profile`
@@ -184,7 +184,7 @@ e `--profile-root`; Windows usa `-Venv`, `-Profile` e `-ProfileRoot`. Controlla 
 piano, poi ripeti senza `--dry-run` / `-DryRun`. L'aggiornamento salva un backup
 del ledger SQLite selezionato e dello YAML esatto prima di pip, conserva la
 registrazione del client e non aggiunge migrazioni da un profilo schema 55 a
-0.10.0. Un'installazione più vecchia 0.3.1/schema 52 usa ancora le migrazioni
+0.11.0. Un'installazione più vecchia 0.3.1/schema 52 usa ancora le migrazioni
 additive esistenti da 52 a 55 al successivo avvio del server. Conserva i percorsi
 dei backup restituiti. L'aggiornamento non resetta il ledger e non ripristina
 automaticamente un backup; un errore di pip può modificare parzialmente l'ambiente.
@@ -210,11 +210,11 @@ Dopo aver controllato i prerequisiti, il comando pubblico avvia l'installer
 guidato e permette di scegliere l'agente o la sola installazione:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.sh | bash
 ```
 
 Lo script prepara un ambiente Python isolato e verifica i checksum del backend
-e del wheel. Puoi scaricare e leggere [lo script](https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.sh)
+e del wheel. Puoi scaricare e leggere [lo script](https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.sh)
 prima di eseguirlo. Opzioni e procedure manuali sono nella guida completa.
 
 ### Windows
@@ -223,8 +223,8 @@ In una directory scrivibile, scarica il launcher pubblico e scegli il client.
 Qui l'esempio usa Codex:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.10.0/install.ps1" -OutFile ".\install.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.10.0' -Platform codex
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.11.0/install.ps1" -OutFile ".\install.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.11.0' -Platform codex
 ```
 
 Esegui i due comandi separatamente e fermati se il download fallisce. Puoi

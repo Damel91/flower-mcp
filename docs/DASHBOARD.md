@@ -1,6 +1,6 @@
 # Local browser dashboard
 
-Flower 0.10.0 lets the local owner create and inspect projects, prepare profile
+Flower 0.11.0 lets the local owner create and inspect projects, prepare profile
 settings, manage backups, and export a project's lifecycle records. The dashboard
 also provides password-confirmed project deletion under whole-instance maintenance.
 See the [owner-login guide](OWNER-LOGIN.md) for account and platform prerequisites.
@@ -41,6 +41,10 @@ and lenses unchanged; dashboard login does not authenticate or reconfigure MCP
 clients. After restart, use ordinary login at the same address. Pending deletion
 references are retained for explicit inspection; uncertain destructive requests
 are never replayed automatically.
+
+For access from another machine, enable the separate [HTTPS listener](REMOTE-DASHBOARD.md)
+on the same Flower instance. Browser restoration, opening a new tab or reloading
+the page requires a fresh login.
 
 ## Create a project
 

@@ -1,6 +1,6 @@
 # Local owner login and optional startup
 
-Flower 0.10.0 uses native account verification for its local dashboard. The
+Flower 0.11.0 uses native account verification for its local dashboard. The
 operating system account that owns the selected profile signs in with its local
 password. The optional per-user startup commands select the same profile.
 
@@ -60,12 +60,14 @@ requires inventory review, exact project-ID confirmation, the host-stop referenc
 and a fresh local password check. See the
 [dashboard guide](DASHBOARD.md#delete-a-project).
 
-Use **Esci** to revoke this browser's session. Each browser session is bound to its
-owner and Flower instance. The cookie has no fixed access lifetime; closing a tab
-is not logout, and browser session restoration can preserve it. Logout or server
-restart requires ordinary login at the same address, without restarting Flower
-again to obtain a code. At the bounded session limit, a new successful login can
-revoke the oldest session and reports that fact.
+Use **Esci** to revoke the session. Flower requires both the session cookie and
+the current page's sign-in proof. Opening, reloading or restoring a tab requires
+a fresh sign-in even when the browser restores the cookie. The latest successful
+sign-in on the same origin replaces the prior cookie. The bounded session store
+can revoke its oldest entry and reports that fact.
+
+Remote access uses a separate [HTTPS dashboard address](REMOTE-DASHBOARD.md) with
+the same owner verification.
 
 ## Recover a connection or an interrupted action
 

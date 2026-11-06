@@ -41,7 +41,7 @@ gate guides work; it does not guarantee every semantic decision will be correct.
 
 ## The project in the browser
 
-The person can inspect the projects in their profile directly. When Flower 0.10.0
+The person can inspect the projects in their profile directly. When Flower 0.11.0
 runs with streamable HTTP, open its local `/dashboard` address and sign in
 with the OS account that owns the Flower profile. Its sections show requirements, roadmap, packets,
 verification and Oracles, architecture and retained evidence. Browser project
