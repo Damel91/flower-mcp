@@ -262,7 +262,11 @@ class DashboardAuth:
                 self._epoch += 1
             raise DashboardAuthError('dashboard_owner_changed', 403) from None
 
-    def inspect(self, cookie=None):
+    @staticmethod
+    def _matches_proof(csrf, expected):
+        return isinstance(csrf, str) and csrf.isascii() and hmac.compare_digest(csrf, expected)
+
+    def inspect(self, cookie=None, csrf=""):
         try:
             self._check()
         except DashboardAuthError as exc:
@@ -271,7 +275,7 @@ class DashboardAuth:
                     'instance_id': self.instance_id}
         with self._lock:
             session = self._sessions.get(self._digest(cookie))
-            if session:
+            if session and self._matches_proof(csrf, session.csrf):
                 return {'authenticated': True, 'availability': 'ready', 'reason': None,
                         'csrf_token': session.csrf, 'instance_id': self.instance_id}
         now = self._clock()
@@ -296,11 +300,15 @@ class DashboardAuth:
         return {'authenticated': False, 'availability': availability, 'reason': reason,
                 'csrf_token': self._prelogin_csrf, 'instance_id': self.instance_id}
 
-    def authorize(self, cookie):
+    def authorize(self, cookie, csrf, *, write=False):
         self._check()
         with self._lock:
             session = self._sessions.get(self._digest(cookie))
             if session is None:
+                raise DashboardAuthError('dashboard_session_required', 401)
+            if not self._matches_proof(csrf, session.csrf):
+                if write:
+                    raise DashboardAuthError('dashboard_csrf_invalid', 403)
                 raise DashboardAuthError('dashboard_session_required', 401)
             return session.csrf
 
@@ -327,8 +335,10 @@ class DashboardAuth:
                 _native().validate_credentials(username, password)
             except ValueError:
                 raise denied from None
-            expected = prior.csrf if prior else self._prelogin_csrf
-            if not hmac.compare_digest(csrf, expected):
+            has_session_proof = prior is not None and self._matches_proof(csrf, prior.csrf)
+            # A restored cookie can accompany a new document. Its prelogin
+            # proof is valid for password login, never for using that session.
+            if not has_session_proof and (confirm or not self._matches_proof(csrf, self._prelogin_csrf)):
                 raise DashboardAuthError('dashboard_csrf_invalid', 403)
             if self._active:
                 raise DashboardAuthError('dashboard_auth_busy', 429)
@@ -384,7 +394,7 @@ class DashboardAuth:
             session = self._sessions.get(key) or self._retired.get(key)
             if session is None:
                 raise DashboardAuthError('dashboard_session_required', 401)
-            if not hmac.compare_digest(csrf, session.csrf):
+            if not self._matches_proof(csrf, session.csrf):
                 raise DashboardAuthError('dashboard_csrf_invalid', 403)
             # A prior cookie may arrive after a concurrent successful re-login
             # has rotated it. Revoke that browser lineage, not another browser.

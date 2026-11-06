@@ -194,26 +194,29 @@
   applyTheme(initialTheme);
   $("theme-select").addEventListener("change", (event) => applyTheme(event.target.value));
 
+  const dashboardRequests = new Set();
+
   async function request(path, body, { timeoutMs = 15000, archive = false } = {}) {
     const generation = state.authGeneration;
     const controller = new AbortController();
+    dashboardRequests.add(controller);
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const options = { credentials: "same-origin", cache: "no-store", signal: controller.signal,
       headers: { Accept: archive ? "application/zip, application/json" : "application/json" } };
+    if (state.csrf) options.headers["X-Flower-CSRF"] = state.csrf;
     if (body !== undefined) {
       options.method = "POST";
       options.headers["Content-Type"] = "application/json";
-      if (state.csrf) options.headers["X-Flower-CSRF"] = state.csrf;
       options.body = JSON.stringify(body);
     }
     try {
       const response = await fetch(`/dashboard/api/${path}`, options);
       const isZip = archive && response.ok && response.headers.get("Content-Type")?.split(";", 1)[0].trim() === "application/zip";
       const payload = isZip ? await response.blob() : await response.json();
-      connection(true);
-      if (generation !== state.authGeneration && path !== "logout") {
+      if (generation !== state.authGeneration) {
         throw Object.assign(new Error(errorMessages.dashboard_session_changed), { reason: "dashboard_session_changed", stale: true });
       }
+      connection(true);
       if (isZip) return payload;
       const envelope = payload;
       if (!response.ok || envelope.status !== "success") {
@@ -232,6 +235,9 @@
       if (["auth", "status", "login"].includes(path)) state.csrf = envelope.result.csrf_token;
       return envelope.result;
     } catch (error) {
+      if (generation !== state.authGeneration && !error.stale) {
+        throw Object.assign(new Error(errorMessages.dashboard_session_changed), { reason: "dashboard_session_changed", stale: true });
+      }
       if (error.name === "AbortError") {
         connection(false);
         throw Object.assign(new Error("Flower non ha risposto in tempo. Controlla lo stato dell’operazione."), { reason: "response_timeout" });
@@ -243,6 +249,7 @@
       throw error;
     } finally {
       clearTimeout(timeout);
+      dashboardRequests.delete(controller);
     }
   }
 
@@ -920,8 +927,8 @@
     }
   }
 
-  function showLogin(message) {
-    const changed = state.ready || $("login-panel").hidden;
+  function showLogin(message, { reset = false } = {}) {
+    const changed = reset || state.ready || $("login-panel").hidden;
     closePrivateDialogs();
     if (changed) {
       state.authGeneration += 1;
@@ -1808,6 +1815,7 @@
       loginMessage("Sei uscito da Flower.", true);
       try { applyAuth(await request("auth")); } catch (_) { /* Connection retry remains explicit in the login panel. */ }
     } catch (error) {
+      if (error.stale) return;
       if (state.ready) notice(error.message, true);
       else loginMessage(error.message);
     } finally {
@@ -1890,6 +1898,16 @@
   let searchTimer;
   $("project-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.projectOffset = 0; loadProjects(); }, 250); });
   document.addEventListener("visibilitychange", checkMaintenance);
+  window.addEventListener("pagehide", () => {
+    showLogin("", { reset: true });
+    for (const controller of dashboardRequests) controller.abort();
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      showLogin("", { reset: true });
+      window.location.reload();
+    }
+  });
   setInterval(checkMaintenance, 15000);
 
   startDashboard();

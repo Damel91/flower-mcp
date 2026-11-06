@@ -6049,6 +6049,8 @@ def create_app(
 
 
 def build_cli_parser() -> argparse.ArgumentParser:
+    from flow_of_work_mcp.dashboard_https_listener import add_dashboard_https_arguments
+
     parser = argparse.ArgumentParser(prog="flower-mcp", description="Flower MCP standalone software-engineering lifecycle plane")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--config")
@@ -6059,10 +6061,16 @@ def build_cli_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8010)
+    add_dashboard_https_arguments(parser)
     return parser
 
 
 def main(argv: list[str] | None = None, *, dashboard_created=None, managed_restart: str | None = None) -> None:
+    from flow_of_work_mcp.dashboard_https_listener import (
+        DashboardHTTPSListener,
+        DashboardHTTPSListenerError,
+        dashboard_https_options,
+    )
     from flow_of_work_mcp.installation_fence import InstallationFenceError, startup_lease
     from flow_of_work_mcp.profiles import ProfileError, prepare_profile, profile_config_path
     from flow_of_work_mcp.runtime_ownership import RuntimeOwnershipError, acquire_runtime_ownership
@@ -6071,6 +6079,14 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be in the range 1..65535")
+    try:
+        https_options = dashboard_https_options(args)
+        if https_options is not None:
+            from flow_of_work_mcp.dashboard_tls import validate_dashboard_tls
+
+            validate_dashboard_tls(**https_options)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
     previous_sigterm = None
     if args.transport == "streamable-http":
         if threading.current_thread() is not threading.main_thread():
@@ -6080,6 +6096,7 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
             parser.error("streamable-http transport requires a restorable SIGTERM handler")
     installation = None
     ownership = None
+    dashboard_tls = None
     try:
         installation = startup_lease(transport=args.transport, host=args.host, port=args.port,
                                      managed_restart=managed_restart)
@@ -6103,6 +6120,13 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
             # opening its profile. Read the durable fence again with the ledger held.
             installation.assert_admitted(transport=args.transport, host=args.host, port=args.port,
                                          managed_restart=managed_restart)
+        if https_options is not None:
+            from flow_of_work_mcp.dashboard_tls import prepare_dashboard_tls
+
+            try:
+                dashboard_tls = prepare_dashboard_tls(Path(config_path).absolute(), **https_options)
+            except (OSError, ValueError) as exc:
+                parser.error(str(exc))
     except BaseException as exc:
         if ownership is not None:
             ownership.close()
@@ -6119,6 +6143,7 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
     logger = None
     runtime: McpRuntime | None = None
     dashboard = None
+    https_listener = None
     composition_cleanup_incomplete = False
     closing = False
     restore_sigterm = False
@@ -6166,6 +6191,15 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
             dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port, host=args.host,
                                       loaded_config_revision=loaded_config_revision)
         app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
+        if dashboard_tls is not None:
+            https_listener = DashboardHTTPSListener(dashboard.remote_dashboard_app(dashboard_tls), dashboard_tls)
+            try:
+                https_listener.start()
+            except DashboardHTTPSListenerError as exc:
+                parser.error(str(exc))
+            print(f"Flower HTTPS dashboard: https://{dashboard_tls.authority}/dashboard", file=sys.stderr)
+            if dashboard_tls.ca_file is not None:
+                print(f"Flower dashboard CA certificate: {dashboard_tls.ca_file}", file=sys.stderr)
         if dashboard is not None:
             if dashboard_created is not None:
                 dashboard_created(dashboard.auth.instance_id)
@@ -6189,6 +6223,8 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
     finally:
         closing = True
         try:
+            if https_listener is not None:
+                https_listener.close()
             runtime_stopped = False
             try:
                 if runtime is not None:

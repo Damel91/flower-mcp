@@ -24,6 +24,8 @@ def _location_options(parser: argparse.ArgumentParser, *, config: bool = False) 
 
 
 def build_cli_parser() -> argparse.ArgumentParser:
+    from flow_of_work_mcp.dashboard_https_listener import add_dashboard_https_arguments
+
     parser = argparse.ArgumentParser(prog="flower-mcp", description="Flower MCP installation and standalone lifecycle plane")
     commands = parser.add_subparsers(dest="operation", required=True)
     serve = commands.add_parser("serve", help="start the MCP server (stdio by default)")
@@ -31,6 +33,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     serve.add_argument("--transport", choices=("stdio", "streamable-http"), default="stdio")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8010)
+    add_dashboard_https_arguments(serve)
     service = commands.add_parser("service", help="optional per-user HTTP startup; install never starts Flower")
     service.add_argument("service_operation", choices=("plan", "install", "enable", "disable", "start", "stop", "status", "remove", "run",
                                                         "enroll-upgrade", "upgrade", "upgrade-status"))
@@ -158,8 +161,10 @@ def main(argv: list[str] | None = None) -> None:
             location = ["--config", str(args.config)] if args.config is not None else ["--profile", args.profile or "default"]
             if args.profile_root is not None:
                 location.extend(("--profile-root", str(args.profile_root)))
+            from flow_of_work_mcp.dashboard_https_listener import dashboard_https_arguments
             from flow_of_work_mcp.server import main as serve_main
-            serve_main([*location, "--transport", args.transport, "--host", args.host, "--port", str(args.port)])
+            serve_main([*location, "--transport", args.transport, "--host", args.host, "--port", str(args.port),
+                        *dashboard_https_arguments(args)])
             return
         from flow_of_work_mcp.client_registration import (
             check_implicit_client_config, default_client_config, inspect_client_registration,

@@ -47,7 +47,9 @@ def request_csrf(client):
     cookie = response.headers['set-cookie']
     assert 'HttpOnly' in cookie and 'SameSite=strict' in cookie and 'Path=/dashboard' in cookie
     assert 'Max-Age' not in cookie and 'Expires' not in cookie and 'Domain=' not in cookie
-    return response.json()['result']['csrf_token']
+    csrf = response.json()['result']['csrf_token']
+    client.headers['X-Flower-CSRF'] = csrf
+    return csrf
 
 
 def test_owner_login_protects_all_private_status_reads_and_administration(tmp_path):
@@ -71,7 +73,8 @@ def test_owner_login_protects_all_private_status_reads_and_administration(tmp_pa
             endpoint = '/dashboard/api/projects/project-a/deletion/prepare'
             body = {'deletion_id': str(uuid4())}
             assert client.post(endpoint, json=body).status_code == 403
-            assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760'}).status_code == 403
+            assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760',
+                                                           'X-Flower-CSRF': ''}).status_code == 403
             assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': 'wrong'}).status_code == 403
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': csrf}
             prepared = client.post(endpoint, json=body, headers=headers)
@@ -129,16 +132,37 @@ def test_final_delete_requires_fresh_owner_password_and_preserves_prepared_inten
         runtime.close()
 
 
-def test_new_browser_reauthenticates_without_activation_or_server_restart(tmp_path):
-    runtime, dashboard, _ = fixture(tmp_path)
+def test_restored_browser_cookie_requires_fresh_password_without_server_restart(tmp_path):
+    runtime, dashboard, mcp = fixture(tmp_path)
     try:
-        for _ in range(2):
-            fresh_app = create_app(runtime, host='127.0.0.1', port=18760, dashboard=dashboard)
-            with TestClient(fresh_app.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
-                assert client.get('/dashboard').status_code == 200
-                assert client.get('/dashboard/api/projects').status_code == 401
-                assert request_csrf(client)
-                assert client.get('/dashboard/api/projects').status_code == 200
+        with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+            assert client.get('/dashboard').status_code == 200
+            csrf = request_csrf(client)
+            cookie = client.cookies.get(dashboard.auth.cookie_name)
+            state = client.get('/dashboard/api/auth').json()['result']
+            assert state['authenticated'] and state['csrf_token'] == csrf
+            assert client.get('/dashboard/api/projects').status_code == 200
+
+            # Restoring the browser preserves this cookie, but the new document
+            # no longer has the proof that accompanied the original login.
+            del client.headers['X-Flower-CSRF']
+            restored = client.get('/dashboard/api/auth').json()['result']
+            assert client.cookies.get(dashboard.auth.cookie_name) == cookie
+            assert not restored['authenticated'] and restored['csrf_token'] != csrf
+            assert restored['instance_id'] == state['instance_id']
+            for path in ('status', 'projects', 'settings', 'upgrade', 'backups',
+                         'projects/project-a/sections/overview', 'projects/project-a/evidence/artifact/1'):
+                assert client.get('/dashboard/api/' + path).status_code == 401
+            assert client.get('/dashboard/api/projects',
+                              headers={'X-Flower-CSRF': restored['csrf_token']}).status_code == 401
+            assert client.post('/dashboard/api/archive', json={'project_id': None}, headers={
+                'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': restored['csrf_token'],
+            }).status_code == 403
+
+            fresh = request_csrf(client)
+            assert fresh != csrf and client.cookies.get(dashboard.auth.cookie_name) != cookie
+            assert client.get('/dashboard/api/projects').status_code == 200
+            assert client.get('/dashboard/api/projects', headers={'X-Flower-CSRF': csrf}).status_code == 401
     finally:
         runtime.close()
 

@@ -1,7 +1,6 @@
-"""Same-instance local browser adapter, independent of MCP transport security."""
+"""Owner dashboard HTTP adapter with separate local and HTTPS ingress."""
 from __future__ import annotations
 
-import hmac
 import ipaddress
 import json
 import logging
@@ -10,14 +9,18 @@ import re
 import shutil
 import stat
 import tempfile
+from contextlib import asynccontextmanager
+from copy import copy
 from functools import partial
 from importlib.resources import files
 from pathlib import Path
 from threading import Lock
 
+from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.routing import Route
 
 from flow_of_work_mcp import managed_service_security as secure
 from flow_of_work_mcp.dashboard_maintenance import DashboardMaintenance, MaintenanceUnavailable
@@ -157,6 +160,7 @@ class DashboardHTTP:
         self.requirements = runtime.requirements
         self.maintenance = DashboardMaintenance(runtime, config_path)
         self.host, self.port = host, port
+        self._remote_authority = None
         self.auth = DashboardAuth(config_path, runtime.ledger.database_path, port=port)
         self.settings = DashboardSettings(config_path, runtime.ledger.database_path,
                                           loaded_revision=loaded_config_revision)
@@ -170,6 +174,16 @@ class DashboardHTTP:
         return f'http://{local}:{self.port}/dashboard'
 
     def _security(self, request):
+        if self._remote_authority is not None:
+            hosts = request.headers.getlist('host')
+            origins = request.headers.getlist('origin')
+            expected = f'https://{self._remote_authority}'
+            if (request.scope.get('scheme') != 'https' or len(hosts) != 1
+                    or hosts[0].lower() != self._remote_authority or len(origins) > 1):
+                return False
+            if origins and origins[0] != expected:
+                return False
+            return request.method != 'POST' or origins == [expected]
         try:
             if request.client is None or not ipaddress.ip_address(request.client.host).is_loopback:
                 return False
@@ -187,6 +201,13 @@ class DashboardHTTP:
             return False
         return request.method != 'POST' or origin == expected
 
+    def _access_denied(self):
+        if self._remote_authority is not None:
+            return self._json(status=403, reason='dashboard_remote_access_required',
+                              message='Use the configured Flower HTTPS address.')
+        return self._json(status=403, reason='dashboard_local_access_required',
+                          message='Use the dashboard on its local origin.')
+
     @staticmethod
     def _headers():
         return {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
@@ -201,7 +222,7 @@ class DashboardHTTP:
 
     async def static(self, request):
         if not self._security(request):
-            return self._json(status=403, reason='dashboard_local_access_required', message='Dashboard access is restricted to the local computer and origin.')
+            return self._access_denied()
         name = request.path_params.get('asset', 'index.html')
         types = {'index.html': 'text/html', 'app.css': 'text/css', 'app.js': 'text/javascript'}
         if name not in types:
@@ -233,19 +254,16 @@ class DashboardHTTP:
             raise ValueError('dashboard_project_name_invalid')
         name.encode('utf-8')
         with self.maintenance.admission():
-            if not hmac.compare_digest(csrf, self.auth.authorize(cookie)):
-                raise DashboardAuthError('dashboard_csrf_invalid', 403)
+            self._reauthorize(cookie, csrf)
             return dict(self.requirements.create_project(body['project_id'], name, actor='dashboard-owner'))
 
     def _save_settings(self, body, cookie, csrf):
         with self.maintenance.admission():
-            if not hmac.compare_digest(csrf, self.auth.authorize(cookie)):
-                raise DashboardAuthError('dashboard_csrf_invalid', 403)
+            self._reauthorize(cookie, csrf)
             return self.settings.save(body)
 
     def _reauthorize(self, cookie, csrf):
-        if not hmac.compare_digest(csrf, self.auth.authorize(cookie)):
-            raise DashboardAuthError('dashboard_csrf_invalid', 403)
+        self.auth.authorize(cookie, csrf, write=True)
 
     def _upgrade_status(self, cookie, csrf):
         self._reauthorize(cookie, csrf)
@@ -365,13 +383,13 @@ class DashboardHTTP:
 
     async def api(self, request):
         if not self._security(request):
-            return self._json(status=403, reason='dashboard_local_access_required', message='Use the dashboard on its local origin.')
+            return self._access_denied()
         path = request.path_params['path'].strip('/').split('/')
         try:
             cookie = request.cookies.get(self.auth.cookie_name)
             submitted_csrf = request.headers.get('x-flower-csrf', '')
             if path == ['auth'] and request.method == 'GET':
-                return self._json(await run_in_threadpool(self.auth.inspect, cookie))
+                return self._json(await run_in_threadpool(self.auth.inspect, cookie, submitted_csrf))
             if path == ['login'] and request.method == 'POST':
                 body = await self._body(request)
                 if set(body) != {'username', 'password'}:
@@ -405,10 +423,9 @@ class DashboardHTTP:
                     or request.method == 'POST' and (admin_route or create_route or settings_route or upgrade_action
                                                       or archive_route or backups_route or backup_action)):
                 return self._json(status=404, reason='dashboard_route_not_found', message='Unknown dashboard route.')
-            csrf = await run_in_threadpool(self.auth.authorize, cookie)
+            csrf = await run_in_threadpool(self.auth.authorize, cookie, submitted_csrf,
+                                           write=request.method == 'POST')
             if request.method == 'POST':
-                if not hmac.compare_digest(submitted_csrf, csrf):
-                    return self._json(status=403, reason='dashboard_csrf_invalid', message='Refresh the dashboard before continuing. Inspect any uncertain operation before retrying it.')
                 body = await self._body(request)
                 if create_route:
                     try:
@@ -534,6 +551,30 @@ class DashboardHTTP:
 
     def _archive_error(self, exc):
         return self._json(status=getattr(exc, 'status', None) or 409, reason=exc.code, message=str(exc))
+
+    def remote_dashboard_app(self, tls):
+        # The two listeners share all runtime mutation gates. Authentication
+        # and its cookie remain separate for each ingress.
+        remote = copy(self)
+        remote._remote_authority = tls.authority
+        remote.auth = DashboardAuth(self.maintenance.config_path, self.database_path, port=tls.port)
+        remote.auth.cookie_name += '_https'
+
+        @asynccontextmanager
+        async def lifespan(app):
+            try:
+                yield
+            finally:
+                remote.close()
+
+        app = Starlette(routes=[
+            Route('/dashboard', remote.static, methods=['GET']),
+            Route('/dashboard/', remote.static, methods=['GET']),
+            Route('/dashboard/assets/{asset}', remote.static, methods=['GET']),
+            Route('/dashboard/api/{path:path}', remote.api, methods=['GET', 'POST']),
+        ], lifespan=lifespan)
+        app.router.redirect_slashes = False
+        return app
 
     def mount(self, mcp):
         mcp.custom_route('/dashboard', methods=['GET'])(self.static)

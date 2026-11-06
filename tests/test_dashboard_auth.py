@@ -60,13 +60,13 @@ def test_private_authority_requires_real_verifier_result_and_owner_binding(tmp_p
     auth, binding, verifier, _ = authority(tmp_path)
     assert not auth.inspect()['authenticated']
     with pytest.raises(DashboardAuthError, match='session_required'):
-        auth.authorize(None)
+        auth.authorize(None, '')
     token, result = login(auth)
-    assert auth.authorize(token) == result['csrf_token']
+    assert auth.authorize(token, result['csrf_token']) == result['csrf_token']
     binding.changed = True
     with pytest.raises(DashboardAuthError, match='owner_changed'):
-        auth.authorize(token)
-    assert not auth.inspect(token)['authenticated']
+        auth.authorize(token, result['csrf_token'])
+    assert not auth.inspect(token, result['csrf_token'])['authenticated']
 
 
 def test_denied_and_foreign_identity_never_issue_session(tmp_path):
@@ -87,22 +87,22 @@ def test_session_cookie_names_and_logout_are_instance_specific(tmp_path):
     one, a = login(first)
     two, b = login(second)
     with pytest.raises(DashboardAuthError):
-        second.authorize(one)
+        second.authorize(one, a['csrf_token'])
     first.logout(one, a['csrf_token'])
-    assert second.authorize(two) == b['csrf_token']
-    assert not first.inspect(one)['authenticated']
+    assert second.authorize(two, b['csrf_token']) == b['csrf_token']
+    assert not first.inspect(one, a['csrf_token'])['authenticated']
 
 
 def test_time_does_not_expire_browser_access_but_restart_and_logout_revoke_it(tmp_path):
     auth, _, _, now = authority(tmp_path)
     token, result = login(auth)
     now[0] += 365 * 86400
-    assert auth.authorize(token) == result['csrf_token']
+    assert auth.authorize(token, result['csrf_token']) == result['csrf_token']
     restarted, _, _, _ = authority(tmp_path)
-    assert not restarted.inspect(token)['authenticated']
+    assert not restarted.inspect(token, result['csrf_token'])['authenticated']
     auth.logout(token, result['csrf_token'])
     with pytest.raises(DashboardAuthError):
-        auth.authorize(token)
+        auth.authorize(token, result['csrf_token'])
 
 
 def test_failed_csrf_and_empty_password_do_not_reach_native_verification(tmp_path):
@@ -149,7 +149,7 @@ def test_logout_prevents_late_login_result_from_restoring_revoked_browser(tmp_pa
     thread.join(2)
     assert not thread.is_alive()
     assert errors == ['dashboard_session_changed']
-    assert not auth.inspect(token)['authenticated']
+    assert not auth.inspect(token, result['csrf_token'])['authenticated']
 
 
 def test_logout_during_delete_password_verification_invalidates_the_result(tmp_path):
@@ -179,15 +179,15 @@ def test_logout_during_delete_password_verification_invalidates_the_result(tmp_p
 
 def test_capacity_revokes_oldest_session_explicitly(tmp_path):
     auth, _, _, now = authority(tmp_path)
-    first = None
+    first = first_csrf = None
     for index in range(33):
         now[0] += 61
         token, result = login(auth)
         if index == 0:
-            first = token
+            first, first_csrf = token, result['csrf_token']
         assert result['evicted_session'] is (index == 32)
-    assert not auth.inspect(first)['authenticated']
-    assert auth.inspect(token)['authenticated']
+    assert not auth.inspect(first, first_csrf)['authenticated']
+    assert auth.inspect(token, result['csrf_token'])['authenticated']
 
 
 def test_logout_with_rotated_cookie_revokes_late_set_cookie_for_that_browser_only(tmp_path):
@@ -196,9 +196,9 @@ def test_logout_with_rotated_cookie_revokes_late_set_cookie_for_that_browser_onl
     other, independent = login(auth)
     rotated, after = auth.login(old, before['csrf_token'], 'owner', 'synthetic')
     auth.logout(old, before['csrf_token'])
-    assert not auth.inspect(rotated)['authenticated']
-    assert not auth.inspect(old)['authenticated']
-    assert auth.authorize(other) == independent['csrf_token']
+    assert not auth.inspect(rotated, after['csrf_token'])['authenticated']
+    assert not auth.inspect(old, before['csrf_token'])['authenticated']
+    assert auth.authorize(other, independent['csrf_token']) == independent['csrf_token']
 
 
 @pytest.mark.skipif(os.name == 'nt', reason='POSIX nonblocking FIFO replacement')

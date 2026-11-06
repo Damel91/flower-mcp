@@ -29,7 +29,9 @@ def test_settings_routes_protect_and_stage_the_current_profile(tmp_path):
             assert all(field['key'] != 'runtime.database_path' for field in snapshot['fields'])
             body = {'revision': snapshot['revision'], 'draft_id': None,
                     'changes': {'logging.level': 'WARNING'}}
+            del client.headers['X-Flower-CSRF']
             assert client.post(settings + '/draft', json=body, headers={'Origin': headers['Origin']}).status_code == 403
+            client.headers['X-Flower-CSRF'] = headers['X-Flower-CSRF']
             response = client.post(settings + '/draft', json=body, headers=headers)
             assert response.status_code == 200
             draft = response.json()['result']['draft']

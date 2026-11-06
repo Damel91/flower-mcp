@@ -42,8 +42,10 @@ def test_upgrade_http_requires_owner_csrf_exact_preview_and_fresh_password(tmp_p
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
             assert client.get(endpoint, headers={'Origin': 'https://unrelated.test'}).status_code == 403
             assert client.get(endpoint).json()['result']['operation'] is None
+            del client.headers['X-Flower-CSRF']
             assert client.post(endpoint + '/preview', json={'version': '1.0.1'},
                                headers={'Origin': headers['Origin']}).status_code == 403
+            client.headers['X-Flower-CSRF'] = headers['X-Flower-CSRF']
             assert client.post(endpoint + '/preview', json={'version': '1.0.1', 'path': '/tmp/not-an-asset'},
                                headers=headers).status_code == 400
             preview = client.post(endpoint + '/preview', json={'version': '1.0.1'}, headers=headers)

@@ -91,7 +91,11 @@ def cli(monkeypatch, tmp_path):
     def dashboard(runtime, config_path, *, port, host, loaded_config_revision):
         assert runtime is state.runtime
         assert host == "127.0.0.1"
-        return SimpleNamespace(local_url=lambda host: f"http://{host}:{port}/dashboard", close=lambda: None)
+        return SimpleNamespace(
+            local_url=lambda host: f"http://{host}:{port}/dashboard",
+            remote_dashboard_app=lambda tls: step("https.app"),
+            close=lambda: None,
+        )
 
     monkeypatch.setattr(server.signal, "getsignal", getsignal)
     monkeypatch.setattr(server.signal, "signal", install)
@@ -130,6 +134,56 @@ def _cleanup_events(cli):
     return [event for event in cli.events if event in {
         "runtime.close", "ownership.close", "stopped", "manager.close", "restore",
     }]
+
+
+@pytest.fixture
+def https_cli(cli, monkeypatch):
+    from flow_of_work_mcp import dashboard_https_listener, dashboard_tls
+
+    def prepare(config_path, **options):
+        cli.step("https.material")
+        assert options["port"] == 8443
+        return SimpleNamespace(authority="flower.example:8443", ca_file=None)
+
+    def listener(app, tls):
+        return SimpleNamespace(start=lambda: cli.step("https.start"),
+                               close=lambda: cli.step("https.close"))
+
+    monkeypatch.setattr(dashboard_tls, "prepare_dashboard_tls", prepare)
+    monkeypatch.setattr(dashboard_https_listener, "DashboardHTTPSListener", listener)
+    cli.main = lambda: server.main(["--transport", "streamable-http",
+                                   "--dashboard-bind", "127.0.0.1", "--dashboard-name", "flower.example"])
+    return cli
+
+
+def test_https_listener_starts_before_local_mcp_and_drains_before_runtime(https_cli):
+    https_cli.main()
+    events = https_cli.events
+    assert events.index("https.material") < events.index("https.app")
+    assert events.index("https.start") < events.index("run")
+    assert events.index("https.close") < events.index("runtime.close") < events.index("ownership.close")
+
+
+def test_https_startup_failure_never_runs_local_mcp(https_cli):
+    from flow_of_work_mcp.dashboard_https_listener import DashboardHTTPSListenerError
+
+    https_cli.hooks["https.start"] = lambda: _raise(DashboardHTTPSListenerError("fixture bind refused"))
+    with pytest.raises(SystemExit) as error:
+        https_cli.main()
+    assert error.value.code == 2
+    assert "run" not in https_cli.events
+    assert https_cli.events.index("https.close") < https_cli.events.index("runtime.close")
+
+
+def test_https_drain_failure_retains_runtime_and_ledger_ownership(https_cli):
+    from flow_of_work_mcp.dashboard_https_listener import DashboardHTTPSListenerError
+
+    https_cli.hooks["https.close"] = lambda: _raise(DashboardHTTPSListenerError("fixture drain unproved"))
+    with pytest.raises(DashboardHTTPSListenerError, match="fixture drain unproved"):
+        https_cli.main()
+    assert "runtime.close" not in https_cli.events
+    assert "ownership.close" not in https_cli.events
+    assert https_cli.current is https_cli.prior
 
 
 @pytest.mark.parametrize("prior", ["custom", signal.SIG_IGN, signal.SIG_DFL])
