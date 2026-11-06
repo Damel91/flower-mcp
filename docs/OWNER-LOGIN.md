@@ -1,6 +1,6 @@
 # Local owner login and optional startup
 
-Flower 0.11.0 uses native account verification for its local dashboard. The
+Flower 0.12.0 uses native account verification for its local dashboard. The
 operating system account that owns the selected profile signs in with its local
 password. The optional per-user startup commands select the same profile.
 
@@ -66,8 +66,10 @@ a fresh sign-in even when the browser restores the cookie. The latest successful
 sign-in on the same origin replaces the prior cookie. The bounded session store
 can revoke its oldest entry and reports that fact.
 
-Remote access uses a separate [HTTPS dashboard address](REMOTE-DASHBOARD.md) with
-the same owner verification.
+The LAN dashboard uses HTTPS and the same owner verification. Enable LAN
+access in **Impostazioni Flower** and restart the selected profile. Use the
+hostname link or one of the IPv4 links that Flower prints.
+[LAN access guide](REMOTE-DASHBOARD.md)
 
 ## Recover a connection or an interrupted action
 

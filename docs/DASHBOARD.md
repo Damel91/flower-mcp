@@ -1,6 +1,6 @@
-# Local browser dashboard
+# Flower browser dashboard
 
-Flower 0.11.0 lets the local owner create and inspect projects, prepare profile
+Flower 0.12.0 lets the local owner create and inspect projects, prepare profile
 settings, manage backups, and export a project's lifecycle records. The dashboard
 also provides password-confirmed project deletion under whole-instance maintenance.
 See the [owner-login guide](OWNER-LOGIN.md) for account and platform prerequisites.
@@ -42,9 +42,11 @@ clients. After restart, use ordinary login at the same address. Pending deletion
 references are retained for explicit inspection; uncertain destructive requests
 are never replayed automatically.
 
-For access from another machine, enable the separate [HTTPS listener](REMOTE-DASHBOARD.md)
-on the same Flower instance. Browser restoration, opening a new tab or reloading
-the page requires a fresh login.
+For access from another device, save **Accesso dalla LAN** in **Impostazioni
+Flower** and restart the same profile. The separate HTTPS listener starts with
+the saved port and Flower prints its available links. Browser restoration,
+opening a new tab or reloading the page requires a fresh login.
+[LAN access guide](REMOTE-DASHBOARD.md)
 
 ## Create a project
 
@@ -56,7 +58,11 @@ inspect the result before attempting creation again.
 
 ## Configure Flower
 
-Open **Impostazioni Flower**. **Base** contains the import directory and the
+Open **Impostazioni Flower**. The **Accesso dalla LAN** card saves the dashboard
+network settings for the next start and displays the currently running listener
+separately. Use **Salva accesso dalla LAN** to save this card.
+
+**Base** contains the import directory and the
 optional model switch and name. **Avanzate** contains worker and log settings,
 model options and the supported provider connection fields. The selected file,
 ledger and loaded revision identify the profile being edited.

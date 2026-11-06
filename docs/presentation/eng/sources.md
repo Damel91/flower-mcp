@@ -25,20 +25,20 @@ at `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corrects complete recovery cost. E
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 is operational documentation, not a claim that it existed at the frozen pin. That checkpoint
 linked to published `0.5.2` downloads. Operational commands in
-[Now try Flower](try-flower.md) now select 0.11.0. Historical `0.4.1` retains runtime
+[Now try Flower](try-flower.md) now select 0.12.0. Historical `0.4.1` retains runtime
 `0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
 `0.4.0`, `0.4.1`, `0.5.0` and `0.5.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
 server behavior changes.
 
-## Current supplement: the 0.11.0 dashboard
+## Current supplement: the 0.12.0 dashboard
 
-The Operate chapter also describes the local dashboard and Markdown reader
-introduced in 0.9.0, with native local owner sign-in in 0.11.0. These sources follow mutable `main`, separately from the frozen
-historical references above:
+The Operate chapter describes the local dashboard and Markdown reader first
+introduced in 0.9.0. Flower 0.12.0 adds persistent HTTPS access from the LAN
+for the profile owner. The links below follow the current `main` branch.
 
 - [Dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): startup, local owner sign-in, themes, reading and maintenance.
-- [0.11.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.11.0.md): release scope, dependencies and limits.
+- [0.12.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.12.0.md): release scope, dependencies and limits.
 - [Currentness recovery](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprints and review of earlier snapshots.
 
 The presentation reader remains offline. The dashboard uses a running server's

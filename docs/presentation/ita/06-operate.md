@@ -44,7 +44,7 @@ decisione semantica correttamente.
 ## Il progetto nel browser
 
 La persona può consultare direttamente i progetti del proprio profilo. Con
-Flower 0.11.0 avviato in streamable HTTP, apri l'indirizzo locale `/dashboard` e
+Flower 0.12.0 avviato in streamable HTTP, apri l'indirizzo locale `/dashboard` e
 accedi con l'account del sistema operativo che possiede il profilo Flower. Le sezioni mostrano requisiti, roadmap,
 pacchetti, verifiche e oracoli, architettura ed evidenze conservate. La scelta del
 progetto nel browser lascia invariato il contesto delle chat.

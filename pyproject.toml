@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flow-of-work-mcp"
-version = "0.11.0"
+version = "0.12.0"
 description = "Flower MCP: auditable software-engineering lifecycle plane"
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,6 +16,7 @@ dependencies = [
     "mdengine==0.13.4",
     "markdown-it-py>=3,<5",
     "mcp>=1.23,<2",
+    "psutil>=5.9.8,<8",
     "PyYAML>=6.0",
     "tree-sitter>=0.25,<0.26",
     "tree-sitter-markdown==0.5.1",
