@@ -88,9 +88,11 @@ def cli(monkeypatch, tmp_path):
         step("app")
         return state.app
 
-    def dashboard(runtime, config_path, *, port, host, loaded_config_revision):
+    def dashboard(runtime, config_path, *, port, host, loaded_config_revision, network_active, network_urls):
         assert runtime is state.runtime
         assert host == "127.0.0.1"
+        state.network_active = network_active
+        state.network_urls = network_urls
         return SimpleNamespace(
             local_url=lambda host: f"http://{host}:{port}/dashboard",
             remote_dashboard_app=lambda tls: step("https.app"),

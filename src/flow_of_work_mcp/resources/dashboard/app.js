@@ -79,6 +79,11 @@
     dashboard_auth_unavailable: "La verifica dell’account locale non è disponibile. Controlla i prerequisiti di autenticazione del tuo sistema operativo nella guida di Flower, poi riprova.",
     dashboard_csrf_invalid: "Flower è stato riavviato o lo stato della richiesta è cambiato. Aggiorna la vista e controlla lo stato dell’operazione prima di riprovare.",
     dashboard_project_conflict: "Questo ID è già in uso. Scegli un altro identificativo.",
+    dashboard_network_input_invalid: "Controlla i valori di rete e usa una porta intera da 1 a 65535.",
+    dashboard_network_port_conflict: "La porta HTTPS coincide con la porta MCP. Scegli una porta diversa.",
+    dashboard_network_mcp_host_invalid: "L’accesso dalla LAN richiede che l’endpoint MCP ascolti in locale.",
+    dashboard_network_changed: "La configurazione di rete è cambiata. Rileggi il profilo prima di salvare.",
+    dashboard_network_state_invalid: "La configurazione di rete salvata non è leggibile o non è valida.",
     settings_configuration_changed: "Il file del profilo è cambiato. Riavvia Flower per rileggerlo.",
     settings_draft_changed: "La bozza è cambiata. Rileggi il profilo prima di salvare.",
     dashboard_project_not_found: "Il progetto non è più presente in questo profilo. Torna ai progetti e aggiorna l’elenco.",
@@ -132,6 +137,7 @@
     section: "overview", projectOffset: 0, sectionOffset: 0, projects: null, sectionData: null,
     createBusy: false, createUncertain: "", createIdEdited: false,
     settings: null, settingsBusy: false, settingsEpoch: 0,
+    network: null, networkBusy: false, networkEpoch: 0,
     upgradeStatus: null, upgradePreview: null, upgradeBusy: false, upgradeReading: false, upgradeEpoch: 0, rememberedUpgrade: null,
     archive: null, archiveBusy: false, backupDeletion: null,
     loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false, rememberedIntent: null,
@@ -723,6 +729,106 @@
     }
   }
 
+  function updateNetworkControls() {
+    const editable = state.ready && state.network && !state.networkBusy && state.maintenance.state === "ready";
+    const enabled = $("network-enabled");
+    const port = $("network-port");
+    enabled.disabled = port.disabled = !editable;
+    $("network-save").disabled = !editable
+      || (enabled.checked === state.network.enabled && port.valueAsNumber === state.network.port);
+  }
+
+  function renderNetworkLinks(urls) {
+    const list = $("network-urls");
+    list.replaceChildren();
+    for (const address of Array.isArray(urls) ? urls : []) {
+      if (typeof address !== "string") continue;
+      let url;
+      try { url = new URL(address); } catch (_) { continue; }
+      if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash
+          || !["/", "/dashboard", "/dashboard/"].includes(url.pathname)) continue;
+      const item = element("li");
+      const link = element("a", "", url.href);
+      link.href = url.href;
+      link.target = "_blank";
+      link.rel = "noopener";
+      item.append(link);
+      list.append(item);
+    }
+    list.hidden = !list.childElementCount;
+  }
+
+  function renderNetwork(snapshot) {
+    state.network = snapshot;
+    const { active, enabled, port } = snapshot;
+    const running = {
+      local: "Solo accesso locale",
+      lan: `HTTPS su tutte le interfacce IPv4, porta ${active.port}`,
+      explicit: `HTTPS su un indirizzo configurato, porta ${active.port}`,
+    };
+    $("network-active").textContent = running[active.mode];
+    renderNetworkLinks(active.urls);
+    $("network-saved").textContent = enabled ? `LAN abilitata, porta ${port}` : "LAN disattivata";
+    $("network-override").hidden = !active.cli_override;
+    $("network-enabled").checked = enabled;
+    $("network-port").value = port;
+    $("network-content").replaceChildren();
+    $("network-form").hidden = false;
+    updateNetworkControls();
+  }
+
+  async function loadNetwork() {
+    if (!state.ready || $("settings-view").hidden || state.networkBusy) return;
+    const epoch = ++state.networkEpoch;
+    state.network = null;
+    $("network-form").hidden = true;
+    formMessage("network-message", "");
+    loading($("network-content"), "Lettura della configurazione di rete…");
+    try {
+      const result = await request("network");
+      if (epoch === state.networkEpoch) renderNetwork(result);
+    } catch (error) {
+      if (!error.stale && epoch === state.networkEpoch) {
+        $("network-content").replaceChildren(errorPanel(error, loadNetwork));
+      }
+    }
+  }
+
+  async function saveNetwork(event) {
+    event.preventDefault();
+    if (!state.ready || $("settings-view").hidden || $("network-save").disabled
+        || !$("network-form").reportValidity()) return;
+    const epoch = state.networkEpoch;
+    const body = { revision: state.network.revision, enabled: $("network-enabled").checked,
+      port: $("network-port").valueAsNumber };
+    state.networkBusy = true;
+    updateNetworkControls();
+    formMessage("network-message", "Salvataggio in corso…");
+    try {
+      const result = await request("network", body);
+      if (epoch === state.networkEpoch) {
+        renderNetwork(result);
+        const { active, enabled, port } = result;
+        const pendingRestart = !active.cli_override
+          && (enabled !== (active.mode === "lan") || (enabled && port !== active.port));
+        formMessage("network-message", pendingRestart
+          ? "Configurazione di rete salvata. Riavvia Flower per applicarla."
+          : "Configurazione di rete salvata.");
+      }
+    } catch (error) {
+      if (!error.stale && epoch === state.networkEpoch) {
+        const uncertain = !error.status || error.status >= 500 || error.reason === "dashboard_network_save_unconfirmed";
+        if (uncertain || error.reason === "dashboard_network_changed") state.network = null;
+        const message = uncertain ? "Rileggi il profilo per verificare se la configurazione è stata salvata." : error.message;
+        formMessage("network-message", message, true);
+      }
+    } finally {
+      state.networkBusy = false;
+      updateNetworkControls();
+      if (state.ready && epoch !== state.networkEpoch && !$("settings-view").hidden) loadNetwork();
+    }
+  }
+
   const upgradeStorageKey = "flower.dashboard.upgrade";
   const terminalUpgradePhases = new Set(["complete", "preflight_failed", "failed"]);
 
@@ -944,6 +1050,7 @@
       $("create-form").reset();
       formMessage("create-message", "");
       state.settingsEpoch += 1;
+      state.networkEpoch += 1;
       state.upgradeEpoch += 1;
       state.upgradePreview = null;
       $("upgrade-version").value = "";
@@ -954,6 +1061,13 @@
       $("settings-form").hidden = true;
       for (const name of ["settings-content", "settings-basic-fields", "settings-advanced-fields"]) $(name).replaceChildren();
       formMessage("settings-message", "");
+      state.network = null;
+      $("network-form").reset();
+      $("network-form").hidden = $("network-override").hidden = true;
+      $("network-content").replaceChildren();
+      renderNetworkLinks();
+      $("network-active").textContent = $("network-saved").textContent = "";
+      formMessage("network-message", "");
       state.deletion = null;
       state.maintenance = { state: "ready" };
       for (const name of ["catalog-content", "section-content", "evidence-content", "delete-content", "delete-actions", "section-navigation", "backups-content"]) $(name).replaceChildren();
@@ -992,6 +1106,7 @@
     const settings = !projectId && view === "settings";
     const backups = !projectId && view === "backups";
     state.settingsEpoch += 1;
+    state.networkEpoch += 1;
     $("settings-view").hidden = !settings;
     $("backups-view").hidden = !backups;
     $("settings-button").removeAttribute("aria-current");
@@ -1007,6 +1122,7 @@
       document.title = settings ? "Flower MCP · Impostazioni" : "Flower MCP · Backup";
       if (settings) {
         loadSettings();
+        loadNetwork();
         loadUpgrade();
       }
       else loadBackups();
@@ -1475,6 +1591,7 @@
     state.maintenance = maintenance || { state: "ready" };
     updateCreateControls();
     updateSettingsControls();
+    updateNetworkControls();
     updateArchiveControls();
     updateUpgradeControls();
     const banner = $("maintenance-banner");
@@ -1832,11 +1949,16 @@
     notice("");
     navigate(null, "settings");
   });
-  $("settings-refresh").addEventListener("click", loadSettings);
+  $("settings-refresh").addEventListener("click", () => {
+    loadSettings();
+    loadNetwork();
+  });
   $("settings-basic").addEventListener("click", () => showSettingsSection("basic"));
   $("settings-advanced").addEventListener("click", () => showSettingsSection("advanced"));
   $("settings-form").addEventListener("submit", (event) => { event.preventDefault(); saveSettings(); });
   $("settings-discard").addEventListener("click", () => saveSettings(true));
+  $("network-form").addEventListener("input", updateNetworkControls);
+  $("network-form").addEventListener("submit", saveNetwork);
   $("upgrade-refresh").addEventListener("click", loadUpgrade);
   $("upgrade-version").addEventListener("input", changeUpgradeVersion);
   $("upgrade-preview-form").addEventListener("submit", previewUpgrade);

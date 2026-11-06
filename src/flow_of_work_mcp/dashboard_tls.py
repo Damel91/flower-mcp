@@ -9,8 +9,11 @@ import ipaddress
 import os
 from pathlib import Path
 import re
+import socket
 import ssl
 import stat
+import subprocess
+import sys
 
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
@@ -50,19 +53,34 @@ class DashboardTLS(DashboardTLSAddress):
     ca_file: Path | None
 
     def context(self) -> ssl.SSLContext:
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.minimum_version = ssl.TLSVersion.TLSv1_2
-        try:
-            # A fixed empty passphrase prevents OpenSSL from prompting on an
-            # unexpectedly encrypted file.
-            context.load_cert_chain(self.certfile, self.keyfile, password="")
-        except (OSError, ValueError) as exc:
-            raise DashboardTLSError("Cannot load the dashboard TLS certificate and key.") from exc
-        return context
+        return _server_context(self.certfile, self.keyfile)
+
+
+def _server_context(certfile: Path, keyfile: Path) -> ssl.SSLContext:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    try:
+        # A fixed empty passphrase prevents OpenSSL from prompting on an
+        # unexpectedly encrypted file.
+        context.load_cert_chain(certfile, keyfile, password="")
+    except (OSError, ValueError) as exc:
+        raise DashboardTLSError("Cannot load the dashboard TLS certificate and key.") from exc
+    return context
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _validate_port(port: int) -> None:
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise DashboardTLSError("The dashboard TLS port must be between 1 and 65535.")
+
+
+def _is_dns_name(name: str) -> bool:
+    labels = name.split(".")
+    return (len(name) <= 253 and all(_DNS_LABEL.fullmatch(label) for label in labels)
+            and not _BROWSER_NUMERIC.fullmatch(labels[-1]))
 
 
 def _address(bind: str, name: str, port: int) -> DashboardTLSAddress:
@@ -74,17 +92,14 @@ def _address(bind: str, name: str, port: int) -> DashboardTLSAddress:
             raise ValueError
     except ValueError as exc:
         raise DashboardTLSError("The dashboard TLS bind must be a concrete unicast IP address.") from exc
-    if type(port) is not int or not 1 <= port <= 65535:
-        raise DashboardTLSError("The dashboard TLS port must be between 1 and 65535.")
+    _validate_port(port)
     if not isinstance(name, str) or not name.isascii() or "%" in name:
         raise DashboardTLSError("The dashboard TLS name must be an ASCII DNS name or an IP address.")
     try:
         ip = ipaddress.ip_address(name)
     except ValueError:
         name = name.lower()
-        labels = name.split(".")
-        if (len(name) > 253 or any(not _DNS_LABEL.fullmatch(label) for label in labels)
-                or _BROWSER_NUMERIC.fullmatch(labels[-1])):
+        if not _is_dns_name(name):
             raise DashboardTLSError("The dashboard TLS name must be an ASCII DNS name or an IP address.") from None
         host = name
     else:
@@ -196,7 +211,10 @@ def _identity(path: Path) -> tuple[x509.Certificate, ec.EllipticCurvePrivateKey]
 
 
 def _save_identity(path: Path, certificate: x509.Certificate, key: ec.EllipticCurvePrivateKey) -> None:
-    secure.write_owned(path, certificate.public_bytes(serialization.Encoding.PEM) + _private_pem(key))
+    payload = certificate.public_bytes(serialization.Encoding.PEM) + _private_pem(key)
+    if len(payload) > _MAX_PEM_BYTES:
+        raise DashboardTLSError("The generated dashboard TLS identity is too large.")
+    secure.write_owned(path, payload)
 
 
 def _common_name(value: str) -> x509.Name:
@@ -241,7 +259,7 @@ def _authority(directory: Path, now: datetime) -> tuple[x509.Certificate, ec.Ell
         if not ca.not_valid_before_utc <= now < ca.not_valid_after_utc - _RENEW_BEFORE:
             raise DashboardTLSError("The dashboard TLS CA is outside its usable lifetime. Supply a current PEM pair.")
     else:
-        if _exists(exported) or _exists(directory / "server.pem"):
+        if _exists(exported) or _exists(directory / "server.pem") or _exists(directory / "lan.pem"):
             raise DashboardTLSError("The dashboard TLS CA identity is missing.")
         key = ec.generate_private_key(ec.SECP256R1())
         subject = _common_name("Flower Dashboard CA")
@@ -259,33 +277,74 @@ def _authority(directory: Path, now: datetime) -> tuple[x509.Certificate, ec.Ell
 
 
 def _leaf(
-    path: Path, name: str, ca: x509.Certificate, ca_key: ec.EllipticCurvePrivateKey, now: datetime
-) -> None:
-    expected = _san(name)
+    path: Path, names: tuple[str, ...], ca: x509.Certificate, ca_key: ec.EllipticCurvePrivateKey,
+    now: datetime, *, lan: bool,
+) -> datetime:
+    expected = [_san(name) for name in names]
     if _exists(path):
         leaf, _ = _identity(path)
         leaf.verify_directly_issued_by(ca)
         constraints = leaf.extensions.get_extension_for_class(x509.BasicConstraints).value
         usage = leaf.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
-        names = list(leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value)
+        stored_names = list(leaf.extensions.get_extension_for_class(x509.SubjectAlternativeName).value)
+        if lan:
+            ipv4 = [name for name in stored_names if isinstance(name, x509.IPAddress)
+                    and isinstance(name.value, ipaddress.IPv4Address)]
+            dns_count = sum(isinstance(name, x509.DNSName) for name in stored_names)
+            valid_names = bool(ipv4) and len(ipv4) + dns_count == len(stored_names)
+        else:
+            valid_names = len(stored_names) == 1 and isinstance(stored_names[0], (x509.DNSName, x509.IPAddress))
         if (constraints.ca or usage != x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH])
-                or len(names) != 1 or not isinstance(names[0], (x509.DNSName, x509.IPAddress))
+                or not valid_names
                 or leaf.not_valid_before_utc < ca.not_valid_before_utc
                 or leaf.not_valid_after_utc > ca.not_valid_after_utc
                 or leaf.not_valid_before_utc > now):
             raise DashboardTLSError("The persisted dashboard TLS server certificate is unsuitable.")
-        if names == [expected] and leaf.not_valid_after_utc > now + _RENEW_BEFORE:
-            return
+        if stored_names == expected and leaf.not_valid_after_utc > now + _RENEW_BEFORE:
+            return leaf.not_valid_after_utc
     key = ec.generate_private_key(ec.SECP256R1())
     leaf = (
         _certificate(_common_name("Flower Dashboard"), ca.subject, key, now,
                      min(now + _LEAF_LIFETIME, ca.not_valid_after_utc), is_ca=False)
-        .add_extension(x509.SubjectAlternativeName([expected]), critical=False)
+        .add_extension(x509.SubjectAlternativeName(expected), critical=False)
         .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
         .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
         .sign(ca_key, hashes.SHA256())
     )
     _save_identity(path, leaf, key)
+    return leaf.not_valid_after_utc
+
+
+@dataclass(frozen=True)
+class _GeneratedTLS:
+    names: tuple[str, ...]
+    hostnames: tuple[str, ...]
+    certfile: Path
+    ca_file: Path
+    expires_at: datetime
+    context: ssl.SSLContext
+
+
+def _generated_tls(
+    config_path: Path, names: tuple[str, ...], now: datetime, *, lan: bool, hostnames: tuple[str, ...] = (),
+) -> _GeneratedTLS:
+    config_path = Path(config_path).expanduser().absolute()
+    selector = hashlib.sha256(os.fsencode(config_path.name)).hexdigest()[:16]
+    directory = config_path.parent / f".flower-dashboard-tls-{selector}"
+    try:
+        secure.check_data_file(config_path)
+        secure.ensure_directory(directory)
+        assert_private_archive_directory(directory)
+        with acquire_file_ownership(directory / "material"):
+            ca, ca_key, ca_file = _authority(directory, now)
+            leaf = directory / ("lan.pem" if lan else "server.pem")
+            expires_at = _leaf(leaf, names + hostnames, ca, ca_key, now, lan=lan)
+            return _GeneratedTLS(names, hostnames, leaf, ca_file, expires_at, _server_context(leaf, leaf))
+    except DashboardTLSError:
+        raise
+    except (OSError, ValueError, TypeError, ArchiveError, RuntimeOwnershipError,
+            InvalidSignature, UnsupportedAlgorithm, x509.ExtensionNotFound, x509.DuplicateExtension) as exc:
+        raise DashboardTLSError("Cannot prepare safe dashboard TLS material for this profile.") from exc
 
 
 def prepare_dashboard_tls(
@@ -296,23 +355,96 @@ def prepare_dashboard_tls(
     address = validate_dashboard_tls(bind=bind, name=name, port=port, cert=cert, key=key)
     if isinstance(address, DashboardTLS):
         return address
-    config_path = Path(config_path).expanduser().absolute()
-    selector = hashlib.sha256(os.fsencode(config_path.name)).hexdigest()[:16]
-    directory = config_path.parent / f".flower-dashboard-tls-{selector}"
+    material = _generated_tls(config_path, (address.name,), _now(), lan=False)
+    return DashboardTLS(address.bind, address.port, address.name, address.authority,
+                        material.certfile, material.certfile, material.ca_file)
+
+
+def _lan_names() -> tuple[str, ...]:
     try:
-        secure.check_data_file(config_path)
-        secure.ensure_directory(directory)
-        assert_private_archive_directory(directory)
-        with acquire_file_ownership(directory / "material"):
-            now = _now()
-            ca, ca_key, ca_file = _authority(directory, now)
-            leaf = directory / "server.pem"
-            _leaf(leaf, address.name, ca, ca_key, now)
-            result = DashboardTLS(address.bind, address.port, address.name, address.authority, leaf, leaf, ca_file)
-            result.context()
-            return result
-    except DashboardTLSError:
-        raise
-    except (OSError, ValueError, TypeError, ArchiveError, RuntimeOwnershipError,
-            InvalidSignature, UnsupportedAlgorithm, x509.ExtensionNotFound, x509.DuplicateExtension) as exc:
-        raise DashboardTLSError("Cannot prepare safe dashboard TLS material for this profile.") from exc
+        from psutil import net_if_addrs
+    except ImportError as exc:
+        raise DashboardTLSError("The LAN dashboard requires psutil for interface discovery.") from exc
+    try:
+        addresses = {
+            ipaddress.IPv4Address(entry.address)
+            for entries in net_if_addrs().values()
+            for entry in entries
+            if entry.family == socket.AF_INET
+        }
+    except (OSError, ValueError) as exc:
+        raise DashboardTLSError("Cannot discover IPv4 addresses for the LAN dashboard.") from exc
+    names = tuple(
+        str(address) for address in sorted(addresses)
+        if not (address.is_unspecified or address.is_multicast or address.is_reserved)
+    )
+    if not names:
+        raise DashboardTLSError("No assigned IPv4 addresses are available for the LAN dashboard.")
+    return names
+
+
+def _lan_hostnames() -> tuple[str, ...]:
+    # macOS's Bonjour name is separately configured from the machine hostname.
+    # DNS is optional. Missing or invalid OS names leave the IPv4 URLs usable.
+    try:
+        if sys.platform == "darwin":
+            result = subprocess.run(["/usr/sbin/scutil", "--get", "LocalHostName"], capture_output=True,
+                                    encoding="ascii", errors="replace", check=True, timeout=0.25)
+            label = result.stdout.strip().lower()
+            name = f"{label}.local" if _DNS_LABEL.fullmatch(label) else ""
+        else:
+            name = socket.gethostname().lower().removesuffix(".")
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    if (not _is_dns_name(name) or name.split(".", 1)[0] == "localhost" or name.endswith(".localhost")):
+        return ()
+    return (name,)
+
+
+class DashboardLANTLS:
+    """Select the current SAN set and leaf for new wildcard TLS connections."""
+
+    bind = "0.0.0.0"
+
+    def __init__(self, config_path: Path, port: int, material: _GeneratedTLS) -> None:
+        self.port = port
+        self.ca_file = material.ca_file
+        self._config_path = config_path
+        self._material = material
+        self._listener_context = material.context
+        self._listener_context.sni_callback = self._select_context
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        return self._material.names
+
+    @property
+    def hostnames(self) -> tuple[str, ...]:
+        return self._material.hostnames
+
+    def context(self) -> ssl.SSLContext:
+        return self._listener_context
+
+    def _select_context(
+        self, connection: ssl.SSLObject | ssl.SSLSocket, _name: str | None, _context: ssl.SSLContext,
+    ) -> None:
+        # IP clients can omit SNI. The current leaf covers every assigned IP.
+        connection.context = self._material.context
+
+    def refresh(self) -> bool:
+        """Publish a complete generation. On failure retain the last good one."""
+        names = _lan_names()
+        hostnames = _lan_hostnames()
+        now = _now()
+        if (names == self.names and hostnames == self.hostnames
+                and self._material.expires_at > now + _RENEW_BEFORE):
+            return False
+        self._material = _generated_tls(self._config_path, names, now, lan=True, hostnames=hostnames)
+        return True
+
+
+def prepare_dashboard_lan_tls(config_path: Path, *, port: int) -> DashboardLANTLS:
+    """Issue a profile-CA leaf for assigned IPv4 addresses and configured names."""
+    _validate_port(port)
+    path = config_path.expanduser().absolute()
+    return DashboardLANTLS(path, port, _generated_tls(path, _lan_names(), _now(), lan=True, hostnames=_lan_hostnames()))

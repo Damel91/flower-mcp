@@ -138,6 +138,32 @@
             <div><span class="section-label">Profilo locale</span><h1 id="settings-title">Impostazioni Flower</h1><p>Prepara le impostazioni del profilo per il prossimo avvio.</p></div>
             <button id="settings-refresh" class="button button-secondary" type="button">Rileggi profilo</button>
           </div>
+          <section class="settings-group" aria-labelledby="network-title">
+            <div class="section-heading">
+              <div><h2 id="network-title">Accesso dalla LAN</h2><p class="muted small">Abilita la dashboard HTTPS sugli indirizzi IPv4 del computer. Flower applica le modifiche al prossimo riavvio.</p></div>
+            </div>
+            <div id="network-content" aria-live="polite"></div>
+            <form id="network-form" hidden>
+              <p><strong>In esecuzione</strong> <span id="network-active"></span></p>
+              <ul id="network-urls" aria-label="Indirizzi HTTPS della dashboard" hidden></ul>
+              <p><strong>Configurazione salvata</strong> <span id="network-saved"></span></p>
+              <p id="network-override" class="muted small" hidden>I parametri di avvio hanno la precedenza. Avvia Flower senza quei parametri per usare la configurazione salvata qui.</p>
+              <div class="settings-grid">
+                <div class="settings-field">
+                  <label for="network-enabled">Consenti l’accesso dalla LAN</label>
+                  <input id="network-enabled" type="checkbox">
+                </div>
+                <div class="settings-field">
+                  <label for="network-port">Porta HTTPS</label>
+                  <input id="network-port" type="number" min="1" max="65535" step="1" required>
+                </div>
+              </div>
+              <p id="network-message" class="form-message" role="status" hidden></p>
+              <div class="project-actions settings-actions">
+                <button id="network-save" class="button button-primary" type="submit">Salva accesso dalla LAN</button>
+              </div>
+            </form>
+          </section>
           <div id="settings-content"></div>
           <form id="settings-form" novalidate hidden>
             <div class="settings-switch markdown-mode-control" role="group" aria-label="Vista impostazioni">

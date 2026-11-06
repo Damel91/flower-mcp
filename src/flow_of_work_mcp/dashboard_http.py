@@ -19,7 +19,7 @@ from threading import Lock
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
-from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from flow_of_work_mcp import managed_service_security as secure
@@ -27,6 +27,7 @@ from flow_of_work_mcp.dashboard_maintenance import DashboardMaintenance, Mainten
 from flow_of_work_mcp.core.errors import ProjectNotFoundError, RequirementConflictError
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.dashboard_auth import DashboardAuth, DashboardAuthError
+from flow_of_work_mcp.dashboard_network import DashboardNetworkError, DashboardNetworkSettings
 from flow_of_work_mcp.profile_settings import DashboardSettings, SettingsError
 from flow_of_work_mcp.ledger_archive import ArchiveError, MAX_ARCHIVE_BYTES, create_archive
 from flow_of_work_mcp.dashboard_backups import DashboardBackups
@@ -153,17 +154,22 @@ class _ArchiveResponse(Response):
 
 class DashboardHTTP:
     def __init__(self, runtime, config_path: Path, *, port: int, host: str = '127.0.0.1',
-                 loaded_config_revision: str | None = None):
+                 loaded_config_revision: str | None = None, network_active: dict | None = None,
+                 network_urls=None):
         from flow_of_work_mcp.application.dashboard import DashboardProjectionService
         from flow_of_work_mcp.managed_upgrade import UpgradeController
         self.projection = DashboardProjectionService(runtime)
         self.requirements = runtime.requirements
         self.maintenance = DashboardMaintenance(runtime, config_path)
         self.host, self.port = host, port
-        self._remote_authority = None
+        self._remote_tls = None
         self.auth = DashboardAuth(config_path, runtime.ledger.database_path, port=port)
         self.settings = DashboardSettings(config_path, runtime.ledger.database_path,
                                           loaded_revision=loaded_config_revision)
+        self.network = DashboardNetworkSettings(config_path)
+        self._network_active = (dict(network_active) if network_active is not None
+                                else {'mode': 'local', 'port': None, 'cli_override': False})
+        self._network_urls = network_urls
         self.database_path = runtime.ledger.database_path
         self.backups = DashboardBackups(self.database_path)
         self._archive_gate = Lock()
@@ -173,14 +179,29 @@ class DashboardHTTP:
         local = '[::1]' if ':' in host else '127.0.0.1'
         return f'http://{local}:{self.port}/dashboard'
 
+    def _allows_https_authority(self, request, authority):
+        tls = self._remote_tls
+        if getattr(tls, 'bind', None) != '0.0.0.0':
+            return authority == tls.authority
+        server = request.scope.get('server')
+        if server is None:
+            return False
+        address, port = server
+        if port != tls.port or address not in tls.names:
+            return False
+        suffix = '' if port == 443 else f':{port}'
+        return authority == address + suffix or any(
+            authority == name + suffix for name in tls.hostnames
+        )
+
     def _security(self, request):
-        if self._remote_authority is not None:
+        if self._remote_tls is not None:
             hosts = request.headers.getlist('host')
             origins = request.headers.getlist('origin')
-            expected = f'https://{self._remote_authority}'
-            if (request.scope.get('scheme') != 'https' or len(hosts) != 1
-                    or hosts[0].lower() != self._remote_authority or len(origins) > 1):
+            if (request.scope.get('scheme') != 'https' or len(hosts) != 1 or len(origins) > 1
+                    or not self._allows_https_authority(request, hosts[0].lower())):
                 return False
+            expected = f'https://{hosts[0].lower()}'
             if origins and origins[0] != expected:
                 return False
             return request.method != 'POST' or origins == [expected]
@@ -202,7 +223,7 @@ class DashboardHTTP:
         return request.method != 'POST' or origin == expected
 
     def _access_denied(self):
-        if self._remote_authority is not None:
+        if self._remote_tls is not None:
             return self._json(status=403, reason='dashboard_remote_access_required',
                               message='Use the configured Flower HTTPS address.')
         return self._json(status=403, reason='dashboard_local_access_required',
@@ -229,6 +250,11 @@ class DashboardHTTP:
             return self._json(status=404, reason='dashboard_resource_not_found', message='The dashboard resource does not exist.')
         data = files('flow_of_work_mcp').joinpath('resources', 'dashboard', name).read_bytes()
         return Response(data, media_type=types[name], headers=self._headers())
+
+    async def _redirect_to_dashboard(self, request):
+        if not self._security(request):
+            return self._access_denied()
+        return RedirectResponse('/dashboard', headers=self._headers())
 
     async def _body(self, request):
         if request.headers.get('content-type', '').split(';', 1)[0].strip() != 'application/json':
@@ -261,6 +287,17 @@ class DashboardHTTP:
         with self.maintenance.admission():
             self._reauthorize(cookie, csrf)
             return self.settings.save(body)
+
+    def _network_view(self, cookie, csrf, body=None):
+        with self.maintenance.admission():
+            self.auth.authorize(cookie, csrf, write=body is not None)
+            self._assert_runtime_lease()
+            saved = (self.network.snapshot() if body is None else
+                     self.network.save(body, mcp_host=self.host, mcp_port=self.port))
+            active = dict(self._network_active)
+            if self._network_urls is not None:
+                active['urls'] = list(self._network_urls())
+            return {**saved, 'active': active}
 
     def _reauthorize(self, cookie, csrf):
         self.auth.authorize(cookie, csrf, write=True)
@@ -408,7 +445,8 @@ class DashboardHTTP:
                 response.delete_cookie(self.auth.cookie_name, path='/dashboard',
                     httponly=True, samesite='strict', secure=request.url.scheme == 'https')
                 return response
-            read_route = (path in (['status'], ['projects'], ['settings'], ['backups'], ['upgrade'])
+            network_route = path == ['network']
+            read_route = (path in (['status'], ['projects'], ['settings'], ['backups'], ['upgrade']) or network_route
                 or len(path) == 4 and path[0] == 'projects' and path[2] == 'sections'
                 or len(path) == 5 and path[0] == 'projects' and path[2] == 'evidence')
             admin_route = len(path) == 4 and path[0] == 'projects' and path[2] == 'deletion'
@@ -421,7 +459,7 @@ class DashboardHTTP:
                              and path[2] in ('download', 'delete'))
             if not (request.method == 'GET' and read_route
                     or request.method == 'POST' and (admin_route or create_route or settings_route or upgrade_action
-                                                      or archive_route or backups_route or backup_action)):
+                                                      or archive_route or backups_route or backup_action or network_route)):
                 return self._json(status=404, reason='dashboard_route_not_found', message='Unknown dashboard route.')
             csrf = await run_in_threadpool(self.auth.authorize, cookie, submitted_csrf,
                                            write=request.method == 'POST')
@@ -437,6 +475,8 @@ class DashboardHTTP:
                 if settings_route:
                     result = await run_in_threadpool(self._save_settings, body, cookie, submitted_csrf)
                     return self._json(result)
+                if network_route:
+                    return self._json(await run_in_threadpool(self._network_view, cookie, csrf, body))
                 if upgrade_action:
                     result = await run_in_threadpool(self._upgrade_operation, path[1], body, cookie, submitted_csrf)
                     return self._json(result, status=202 if path[1] == 'apply' else 200)
@@ -477,6 +517,8 @@ class DashboardHTTP:
                 return self._json({**self.maintenance.status(), 'csrf_token': csrf})
             if path == ['settings']:
                 return self._json(await run_in_threadpool(self.maintenance.read, self.settings.snapshot))
+            if network_route:
+                return self._json(await run_in_threadpool(self._network_view, cookie, csrf))
             if path == ['upgrade']:
                 return self._json(await run_in_threadpool(self._upgrade_status, cookie, csrf))
             if backups_route:
@@ -496,7 +538,7 @@ class DashboardHTTP:
             return self._json(result)
         except DashboardAuthError as exc:
             return self._auth_error(exc)
-        except SettingsError as exc:
+        except (SettingsError, DashboardNetworkError) as exc:
             return self._json(status=exc.status, reason=exc.code, message=str(exc))
         except ArchiveError as exc:
             return self._archive_error(exc)
@@ -556,7 +598,7 @@ class DashboardHTTP:
         # The two listeners share all runtime mutation gates. Authentication
         # and its cookie remain separate for each ingress.
         remote = copy(self)
-        remote._remote_authority = tls.authority
+        remote._remote_tls = tls
         remote.auth = DashboardAuth(self.maintenance.config_path, self.database_path, port=tls.port)
         remote.auth.cookie_name += '_https'
 
@@ -568,6 +610,7 @@ class DashboardHTTP:
                 remote.close()
 
         app = Starlette(routes=[
+            Route('/', remote._redirect_to_dashboard, methods=['GET']),
             Route('/dashboard', remote.static, methods=['GET']),
             Route('/dashboard/', remote.static, methods=['GET']),
             Route('/dashboard/assets/{asset}', remote.static, methods=['GET']),

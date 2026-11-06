@@ -3,8 +3,11 @@
 from datetime import timedelta
 import os
 from pathlib import Path
+import socket
 import ssl
 import stat
+import sys
+from types import SimpleNamespace
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -160,3 +163,105 @@ def test_supplied_pem_requires_matching_name_and_usable_key(profile):
     secure.write_owned(key, b"malformed key", private_parent=False)
     with pytest.raises(tls.DashboardTLSError):
         _prepare(profile, cert=cert, key=key)
+
+
+def test_lan_discovery_uses_assigned_ipv4_addresses(monkeypatch):
+    def ipv4(address):
+        return SimpleNamespace(family=socket.AF_INET, address=address)
+
+    addresses = {
+        "ethernet": [ipv4("192.0.2.42"), ipv4("192.0.2.3")],
+        "wireless": [ipv4("192.0.2.42"), ipv4("0.0.0.0"), ipv4("224.0.0.1"), ipv4("255.255.255.255")],
+        "loopback": [ipv4("127.0.0.1"), SimpleNamespace(family=socket.AF_INET6, address="::1")],
+    }
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(net_if_addrs=lambda: addresses))
+    assert tls._lan_names() == ("127.0.0.1", "192.0.2.3", "192.0.2.42")
+    addresses.clear()
+    with pytest.raises(tls.DashboardTLSError, match="No assigned IPv4"):
+        tls._lan_names()
+
+
+def test_lan_hostname_discovery_uses_os_configured_identity(monkeypatch):
+    monkeypatch.setattr(tls, "sys", SimpleNamespace(platform="darwin"))
+
+    def bonjour_name(command, **options):
+        assert command == ["/usr/sbin/scutil", "--get", "LocalHostName"]
+        assert options["timeout"] < 1
+        return SimpleNamespace(stdout="Flower-Lab\n")
+
+    monkeypatch.setattr(tls.subprocess, "run", bonjour_name)
+    assert tls._lan_hostnames() == ("flower-lab.local",)
+    monkeypatch.setattr(tls, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(tls.socket, "gethostname", lambda: "Flower.Example.Test.")
+    assert tls._lan_hostnames() == ("flower.example.test",)
+    monkeypatch.setattr(tls.socket, "gethostname", lambda: "localhost.localdomain")
+    assert tls._lan_hostnames() == ()
+
+
+def test_lan_refresh_switches_leaf_on_the_existing_listener_context(profile, monkeypatch):
+    concrete = _prepare(profile)
+    concrete_leaf = concrete.certfile.read_bytes()
+    original_ca = concrete.ca_file.read_bytes()
+    addresses = ("127.0.0.1", "192.0.2.3")
+    hostnames = ("flower.local",)
+    monkeypatch.setattr(tls, "_lan_names", lambda: addresses)
+    monkeypatch.setattr(tls, "_lan_hostnames", lambda: hostnames)
+    material = tls.prepare_dashboard_lan_tls(profile, port=8443)
+    assert (material.bind, material.port, material.names) == ("0.0.0.0", 8443, addresses)
+    assert material.hostnames == hostnames
+    assert material.ca_file == concrete.ca_file
+    listener_context = material.context()
+    assert listener_context.minimum_version == ssl.TLSVersion.TLSv1_2
+    for name in addresses + hostnames:
+        assert _handshake(material, name) in {"TLSv1.2", "TLSv1.3"}
+    assert not material.refresh()
+
+    addresses = ("127.0.0.1", "198.51.100.8")
+    assert material.refresh()
+    assert material.context() is listener_context
+    assert material.names == addresses
+    assert _handshake(material, "198.51.100.8") in {"TLSv1.2", "TLSv1.3"}
+    with pytest.raises(ssl.SSLCertVerificationError):
+        _handshake(material, "192.0.2.3")
+
+    hostnames = ("new-flower.local",)
+    assert material.refresh()
+    assert material.hostnames == hostnames
+    assert _handshake(material, "new-flower.local") in {"TLSv1.2", "TLSv1.3"}
+    with pytest.raises(ssl.SSLCertVerificationError):
+        _handshake(material, "flower.local")
+    assert material.ca_file.read_bytes() == original_ca
+    assert concrete.certfile.read_bytes() == concrete_leaf
+
+
+def test_lan_starts_with_loopback_and_renews_unchanged_names(profile, monkeypatch):
+    instant = tls._now()
+    monkeypatch.setattr(tls, "_now", lambda: instant)
+    monkeypatch.setattr(tls, "_lan_names", lambda: ("127.0.0.1",))
+    monkeypatch.setattr(tls, "_lan_hostnames", lambda: ())
+    material = tls.prepare_dashboard_lan_tls(profile, port=8443)
+    lan_leaf = material.ca_file.with_name("lan.pem")
+    leaf = lan_leaf.read_bytes()
+    ca = material.ca_file.read_bytes()
+    assert _handshake(material, "127.0.0.1") in {"TLSv1.2", "TLSv1.3"}
+    assert not material.refresh()
+
+    instant += timedelta(days=80)
+    assert material.refresh()
+    assert lan_leaf.read_bytes() != leaf
+    assert material.ca_file.read_bytes() == ca
+    assert material.names == ("127.0.0.1",)
+
+
+def test_lan_refresh_retains_last_good_leaf_if_preparation_fails(profile, monkeypatch):
+    addresses = ("127.0.0.1",)
+    monkeypatch.setattr(tls, "_lan_names", lambda: addresses)
+    monkeypatch.setattr(tls, "_lan_hostnames", lambda: ())
+    material = tls.prepare_dashboard_lan_tls(profile, port=8443)
+    identity = material.ca_file.with_name("ca-identity.pem")
+    secure.write_owned(identity, b"invalid private identity")
+    addresses = ("198.51.100.8",)
+    with pytest.raises(tls.DashboardTLSError):
+        material.refresh()
+    assert material.names == ("127.0.0.1",)
+    assert _handshake(material, "127.0.0.1") in {"TLSv1.2", "TLSv1.3"}

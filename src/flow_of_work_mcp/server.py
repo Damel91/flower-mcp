@@ -6070,6 +6070,7 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
         DashboardHTTPSListener,
         DashboardHTTPSListenerError,
         dashboard_https_options,
+        dashboard_https_urls,
     )
     from flow_of_work_mcp.installation_fence import InstallationFenceError, startup_lease
     from flow_of_work_mcp.profiles import ProfileError, prepare_profile, profile_config_path
@@ -6081,7 +6082,8 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
         parser.error("--port must be in the range 1..65535")
     try:
         https_options = dashboard_https_options(args)
-        if https_options is not None:
+        cli_dashboard_override = args.dashboard_local or https_options is not None
+        if https_options is not None and https_options["bind"] != "0.0.0.0":
             from flow_of_work_mcp.dashboard_tls import validate_dashboard_tls
 
             validate_dashboard_tls(**https_options)
@@ -6120,13 +6122,22 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
             # opening its profile. Read the durable fence again with the ledger held.
             installation.assert_admitted(transport=args.transport, host=args.host, port=args.port,
                                          managed_restart=managed_restart)
-        if https_options is not None:
-            from flow_of_work_mcp.dashboard_tls import prepare_dashboard_tls
+        try:
+            if args.transport == "streamable-http" and not cli_dashboard_override:
+                from flow_of_work_mcp.dashboard_network import DashboardNetworkSettings
 
-            try:
-                dashboard_tls = prepare_dashboard_tls(Path(config_path).absolute(), **https_options)
-            except (OSError, ValueError) as exc:
-                parser.error(str(exc))
+                network = DashboardNetworkSettings(Path(config_path).absolute()).snapshot()
+                if network["enabled"]:
+                    https_options = dashboard_https_options(args, saved_port=network["port"])
+            if https_options is not None:
+                from flow_of_work_mcp import dashboard_tls as tls
+
+                if https_options["bind"] == "0.0.0.0":
+                    dashboard_tls = tls.prepare_dashboard_lan_tls(Path(config_path).absolute(), port=https_options["port"])
+                else:
+                    dashboard_tls = tls.prepare_dashboard_tls(Path(config_path).absolute(), **https_options)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     except BaseException as exc:
         if ownership is not None:
             ownership.close()
@@ -6188,8 +6199,14 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
         dashboard = None
         if args.transport == "streamable-http":
             from flow_of_work_mcp.dashboard_http import DashboardHTTP
+            mode = "local"
+            if https_options is not None:
+                mode = "lan" if https_options["bind"] == "0.0.0.0" else "explicit"
+            network_active = {"mode": mode, "port": https_options["port"] if https_options else None,
+                              "cli_override": cli_dashboard_override}
             dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port, host=args.host,
-                                      loaded_config_revision=loaded_config_revision)
+                                      loaded_config_revision=loaded_config_revision, network_active=network_active,
+                                      network_urls=(lambda: dashboard_https_urls(dashboard_tls)) if dashboard_tls else None)
         app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
         if dashboard_tls is not None:
             https_listener = DashboardHTTPSListener(dashboard.remote_dashboard_app(dashboard_tls), dashboard_tls)
@@ -6197,7 +6214,8 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
                 https_listener.start()
             except DashboardHTTPSListenerError as exc:
                 parser.error(str(exc))
-            print(f"Flower HTTPS dashboard: https://{dashboard_tls.authority}/dashboard", file=sys.stderr)
+            for url in dashboard_https_urls(dashboard_tls):
+                print(f"Flower HTTPS dashboard: {url}", file=sys.stderr)
             if dashboard_tls.ca_file is not None:
                 print(f"Flower dashboard CA certificate: {dashboard_tls.ca_file}", file=sys.stderr)
         if dashboard is not None:
