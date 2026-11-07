@@ -264,3 +264,22 @@ def test_large_retained_evidence_has_explicit_read_limit_without_mutation(tmp_pa
         assert dump(runtime) == before
     finally:
         runtime.close()
+
+
+def test_verification_list_keeps_a_link_without_loading_oversized_reference(tmp_path):
+    runtime, ids, _, _, _ = prepared(tmp_path)
+    project_id = ids[0]
+    try:
+        evidence = runtime.ledger.record_verification(
+            project_id, 'REQ-000001', kind='tested_deterministically', outcome='passed',
+            reference='x' * (MAXIMUM_EVIDENCE_BYTES + 1), actor='agent')
+        service = DashboardProjectionService(runtime)
+        items = service.project(project_id, 'verification', channel='verification')['items']
+        assert len(items) == 1
+        assert items[0]['identity'] == str(evidence['evidence_id'])
+        assert items[0]['outcome'] == 'passed'
+        assert 'reference' not in items[0]
+        with pytest.raises(ValueError, match='2 MiB'):
+            service.evidence(project_id, 'verification', items[0]['identity'])
+    finally:
+        runtime.close()

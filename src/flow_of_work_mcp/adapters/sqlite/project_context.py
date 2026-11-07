@@ -24,7 +24,7 @@ _DASHBOARD_VERIFICATION_CHANNELS = {
     ),
     "verification": (
         """SELECT 'verification' AS kind, CAST(evidence_id AS TEXT) AS identity,
-                  verification_kind AS title, evidence_id, requirement_id, outcome, reference,
+                  verification_kind AS title, evidence_id, requirement_id, outcome,
                   recorded_at, actor, 'recorded_verification_evidence' AS provenance
              FROM verification_evidence WHERE project_id = ?""",
         "evidence_id DESC", "requirement_id",
