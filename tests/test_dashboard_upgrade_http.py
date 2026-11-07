@@ -4,7 +4,7 @@ from uuid import uuid4
 from starlette.testclient import TestClient
 
 from flow_of_work_mcp.managed_service import ServiceError
-from tests.test_dashboard_http import fixture, request_csrf
+from tests.test_dashboard_http import delete_while_checking_maintenance, fixture, request_csrf
 
 
 class UpgradeProbe:
@@ -82,7 +82,7 @@ def test_upgrade_http_requires_owner_csrf_exact_preview_and_fresh_password(tmp_p
         runtime.close()
 
 
-def test_upgrade_submission_respects_project_maintenance_without_hiding_receipt(tmp_path):
+def test_upgrade_submission_respects_project_maintenance_without_hiding_receipt(tmp_path, monkeypatch):
     runtime, dashboard, mcp = fixture(tmp_path)
     probe = dashboard.upgrade = UpgradeProbe()
     endpoint = '/dashboard/api/upgrade'
@@ -90,15 +90,14 @@ def test_upgrade_submission_respects_project_maintenance_without_hiding_receipt(
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760',
                         client=('127.0.0.1', 12345)) as client:
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
-            path = '/dashboard/api/projects/project-a/deletion/'
-            body = {'deletion_id': str(uuid4())}
-            assert client.post(path + 'prepare', json=body, headers=headers).status_code == 200
-            assert client.get(endpoint).status_code == 200
-            assert client.post(endpoint + '/preview', json={'version': '1.0.1'}, headers=headers).status_code == 503
-            assert client.post(endpoint + '/apply',
-                               json={'id': probe.preview_id, 'password': 'synthetic-fixture-only'},
-                               headers=headers).status_code == 503
-            assert not probe.previews and not probe.applies
-            assert client.post(path + 'cancel', json=body, headers=headers).status_code == 200
+            def check():
+                assert client.get(endpoint).status_code == 200
+                assert client.post(endpoint + '/preview', json={'version': '1.0.1'}, headers=headers).status_code == 503
+                assert client.post(endpoint + '/apply',
+                                   json={'id': probe.preview_id, 'password': 'synthetic-fixture-only'},
+                                   headers=headers).status_code == 503
+                assert not probe.previews and not probe.applies
+
+            delete_while_checking_maintenance(client, headers, monkeypatch, check)
     finally:
         runtime.close()

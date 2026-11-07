@@ -1,10 +1,10 @@
 """HTTP owner-authority contracts using a deterministic native seam, not OS acceptance."""
 import asyncio
-from uuid import uuid4
 from types import SimpleNamespace
 
 from starlette.testclient import TestClient
 
+from flow_of_work_mcp import dashboard_maintenance
 from flow_of_work_mcp.dashboard_http import DashboardHTTP
 from flow_of_work_mcp.dashboard_auth import DashboardAuth
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind
@@ -52,6 +52,24 @@ def request_csrf(client):
     return csrf
 
 
+def delete_while_checking_maintenance(client, headers, monkeypatch, check):
+    original = dashboard_maintenance.run_dashboard_project_purge
+
+    def during_purge(*args, **kwargs):
+        check()
+        return original(*args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(dashboard_maintenance, 'run_dashboard_project_purge', during_purge)
+        response = client.post('/dashboard/api/projects/project-a/deletion/delete', json={
+            'confirm_project_id': 'project-a', 'password': 'synthetic-fixture-only',
+        }, headers=headers)
+    assert response.status_code == 200, response.text
+    result = response.json()['result']
+    assert result['deletion']['deletion_state'] == 'scrubbed', result
+    assert result['maintenance']['state'] == 'ready'
+
+
 def test_owner_login_protects_all_private_status_reads_and_administration(tmp_path):
     runtime, dashboard, mcp = fixture(tmp_path)
     try:
@@ -70,21 +88,13 @@ def test_owner_login_protects_all_private_status_reads_and_administration(tmp_pa
             csrf = request_csrf(client)
             assert client.get('/dashboard/api/projects').status_code == 200
             assert client.get('/dashboard/api/projects', headers={'Origin': 'https://evil.example'}).status_code == 403
-            endpoint = '/dashboard/api/projects/project-a/deletion/prepare'
-            body = {'deletion_id': str(uuid4())}
+            endpoint = '/dashboard/api/projects/project-a/deletion/delete'
+            body = {'confirm_project_id': 'project-a', 'password': 'synthetic-fixture-only'}
             assert client.post(endpoint, json=body).status_code == 403
             assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760',
                                                            'X-Flower-CSRF': ''}).status_code == 403
             assert client.post(endpoint, json=body, headers={'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': 'wrong'}).status_code == 403
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': csrf}
-            prepared = client.post(endpoint, json=body, headers=headers)
-            assert prepared.status_code == 200
-            assert prepared.json()['result']['deletion']['deletion_state'] == 'prepared'
-            assert client.get('/dashboard/api/projects').status_code == 503
-            assert client.get('/dashboard/api/status').json()['result']['state'] == 'maintenance'
-            cancelled = client.post('/dashboard/api/projects/project-a/deletion/cancel', json=body, headers=headers)
-            assert cancelled.json()['result']['maintenance']['state'] == 'ready'
-            assert client.get('/dashboard/api/projects').status_code == 200
             assert client.post('/dashboard/api/logout', json={}, headers=headers).status_code == 200
             assert client.get('/dashboard/api/status').status_code == 401
             assert client.get('/dashboard/api/projects').status_code == 401
@@ -94,40 +104,66 @@ def test_owner_login_protects_all_private_status_reads_and_administration(tmp_pa
         runtime.close()
 
 
-def test_final_delete_requires_fresh_owner_password_and_preserves_prepared_intent_on_refusal(tmp_path):
+def test_direct_delete_requires_exact_id_and_fresh_password_without_retaining_an_intent(tmp_path):
     runtime, _, mcp = fixture(tmp_path)
     database = runtime.ledger.database_path
     try:
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
-            endpoint = '/dashboard/api/projects/project-a/deletion/'
-            intent = {'deletion_id': str(uuid4())}
-            prepared = client.post(endpoint + 'prepare', json=intent, headers=headers)
-            assert prepared.status_code == 200
-            fingerprint = prepared.json()['result']['deletion']['prepared_fingerprint']
-            body = {**intent, 'expected_fingerprint': fingerprint, 'confirm_project_id': 'project-a',
-                    'host_quiescence_ref': 'synthetic-fixture:idle'}
+            endpoint = '/dashboard/api/projects/project-a/deletion/delete'
+            body = {'confirm_project_id': 'project-a'}
+            journal = database.with_name(database.name + '.project-purge')
             before = _rows(database)
             for supplied, status, reason in (
                 ({}, 400, 'dashboard_delete_password_required'),
                 ({'password': 'wrong-synthetic'}, 403, 'dashboard_delete_password_denied'),
             ):
-                refused = client.post(endpoint + 'delete', json={**body, **supplied}, headers=headers)
+                refused = client.post(endpoint, json={**body, **supplied}, headers=headers)
                 assert refused.status_code == status
                 assert refused.json()['reason'] == reason
                 assert 'wrong-synthetic' not in refused.text
                 assert _rows(database) == before
-                inspected = client.post(endpoint + 'inspect', json=intent, headers=headers)
-                assert inspected.json()['result']['deletion']['deletion_state'] == 'prepared'
-            deleted = client.post(endpoint + 'delete',
-                json={**body, 'password': 'synthetic-fixture-only'}, headers=headers)
+                assert client.get('/dashboard/api/status').json()['result']['state'] == 'ready'
+                assert not journal.exists()
+            wrong_project = client.post(endpoint, json={
+                'confirm_project_id': 'project-b', 'password': 'synthetic-fixture-only',
+            }, headers=headers)
+            assert wrong_project.status_code == 400
+            assert _rows(database) == before
+            deleted = client.post(endpoint, json={**body, 'password': 'synthetic-fixture-only'}, headers=headers)
             assert deleted.status_code == 200
             assert deleted.json()['result']['deletion']['deletion_state'] == 'scrubbed'
             assert 'synthetic-fixture-only' not in deleted.text
-            journal = database.with_name(database.name + '.project-purge') / (intent['deletion_id'] + '.json')
-            assert 'synthetic-fixture-only' not in journal.read_text()
-            assert client.post(endpoint + 'delete', json=body, headers=headers).status_code == 400
+            assert not journal.exists()
+            assert _rows(database)['projects'] == [before['projects'][1]]
+            assert client.post(endpoint, json=body, headers=headers).status_code == 400
             assert client.get('/dashboard/api/status').json()['result']['state'] == 'ready'
+    finally:
+        runtime.close()
+
+
+def test_delete_rechecks_owner_session_after_draining_local_work(tmp_path, monkeypatch):
+    runtime, dashboard, mcp = fixture(tmp_path)
+    database = runtime.ledger.database_path
+    try:
+        with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+            csrf = request_csrf(client)
+            cookie = client.cookies.get(dashboard.auth.cookie_name)
+            before = _rows(database)
+            begin = dashboard.maintenance._begin
+
+            def drain_and_logout():
+                begin()
+                dashboard.auth.logout(cookie, csrf)
+
+            monkeypatch.setattr(dashboard.maintenance, '_begin', drain_and_logout)
+            result = client.post('/dashboard/api/projects/project-a/deletion/delete',
+                headers={'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': csrf},
+                json={'confirm_project_id': 'project-a', 'password': 'synthetic-fixture-only'})
+            assert result.status_code == 401
+            assert _rows(database) == before
+            assert dashboard.maintenance.status()['state'] == 'ready'
+            assert not database.with_name(database.name + '.project-purge').exists()
     finally:
         runtime.close()
 
@@ -181,9 +217,16 @@ def test_administration_keeps_closed_fields_and_bounded_body(tmp_path):
     try:
         with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
             headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
-            endpoint = '/dashboard/api/projects/project-a/deletion/prepare'
-            assert client.post(endpoint, json={'deletion_id': 'x' * 17000}, headers=headers).status_code == 400
-            assert client.post(endpoint, json={'deletion_id': str(uuid4()), 'project': 'other'}, headers=headers).status_code == 400
+            route = '/dashboard/api/projects/project-a/deletion/'
+            assert client.post(route + 'delete', json={
+                'confirm_project_id': 'project-a', 'password': 'x' * 17000,
+            }, headers=headers).status_code == 400
+            assert client.post(route + 'delete', json={
+                'confirm_project_id': 'project-a', 'password': 'synthetic-fixture-only',
+                'host_quiescence_ref': 'obsolete',
+            }, headers=headers).status_code == 400
+            for operation in ('prepare', 'inspect', 'reconcile', 'cancel'):
+                assert client.post(route + operation, json={}, headers=headers).status_code == 404
             assert client.get('/dashboard/assets/../config.yaml').status_code != 200
     finally:
         runtime.close()

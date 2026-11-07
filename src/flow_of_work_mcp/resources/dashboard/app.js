@@ -117,6 +117,11 @@
     archive_source_unavailable: "Il registro non è disponibile. Controlla il profilo e riprova.",
     archive_io_failure: "Flower non ha potuto leggere o scrivere l’archivio. Controlla lo spazio disponibile e i permessi del profilo.",
     archive_invalid: "L’archivio non ha superato il controllo di integrità.",
+    archive_profile_name_invalid: "Scegli un nome valido per il nuovo profilo.",
+    archive_destination_exists: "Esiste già un profilo con questo nome. Scegli un altro nome.",
+    archive_restore_media_type: "Seleziona un archivio ZIP di Flower.",
+    archive_restore_timeout: "Il caricamento dell’archivio ha impiegato troppo tempo. Riprova.",
+    archive_workspace_unsafe: "La cartella dei profili non è disponibile per il ripristino. Controlla la configurazione e i permessi di Flower.",
   };
   const markdownTags = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote",
     "pre", "code", "strong", "em", "s", "hr", "br", "a", "table", "thead", "tbody", "tr", "th", "td", "span"]);
@@ -155,7 +160,7 @@
     network: null, networkBusy: false, networkEpoch: 0,
     upgradeStatus: null, upgradePreview: null, upgradeBusy: false, upgradeReading: false, upgradeEpoch: 0, rememberedUpgrade: null,
     archive: null, archiveBusy: false, backupDeletion: null,
-    loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false, rememberedIntent: null,
+    loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false,
   };
   const $ = (id) => document.getElementById(id);
 
@@ -217,7 +222,7 @@
 
   const dashboardRequests = new Set();
 
-  async function request(path, body, { timeoutMs = 15000, archive = false } = {}) {
+  async function request(path, body, { timeoutMs = 15000, archive = false, zipUpload = false } = {}) {
     const generation = state.authGeneration;
     const controller = new AbortController();
     dashboardRequests.add(controller);
@@ -227,8 +232,8 @@
     if (state.csrf) options.headers["X-Flower-CSRF"] = state.csrf;
     if (body !== undefined) {
       options.method = "POST";
-      options.headers["Content-Type"] = "application/json";
-      options.body = JSON.stringify(body);
+      options.headers["Content-Type"] = zipUpload ? "application/zip" : "application/json";
+      options.body = zipUpload ? body : JSON.stringify(body);
     }
     try {
       const response = await fetch(`/dashboard/api/${path}`, options);
@@ -310,7 +315,9 @@
   }
 
   const projectIdPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+  const archiveProfilePattern = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
   const archiveTimeoutMs = 120000;
+  const restoreTimeoutMs = 330000;
 
   function updateArchiveControls() {
     const disabled = state.archiveBusy || state.maintenance.state !== "ready";
@@ -321,6 +328,13 @@
     $("backup-delete-submit").disabled = disabled || !$("backup-delete-password").value;
     $("backup-delete-password").readOnly = state.archiveBusy;
     $("backup-delete-close").disabled = state.archiveBusy;
+    const profileName = $("restore-profile").value.trim();
+    $("restore-open").disabled = disabled;
+    $("restore-submit").disabled = disabled || !$("restore-file").files.length
+      || !archiveProfilePattern.test(profileName) || profileName.endsWith(".");
+    $("restore-file").disabled = state.archiveBusy;
+    $("restore-profile").readOnly = state.archiveBusy;
+    $("restore-close").disabled = $("restore-cancel").disabled = state.archiveBusy;
     for (const item of $("backups-content").querySelectorAll("button[data-backup-action]")) item.disabled = disabled;
   }
 
@@ -329,7 +343,6 @@
     const projectId = project.project_id;
     state.archive = { projectId };
     $("archive-scope").textContent = project.name === projectId ? projectId : `${project.name} (${projectId})`;
-    $("archive-restore-guide").querySelector("details").open = false;
     formMessage("archive-message", "");
     $("archive-dialog").showModal();
   }
@@ -365,6 +378,41 @@
     if (error.reason === "response_timeout") return "Il download ha richiesto troppo tempo. Riprova fra poco.";
     if (error instanceof SyntaxError) return "Flower non ha restituito il file ZIP richiesto.";
     return error.message;
+  }
+
+  function openRestore() {
+    if (!state.ready || $("restore-open").disabled) return;
+    $("restore-form").reset();
+    formMessage("restore-message", "");
+    updateArchiveControls();
+    $("restore-dialog").showModal();
+    $("restore-file").focus();
+  }
+
+  function restoreArchive(event) {
+    event.preventDefault();
+    if ($("restore-submit").disabled) return;
+    const profileName = $("restore-profile").value.trim();
+    const archive = $("restore-file").files[0];
+    const dialog = $("restore-dialog");
+    return archiveTask(async () => {
+      formMessage("restore-message", "Caricamento e verifica dell’archivio in corso…");
+      try {
+        const result = await request(`restore/${encodeURIComponent(profileName)}`, archive,
+          { zipUpload: true, timeoutMs: restoreTimeoutMs });
+        if (!dialog.open || state.authBusy) return;
+        if (result.profile_name !== profileName) throw new Error("Ripristino non confermato.");
+        dialog.close();
+        notice(`Archivio ripristinato nel nuovo profilo «${profileName}». Il profilo è spento.`);
+        $("backups-title").focus();
+      } catch (error) {
+        if (!dialog.open || error.stale) return;
+        const message = !error.status || error.status >= 500
+          ? `Il ripristino del profilo «${profileName}» non è confermato. Controlla se il profilo esiste prima di riprovare.`
+          : archiveError(error);
+        formMessage("restore-message", message, true);
+      }
+    });
   }
 
   function downloadArchive() {
@@ -1042,8 +1090,7 @@
   }
 
   function closePrivateDialogs() {
-    if (state.deletion) rememberIntent();
-    for (const name of ["create-dialog", "delete-dialog", "evidence-dialog", "archive-dialog", "backup-delete-dialog", "upgrade-dialog"]) {
+    for (const name of ["create-dialog", "delete-dialog", "evidence-dialog", "archive-dialog", "backup-delete-dialog", "restore-dialog", "upgrade-dialog"]) {
       if ($(name).open) $(name).close();
     }
   }
@@ -1084,9 +1131,11 @@
       $("network-active").textContent = $("network-saved").textContent = "";
       formMessage("network-message", "");
       state.deletion = null;
+      $("delete-form").reset();
+      formMessage("delete-message", "");
       state.maintenance = { state: "ready" };
-      for (const name of ["catalog-content", "section-content", "evidence-content", "delete-content", "delete-actions", "section-navigation", "backups-content"]) $(name).replaceChildren();
-      for (const name of ["sidebar-project-name", "sidebar-project-id", "project-title", "section-title", "section-observed", "catalog-count", "catalog-observed", "section-bounds", "archive-scope", "backup-delete-selection"]) $(name).textContent = "";
+      for (const name of ["catalog-content", "section-content", "evidence-content", "section-navigation", "backups-content"]) $(name).replaceChildren();
+      for (const name of ["sidebar-project-name", "sidebar-project-id", "project-title", "section-title", "section-observed", "catalog-count", "catalog-observed", "section-bounds", "archive-scope", "backup-delete-selection", "delete-project-name", "delete-project-id"]) $(name).textContent = "";
       formMessage("archive-message", "");
       formMessage("backup-delete-message", "");
       $("login-password").value = "";
@@ -1688,32 +1737,12 @@
     updateNetworkControls();
     updateArchiveControls();
     updateUpgradeControls();
+    updateDeleteControls();
     const banner = $("maintenance-banner");
-    banner.replaceChildren();
-    banner.hidden = state.maintenance.state === "ready" && !state.rememberedIntent;
-    if (banner.hidden) return;
-    if (state.maintenance.state === "ready") {
-      banner.append(element("span", "", "È conservato il riferimento a una precedente gestione del progetto."));
-      banner.append(button("Apri stato dell’operazione", "button-secondary", () => {
-        const saved = state.rememberedIntent;
-        state.deletion = { project: saved.project, deletion_id: saved.deletion_id, result: null,
-          error: "", confirm: "", hostRef: "", stoppedRuns: "", unknown: true };
-        showDeleteDialog();
-      }));
-      return;
-    }
-    const text = state.maintenance.state === "recovery_required"
-      ? "Flower richiede il recupero di un’eliminazione. Le operazioni sui progetti restano sospese."
+    banner.hidden = state.maintenance.state === "ready";
+    banner.textContent = state.maintenance.state === "recovery_required"
+      ? "Un’eliminazione precedente richiede il recupero da riga di comando."
       : "Flower è in manutenzione per la gestione di un progetto. Le chat possono riprovare al termine.";
-    banner.append(element("span", "", text));
-    if (state.maintenance.project_id && state.maintenance.deletion_id) {
-      banner.append(button("Apri stato e recupero", "button-secondary", () => {
-        state.deletion = { project: { project_id: state.maintenance.project_id, name: state.maintenance.project_id },
-          deletion_id: state.maintenance.deletion_id, result: state.maintenance.result?.deletion || null, error: "", confirm: "", hostRef: "", stoppedRuns: "" };
-        showDeleteDialog();
-        adminAction("inspect");
-      }));
-    }
   }
 
   async function checkMaintenance() {
@@ -1731,220 +1760,90 @@
     }
   }
 
-  function rememberIntent() {
-    if (!state.deletion) return;
-    state.rememberedIntent = { project: { project_id: state.deletion.project.project_id, name: state.deletion.project.project_id }, deletion_id: state.deletion.deletion_id,
-      prepared_fingerprint: state.deletion.result?.prepared_fingerprint };
-    try {
-      sessionStorage.setItem("flower.dashboard.deletion", JSON.stringify(state.rememberedIntent));
-    } catch (_) { /* The running server also retains the maintenance intent. */ }
-  }
-
-  function forgetIntent() {
-    state.rememberedIntent = null;
-    try { sessionStorage.removeItem("flower.dashboard.deletion"); } catch (_) { /* No browser state is required to retain the server journal. */ }
-    updateMaintenance(state.maintenance);
-  }
-
-  function restoreIntent() {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem("flower.dashboard.deletion") || "null");
-      if (saved && typeof saved.deletion_id === "string" && saved.deletion_id.length <= 64 &&
-          typeof saved.project?.project_id === "string" && saved.project.project_id.length <= 128) {
-        state.rememberedIntent = { project: { project_id: saved.project.project_id, name: saved.project.project_id }, deletion_id: saved.deletion_id,
-          prepared_fingerprint: saved.prepared_fingerprint };
-      }
-    } catch (_) { /* Server status remains the authority when local UI state is unavailable. */ }
-  }
-
   function openDeletion(project) {
+    if (!project || !state.ready || state.adminBusy || state.maintenance.state !== "ready") return;
     notice("");
-    if (state.maintenance.state !== "ready" && state.maintenance.deletion_id) {
-      state.deletion = { project: { project_id: state.maintenance.project_id, name: state.maintenance.project_id },
-        deletion_id: state.maintenance.deletion_id, result: null, error: "", confirm: "", hostRef: "", stoppedRuns: "" };
-      showDeleteDialog();
-      adminAction("inspect");
-      return;
-    }
-    state.deletion = { project, deletion_id: crypto.randomUUID(), result: null, error: "", confirm: "", hostRef: "", stoppedRuns: "" };
-    showDeleteDialog();
+    state.deletion = { projectId: project.project_id, readback: false };
+    $("delete-project-name").textContent = project.name;
+    $("delete-project-id").textContent = project.project_id;
+    $("delete-form").reset();
+    formMessage("delete-message", "");
+    updateDeleteControls();
+    $("delete-dialog").showModal();
+    $("confirm-project").focus();
   }
 
-  function showDeleteDialog() {
-    renderDeletion();
-    if (!$("delete-dialog").open) $("delete-dialog").showModal();
-  }
-
-  function deleteField(id, title, value, description, handler, type = "text") {
-    const field = element("div", "delete-form-field");
-    const labelElement = element("label", "", title);
-    labelElement.htmlFor = id;
-    const input = element("input");
-    input.id = id;
-    input.type = type;
-    input.autocomplete = "off";
-    input.spellcheck = false;
-    input.maxLength = type === "password" ? 8192 : id === "host-stop-reference" ? 256 : 2048;
-    input.value = value || "";
-    input.addEventListener("input", (event) => handler(event.target.value));
-    field.append(labelElement, input);
-    if (description) field.append(element("small", "", description));
-    return field;
-  }
-
-  function renderDeletion() {
-    const deletion = state.deletion;
-    if (!deletion) return;
-    const content = $("delete-content");
-    const actions = $("delete-actions");
-    content.replaceChildren();
-    actions.replaceChildren();
-    $("delete-close").disabled = state.adminBusy;
-    content.append(element("div", "delete-project-name", deletion.project.name), element("span", "delete-project-id identifier", deletion.project.project_id));
-    const result = deletion.result;
-    const stage = result?.deletion_state;
-    if (state.adminBusy) {
-      const progress = element("div", "loading-panel");
-      progress.append(element("span", "loader"), element("span", "", "Operazione in corso. Mantieni questa finestra aperta."));
-      content.append(progress);
-      return;
-    }
-    if (deletion.error) content.append(errorPanel({ message: deletion.error, reason: deletion.reason }));
-    if (stage === "scrubbed" || stage === "acknowledged") {
-      content.append(element("div", "dialog-notice dialog-success", "I dati del progetto in Flower sono stati eliminati e la pulizia è verificata."));
-      content.append(element("p", "delete-explanation", "File del repository, backup e chat dell’host restano nel rispettivo ambiente. Il journal di recupero conserva lo stato dell’operazione."));
-      actions.append(button("Torna ai progetti", "button-primary", () => { $("delete-dialog").close(); state.deletion = null; forgetIntent(); navigate(null); }));
-      return;
-    }
-    const recovering = ["deleting", "ledger_deleted", "unknown"].includes(stage) || deletion.unknown || state.maintenance.state === "recovery_required";
-    if (recovering) {
-      const explanation = state.maintenance.state === "ready"
-        ? "L’esito richiede una verifica. Ispeziona l’intento originale prima di continuare."
-        : "L’esito richiede una verifica. Flower mantiene la manutenzione finché il recupero è completato.";
-      content.append(element("div", "dialog-notice", explanation));
-      if (stage) content.append(badge(stage));
-      if (result) content.append(fields(result));
-      actions.append(button("Ispeziona stato", "button-secondary", () => adminAction("inspect")), button("Riconcilia operazione", "button-primary", () => adminAction("reconcile")));
-      return;
-    }
-    content.append(element("p", "delete-explanation", "La preparazione mette in manutenzione questa istanza di Flower. Mostrerà i dati coinvolti e gli eventuali blocchi prima della conferma finale."));
-    if (!result) {
-      content.append(element("div", "dialog-notice", "Durante la manutenzione le operazioni di tutte le chat collegate a questa istanza saranno sospese."));
-      actions.append(button("Indietro", "button-secondary", () => $("delete-dialog").close()), button("Prepara eliminazione", "button-danger-quiet", () => adminAction("prepare")));
-      return;
-    }
-    const counts = Object.entries(result.counts || {}).filter(([, value]) => typeof value === "number" && value > 0);
-    if (counts.length) {
-      content.append(element("h3", "", "Inventario del progetto"));
-      const box = element("div", "inventory");
-      const table = element("table");
-      const heading = element("tr");
-      heading.append(element("th", "", "Categoria"), element("th", "", "Record"));
-      const head = element("thead"); head.append(heading); table.append(head);
-      const body = element("tbody");
-      for (const [key, count] of counts) { const row = element("tr"); row.append(element("td", "", label(key)), element("td", "", count)); body.append(row); }
-      table.append(body); box.append(table); content.append(box);
-    }
-    if (result.blockers?.length) {
-      const warning = element("div", "dialog-notice");
-      warning.append(element("h3", "", "L’eliminazione è bloccata"));
-      appendValue(warning, result.blockers);
-      content.append(warning);
-    }
-    if (result.diagnostics?.length) {
-      const diagnostics = element("details", "nested-detail");
-      diagnostics.append(element("summary", "", "Diagnostica dell’operazione"));
-      appendValue(diagnostics, result.diagnostics);
-      content.append(diagnostics);
-    }
-    const identity = element("details", "nested-detail");
-    identity.append(element("summary", "", "Riferimento della preparazione"), fields({ deletion_id: deletion.deletion_id, prepared_fingerprint: result.prepared_fingerprint }));
-    content.append(identity);
-    const canConfirm = stage === "prepared" && !result.blockers?.length && result.prepared_fingerprint;
-    if (canConfirm) {
-      content.append(deleteField("confirm-project", "Riscrivi l’ID del progetto", deletion.confirm, deletion.project.project_id,
-        (value) => { deletion.confirm = value; updateDeleteButton(); }));
-      content.append(deleteField("host-stop-reference", "Riferimento di arresto dell’host", deletion.hostRef,
-        "Indica il riferimento effettivo alla verifica dei worker o delle sessioni che possiedi.",
-        (value) => { deletion.hostRef = value; updateDeleteButton(); }));
-      content.append(deleteField("host-stopped-runs", "Run dell’host arrestati, se presenti", deletion.stoppedRuns,
-        "ID esatti separati da virgola. Compila soltanto per esecuzioni realmente arrestate dal tuo host.",
-        (value) => { deletion.stoppedRuns = value; }));
-      content.append(deleteField("delete-password", "Password dell’account locale", "",
-        "Conferma l’eliminazione con la password usata per accedere a Flower.", updateDeleteButton, "password"));
-    }
-    actions.append(button("Annulla e riprendi Flower", "button-secondary", () => adminAction("cancel")), button("Ispeziona stato", "button-quiet", () => adminAction("inspect")));
-    if (canConfirm) {
-      const confirm = button("Elimina progetto", "button-danger", () => adminAction("delete"));
-      confirm.id = "confirm-delete-button";
-      actions.append(confirm);
-      updateDeleteButton();
-    }
-  }
-
-  function updateDeleteButton() {
+  function updateDeleteControls() {
+    const readback = state.deletion?.readback === true;
+    const id = $("confirm-project");
+    const password = $("delete-password");
     const confirm = $("confirm-delete-button");
-    if (confirm) confirm.disabled = state.deletion.confirm !== state.deletion.project.project_id ||
-      !state.deletion.hostRef.trim() || !$("delete-password").value;
+    const cancel = $("delete-cancel");
+    $("delete-close").disabled = cancel.disabled = state.adminBusy;
+    id.readOnly = password.readOnly = state.adminBusy;
+    $("delete-fields").hidden = confirm.hidden = readback;
+    cancel.textContent = readback ? "Torna ai progetti" : "Annulla";
+    confirm.disabled = !state.deletion || state.adminBusy || readback || state.maintenance.state !== "ready"
+      || id.value !== state.deletion.projectId || !password.value;
   }
 
-  async function adminAction(operation) {
-    if (!state.deletion || state.adminBusy) return;
-    notice("");
+  function closeDeletion() {
+    if (state.adminBusy) return;
     const deletion = state.deletion;
-    const body = { deletion_id: deletion.deletion_id };
-    if (operation === "delete") {
-      const password = $("delete-password");
-      if (!password?.value) return;
-      body.password = password.value;
-      password.value = "";
-      body.expected_fingerprint = deletion.result.prepared_fingerprint;
-      body.confirm_project_id = deletion.confirm;
-      body.host_quiescence_ref = deletion.hostRef.trim();
-      body.host_stopped_run_ids = deletion.stoppedRuns.split(",").map((item) => item.trim()).filter(Boolean);
+    $("delete-dialog").close();
+    if (deletion?.readback) {
+      $("project-search").value = deletion.projectId;
+      state.projectOffset = 0;
+      navigate(null);
     }
-    if (operation === "reconcile" && deletion.result?.prepared_fingerprint) body.expected_fingerprint = deletion.result.prepared_fingerprint;
+  }
+
+  async function deleteProject(event) {
+    event.preventDefault();
+    if ($("confirm-delete-button").disabled) return;
+    const deletion = state.deletion;
+    const passwordInput = $("delete-password");
+    const password = passwordInput.value;
+    passwordInput.value = "";
     state.adminBusy = true;
-    deletion.error = "";
-    rememberIntent();
-    renderDeletion();
+    updateDeleteControls();
+    formMessage("delete-message", "Eliminazione in corso…");
+    let result;
+    let error;
     try {
-      // Final deletion adds the native verifier budget to the ordinary request timeout.
-      const result = await request(`projects/${encodeURIComponent(deletion.project.project_id)}/deletion/${operation}`, body,
-        operation === "delete" ? { timeoutMs: 27000 } : undefined);
-      if (result.deletion) {
-        deletion.result = result.deletion;
-        deletion.unknown = false;
-        if (deletion.result.deletion_state === "scrubbed") notice("Eliminazione dei dati Flower del progetto completata.");
-      }
-      updateMaintenance(result.maintenance);
-      if (operation === "cancel") {
-        $("delete-dialog").close();
-        state.deletion = null;
-        forgetIntent();
-        notice("Preparazione annullata; il journal dell’intento è conservato.");
-      }
-    } catch (error) {
-      if (error.stale) return;
-      deletion.error = error.message;
-      deletion.reason = error.reason;
-      const result = error.envelope?.result;
-      if (result?.deletion) {
-        deletion.result = result.deletion;
-        deletion.unknown = false;
-      } else {
-        const passwordRefused = operation === "delete" && [
-          "dashboard_delete_password_required", "dashboard_delete_password_denied",
-          "dashboard_auth_busy", "dashboard_auth_rate_limited", "dashboard_auth_unavailable",
-        ].includes(error.reason);
-        deletion.unknown = !passwordRefused;
-      }
-      if (result?.maintenance) updateMaintenance(result.maintenance);
+      result = await request(`projects/${encodeURIComponent(deletion.projectId)}/deletion/delete`,
+        { confirm_project_id: $("confirm-project").value, password }, { timeoutMs: 27000 });
+    } catch (failure) {
+      error = failure;
+      result = failure.envelope?.result;
     } finally {
       state.adminBusy = false;
-      if (state.deletion) { rememberIntent(); renderDeletion(); }
-      await checkMaintenance();
     }
+    if (deletion !== state.deletion || error?.stale) return;
+    if (result?.maintenance) updateMaintenance(result.maintenance);
+    const outcome = result?.deletion;
+    if (!error && outcome?.deletion_state === "scrubbed") {
+      $("delete-dialog").close();
+      state.projectOffset = 0;
+      navigate(null);
+      notice("I dati del progetto in Flower sono stati eliminati.");
+      return;
+    }
+    let message = error?.message || outcome?.diagnostics?.[0]?.message || "L’eliminazione non è stata eseguita.";
+    if (outcome?.project_effect_state === "applied") {
+      message = "I dati del progetto sono stati rimossi. La pulizia del database è rimasta incompleta.";
+      deletion.readback = true;
+    } else if (outcome?.deletion_state === "absent" || error?.reason === "dashboard_project_not_found") {
+      message = "Il progetto non è più presente. Torna ai progetti per aggiornare l’elenco.";
+      deletion.readback = true;
+    } else if (outcome?.project_effect_state === "unknown"
+        || (outcome?.project_effect_state !== "none" && (!error?.status || error.status >= 500))) {
+      message = "L’esito dell’eliminazione è incerto. Rileggi l’elenco dei progetti prima di una nuova richiesta.";
+      deletion.readback = true;
+    }
+    formMessage("delete-message", message, true);
+    updateDeleteControls();
+    $(deletion.readback ? "delete-cancel" : "delete-password").focus();
   }
 
   async function startDashboard({ clearMessage = false } = {}) {
@@ -1962,7 +1861,6 @@
       if (!auth.authenticated) return;
       const status = await request("status");
       showWorkspace();
-      restoreIntent();
       restoreUpgrade();
       updateMaintenance(status);
       notice("");
@@ -1990,7 +1888,6 @@
       if (generation !== state.authGeneration) return;
       const status = await request("status");
       showWorkspace();
-      restoreIntent();
       restoreUpgrade();
       updateMaintenance(status);
       route();
@@ -2062,15 +1959,19 @@
   $("upgrade-close").addEventListener("click", () => $("upgrade-dialog").close());
   $("upgrade-dialog").addEventListener("cancel", (event) => { if (state.upgradeBusy) event.preventDefault(); });
   $("upgrade-dialog").addEventListener("close", () => { $("upgrade-password").value = ""; });
-  for (const id of ["backups-restore-guide", "archive-restore-guide"]) {
-    $(id).append($("archive-restore-template").content.cloneNode(true));
-  }
   $("backups-button").addEventListener("click", () => {
     notice("");
     navigate(null, "backups");
   });
   $("backups-refresh").addEventListener("click", loadBackups);
   $("backup-create").addEventListener("click", createBackup);
+  $("restore-open").addEventListener("click", openRestore);
+  $("restore-form").addEventListener("input", updateArchiveControls);
+  $("restore-form").addEventListener("submit", restoreArchive);
+  $("restore-close").addEventListener("click", () => $("restore-dialog").close());
+  $("restore-cancel").addEventListener("click", () => $("restore-dialog").close());
+  $("restore-dialog").addEventListener("cancel", (event) => { if (state.archiveBusy) event.preventDefault(); });
+  $("restore-dialog").addEventListener("close", () => $("restore-form").reset());
   $("backup-delete-form").addEventListener("submit", deleteBackup);
   $("backup-delete-password").addEventListener("input", updateArchiveControls);
   $("backup-delete-close").addEventListener("click", () => $("backup-delete-dialog").close());
@@ -2103,12 +2004,19 @@
   $("projects-next").addEventListener("click", () => { state.projectOffset = state.projects.next_offset; loadProjects(); });
   $("section-previous").addEventListener("click", () => { state.sectionOffset = Math.max(0, state.sectionOffset - 25); loadSection(); });
   $("section-next").addEventListener("click", () => { state.sectionOffset = state.sectionData.bounds.next_offset; loadSection(); });
-  $("delete-close").addEventListener("click", () => $("delete-dialog").close());
+  $("delete-form").addEventListener("input", updateDeleteControls);
+  $("delete-form").addEventListener("submit", deleteProject);
+  $("delete-close").addEventListener("click", closeDeletion);
+  $("delete-cancel").addEventListener("click", closeDeletion);
   $("delete-dialog").addEventListener("close", () => {
-    const password = $("delete-password");
-    if (password) password.value = "";
+    if ($("delete-dialog").open) return;
+    state.deletion = null;
+    $("delete-form").reset();
   });
-  $("delete-dialog").addEventListener("cancel", (event) => { if (state.adminBusy) event.preventDefault(); });
+  $("delete-dialog").addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDeletion();
+  });
   $("evidence-close").addEventListener("click", () => $("evidence-dialog").close());
   window.addEventListener("popstate", () => { if (state.ready) route(); });
   let searchTimer;

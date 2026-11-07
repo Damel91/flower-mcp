@@ -124,6 +124,7 @@
             <div><span class="section-label">Profilo locale</span><h1 id="backups-title" tabindex="-1">Backup</h1><p>Crea e conserva una copia dell’intero registro SQLite del profilo.</p></div>
             <div class="project-actions">
               <button id="backups-refresh" class="button button-secondary" type="button">Aggiorna</button>
+              <button id="restore-open" class="button button-secondary" type="button">Ripristina archivio</button>
               <button id="backup-create" class="button button-primary" type="button">Crea backup</button>
             </div>
           </div>
@@ -131,7 +132,6 @@
           <div id="backups-content" aria-live="polite"></div>
           <p class="muted small">Scarica una copia e conservala in un luogo privato, separato da questo profilo.</p>
           <p class="muted small">Se il browser non riesce a gestire un archivio grande, ferma il profilo e usa il terminale: <code>flower-mcp data backup --help</code>.</p>
-          <div id="backups-restore-guide"></div>
         </section>
         <section id="settings-view" aria-labelledby="settings-title" hidden>
           <div class="page-heading">
@@ -240,7 +240,7 @@
         <p id="archive-includes">Include la cronologia, le verifiche e le evidenze salvate per questo progetto. Esclude le sessioni dei client e il loro stato di navigazione e ripresa.</p>
         <p class="muted small">Conserva l’archivio in un luogo privato. Non copia i file di lavoro, la configurazione o le credenziali esterne al registro. I riferimenti esterni restano riferimenti.</p>
         <p class="muted small">Se il browser non riesce a gestire un archivio grande, ferma il profilo e usa il terminale: <code>flower-mcp data export --help</code>.</p>
-        <div id="archive-restore-guide"></div>
+        <p class="muted small">Per ripristinare un progetto esportato, apri <strong>Backup</strong> e scegli <strong>Ripristina archivio</strong>.</p>
         <p id="archive-message" class="form-message" role="status" hidden></p>
       </div>
       <div class="dialog-actions">
@@ -290,22 +290,56 @@
       </form>
     </dialog>
 
-    <template id="archive-restore-template">
-      <details class="archive-guide">
-        <summary>Come ripristinare l’archivio</summary>
-        <p>Usa un archivio di cui ti fidi. Nel terminale, sostituisci i percorsi degli esempi con i tuoi.</p>
-        <ol>
-          <li>Controlla l’archivio:<pre><code>flower-mcp data inspect --archive "/percorso/archivio.flower.zip"</code></pre></li>
-          <li>Ripristina in una cartella che non esiste:<pre><code>flower-mcp data restore --archive "/percorso/archivio.flower.zip" --restore-dir "/percorso/nuovo-profilo"</code></pre></li>
-        </ol>
-        <p>Il ripristino prepara un profilo separato con una nuova configurazione, senza avviarlo. I profili esistenti restano intatti.</p>
-      </details>
-    </template>
+    <dialog id="restore-dialog" class="dialog" aria-labelledby="restore-title" aria-describedby="restore-help">
+      <form id="restore-form" method="dialog">
+        <div class="dialog-heading">
+          <h2 id="restore-title">Ripristina archivio</h2>
+          <button id="restore-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="dialog-content">
+          <p id="restore-help">Seleziona un backup Flower o un progetto esportato. Flower creerà un nuovo profilo separato e lo lascerà spento.</p>
+          <div class="login-field">
+            <label for="restore-file">Archivio ZIP di Flower</label>
+            <input id="restore-file" type="file" accept=".zip,application/zip" required>
+          </div>
+          <div class="login-field">
+            <label for="restore-profile">Nome del nuovo profilo</label>
+            <input id="restore-profile" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="profilo-ripristinato" aria-describedby="restore-profile-help" required>
+            <small id="restore-profile-help" class="muted">Inizia con una lettera o un numero. Puoi usare trattini, underscore e punti nel nome.</small>
+          </div>
+          <p id="restore-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="restore-cancel" class="button button-secondary" type="button">Annulla</button>
+          <button id="restore-submit" class="button button-primary" type="submit" disabled>Ripristina</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="delete-dialog" class="dialog delete-dialog" aria-labelledby="delete-title">
       <div class="dialog-heading"><div><span class="section-label">Gestione del progetto</span><h2 id="delete-title">Elimina progetto</h2></div><button id="delete-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button></div>
-      <div id="delete-content" class="dialog-content"></div>
-      <div id="delete-actions" class="dialog-actions"></div>
+      <form id="delete-form" method="dialog">
+        <div class="dialog-content">
+          <div id="delete-project-name" class="delete-project-name"></div>
+          <span id="delete-project-id" class="delete-project-id identifier"></span>
+          <p class="delete-explanation">I dati del progetto in Flower saranno eliminati definitivamente. Le chat collegate potranno riprovare al termine dell’operazione.</p>
+          <div id="delete-fields">
+            <div class="delete-form-field">
+              <label for="confirm-project">Riscrivi l’ID del progetto</label>
+              <input id="confirm-project" maxlength="128" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+            </div>
+            <div class="delete-form-field">
+              <label for="delete-password">Password dell’account locale</label>
+              <input id="delete-password" type="password" maxlength="8192" autocomplete="off" required>
+            </div>
+          </div>
+          <p id="delete-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="delete-cancel" class="button button-secondary" type="button">Annulla</button>
+          <button id="confirm-delete-button" class="button button-danger" type="submit" disabled>Elimina progetto</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="evidence-dialog" class="dialog evidence-dialog" aria-labelledby="evidence-title">

@@ -1,9 +1,9 @@
 """Verify persistent LAN settings and the wildcard HTTPS ingress authority."""
 from types import SimpleNamespace
-from uuid import uuid4
 
 from starlette.testclient import TestClient
 
+from flow_of_work_mcp import dashboard_maintenance
 from flow_of_work_mcp.dashboard_network import DashboardNetworkSettings
 from tests.test_dashboard_http import fixture, request_csrf
 
@@ -12,7 +12,7 @@ LOCAL = 'http://127.0.0.1:18760'
 NETWORK = '/dashboard/api/network'
 
 
-def test_dashboard_saves_profile_network_settings_and_rejects_stale_writes(tmp_path):
+def test_dashboard_saves_profile_network_settings_and_rejects_stale_writes(tmp_path, monkeypatch):
     runtime, dashboard, mcp = fixture(tmp_path)
     config = dashboard.maintenance.config_path
     original_config = config.read_bytes()
@@ -42,12 +42,17 @@ def test_dashboard_saves_profile_network_settings_and_rejects_stale_writes(tmp_p
             assert config.read_bytes() == original_config
             stale = client.post(NETWORK, json=update, headers=headers)
             assert stale.status_code == 409 and stale.json()['reason'] == 'dashboard_network_changed'
-            endpoint = '/dashboard/api/projects/project-a/deletion/'
-            body = {'deletion_id': str(uuid4())}
-            assert client.post(endpoint + 'prepare', json=body, headers=headers).status_code == 200
             disable = {'revision': view['revision'], 'enabled': False, 'port': view['port']}
-            assert client.post(NETWORK, json=disable, headers=headers).status_code == 503
-            assert client.post(endpoint + 'cancel', json=body, headers=headers).status_code == 200
+            original = dashboard_maintenance.run_dashboard_project_purge
+            def during_purge(*args, **kwargs):
+                assert client.post(NETWORK, json=disable, headers=headers).status_code == 503
+                return original(*args, **kwargs)
+            monkeypatch.setattr(dashboard_maintenance, 'run_dashboard_project_purge', during_purge)
+            deleted = client.post('/dashboard/api/projects/project-a/deletion/delete', json={
+                'confirm_project_id': 'project-a', 'password': 'synthetic-fixture-only',
+            }, headers=headers)
+            assert deleted.status_code == 200
+            assert deleted.json()['result']['deletion']['deletion_state'] == 'scrubbed'
             assert client.post(NETWORK, json=disable, headers=headers).status_code == 200
             assert DashboardNetworkSettings(config).snapshot()['enabled'] is False
     finally:

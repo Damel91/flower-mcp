@@ -9,7 +9,8 @@ import re
 import shutil
 import stat
 import tempfile
-from contextlib import asynccontextmanager
+from asyncio import timeout
+from contextlib import asynccontextmanager, contextmanager
 from copy import copy
 from functools import partial
 from importlib.resources import files
@@ -29,14 +30,19 @@ from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.dashboard_auth import DashboardAuth, DashboardAuthError
 from flow_of_work_mcp.dashboard_network import DashboardNetworkError, DashboardNetworkSettings
 from flow_of_work_mcp.profile_settings import DashboardSettings, SettingsError
-from flow_of_work_mcp.ledger_archive import ArchiveError, MAX_ARCHIVE_BYTES, create_archive
+from flow_of_work_mcp.ledger_archive import (
+    ArchiveError, MAX_ARCHIVE_BYTES, assert_private_archive_directory, create_archive,
+)
+from flow_of_work_mcp.ledger_recovery import inspect_or_restore
 from flow_of_work_mcp.dashboard_backups import DashboardBackups
 from flow_of_work_mcp.managed_service import ServiceError
+from flow_of_work_mcp.profiles import ProfileError, profile_config_path, profile_root
 from flow_of_work_mcp.runtime_ownership import RuntimeOwnershipError
 
 
 _BACKUP_ID = re.compile(r'[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}')
 _CHUNK_SIZE = 1024 * 1024
+_RESTORE_UPLOAD_TIMEOUT = 300
 _LOG = logging.getLogger(__name__)
 
 
@@ -73,7 +79,7 @@ class _ArchiveLifetime:
     def run(self, operation, *args):
         with self.lock:
             if self.closed or self.running:
-                raise RuntimeError('download worker not available')
+                raise RuntimeError('archive worker not available')
             self.running = True
         try:
             return operation(*args)
@@ -85,13 +91,29 @@ class _ArchiveLifetime:
                 self._dispose()
 
     def temporary_archive(self):
-        self.directory = Path(tempfile.mkdtemp(prefix='flower-download-')).resolve()
+        self.directory = Path(tempfile.mkdtemp(prefix='flower-archive-')).resolve()
         info = self.directory.lstat()
         self.directory_identity = (info.st_dev, info.st_ino)
         if os.name == 'nt':
             secure._windows_protect(self.directory, directory=True)
         secure.ensure_directory(self.directory)
-        return self.directory / 'download.flower.zip'
+        return self.directory / 'archive.flower.zip'
+
+    def open_upload(self):
+        path = self.temporary_archive()
+        assert_private_archive_directory(path.parent)
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0), 0o600)
+        try:
+            self.stream = os.fdopen(descriptor, 'wb')
+        except BaseException:
+            os.close(descriptor)
+            raise
+        return path
+
+    def assert_open(self):
+        with self.lock:
+            if self.closed:
+                raise ArchiveError('archive_restore_interrupted', 'The upload was interrupted.')
 
     def attach(self, stream, *, expected=None):
         self.stream = stream
@@ -418,6 +440,86 @@ class DashboardHTTP:
         finally:
             lifetime.close()
 
+    def _restore_destination(self, profile_name):
+        config = self.maintenance.config_path
+        profiles = config.parent.parent
+        managed_root = profiles.parent if config.name == 'flower.yaml' and profiles.name == 'profiles' else None
+        try:
+            root = profile_root(managed_root)
+        except ProfileError as exc:
+            raise ArchiveError('archive_workspace_unsafe', 'The server profile root is invalid.', 409) from exc
+        try:
+            destination = profile_config_path(root, profile_name).parent
+        except ProfileError as exc:
+            raise ArchiveError('archive_profile_name_invalid', 'Choose a valid new Flower profile name.') from exc
+        if os.path.lexists(destination):
+            raise ArchiveError('archive_destination_exists', 'A directory already uses this profile name.', 409)
+        return destination
+
+    def _restore_archive(self, lifetime, archive, destination, profile_name, cookie, csrf):
+        self._reauthorize(cookie, csrf)
+        self._assert_runtime_lease()
+        secure.ensure_directory(destination.parent, private=False)
+
+        @contextmanager
+        def publication_guard():
+            with self.maintenance.admission():
+                self._reauthorize(cookie, csrf)
+                self._assert_runtime_lease()
+                lifetime.assert_open()
+                yield
+
+        try:
+            manifest = inspect_or_restore(archive, restore_dir=destination, publication_guard=publication_guard)
+        except ArchiveError as exc:
+            if exc.code == 'archive_destination_exists':
+                raise ArchiveError(exc.code, str(exc), 409) from exc
+            raise
+        return {'profile_name': profile_name, 'kind': manifest['kind'], 'project_id': manifest['project_id']}
+
+    async def _receive_restore(self, request, profile_name, cookie, csrf):
+        types = request.headers.getlist('content-type')
+        if len(types) != 1 or types[0].split(';', 1)[0].strip().lower() != 'application/zip':
+            raise ArchiveError('archive_restore_media_type', 'Upload a Flower ZIP archive.', 415)
+        lengths = request.headers.getlist('content-length')
+        declared_size = None
+        if lengths:
+            if len(lengths) != 1 or not re.fullmatch(r'[0-9]{1,20}', lengths[0]):
+                raise ArchiveError('archive_invalid', 'The upload length is invalid.')
+            declared_size = int(lengths[0])
+            if declared_size > MAX_ARCHIVE_BYTES:
+                raise ArchiveError('archive_size_exceeded', 'The archive exceeds the supported size.', 413)
+        if not self._archive_gate.acquire(blocking=False):
+            raise _archive_busy()
+        lifetime = _ArchiveLifetime(self._archive_gate)
+        try:
+            destination = await run_in_threadpool(self._restore_destination, profile_name)
+            archive = await run_in_threadpool(lifetime.run, lifetime.open_upload)
+            size = 0
+            try:
+                async with timeout(_RESTORE_UPLOAD_TIMEOUT):
+                    async for chunk in request.stream():
+                        size += len(chunk)
+                        if size > MAX_ARCHIVE_BYTES:
+                            raise ArchiveError('archive_size_exceeded', 'The archive exceeds the supported size.', 413)
+                        if chunk:
+                            await run_in_threadpool(lifetime.run, lifetime.stream.write, chunk)
+            except TimeoutError as exc:
+                raise ArchiveError('archive_restore_timeout', 'The archive upload took too long.', 408) from exc
+            if not size or (declared_size is not None and declared_size != size):
+                raise ArchiveError('archive_invalid', 'The upload is empty or incomplete.')
+            await run_in_threadpool(lifetime.run, lifetime.stream.close)
+            return await run_in_threadpool(lifetime.run, self._restore_archive,
+                                            lifetime, archive, destination, profile_name, cookie, csrf)
+        except ClientDisconnect as exc:
+            raise ArchiveError('archive_restore_interrupted', 'The upload was interrupted.') from exc
+        except secure.ServiceSecurityError as exc:
+            raise ArchiveError('archive_workspace_unsafe', 'The server cannot stage or restore the archive safely.', 409) from exc
+        except OSError as exc:
+            raise ArchiveError('archive_io_failure', 'The server could not stage the archive or write the new profile.', 500) from exc
+        finally:
+            lifetime.close()
+
     async def api(self, request):
         if not self._security(request):
             return self._access_denied()
@@ -449,21 +551,25 @@ class DashboardHTTP:
             read_route = (path in (['status'], ['projects'], ['settings'], ['backups'], ['upgrade']) or network_route
                 or len(path) == 4 and path[0] == 'projects' and path[2] == 'sections'
                 or len(path) == 5 and path[0] == 'projects' and path[2] == 'evidence')
-            admin_route = len(path) == 4 and path[0] == 'projects' and path[2] == 'deletion'
+            admin_route = len(path) == 4 and path[0] == 'projects' and path[2:] == ['deletion', 'delete']
             create_route = path == ['projects']
             settings_route = path == ['settings', 'draft']
             upgrade_action = path in (['upgrade', 'preview'], ['upgrade', 'apply'])
             archive_route = path == ['archive']
+            restore_route = len(path) == 2 and path[0] == 'restore'
             backups_route = path == ['backups']
             backup_action = (len(path) == 3 and path[0] == 'backups'
                              and path[2] in ('download', 'delete'))
             if not (request.method == 'GET' and read_route
                     or request.method == 'POST' and (admin_route or create_route or settings_route or upgrade_action
-                                                      or archive_route or backups_route or backup_action or network_route)):
+                                                      or archive_route or restore_route or backups_route or backup_action or network_route)):
                 return self._json(status=404, reason='dashboard_route_not_found', message='Unknown dashboard route.')
             csrf = await run_in_threadpool(self.auth.authorize, cookie, submitted_csrf,
                                            write=request.method == 'POST')
             if request.method == 'POST':
+                if restore_route:
+                    result = await self._receive_restore(request, path[1], cookie, submitted_csrf)
+                    return self._json(result, status=201)
                 body = await self._body(request)
                 if create_route:
                     try:
@@ -506,12 +612,11 @@ class DashboardHTTP:
                     result = await run_in_threadpool(self._backup_operation, 'delete', cookie, submitted_csrf,
                                                      backup_id=path[1], password=body['password'])
                     return self._json(result)
-                authorize_delete = None
-                if path[3] == 'delete':
-                    authorize_delete = partial(self.auth.confirm_password, cookie, submitted_csrf,
-                                               body.pop('password', None))
+                authorize_delete = partial(self.auth.confirm_password, cookie, submitted_csrf,
+                                           body.pop('password', None))
                 result = await run_in_threadpool(self.maintenance.operate, path[1], path[3], body,
-                                                 authorize_delete=authorize_delete)
+                                                 authorize_delete=authorize_delete,
+                                                 recheck_session=partial(self._reauthorize, cookie, submitted_csrf))
                 return self._json(result)
             if path == ['status']:
                 return self._json({**self.maintenance.status(), 'csrf_token': csrf})
@@ -558,6 +663,9 @@ class DashboardHTTP:
         except (TypeError, KeyError):
             return self._json(status=400, reason='dashboard_input_invalid', message='Inspect the selected project, bounds and required action fields.')
         except Exception:
+            if path[0] == 'restore':
+                return self._json(status=500, reason='archive_io_failure',
+                    message='The restore outcome could not be confirmed. Inspect the new profile before retrying.')
             if path == ['projects'] and request.method == 'POST':
                 return self._json(status=500, reason='dashboard_operation_failed',
                     message='Project creation could not be confirmed. Inspect the chosen identifier in the catalog before another attempt.')
@@ -567,7 +675,10 @@ class DashboardHTTP:
             if path[0] == 'upgrade':
                 return self._json(status=500, reason='dashboard_upgrade_uncertain',
                     message='The upgrade outcome could not be confirmed. Inspect the upgrade receipt before retrying.')
-            return self._json(status=500, reason='dashboard_operation_failed', message='The request could not complete. Inspect the current maintenance intent before any destructive retry.')
+            if len(path) == 4 and path[0] == 'projects' and path[2:] == ['deletion', 'delete']:
+                return self._json(status=500, reason='dashboard_operation_failed',
+                    message='The deletion outcome could not be confirmed. Refresh the project list before trying again.')
+            return self._json(status=500, reason='dashboard_operation_failed', message='The request could not complete.')
 
     def _auth_error(self, exc):
         messages = {

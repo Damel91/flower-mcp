@@ -1,17 +1,16 @@
 """Settings HTTP admission and draft behavior with an isolated owned profile."""
 import os
-from uuid import uuid4
 
 import pytest
 
 from starlette.testclient import TestClient
 
-from tests.test_dashboard_http import fixture, request_csrf
+from tests.test_dashboard_http import delete_while_checking_maintenance, fixture, request_csrf
 
 
 @pytest.mark.skipif(os.name == 'posix' and os.geteuid() == 0,
                     reason='Settings require a normal local owner account.')
-def test_settings_routes_protect_and_stage_the_current_profile(tmp_path):
+def test_settings_routes_protect_and_stage_the_current_profile(tmp_path, monkeypatch):
     runtime, dashboard, mcp = fixture(tmp_path)
     config = dashboard.maintenance.config_path
     original = config.read_bytes()
@@ -39,12 +38,11 @@ def test_settings_routes_protect_and_stage_the_current_profile(tmp_path):
             assert draft['changes'] == body['changes']
             assert config.read_bytes() == original
             assert client.post(settings + '/draft', json=body, headers=headers).status_code == 409
-            deletion = '/dashboard/api/projects/project-a/deletion/'
-            intent = {'deletion_id': str(uuid4())}
-            assert client.post(deletion + 'prepare', json=intent, headers=headers).status_code == 200
-            assert client.get(settings).status_code == 503
-            assert client.post(settings + '/draft', json=body, headers=headers).status_code == 503
-            assert client.post(deletion + 'cancel', json=intent, headers=headers).status_code == 200
+            def check():
+                assert client.get(settings).status_code == 503
+                assert client.post(settings + '/draft', json=body, headers=headers).status_code == 503
+
+            delete_while_checking_maintenance(client, headers, monkeypatch, check)
             discarded = client.post(settings + '/draft',
                 json={**body, 'draft_id': draft['id'], 'changes': {}}, headers=headers)
             assert discarded.status_code == 200

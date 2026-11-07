@@ -146,11 +146,6 @@ p { max-width: 72ch; }
 .backup-identity time, .archive-scope { font-weight: 600; }
 .backup-size { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .archive-scope { overflow-wrap: anywhere; }
-.archive-guide { margin: 16px 0 0; padding: 12px 15px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-secondary); }
-.archive-guide > summary { font-weight: 580; }
-.archive-guide p { margin: 10px 0 0; }
-.archive-guide ol { padding-inline-start: 20px; }
-.archive-guide pre { margin: 6px 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .settings-switch { margin-bottom: 18px; }
 .settings-meta { margin-bottom: 20px; }
 .settings-meta code { overflow-wrap: anywhere; }
@@ -281,16 +276,7 @@ input::placeholder { color: var(--subtle); }
 .delete-explanation { color: var(--muted); font-size: 14px; }
 .delete-form-field { display: flex; flex-direction: column; gap: 7px; margin-top: 20px; }
 .delete-form-field label { font-size: 13px; font-weight: 600; }
-.delete-form-field input, .delete-form-field textarea { background: var(--page); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; color: var(--ink); width: 100%; font: inherit; font-size: 14px; }
-.delete-form-field small { font-size: 12px; color: var(--muted); }
-.inventory { max-height: 200px; overflow: auto; margin: 15px 0 19px; border: 1px solid var(--line); border-radius: 7px; }
-.inventory table { border-collapse: collapse; width: 100%; font-size: 12px; }
-.inventory td, .inventory th { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); }
-.inventory th { background: var(--surface-secondary); color: var(--muted); font-weight: 550; }
-.inventory td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.inventory tr:last-child td { border-bottom: 0; }
-.dialog-notice { border-left: 3px solid var(--warning); padding: 13px 16px; border-radius: 0 7px 7px 0; background: var(--warning-soft); color: var(--warning); font-size: 13px; margin-bottom: 20px; }
-.dialog-success { border-left-color: var(--positive); background: var(--positive-soft); color: var(--positive); }
+.delete-form-field input { background: var(--page); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; color: var(--ink); width: 100%; font: inherit; font-size: 14px; }
 .evidence-dialog { width: min(970px, calc(100% - 32px)); }
 .evidence-content { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 14px; line-height: 1.7; max-width: 80ch; }
 .evidence-action { margin-top: 15px; }

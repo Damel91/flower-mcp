@@ -5,14 +5,13 @@ import asyncio
 from io import BytesIO
 import json
 from threading import Event
-from uuid import uuid4
 import zipfile
 
 import pytest
 from starlette.testclient import TestClient
 
 from flow_of_work_mcp import dashboard_http
-from tests.test_dashboard_http import fixture, request_csrf
+from tests.test_dashboard_http import delete_while_checking_maintenance, fixture, request_csrf
 from tests.test_native_project_purge import _rows
 
 
@@ -101,18 +100,17 @@ def test_archive_request_gates_and_closed_fields_do_not_touch_private_files(brow
     assert not workspaces and not dashboard.backups.directory.exists()
 
 
-def test_archives_respect_maintenance_and_serialize_downloads(browser, workspaces):
+def test_archives_respect_maintenance_and_serialize_downloads(browser, workspaces, monkeypatch):
     _, dashboard, client = browser
     headers = _headers(client)
-    deletion = '/dashboard/api/projects/project-a/deletion/'
-    intent = {'deletion_id': str(uuid4())}
-    assert client.post(deletion + 'prepare', json=intent, headers=headers).status_code == 200
-    for endpoint, body in ((_ARCHIVE, {'project_id': None}), (_BACKUPS, {})):
-        response = client.post(endpoint, json=body, headers=headers)
-        assert response.status_code == 503 and response.json()['reason'] == 'server_maintenance'
-    assert client.get(_BACKUPS).status_code == 503
-    assert not workspaces and not dashboard.backups.directory.exists()
-    assert client.post(deletion + 'cancel', json=intent, headers=headers).status_code == 200
+    def check():
+        for endpoint, body in ((_ARCHIVE, {'project_id': None}), (_BACKUPS, {})):
+            response = client.post(endpoint, json=body, headers=headers)
+            assert response.status_code == 503 and response.json()['reason'] == 'server_maintenance'
+        assert client.get(_BACKUPS).status_code == 503
+        assert not workspaces and not dashboard.backups.directory.exists()
+
+    delete_while_checking_maintenance(client, headers, monkeypatch, check)
     assert dashboard._archive_gate.acquire(blocking=False)
     try:
         for endpoint, body in ((_ARCHIVE, {'project_id': None}), (_BACKUPS, {})):

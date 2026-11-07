@@ -1,6 +1,8 @@
 """Explicit native backup and recovery without taking over an existing profile."""
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from importlib.resources import files
 import os
 from pathlib import Path
@@ -89,7 +91,8 @@ def _publish_profile(database: Path, directory: Path) -> Path:
     return config_path
 
 
-def inspect_or_restore(archive: Path, *, restore_dir: Path | None = None) -> dict:
+def inspect_or_restore(archive: Path, *, restore_dir: Path | None = None,
+                       publication_guard: Callable[[], AbstractContextManager] = nullcontext) -> dict:
     archive = _absolute(archive)
     if restore_dir is not None:
         restore_dir = _absolute(restore_dir)
@@ -108,7 +111,8 @@ def inspect_or_restore(archive: Path, *, restore_dir: Path | None = None) -> dic
         manifest = read_archive(archive, database)
         if restore_dir is None:
             return {**manifest, "verified": True}
-        config_path = _publish_profile(database, restore_dir)
+        with publication_guard():
+            config_path = _publish_profile(database, restore_dir)
         return {
             **manifest, "verified": True, "profile_config": str(config_path),
             "database_path": str(restore_dir / "ledger.sqlite3"),

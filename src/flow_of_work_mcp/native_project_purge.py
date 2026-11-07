@@ -641,15 +641,22 @@ class _Gateway:
         if wal.exists() and wal.stat().st_size:
             raise _Problem("purge_scrub_busy", "WAL content remains after checkpoint.", "Close ledger readers/writers and reconcile before reporting deletion complete.", status="blocked")
 
-    def _verify_absence(self, connection: sqlite3.Connection, columns: dict) -> dict:
+    def _verify_absence(self, connection: sqlite3.Connection, columns: dict, *, observe: bool = True) -> dict:
         self._assert_identity()
         inventory = _inventory(connection, columns, self.args.project_id)
-        self._observe(inventory)
+        if observe:
+            self._observe(inventory)
         if inventory["project_present"] or any(inventory["counts"].values()):
             raise _Problem("purge_project_recreated", "The target is present during deletion recovery.", "Stop recovery and inspect the recreated or remaining project; no further destructive SQL is permitted.", status="blocked")
         if connection.execute("PRAGMA foreign_key_check").fetchone() is not None or [row[0] for row in connection.execute("PRAGMA integrity_check")] != ["ok"]:
             raise _Problem("purge_integrity_failed", "Post-deletion integrity could not be established.", "Preserve the minimal journal and inspect ledger integrity before claiming completion.", status="blocked")
         return inventory
+
+    def _compact(self, connection: sqlite3.Connection) -> None:
+        self._checkpoint_wal(connection)
+        self._assert_identity()
+        connection.execute("VACUUM")
+        self._checkpoint_wal(connection)
 
     def _scrub(self, connection: sqlite3.Connection, columns: dict) -> None:
         self._verify_absence(connection, columns)
@@ -659,15 +666,18 @@ class _Gateway:
             self._stage("ledger_deleted")
         self.result["project_effect_state"] = "applied"
         if self.journal["stage"] != "scrubbed":
-            self._checkpoint_wal(connection)
-            self._assert_identity()
-            connection.execute("VACUUM")
-            self._checkpoint_wal(connection)
+            self._compact(connection)
             self._verify_absence(connection, columns)
             self._stage("scrubbed")
         else:
             self._checkpoint_wal(connection)
             self._verify_absence(connection, columns)
+
+    def _enable_secure_delete(self, connection: sqlite3.Connection) -> None:
+        connection.execute("PRAGMA secure_delete = ON")
+        secure_delete = connection.execute("PRAGMA secure_delete").fetchone()
+        if secure_delete is None or secure_delete[0] != 1:
+            raise _Problem("purge_secure_delete_unavailable", "SQLite secure_delete=ON could not be established.", "Use a separately qualified SQLite/native platform before deleting project data.", status="blocked")
 
     def _delete(self, connection: sqlite3.Connection, columns: dict, inventory: dict) -> None:
         if self.journal is None:
@@ -692,10 +702,7 @@ class _Gateway:
             raise _Problem("purge_external_activity_blocked", "External work is still active or lacks supported terminal proof.", "Resolve the exact listed owner/command/run before native deletion; missing provider availability cannot waive it.", status="blocked")
         _fsync_directory(self.database.parent)
         _fsync_directory(self.journal_directory)
-        connection.execute("PRAGMA secure_delete = ON")
-        secure_delete = connection.execute("PRAGMA secure_delete").fetchone()
-        if secure_delete is None or secure_delete[0] != 1:
-            raise _Problem("purge_secure_delete_unavailable", "SQLite secure_delete=ON could not be established.", "Use a separately qualified SQLite/native platform before deleting project data.", status="blocked")
+        self._enable_secure_delete(connection)
         connection.execute("BEGIN IMMEDIATE")
         try:
             self._assert_identity()
@@ -724,6 +731,46 @@ class _Gateway:
             raise
         self._stage("ledger_deleted")
         self._scrub(connection, columns)
+
+    def execute_dashboard(self, *, ownership: RuntimeOwnership) -> None:
+        """Delete current project rows during an authenticated dashboard request."""
+        self.config_path = self.args.config.expanduser()
+        self._select_database()
+        ownership.assert_resource(self.database)
+        self._assert_identity()
+        with closing(sqlite3.connect(self.database.as_uri() + "?mode=rw", uri=True, timeout=1,
+                                     isolation_level=None)) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA trusted_schema = OFF")
+            self._enable_secure_delete(connection)
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                ownership.assert_resource(self.database)
+                self._assert_identity()
+                columns = _validate_schema(connection)
+                project = connection.execute(
+                    "SELECT 1 FROM projects WHERE project_id = ?", (self.args.project_id,)
+                ).fetchone()
+                if project is None:
+                    self._verify_absence(connection, columns, observe=False)
+                    self.result.update(deletion_state="absent", project_present=False)
+                    raise _Problem("purge_project_not_found", "This project is already absent.",
+                                   "Refresh the project list.")
+                _delete_rows(connection, columns, self.args.project_id)
+                self._verify_absence(connection, columns, observe=False)
+                self.result.update(deletion_state="unknown", project_effect_state="unknown")
+                connection.commit()
+            except BaseException:
+                if connection.in_transaction:
+                    connection.rollback()
+                    if self.result["project_effect_state"] == "unknown":
+                        self.result.update(deletion_state="unprepared", project_effect_state="none")
+                raise
+            self.result.update(deletion_state="ledger_deleted", project_present=False, project_effect_state="applied")
+            self._compact(connection)
+            self._verify_absence(connection, columns, observe=False)
+        self.result.update(status="success", deletion_state="scrubbed", next_action="Refresh the project list.")
 
     def execute(self, *, ownership: RuntimeOwnership | None = None) -> dict:
         self._validate_arguments()
@@ -826,6 +873,43 @@ def run_project_purge(args: Any, *, ownership: RuntimeOwnership | None = None) -
             "message": "Native project management could not complete its current stage.",
             "resolution": "Inspect/reconcile the same deletion ID and selected ledger; a failed response is not proof of no effect."}],
             next_action="Inspect/reconcile this same native intent before any destructive retry.")
+    return result, _EXIT_CODES[result["status"]]
+
+
+def run_dashboard_project_purge(config_path: Path, project_id: str, *,
+                                ownership: RuntimeOwnership | None) -> tuple[dict, int]:
+    """Remove Flower data under the dashboard's maintenance fence without a journal."""
+    args = SimpleNamespace(config=config_path, project_id=project_id, purge_operation="delete", deletion_id="")
+    gateway = _Gateway(args)
+    result = gateway.result = {
+        "project_id": project_id, "status": "failed", "deletion_state": "unprepared", "project_present": None,
+        "project_effect_state": "none", "diagnostics": [], "next_action": "Inspect the project list.",
+    }
+    try:
+        if validate_project_id(project_id) != project_id:
+            raise _Problem("purge_identity_invalid", "Use the exact project ID.", "Refresh the project list.")
+        if ownership is None:
+            raise _Problem("resource_ownership_inactive", "The dashboard has no verified ledger ownership.",
+                           "Use the owning Flower dashboard.", status="blocked")
+        gateway.execute_dashboard(ownership=ownership)
+    except _Problem as exc:
+        resolution = exc.resolution
+        if result["project_effect_state"] != "none":
+            resolution = "Refresh the project list and inspect the reported deletion state."
+        elif exc.code in {"purge_integrity_failed", "purge_project_recreated"}:
+            resolution = "Inspect the ledger before retrying project deletion."
+        result.update(status=exc.status, diagnostics=[{"code": exc.code, "message": exc.message,
+                                                      "resolution": resolution}], next_action=resolution)
+    except RuntimeOwnershipError as exc:
+        resolution = "Use the Flower instance that owns this ledger."
+        result.update(status="blocked", diagnostics=[{"code": exc.code, "message": "Ledger ownership could not be verified.",
+                                                       "resolution": resolution}], next_action=resolution)
+    except Exception:
+        # Database, parser and filesystem diagnostics may contain private data.
+        resolution = "Refresh the project list before taking another action."
+        result.update(diagnostics=[{"code": "dashboard_project_purge_failed",
+                                   "message": "Flower could not complete project deletion.",
+                                   "resolution": resolution}], next_action=resolution)
     return result, _EXIT_CODES[result["status"]]
 
 

@@ -1,10 +1,8 @@
 """Authenticated dashboard creation through the canonical project service."""
-from uuid import uuid4
-
 import pytest
 from starlette.testclient import TestClient
 
-from tests.test_dashboard_http import fixture, request_csrf
+from tests.test_dashboard_http import delete_while_checking_maintenance, fixture, request_csrf
 from tests.test_native_project_purge import _rows
 
 
@@ -78,19 +76,15 @@ def test_create_checks_owner_origin_csrf_and_closed_bounded_input(browser):
     assert _rows(runtime.ledger.database_path) == before
 
 
-def test_create_is_fenced_during_maintenance(browser):
+def test_create_is_fenced_during_maintenance(browser, monkeypatch):
     runtime, client = browser
     headers = authenticated_headers(client)
-    deletion = PROJECTS + '/project-a/deletion/'
-    intent = {'deletion_id': str(uuid4())}
-    prepared = client.post(deletion + 'prepare', json=intent, headers=headers)
-    assert prepared.json()['result']['maintenance']['state'] == 'maintenance'
     before = _rows(runtime.ledger.database_path)
 
-    blocked = client.post(PROJECTS, json={'project_id': 'blocked-project', 'name': 'Blocked project'}, headers=headers)
-    assert blocked.status_code == 503
-    assert blocked.json()['reason'] == 'server_maintenance'
-    assert _rows(runtime.ledger.database_path) == before
+    def check():
+        blocked = client.post(PROJECTS, json={'project_id': 'blocked-project', 'name': 'Blocked project'}, headers=headers)
+        assert blocked.status_code == 503
+        assert blocked.json()['reason'] == 'server_maintenance'
+        assert _rows(runtime.ledger.database_path) == before
 
-    cancelled = client.post(deletion + 'cancel', json=intent, headers=headers)
-    assert cancelled.json()['result']['maintenance']['state'] == 'ready'
+    delete_while_checking_maintenance(client, headers, monkeypatch, check)

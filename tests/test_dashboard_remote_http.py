@@ -1,11 +1,10 @@
 """The HTTPS ingress has its own route and credential boundary."""
 from types import SimpleNamespace
-from uuid import uuid4
 
 from starlette.testclient import TestClient
 
-from flow_of_work_mcp import dashboard_http
-from tests.test_dashboard_http import fixture
+from flow_of_work_mcp import dashboard_http, dashboard_maintenance
+from tests.test_dashboard_http import fixture, request_csrf
 
 
 REMOTE = "https://flower.example:8443"
@@ -58,13 +57,21 @@ def test_remote_uses_secure_cookie_and_shared_maintenance(tmp_path, monkeypatch)
             assert local.get("/dashboard/api/projects", headers={
                 "Cookie": cookie.split(";", 1)[0], "X-Flower-CSRF": proof,
             }).status_code == 401
-            endpoint = "/dashboard/api/projects/project-a/deletion/"
+            request_csrf(local)
+            original = dashboard_maintenance.run_dashboard_project_purge
+            def during_purge(*args, **kwargs):
+                assert dashboard.maintenance.status()["state"] == "maintenance"
+                assert local.get("/dashboard/api/projects").status_code == 503
+                return original(*args, **kwargs)
+            monkeypatch.setattr(dashboard_maintenance, "run_dashboard_project_purge", during_purge)
+            endpoint = "/dashboard/api/projects/project-a/deletion/delete"
             headers = {"Origin": REMOTE, "X-Flower-CSRF": proof}
-            body = {"deletion_id": str(uuid4())}
-            assert remote.post(endpoint + "prepare", json=body, headers=headers).status_code == 200
-            assert dashboard.maintenance.status()["state"] == "maintenance"
-            assert remote.post(endpoint + "cancel", json=body, headers=headers).status_code == 200
+            body = {"confirm_project_id": "project-a", "password": "synthetic-fixture-only"}
+            deleted = remote.post(endpoint, json=body, headers=headers)
+            assert deleted.status_code == 200
+            assert deleted.json()["result"]["deletion"]["deletion_state"] == "scrubbed"
             assert dashboard.maintenance.status()["state"] == "ready"
+            assert local.get("/dashboard/api/projects").status_code == 200
     finally:
         dashboard.close()
         runtime.close()
