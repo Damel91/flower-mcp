@@ -8,8 +8,10 @@ description: Start or resume a Flower MCP engineering cycle, define or execute a
 Use Flower for canonical intent, architecture, plans, lifecycle, verification
 records, acceptance and handover. Use the host's authorized tools for repository
 investigation, edits, builds, tests and Git. Follow applicable project instructions
-when present. A project-local `AGENTS.md` is optional for this workflow. Use the
-existing `flower-mcp bootstrap` guidance for an explicitly requested setup.
+when present. Activate this workflow with the instructions already loaded.
+Do not create or copy `AGENTS.md`, run `/init`, or install or reinstall Flower
+merely to activate the skill. Use the existing `flower-mcp bootstrap` guidance
+when the user explicitly requests setup.
 
 If the full persistent Flower bootstrap template is absent from loaded
 instructions, read [Bootstrap constraints](references/bootstrap-constraints.md)
@@ -25,9 +27,10 @@ that reference.
    a genuinely new conversation.
 2. Discover projects via `fow_interaction` and explicitly select the intended
    existing project. Confirm a choice if discovery and the task leave it
-   ambiguous. Create a project only with current authorization and verified
-   intent, then rediscover and select it. Keep locators and interaction state
-   in their proper scope. Global instructions contain no project state.
+   ambiguous. Create a project only when no existing project fits the verified
+   new scope and the current request authorizes creation. Then rediscover and
+   select it. Keep locators and interaction state in their proper scope. Global
+   instructions contain no project state.
 3. Read `fow_capabilities` summary and `fow_handover` project-state snapshot.
    Use the current lens for attention. Follow the single current `next_gate`
    within authorized scope, and refresh after lifecycle mutations. An idle

@@ -164,5 +164,9 @@ require their own configured authority and prerequisites.
 
 Keep shared instructions free of project locators. If applicable project-local
 instructions carry a locator, keep only stable, verified project identity there.
-Lifecycle state and history remain in Flower: do not persist frame numbers, cursors, request/session IDs,
-revisions, fingerprints, provider handles, credentials or a ledger of tool calls.
+Keep frame numbers, cursors, request/session IDs, revisions, fingerprints,
+provider handles, credentials and tool-call history out of instruction files.
+Lifecycle state and history remain in Flower. Retain the issued revisions,
+fingerprints and relevant request or outcome identities with their durable
+receipts, executable offline plans and outcome evidence where needed for
+recovery and reconciliation.
