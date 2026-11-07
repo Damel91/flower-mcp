@@ -11,6 +11,11 @@ investigation, edits, builds, tests and Git. Follow applicable project instructi
 when present. A project-local `AGENTS.md` is optional for this workflow. Use the
 existing `flower-mcp bootstrap` guidance for an explicitly requested setup.
 
+If the full persistent Flower bootstrap template is absent from loaded
+instructions, read [Bootstrap constraints](references/bootstrap-constraints.md)
+before following this workflow. A skill activation block alone still requires
+that reference.
+
 ## Bind the intended work
 
 1. Establish the repository/worktree, project and user-authorized scope. Discover
