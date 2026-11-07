@@ -85,10 +85,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.13.0/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.13.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -100,7 +100,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.13.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -154,9 +154,10 @@ When Flower runs with streamable HTTP, it also serves a dashboard on the same
 computer. Open `/dashboard` and sign in with the local operating-system account
 that owns your Flower profile. Create and browse projects, read retained documents,
 or prepare profile settings. Use **Backup** to save and manage SQLite copies,
-or export a single project for [restoration into a separate profile](docs/DATA-BACKUP-AND-RECOVERY.md).
+or export a single project. **Backup → Ripristina archivio** restores either ZIP
+into a [new, separate profile](docs/DATA-BACKUP-AND-RECOVERY.md).
 
-Project deletion requires a review and a fresh password confirmation. See the
+To delete a project, enter its exact ID and your local account password. See the
 [dashboard guide](docs/DASHBOARD.md) for startup, access and recovery. A stdio
 connection alone has no browser dashboard. To open the dashboard from another
 device, save **Accesso dalla LAN** in **Impostazioni Flower** and restart the

@@ -44,7 +44,7 @@ decisione semantica correttamente.
 ## Il progetto nel browser
 
 La persona può consultare direttamente i progetti del proprio profilo. Con
-Flower 0.13.0 avviato in streamable HTTP, apri l'indirizzo locale `/dashboard` e
+Flower 0.14.0 avviato in streamable HTTP, apri l'indirizzo locale `/dashboard` e
 accedi con l'account del sistema operativo che possiede il profilo Flower. Le sezioni mostrano requisiti, roadmap,
 pacchetti, verifiche e oracoli, architettura ed evidenze conservate. La scelta del
 progetto nel browser lascia invariato il contesto delle chat.
@@ -55,14 +55,16 @@ HTML e immagini restano inerti. La vista distingue limiti e contenuti parziali
 senza trasformarli in completezza o accettazione. Il tema segue il sistema,
 con una scelta manuale chiara o scura memorizzata nel browser.
 
-L'eliminazione di un progetto è un'operazione separata: preparazione, manutenzione
-esplicita dell'intera istanza, inventario e conferma dell'ID esatto. L'operatore
-deve possedere una dichiarazione reale dell'arresto dei propri worker. La pagina
-non ferma host esterni e non elimina repository, chat o backup. Un esito incerto
-richiede ispezione dello stesso intento, senza ripetere automaticamente il comando.
-La [guida corrente della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
-spiega accesso e recupero. Questa interfaccia live è distinta dal
-[reader offline della presentazione](reader.md), che non interroga Flower.
+Per eliminare un progetto, scegli **Elimina progetto** e inserisci il suo ID
+esatto e la password del tuo account locale. Flower mette brevemente l'istanza
+in manutenzione per rimuovere i propri dati del progetto. Se la risposta si
+interrompe, aggiorna l'elenco dei progetti per verificare l'esito.
+
+Per ripristinare un archivio, apri **Backup → Ripristina archivio**, scegli uno ZIP
+di Flower e dai un nome al nuovo profilo. Flower lascia quel profilo spento.
+La [guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
+spiega accesso e recupero. Il [reader offline](reader.md) funziona separatamente
+dalla dashboard live.
 
 ## Il problema da cui nasce il meccanismo
 

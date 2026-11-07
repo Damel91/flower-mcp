@@ -48,18 +48,17 @@ dell'autore. I ritagli mostrano il metodo, non certificano i risultati dei test.
 
 ## Tre minuti nella dashboard
 
-Aprire in anticipo `/dashboard` sull’indirizzo locale di Flower 0.13.0, in streamable HTTP su
+Aprire in anticipo `/dashboard` sull’indirizzo locale di Flower 0.14.0, in streamable HTTP su
 un profilo dimostrativo. Accedere prima con l’account locale. Durante il talk mostrare un progetto, il prossimo gate,
 un packet e un Markdown già conservato: **Lettura**, indice, poi **Sorgente**.
 Cambiare tema consente di mostrare la preferenza chiara/scura e il default di
 sistema senza modificare il progetto.
 
-Spiegare che l'eliminazione richiede manutenzione dell'intera istanza e conferma
-esplicita. Per il talk basta mostrarne l'accesso: una cancellazione reale richiede
-un progetto sacrificabile, l'arresto verificato dei worker posseduti e le normali
-guardie. Non presentare un campo compilato come prova di arresto di un host.
-La dashboard live legge il ledger. L'HTML usato per raccontare questi capitoli è
-invece il reader offline della presentazione.
+Mostrare i due campi di eliminazione, ID esatto del progetto e password
+dell'account locale. Per una cancellazione dal vivo, usare un progetto
+sacrificabile del profilo dimostrativo. Mostrare **Backup → Ripristina archivio**
+per spiegare come recuperare uno ZIP in un profilo separato. La dashboard live
+legge il ledger. Questa presentazione si apre nel reader offline.
 
 ## Se vogliamo una dimostrazione reale
 

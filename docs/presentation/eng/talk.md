@@ -47,18 +47,17 @@ method, not certification of test outcomes.
 
 ## Three minutes in the dashboard
 
-Open Flower 0.13.0 at its local `/dashboard` address in advance, with streamable HTTP and a dedicated
+Open Flower 0.14.0 at its local `/dashboard` address in advance, with streamable HTTP and a dedicated
 demo profile. Sign in with the local account before the talk. During the talk, show a project, its next gate, a packet and
 already retained Markdown: **Lettura**, its outline, then **Sorgente**. Switch
 the theme to show light/dark preference and the system default without changing
 the project.
 
-Explain that deletion requires instance-wide maintenance and explicit
-confirmation. Showing its entry point is enough for the talk. Actual deletion
-requires a disposable project, verified stop of owned workers and the ordinary
-guards. A filled field does not prove that a host stopped. The live dashboard
-reads the ledger. The HTML presenting these chapters is the separate offline
-presentation reader.
+Show the two deletion fields, exact project ID and local account password.
+For a live deletion, use a disposable project in the demo profile. Show
+**Backup → Ripristina archivio** to illustrate how to recover an archive into
+a separate profile. The live dashboard reads the ledger. This presentation
+runs in the offline reader.
 
 ## If we want a real demonstration
 

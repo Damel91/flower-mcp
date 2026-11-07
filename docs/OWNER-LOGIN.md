@@ -1,6 +1,6 @@
 # Local owner login and optional startup
 
-Flower 0.13.0 uses native account verification for its local dashboard. The
+Flower 0.14.0 uses native account verification for its local dashboard. The
 operating system account that owns the selected profile signs in with its local
 password. The optional per-user startup commands select the same profile.
 
@@ -55,9 +55,9 @@ not persist them in SQLite, files or browser storage. The input clears after a
 completed attempt; a failed attempt is not resubmitted automatically.
 
 The browser offers the same system/light/dark appearance as the workspace. A
-successful login opens the selected profile's projects. Administrative deletion
-requires inventory review, exact project-ID confirmation, the host-stop reference
-and a fresh local password check. See the
+successful login opens the selected profile's projects. Dashboard deletion
+requires the exact project ID and fresh confirmation with the local owner's
+password. See the
 [dashboard guide](DASHBOARD.md#delete-a-project).
 
 Use **Esci** to revoke the session. Flower requires both the session cookie and

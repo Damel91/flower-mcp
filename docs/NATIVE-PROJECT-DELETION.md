@@ -16,11 +16,11 @@ backup of the deleted project's contents.
 
 ## Browser administration and offline CLI
 
-Flower 0.10.0 exposes password-confirmed project deletion through its local
-[browser dashboard](DASHBOARD.md). That route enters whole-instance maintenance,
-drains admitted work, fences idle jobs and retains the running owner's ledger
-lease. Review the inventory, provide the actual host-stop reference and confirm
-the final action with the local owner password. The operator owns external cleanup.
+Flower 0.14.0 offers direct deletion in its [browser dashboard](DASHBOARD.md).
+Confirm the exact project ID with the local owner password. Flower briefly
+enters maintenance under the running owner's ledger lease. The browser path
+removes Flower records for the selected project, and the operator owns any
+external cleanup.
 
 The commands below describe the separate **offline CLI**. Its owner-stop
 requirement remains in force. Do not run this CLI alongside a live Flower owner

@@ -14,6 +14,17 @@ settings, credentials, client registrations, repository files, local import
 files or provider storage. Recorded external links can require reconciliation
 on the destination.
 
+## Restore from the dashboard
+
+Open **Backup → Ripristina archivio**. Choose a Flower backup or
+single-project export from your device and enter the name of a new profile.
+Flower validates the archive and places the recovered data in the installation's
+profiles directory. It refuses an existing name and leaves the new profile
+inactive. Use a trusted archive. Its digest detects damage, while the source
+of the file remains your responsibility.
+
+## Terminal workflow
+
 For a profile that is stopped, the CLI can also create an archive directly.
 Choose a new filename in an existing private directory:
 

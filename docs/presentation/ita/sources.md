@@ -26,20 +26,22 @@ al commit `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corregge il costo del recup
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
 I vecchi download di questo checkpoint puntavano alla release `0.5.2`.
-I comandi operativi in [Ora prova Flower](try-flower.md) selezionano ora 0.13.0. La storica
+I comandi operativi in [Ora prova Flower](try-flower.md) selezionano ora 0.14.0. La storica
 `0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
 binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1`, `0.5.0` e `0.5.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
 prodotto vanno riesaminati quando cambia il comportamento del server.
 
-## Integrazione corrente: dashboard 0.13.0
+## Integrazione corrente: dashboard 0.14.0
 
 Il capitolo Operate descrive la dashboard locale e il lettore Markdown
-introdotti nella 0.9.0. Flower 0.13.0 rende esplicito il recupero degli esiti storici e separa
-i canali di prova nella dashboard. I link seguono il ramo corrente `main`.
+introdotti nella 0.9.0. Flower 0.14.0 semplifica l'eliminazione dei progetti e
+ripristina gli archivi ZIP in nuovi profili dal browser. Le viste per gli esiti
+storici e le evidenze introdotte nella 0.13.0 restano disponibili. I link seguono
+il ramo corrente `main`.
 
 - [Guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): avvio, accesso del proprietario, temi, lettura e manutenzione.
-- [Release notes 0.13.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.13.0.md): scope, dipendenze e limiti della release.
+- [Release notes 0.14.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.14.0.md): scope, dipendenze e limiti della release.
 - [Recupero della currentness](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprint e valutazione degli snapshot precedenti.
 
 Il reader della presentazione rimane offline. La dashboard usa il profilo del

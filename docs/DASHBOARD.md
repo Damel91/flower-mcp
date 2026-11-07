@@ -1,8 +1,9 @@
 # Flower browser dashboard
 
-Flower 0.13.0 lets the local owner create and inspect projects, prepare profile
-settings, manage backups, and export a project's lifecycle records. The dashboard
-also provides password-confirmed project deletion under whole-instance maintenance.
+Flower 0.14.0 lets the local owner create and inspect projects, prepare profile
+settings, manage backups and export a project's lifecycle records. The dashboard
+restores Flower archives to separate profiles and confirms project deletion with
+the exact project ID and the local owner password.
 See the [owner-login guide](OWNER-LOGIN.md) for account and platform prerequisites.
 
 ## Start Flower and open the dashboard
@@ -38,9 +39,8 @@ Dashboard requests retain loopback/Host/Origin and transparent CSRF checks.
 Project and evidence views, maintenance details and administrative routes require
 the authenticated owner session. Browser project selection leaves chat contexts
 and lenses unchanged; dashboard login does not authenticate or reconfigure MCP
-clients. After restart, use ordinary login at the same address. Pending deletion
-references are retained for explicit inspection; uncertain destructive requests
-are never replayed automatically.
+clients. After restart, use ordinary login at the same address. If a deletion
+response is interrupted, refresh the project list to check the outcome.
 
 For access from another device, save **Accesso dalla LAN** in **Impostazioni
 Flower** and restart the same profile. The separate HTTPS listener starts with
@@ -139,9 +139,10 @@ limit is 2 MiB; an oversized record retains its reference and reports that limit
 Open **Backup** and select **Crea backup** to retain a consistent SQLite copy.
 Use **Scarica** to keep a copy elsewhere. **Elimina** removes the selected
 retained archive after password confirmation. Use **Esporta progetto** on a
-project overview to download that project's lifecycle records. The
-[backup and recovery guide](DATA-BACKUP-AND-RECOVERY.md) shows how to inspect
-an archive and restore it into a separate profile.
+project overview to download that project's lifecycle records. To restore either
+kind of archive, choose **Backup → Ripristina archivio**, select the ZIP and enter
+a new profile name. Flower validates the archive and leaves the new profile
+inactive. See the [backup and recovery guide](DATA-BACKUP-AND-RECOVERY.md).
 
 ## Upgrade a dedicated macOS service
 
@@ -186,70 +187,23 @@ preference. The selection is stored locally for this browser and origin. Select
 ## Delete a project
 
 Use **Elimina** in the project list or **Elimina progetto** in the open project.
-The flow has a separate preparation and final confirmation.
+Type the exact ID shown and the password of the local account you signed in
+with, then select **Elimina progetto**. Flower verifies that password for the
+submission.
 
-1. Select **Prepara eliminazione**. Flower stops admitting database operations
-   from the dashboard and MCP, drains admitted work for up to five seconds and
-   pauses the job service only if it is idle. Active requests or jobs can refuse
-   preparation. Let the owning work settle before trying again.
-2. Review the project inventory and all blockers. The maintenance affects every
-   project on this Flower instance. Chats receive `blocked/server_maintenance`
-   with retry guidance while it is held.
-3. If you decide to continue, type the exact project ID. Enter the actual
-   reference to your host's stopped-worker or session evidence. Add stopped run
-   IDs only for runs your host owns and has actually stopped.
-4. Enter the password of the local account you signed in with, then select
-   **Elimina progetto**. Flower verifies the password for this submission and
-   rechecks the prepared inventory and deletion guards before removal. A password
-   refusal leaves the preparation available for a fresh attempt. A changed
-   inventory requires a fresh explicit preparation and confirmation.
+Flower removes the selected project's data under its existing ledger lease.
+The brief maintenance window drains active local calls and pauses local jobs.
+If the instance is still busy, try again after the local work settles. Recorded
+external activity does not block this action. Other projects, existing backups,
+repositories and host chats are outside the deletion scope.
 
-The host-stop reference is an operator declaration with its declared provenance.
-The dashboard does not establish that OpenCode, another host or an external
-provider stopped merely because the field was filled in. Active or uncertain
-external work, missing terminal provider evidence, unsupported schema/storage and
-unsafe ownership remain blockers. A host declaration cannot waive another
-provider's outstanding work.
+The dashboard creates neither a deletion archive nor a persistent deletion
+journal. After a lost response, return to the project list and refresh it
+before trying again. If Flower reports that the project was removed but
+storage cleanup was interrupted, the project is already absent from the ledger.
 
-Before destructive work, **Annulla e riprendi Flower** ends the browser flow and
-resumes service when safe. The native prepared journal remains intact. Closing
-the dialog alone leaves the current maintenance state in place; the page's
-maintenance banner provides **Apri stato e recupero**.
-
-Deletion uses the runtime's existing exclusive ledger lease throughout. It
-preserves other projects, configuration, global sequences, repositories, external
-documents, backups and host chats. Flower does not create an archive of the
-deleted project's contents.
-
-## Recover an interrupted operation
-
-A missing response is a reason to inspect the existing intent. Keep its deletion
-ID and use **Ispeziona stato** before any further destructive action. The browser
-retains a reminder for the intent across page reloads and offers recovery instead
-of automatically submitting another deletion.
-
-| Observed state | Meaning and operator action |
-| --- | --- |
-| `prepared` | The inventory is retained. Review the same intent before confirming, or cancel the browser flow |
-| `deleting` or `unknown` | The result needs inspection. Keep maintenance and inspect/reconcile the same intent |
-| `ledger_deleted` | Ledger removal applied, with cleanup still incomplete. Use **Riconcilia operazione** to recover that intent |
-| `scrubbed` | Flower verified cleanup, project absence and database integrity. Normal service can resume when no other unfinished destructive intent remains |
-
-Flower resumes jobs and request admissions after verified cleanup. It does not
-rebuild a second runtime or release the ledger lease during maintenance. On
-startup, an unfinished destructive journal holds admissions and presents its
-recovery state. Prepared and fully scrubbed historical intents do not execute
-automatically.
-
-The minimal native journal remains until the relevant host completes its own
-cleanup. The dashboard never acknowledges host cleanup automatically. An unreadable
-or invalid journal requires operator inspection through the native workflow;
-preserve it while investigating.
-
-The existing offline administration route is documented in
-[Native project deletion](NATIVE-PROJECT-DELETION.md). Its actual command help is
-available with `flower-mcp project-purge --help`. That route requires the relevant
-runtime to be stopped and retains its existing ownership and recovery guards.
+For earlier unfinished native deletion journals, use the separate
+[native project deletion recovery](NATIVE-PROJECT-DELETION.md) workflow.
 
 ## Compatibility boundaries
 

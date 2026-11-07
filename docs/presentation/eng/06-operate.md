@@ -41,7 +41,7 @@ gate guides work; it does not guarantee every semantic decision will be correct.
 
 ## The project in the browser
 
-The person can inspect the projects in their profile directly. When Flower 0.13.0
+The person can inspect the projects in their profile directly. When Flower 0.14.0
 runs with streamable HTTP, open its local `/dashboard` address and sign in
 with the OS account that owns the Flower profile. Its sections show requirements, roadmap, packets,
 verification and Oracles, architecture and retained evidence. Browser project
@@ -53,14 +53,16 @@ images remain inert. The view identifies limits and partial content without
 turning them into completeness or acceptance. Its theme follows the system,
 with a manual light or dark preference stored in the browser.
 
-Project deletion is a separate operation: preparation, explicit instance-wide
-maintenance, inventory review and exact project-ID confirmation. The operator
-must possess an actual declaration that their workers stopped. The page does
-not stop external hosts or delete repositories, chats or backups. An uncertain
-outcome requires inspecting the same intent instead of automatically repeating
-the command. The [current dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
-explains access and recovery. This live interface is separate from the
-[offline presentation reader](reader.md), which never queries Flower.
+To delete a project, select **Elimina progetto** and enter its exact ID and
+your local account password. Flower briefly puts the instance into maintenance
+to remove its own records for that project. If the response is interrupted,
+refresh the project list to check the outcome.
+
+To restore a saved archive, open **Backup → Ripristina archivio**, select a
+Flower ZIP, and enter a new profile name. Flower leaves the new profile inactive.
+See the [dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md)
+for access and recovery. The [offline presentation reader](reader.md) runs
+independently of the live dashboard.
 
 ## The problem behind the mechanism
 
