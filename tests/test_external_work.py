@@ -105,6 +105,12 @@ def test_dependency_frontier_report_restart_offline_replay_and_deferred_gate(tmp
     assert use['provenance'] == 'external_agent_report'
     consumer = report(resumed, ids, revs, 'consumer', report_key='consumer-1')
     resumed.call(*ids, 'report_outcome', actor='agent', request_id='outcome-2', payload=consumer)
+    replay = resumed.call(*ids, 'report_outcome', actor='agent', request_id='outcome-1', payload=producer)
+    assert replay['recorded_receipt'] == receipt
+    assert replay['receipt_applicability']['state'] == 'current_authority'
+    assert replay['reason'] == 'current_execution_gate_changed'
+    assert replay['execution_allowed'] is False
+    assert replay['next_gate']['arguments']['operation'] == 'todo'
     assert resumed.todo(*ids)['next_gate']['tool'] == 'fow_audit_phase'
     record_test_repository_review(reopened, ids)
     complete = resumed.todo(*ids)
@@ -316,6 +322,8 @@ def test_historical_report_cannot_impersonate_current_fingerprint_or_poison_conf
     assert receipt['status'] == 'historical'
     todo = service.todo(*ids)
     assert todo['current_unit']['unit_key'] == 'producer'
+    assert todo['current_unit']['status'] == 'actionable'
+    assert todo['next_gate']['external_operation'] == 'execute_unit'
     assert todo['historical_reports'] == [spoof['report_key']]
     with pytest.raises(ChangeControlBlockedError, match='stale'):
         service.call(*ids, 'reconcile_outcome', actor='human', request_id='reject-promotion', payload={**current_revs,
@@ -423,7 +431,7 @@ def test_milestone_semantic_policy_drift_stales_host_reports_without_spec_revisi
     ledger, service, ids, revs = fixture(tmp_path)
     milestone = governing_milestone(ledger, ids)
     original = report(service, ids, revs)
-    service.call(*ids, 'report_outcome', actor='agent', request_id='before-policy-drift', payload=original)
+    recorded = service.call(*ids, 'report_outcome', actor='agent', request_id='before-policy-drift', payload=original)
     assert service.todo(*ids)['current_unit']['unit_key'] == 'consumer'
     # Milestone policies are currently immutable through authoring. Exercise
     # changed canonical repository authority at the same identity without
@@ -436,12 +444,77 @@ def test_milestone_semantic_policy_drift_stales_host_reports_without_spec_revisi
     assert (todo['spec_revision'], todo['plan_revision']) == (revs['expected_spec_revision'], revs['expected_plan_revision'])
     assert todo['current_unit']['unit_key'] == 'producer'
     assert todo['historical_reports'] == [original['report_key']]
+    assert todo['execution_allowed'] is False
+    assert todo['current_unit']['status'] == 'recovery_required'
+    gate = todo['next_gate']
+    assert gate['external_operation'] == 'inspect_historical_outcome'
+    assert gate['effect_policy'] == 'inspection_and_review_only'
+    assert gate['original_report']['authority_fingerprint'] == original['authority_fingerprint']
+    assert gate['current_authority']['authority_fingerprint'] == todo['authority_fingerprint']
+    assert gate['inspect_route']['arguments']['payload'] == {'detail': 'full'}
+    assert gate['settlement_route']['arguments']['operation'] == 'report_outcome'
+    assert service.validation(*ids)['next_gate'] == gate
+    assert service.validation(*ids, detail='full')['report_history'][0]['currentness'] == 'historical_on_original_pin'
+    with pytest.raises(ChangeControlBlockedError, match='historical_outcome_recovery_required'):
+        service.call(*ids, 'export_plan', actor='agent', request_id='do-not-export-for-replay', payload=revs)
+    draft = service.call(*ids, 'export_plan', actor='agent', request_id='inspect-draft',
+                         payload={**revs, 'allow_draft': True})
+    assert draft['draft'] and 'historical_outcome_recovery_required' in draft['content']
+    from flow_of_work_mcp.application.external_plan_markdown import render_external_result
+    text = render_external_result(todo)
+    assert 'Primary recovery action' in text and 'Unit to inspect before execution' in text
+    assert 'execute_unit' not in text
+    with sqlite3.connect(tmp_path / 'flower.sqlite') as connection:
+        stored = connection.execute("SELECT result_json FROM external_work_requests WHERE request_id='before-policy-drift'").fetchone()
+        for request_id in ('before-policy-drift', 'same-report-new-request'):
+            retried = service.call(*ids, 'report_outcome', actor='agent', request_id=request_id, payload=original)
+            assert retried['status'] == 'historical' and retried['disposition'] == 'stale' and retried['replayed']
+            assert retried['receipt_applicability'] == {
+                'state': 'historical_on_original_pin', 'recorded_disposition': 'current',
+                'issued_authority': {
+                    'spec_revision': todo['spec_revision'], 'plan_revision': todo['plan_revision'],
+                    'authority_fingerprint': original['authority_fingerprint']},
+                'current_authority': gate['current_authority'], 'reason': 'stale_authority'}
+            assert retried['next_gate'] == gate['inspect_route']
+            assert 'execute_unit' not in render_external_result(retried)
+            if request_id == 'before-policy-drift':
+                assert retried['recorded_receipt'] == recorded
+        assert connection.execute("SELECT result_json FROM external_work_requests WHERE request_id='before-policy-drift'").fetchone() == stored
+        assert connection.execute("SELECT count(*) FROM external_work_reports").fetchone() == (1,)
     late = {**original, 'report_key': 'offline-old-policy'}
     historical = service.call(*ids, 'report_outcome', actor='agent', request_id='late-old-policy', payload=late)
     assert historical['status'] == 'historical'
     with pytest.raises(ChangeControlBlockedError, match='stale'):
         service.call(*ids, 'reconcile_outcome', actor='human', request_id='cannot-promote-old-policy',
             payload={**revs, 'report_key': original['report_key'], 'rationale': 'Old policy evidence cannot silently become current.'})
+    assessed = report(service, ids, revs, report_key='after-current-review')
+    service.call(*ids, 'report_outcome', actor='agent', request_id='record-reviewed-current', payload=assessed)
+    assert service.todo(*ids)['next_gate']['external_operation'] == 'execute_unit'
+    assert service.todo(*ids)['current_unit']['unit_key'] == 'consumer'
+
+
+def test_recovery_is_primary_without_holding_explicitly_selected_independent_new_unit(tmp_path, monkeypatch):
+    ledger, service, ids, revs = fixture(tmp_path)
+    from flow_of_work_mcp.application.packet_work_plan import _unit_from_payload
+    plan = ledger.packet_work_plan_state(*ids)
+    # Preserve a genuine independent, never-run obligation at this same pin.
+    units = [plan['units'][0], {**plan['units'][1], 'depends_on': [], 'requires': []}]
+    revised = ledger.create_packet_work_plan(ids[0], PacketWorkPlanDraft(ids[1], ids[2], revs['expected_spec_revision'],
+        tuple(_unit_from_payload(u) for u in units)), actor='human', expected_current_plan_revision=revs['expected_plan_revision'])
+    ledger.transition_packet_work_plan(ids[0], revised['work_plan_id'], revised['plan_revision'], status='accepted',
+        expected_packet_revision=revised['packet_revision'], expected_current_plan_revision=revised['plan_revision'],
+        rationale='The two units are independently verifiable.', actor='human')
+    revs.update(expected_plan_revision=revised['plan_revision'], expected_spec_revision=revised['packet_revision'])
+    milestone = governing_milestone(ledger, ids)
+    original = report(service, ids, revs)
+    service.call(*ids, 'report_outcome', actor='agent', request_id='producer-previous-authority', payload=original)
+    monkeypatch.setattr(ledger, 'milestones', lambda project_id: [
+        {**milestone, 'exit_policy': {'verification': 'A newly scoped verification policy.'}}])
+    assert service.todo(*ids)['next_gate']['external_operation'] == 'inspect_historical_outcome'
+    fresh = service.todo(*ids, unit_key='consumer')
+    assert fresh['execution_allowed']
+    assert fresh['next_gate']['external_operation'] == 'execute_unit'
+    assert fresh['current_unit']['unit_key'] == 'consumer'
 
 
 def test_milestone_status_acceptance_and_creation_noise_preserve_plan_authority(tmp_path, monkeypatch):

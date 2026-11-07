@@ -398,6 +398,9 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
             _record(lines, residual)
         return '\n'.join(lines).strip() + '\n'
     lines: list[str] = []
+    primary_gate = result.get('next_gate')
+    historical_recovery = (isinstance(primary_gate, Mapping)
+                           and primary_gate.get('external_operation') == 'inspect_historical_outcome')
     _section(lines, 'Current authority')
     identity_fields = ('status', 'reason', 'project_id', 'change_id', 'packet_id', 'consumption_mode',
                        'authority_fingerprint', 'spec_revision', 'plan_revision', 'plan_executable', 'execution_allowed', 'acceptance')
@@ -412,7 +415,9 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
     if isinstance(result.get('repository_review'), Mapping):
         _section(lines, 'Repository and lifecycle reconciliation')
         review = result['repository_review']
-        _record(lines, review if full_review else repository_review_summary(review))
+        displayed = review if full_review else repository_review_summary(review)
+        _record(lines, {key: value for key, value in displayed.items() if key != 'next_gate'}
+                if historical_recovery else displayed)
         lines.append('Repository observations are host-declared. Missing canonical data or current reports do not establish missing code; historical evidence retains its original authority.')
         handled.add('repository_review')
     if inspection:
@@ -450,7 +455,9 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
         ])
         handled.add('todos')
     if 'current_unit' in result:
-        _section(lines, 'Current work')
+        _section(lines, 'Unit to inspect before execution' if historical_recovery else 'Current work')
+        if historical_recovery:
+            lines.append('Use this declaration for comparison. The historical outcome requires review before any further effects.')
         current = result['current_unit']
         if isinstance(current, Mapping):
             _record(lines, {key: value for key, value in current.items() if key != 'unit'})
@@ -496,9 +503,24 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
             handled.add(key)
     if 'report_history' in result or result.get('historical_reports'):
         lines.append('Historical records describe their original pin and provenance. Compatibility review or missing current authority does not authorize replay, replacement fingerprints or reimplementation.')
+    if isinstance(result.get('receipt_applicability'), Mapping):
+        _section(lines, 'Receipt applicability now')
+        _record(lines, result['receipt_applicability'])
+        handled.add('receipt_applicability')
+    if isinstance(result.get('recorded_receipt'), Mapping):
+        _section(lines, 'Original receipt at recording')
+        lines.append('The immutable structured receipt preserves the historical response. Only the current inspection route below applies now.')
+        _record(lines, {key: value for key, value in result['recorded_receipt'].items()
+                        if key not in {'next_gate', 'repository_review'}})
+        handled.add('recorded_receipt')
     for key in ('next_gate', 'gate', 'next_action'):
         if key in result:
-            _section(lines, ('Primary next authority gate' if 'gate_context' in result else 'Next authorized operation') if key == 'next_gate' else _label(key))
+            if key == 'next_gate':
+                title = ('Primary recovery action' if historical_recovery or 'receipt_applicability' in result else
+                         'Primary next authority gate' if 'gate_context' in result else 'Next authorized operation')
+            else:
+                title = _label(key)
+            _section(lines, title)
             _record(lines, result[key])
             handled.add(key)
     residual = {key: value for key, value in result.items() if key not in handled}

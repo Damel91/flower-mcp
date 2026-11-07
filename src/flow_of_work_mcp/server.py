@@ -158,6 +158,8 @@ def _job_view(job) -> dict[str, object]:
 
 def _action_view(action) -> dict[str, object]:
     value = asdict(action)
+    if not value["verification_recovery"]:
+        value.pop("verification_recovery")
     value["kind"] = action.kind.value
     value["execution_class"] = action.execution_class.value
     return value

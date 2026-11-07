@@ -260,6 +260,7 @@ class NextAction:
     required_inputs: tuple[str, ...] = ()
     state: str = "pending"
     decision_class: str = ""
+    verification_recovery: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "action_id", required_text(self.action_id, "action_id"))
@@ -291,6 +292,7 @@ class NextAction:
         object.__setattr__(self, "tool", str(self.tool or "").strip())
         object.__setattr__(self, "operation", str(self.operation or "").strip())
         object.__setattr__(self, "arguments", dict(self.arguments or {}))
+        object.__setattr__(self, "verification_recovery", dict(self.verification_recovery or {}))
         object.__setattr__(
             self,
             "required_inputs",

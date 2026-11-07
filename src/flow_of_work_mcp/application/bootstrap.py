@@ -501,6 +501,8 @@ class BootstrapService:
         actions = []
         for action in self._lifecycle.what_next(project_id):
             value = asdict(action)
+            if not value["verification_recovery"]:
+                value.pop("verification_recovery")
             value["kind"] = action.kind.value
             value["execution_class"] = action.execution_class.value
             actions.append(value)

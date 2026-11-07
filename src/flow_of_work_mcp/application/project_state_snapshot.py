@@ -1018,6 +1018,8 @@ def _normalize_focus(kind: str, ref: str) -> Mapping[str, str]:
 
 def _lifecycle_action(action) -> Mapping[str, object]:
     value = asdict(action)
+    if not value["verification_recovery"]:
+        value.pop("verification_recovery")
     value["kind"] = action.kind.value
     value["execution_class"] = action.execution_class.value
     return value
@@ -1141,6 +1143,8 @@ def _next_gate(
         "kind": gate_kind,
         **({"advisory": True, "establishes_global_admission": False}
            if action_kind == "review_milestone_risk" else {}),
+        **({"verification_recovery": dict(action["verification_recovery"]), "establishes_global_admission": False}
+           if action.get("verification_recovery") else {}),
         "state": str(action.get("state") or "pending"),
         "action_id": _action_identity(action),
         "reason": reason,

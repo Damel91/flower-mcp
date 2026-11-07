@@ -197,7 +197,10 @@ def test_inactive_packet_blocks_new_execution_preserves_replay_and_criterion_ins
     ledger.transition_packet(*ids, PacketTransition(status=status, disposition='Bounded test disposition'), actor='human')
     assert external.todo(*ids)['reason'] == 'external_packet_inactive'
     assert external.validation(*ids)['execution_allowed'] is False
-    assert external.call(*ids, 'report_outcome', actor='agent', request_id='before-inactive', payload=data) == receipt
+    replay = external.call(*ids, 'report_outcome', actor='agent', request_id='before-inactive', payload=data)
+    assert replay['recorded_receipt'] == receipt
+    assert replay['execution_allowed'] is False
+    assert replay['next_gate']['operation'] == 'todo'
     assert external.call(*ids, 'report_outcome', actor='agent', request_id='same-record-other-request', payload=data)['replayed']
     with pytest.raises(Exception, match='external_packet_inactive'):
         external.call(*ids, 'report_outcome', actor='agent', request_id='inactive-new', payload={**data, 'report_key': 'new-record'})
@@ -222,9 +225,12 @@ def test_guided_execution_callback_is_packet_specific_and_replay_precedes_admiss
         calls.append((project, packet))
         raise ChangeControlBlockedError('guided_authority_missing', details={'expected': 'current human confirmation'})
     external = ExternalWorkService(ledger, execution_guard=guard)
-    assert external.call(*ids, 'report_outcome', actor='agent', request_id='original-report', payload=data) == receipt
+    replay = external.call(*ids, 'report_outcome', actor='agent', request_id='original-report', payload=data)
+    assert replay['recorded_receipt'] == receipt
+    assert replay['execution_allowed'] is False
+    assert replay['next_gate']['operation'] == 'todo'
     assert external.call(*ids, 'report_outcome', actor='agent', request_id='original-new-request', payload=data)['replayed']
-    assert not calls
+    assert calls == [(ids[0], ids[2])], 'Only the cached execute gate requires a current admission read.'
     assert external.todo(*ids)['reason'] == 'guided_authority_missing'
     with pytest.raises(ChangeControlBlockedError, match='guided_authority_missing'):
         external.call(*ids, 'report_outcome', actor='agent', request_id='guided-new', payload={**data, 'report_key': 'new-report'})

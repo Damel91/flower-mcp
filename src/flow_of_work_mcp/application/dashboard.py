@@ -8,10 +8,13 @@ import json
 
 from flow_of_work_mcp.application.milestone_traceability import REQUIREMENT_LEDGER_VERSION_NAMESPACE
 from flow_of_work_mcp.application.dashboard_markdown import limited_reader, markdown_reader
-from flow_of_work_mcp.core.domain.identifiers import validate_project_id
+from flow_of_work_mcp.core.domain.change_control import validate_packet_id
+from flow_of_work_mcp.core.domain.identifiers import validate_project_id, validate_requirement_id
 
 
 SECTIONS = frozenset({"overview", "roadmap", "packets", "verification", "architecture", "evidence"})
+VERIFICATION_CHANNELS = frozenset({"campaign", "verification", "external_report", "repository_review"})
+_EVIDENCE_CONTENT_KEYS = {"verification": "metadata", "external_report": "report", "repository_review": "repository_review"}
 MAXIMUM_EVIDENCE_BYTES = 2 * 1024 * 1024
 
 
@@ -72,11 +75,21 @@ class DashboardProjectionService:
                     "offset": offset, "limit": limit, "next_offset": bounds["next_offset"],
                     "observed_at": _observed_at()}
 
-    def project(self, project_id: str, section: str = "overview", *, offset: int = 0, limit: int = 25) -> dict[str, object]:
+    def project(self, project_id: str, section: str = "overview", *, offset: int = 0, limit: int = 25,
+                channel: str = "campaign", scope_id: str = "") -> dict[str, object]:
         _pagination(offset, limit)
         project_id = validate_project_id(project_id)
         if section not in SECTIONS:
             raise ValueError("unsupported dashboard section")
+        if not isinstance(channel, str) or channel not in VERIFICATION_CHANNELS or not isinstance(scope_id, str):
+            raise ValueError("unsupported dashboard verification channel or scope")
+        if (channel != "campaign" or scope_id) and section != "verification":
+            raise ValueError("verification channel and scope require the verification section")
+        if scope_id:
+            if channel == "campaign":
+                raise ValueError("campaign listing does not accept a requirement or packet scope")
+            scope_id = (validate_requirement_id(scope_id) if channel == "verification"
+                        else validate_packet_id(scope_id))
         with self._ledger.consistent_read():
             project = self._ledger.dashboard_project(project_id)
             if section == "architecture":
@@ -85,6 +98,13 @@ class DashboardProjectionService:
                 total = projection["total"]
                 summary = {key: value for key, value in projection.items()
                            if key not in {"items", "count", "offset", "limit", "total", "next_offset", "complete"}}
+            elif section == "verification":
+                page = self._ledger.dashboard_verification_items(project_id, channel=channel, scope_id=scope_id,
+                                                                  offset=offset, limit=limit)
+                items, total = page["items"], page["total"]
+                summary = {"evidence_channels": page["counts"], "channel": channel, "scope_id": scope_id}
+                if channel == "campaign":
+                    items = [self._campaign(project_id, row, limit) for row in items]
             else:
                 page = self._ledger.dashboard_items(project_id, section, offset=offset, limit=limit)
                 items, total = page["items"], page["total"]
@@ -101,8 +121,6 @@ class DashboardProjectionService:
                     summary["scope"] = "visible_milestones"
                 elif section == "packets":
                     items = [self._packet(project_id, row, limit) for row in items]
-                elif section == "verification":
-                    items = [self._campaign(project_id, row, limit) for row in items]
             return {"project": project, "section": section,
                     "source_ledger_version": self._ledger.ledger_version(project_id),
                     "source_ledger_version_namespace": REQUIREMENT_LEDGER_VERSION_NAMESPACE,
@@ -113,22 +131,39 @@ class DashboardProjectionService:
 
     def _packet(self, project_id: str, row: Mapping[str, object], limit: int) -> dict[str, object]:
         ids = (project_id, row["change_id"], row["packet_id"])
-        validation = self._runtime.external_work.validation(*ids)
-        todo = self._runtime.external_work.todo(*ids)
+        validation = self._runtime.external_work.validation(*ids, detail="full")
+        # Full validation keeps the immutable reports readable when current
+        # authority cannot be resolved. In that case TODO cannot resolve it either.
+        validation_projection = validation.get("validation")
+        todo = self._runtime.external_work.todo(*ids) if validation_projection is not None else validation
         units = list(todo.get("todos", []))
         plan = self._ledger.packet_work_plan_state(*ids)
+        proof = self._ledger.dashboard_packet_requirement_evidence(project_id, row["packet_id"], limit=limit)
+        history = [
+            {key: record.get(key) for key in ("report_identity", "report_key", "unit_key", "spec_revision", "plan_revision",
+                "authority_fingerprint", "source_revision", "outcome", "provenance", "currentness")}
+            for record in validation["report_history"][:min(limit, 5)]
+        ]
+        history_total = validation["report_history_page"]["total"]
         return {**row, "plan_revision": (plan or {}).get("plan_revision", 0),
                 "consumption_mode": todo.get("consumption_mode", validation.get("consumption_mode", "")),
-                "validation": validation.get("validation"),
-                "execution_allowed": validation.get("execution_allowed", False),
+                "validation": ({key: validation_projection.get(key) for key in (
+                    "contract_version", "consumer_scope", "status", "authority_fingerprint",
+                    "spec_revision", "plan_revision", "next_gap")} if validation_projection is not None else None),
+                "execution_allowed": todo.get("execution_allowed", validation.get("execution_allowed", False)),
                 "next_gate": todo.get("next_gate", validation.get("next_gate")),
                 "todo_status": todo.get("status"), "todo_reason": todo.get("reason", ""),
                 "reported_units": ({"completed": sum(unit["status"] == "complete" for unit in units),
                                     "total": len(units), "provenance": "external_agent_report"}
                                    if "todos" in todo else None),
-                "units": [{key: unit.get(key) for key in ("unit_key", "unit_number", "status", "report_key", "dependencies_pending")}
+                "units": [{key: unit[key] for key in ("unit_key", "unit_number", "status", "report_key", "dependencies_pending", "historical_outcome")
+                           if key in unit}
                           for unit in units[:limit]],
                 "units_bounds": _bounds(len(units), 0, min(len(units), limit), limit),
+                "repository_review": todo.get("repository_review", validation.get("repository_review")),
+                "report_history": history, "report_history_bounds": _bounds(history_total, 0, len(history), limit),
+                "requirement_evidence": proof["items"],
+                "requirement_evidence_bounds": _bounds(proof["total"], 0, len(proof["items"]), limit),
                 "acceptance": "not_inferred"}
 
     def _campaign(self, project_id: str, row: Mapping[str, object], limit: int) -> dict[str, object]:
@@ -144,11 +179,11 @@ class DashboardProjectionService:
 
     def evidence(self, project_id: str, kind: str, identity: str) -> dict[str, object]:
         project_id = validate_project_id(project_id)
-        if kind not in {"artifact", "handover", "verification"}:
+        if kind not in {"artifact", "handover", *_EVIDENCE_CONTENT_KEYS}:
             raise ValueError("unsupported dashboard evidence kind")
         if not isinstance(identity, str) or not identity or len(identity) > 128:
             raise ValueError("dashboard evidence identity must contain 1 to 128 characters")
-        if kind in {"artifact", "verification"} and (not identity.isascii() or not identity.isdecimal() or int(identity) < 1):
+        if kind != "handover" and (not identity.isascii() or not identity.isdecimal() or int(identity) < 1):
             raise ValueError("dashboard evidence identity must be a positive integer")
         with self._ledger.consistent_read():
             project = self._ledger.dashboard_project(project_id)
@@ -161,8 +196,8 @@ class DashboardProjectionService:
                 content_type = "text/markdown"
             else:
                 payload = json.loads(content)
-                if kind == "verification":
-                    payload = {**retained, "metadata": payload}
+                if kind in _EVIDENCE_CONTENT_KEYS:
+                    payload = {**retained, _EVIDENCE_CONTENT_KEYS[kind]: payload}
                 content = json.dumps(payload, ensure_ascii=False, indent=2)
                 content_type = "application/json"
             result = {"project": project, "kind": kind, "identity": identity,

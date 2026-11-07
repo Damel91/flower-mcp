@@ -530,7 +530,9 @@ class DashboardHTTP:
                     search=request.query_params.get('search', ''), offset=offset, limit=limit)
             elif len(path) == 4 and path[0] == 'projects' and path[2] == 'sections':
                 result = await run_in_threadpool(self.maintenance.read, self.projection.project,
-                    path[1], path[3], offset=offset, limit=limit)
+                    path[1], path[3], offset=offset, limit=limit,
+                    channel=request.query_params.get('channel', 'campaign'),
+                    scope_id=request.query_params.get('scope_id', ''))
             elif len(path) == 5 and path[0] == 'projects' and path[2] == 'evidence':
                 result = await run_in_threadpool(self.maintenance.read, self.projection.evidence, path[1], path[3], path[4])
             else:

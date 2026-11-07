@@ -16,11 +16,34 @@ from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisit
 from flow_of_work_mcp.core.domain.external_work import (fields, fingerprint, number, objects, strings, text)
 from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
 from flow_of_work_mcp.core.errors import (
-    ChangeControlBlockedError, InputValidationError, PacketValidationAlreadyUpgradedError, RequirementConflictError,
+    ChangeControlBlockedError, ChangeNotFoundError, InputValidationError, PacketValidationAlreadyUpgradedError, RequirementConflictError,
 )
 
 READ_OPERATIONS = frozenset({'criteria', 'validation', 'provider_validation', 'todo'})
 MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
+_RECOVERY_REQUIRED = 'historical_outcome_recovery_required'
+
+
+def _authority_pin(value):
+    return {key: value[key] for key in ('spec_revision', 'plan_revision', 'authority_fingerprint')}
+
+
+def _report_matches_authority(report, projection):
+    return report['disposition'] != 'stale' and _authority_pin(report) == _authority_pin(projection)
+
+
+def _historical_materializations(snapshot, projection):
+    # Unchanged revisions identify the same accepted unit declarations. A new
+    # accepted specification/plan must not inherit work from a reused unit key.
+    return {report['unit_key']: report for report in snapshot['external']['reports']
+            if report['payload']['outcome'] == 'complete'
+            and report['spec_revision'] == projection['spec_revision']
+            and report['plan_revision'] == projection['plan_revision']
+            and not _report_matches_authority(report, projection)}
+
+
+def _recovery_frontier(rows):
+    return next((row for row in rows if row['status'] == 'recovery_required' and not row['dependencies_pending']), None)
 
 
 def _verification_error(snapshot, unit, *, field, received, expected, message, criterion=None):
@@ -142,6 +165,8 @@ class ExternalWorkService:
         with self._ledger.atomic():
             replay = self._ledger.external_work_request_replay(project_id, request_id, request_fingerprint)
             if replay is not None:
+                if operation == 'report_outcome':
+                    return self._replayed_outcome(project_id, change_id, packet_id, replay, payload)
                 return replay
             snapshot = self._snapshot(project_id, change_id, packet_id)
             if operation == 'report_outcome':
@@ -205,6 +230,8 @@ class ExternalWorkService:
                 result = self._criterion(snapshot, operation, payload, actor, request_id)
             self._ledger.record_external_work_request(project_id, request_id, request_fingerprint, result,
                                                       actor=actor, operation=operation)
+            if operation == 'report_outcome' and result['replayed']:
+                return self._outcome_replay_view(snapshot, self._projection(snapshot), result, payload)
             return result
 
     def _snapshot(self, project_id: str, change_id: str, packet_id: str, *, _cache=None, _path=(), _change=None) -> dict[str, object]:
@@ -395,6 +422,10 @@ class ExternalWorkService:
                 admission = {'reason': exc.reason, 'details': dict(exc.details),
                     'next_gate': dict(exc.details).get('next_gate')}
             execution_allowed = plan_executable and dependencies['ready'] and admission is None
+            recovery = self._pending_historical_gate(snapshot, projection, dependencies) if execution_allowed else None
+            if recovery is not None:
+                execution_allowed = False
+                admission = {'reason': _RECOVERY_REQUIRED, 'details': {}, 'next_gate': recovery}
             return {'status': 'success' if projection['status'] == 'closed' and not inactive and admission is None else 'blocked',
                     'reason': 'external_packet_inactive' if inactive else (admission['reason'] if admission else (projection['next_gap'] or {}).get('code', '')),
                     'validation': projection if detail == 'full' else {k: projection[k] for k in ('contract_version', 'consumer_scope', 'status', 'authority_fingerprint', 'spec_revision', 'plan_revision', 'next_gap')},
@@ -451,18 +482,44 @@ class ExternalWorkService:
                 'reason': 'read_original_report_provenance_without_execution'}
 
     @staticmethod
+    def _recovery_gate(snapshot, projection, row):
+        address = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
+        return {
+            'action_kind': 'external_obligation',
+            'external_operation': 'inspect_historical_outcome',
+            'reason': _RECOVERY_REQUIRED,
+            'unit_key': row['unit_key'],
+            'current_authority': _authority_pin(projection),
+            'original_report': row['historical_outcome'],
+            'effect_policy': 'inspection_and_review_only',
+            'inspect_route': ExternalWorkService._history_route(**address),
+            'repository_review_route': snapshot['repository_review'].get('next_gate'),
+            'settlement_route': {'tool': 'fow_external_work', 'operation': 'report_outcome',
+                                 'arguments': {**address, 'operation': 'report_outcome'}},
+            'guidance': ('Compare the original issued unit, source and effects against current authority before further effects. '
+                         'After bounded inspection, record an independently verified current outcome with a new report key. '
+                         'If the work itself changed, reassess and revise the affected plan through ordinary authority. '
+                         'Retain the original report and do not re-run effects or substitute pins on old evidence.'),
+        }
+
+    @staticmethod
+    def _pending_historical_gate(snapshot, projection, dependencies):
+        if not _historical_materializations(snapshot, projection):
+            return None
+        rows, *_ = resolve_current_reports(snapshot, projection, packet_dependencies=dependencies)
+        recovery = _recovery_frontier(rows)
+        return ExternalWorkService._recovery_gate(snapshot, projection, recovery) if recovery else None
+
+    @staticmethod
     def _report_history(reports, *, snapshot=None, projection=None, history_offset=0):
         result = []
         for report in reports[history_offset:history_offset + 20]:
             if snapshot is None or projection is None:
                 state, reason = 'not_evaluated', 'current_authority_unresolved'
             else:
-                matches = (report['spec_revision'] == projection['spec_revision']
-                           and report['plan_revision'] == projection['plan_revision']
-                           and report['authority_fingerprint'] == projection['authority_fingerprint'])
-                state = 'current_authority' if matches and report['disposition'] != 'stale' else 'historical_on_original_pin'
+                state = 'current_authority' if _report_matches_authority(report, projection) else 'historical_on_original_pin'
                 reason = ('current_report_conflict' if report['disposition'] == 'conflict' else 'matches_current_authority') if state == 'current_authority' else 'issued_authority_differs_or_report_was_stale'
-            result.append({k: report.get(k) for k in ('report_key', 'unit_key', 'spec_revision', 'plan_revision', 'authority_fingerprint', 'disposition', 'actor', 'occurred_at')})
+            result.append({k: report.get(k) for k in ('report_identity', 'report_key', 'unit_key', 'spec_revision', 'plan_revision', 'authority_fingerprint', 'disposition', 'actor', 'occurred_at')})
             result[-1].update(source_revision=report['payload']['source_revision'], outcome=report['payload']['outcome'],
                               summary=report['payload']['summary'], provenance='host_reported',
                               currentness=state, currentness_reason=reason,
@@ -471,6 +528,53 @@ class ExternalWorkService:
         return {'report_history': result, 'report_history_page': {'offset': history_offset, 'limit': 20, 'total': len(reports),
                 'truncated': end < len(reports), 'next_offset': end if end < len(reports) else None},
                 'history_rule': 'Original pins and provenance are preserved. Missing current reports do not prove missing implementation.'}
+
+    def _replayed_outcome(self, project_id, change_id, packet_id, receipt, payload):
+        address = {'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id}
+        try:
+            snapshot = self._snapshot(**address)
+            projection = self._projection(snapshot)
+        except (ChangeControlBlockedError, ChangeNotFoundError, ValueError):
+            # An exact retry can recover its immutable receipt even if the
+            # current packet authority cannot be composed. Offer inspection.
+            snapshot, projection = address, None
+        return self._outcome_replay_view(snapshot, projection, receipt, payload, exact_request=True)
+
+    def _outcome_replay_view(self, snapshot, projection, receipt, payload, *, exact_request=False):
+        report = next((row for row in (snapshot.get('external') or {}).get('reports', [])
+                       if row['report_key'] == receipt['report_key']), None)
+        evaluated = projection is not None and report is not None
+        matches = evaluated and _report_matches_authority(report, projection)
+        address = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
+        if matches:
+            cached_gate = receipt.get('next_gate') or {}
+            if cached_gate.get('external_operation') != 'execute_unit' or self._todo(snapshot).get('next_gate') == cached_gate:
+                # Preserve the established exact replay when the pin and the
+                # recorded effects gate still agree with current authority.
+                return receipt
+            state, reason = 'current_authority', 'current_execution_gate_changed'
+            status, disposition = receipt['status'], receipt['disposition']
+            route = {'tool': 'fow_external_work', 'operation': 'todo',
+                     'arguments': {**address, 'operation': 'todo'}, 'reason': reason}
+        else:
+            state, reason = (('historical_on_original_pin', 'stale_authority') if evaluated else
+                             ('not_evaluated', 'current_authority_unresolved'))
+            status, disposition = ('historical', 'stale') if evaluated else ('blocked', 'not_evaluated')
+            route = self._history_route(**address)
+        issued = (_authority_pin(report) if report is not None else
+                  {'spec_revision': payload.get('expected_spec_revision'),
+                   'plan_revision': payload.get('expected_plan_revision'),
+                   'authority_fingerprint': payload.get('authority_fingerprint')})
+        return {**{key: value for key, value in receipt.items() if key not in {'next_gate', 'repository_review'}},
+                'status': status, 'reason': reason, 'disposition': disposition, 'replayed': True,
+                'execution_allowed': False, 'next_gate': route,
+                'receipt_applicability': {
+                    'state': state,
+                    'recorded_disposition': receipt['disposition'], 'issued_authority': issued,
+                    'current_authority': _authority_pin(projection) if projection is not None else None,
+                    'reason': reason,
+                },
+                **({'recorded_receipt': receipt} if exact_request else {})}
 
     @staticmethod
     def _projection(snapshot, *, consumer_scope='external_agent', _cache=None) -> dict[str, object]:
@@ -575,7 +679,7 @@ class ExternalWorkService:
         elif implementation_complete and local_verification_complete and not reconciliation_complete:
             reason = 'repository_review_required'
         elif not complete:
-            reason = 'external_unit_reports_incomplete'
+            reason = _RECOVERY_REQUIRED if _recovery_frontier(rows) else 'external_unit_reports_incomplete'
         return {'scope_complete': scope_complete, 'implementation_complete': implementation_complete,
             'local_verification_complete': local_verification_complete, 'dependencies_complete': dependencies['ready'], 'complete': complete,
             'reconciliation_complete': reconciliation_complete, 'repository_review': review,
@@ -836,7 +940,8 @@ class ExternalWorkService:
                 'spec_revision': projection['spec_revision'], 'plan_revision': projection['plan_revision'],
                 'criteria': criteria, 'deferred_obligations': deferred, 'gaps': gaps,
                 'packet_dependencies': dependencies,
-                'execution_allowed': closed and dependencies['ready'] and snapshot['packet']['status'] not in PACKET_INACTIVE_STATUS_VALUES,
+                'execution_allowed': closed and dependencies['ready'] and not _recovery_frontier(rows)
+                                     and snapshot['packet']['status'] not in PACKET_INACTIVE_STATUS_VALUES,
                 'acceptance': 'not_inferred'}
 
     @staticmethod
@@ -882,7 +987,11 @@ class ExternalWorkService:
         if unit_key and not any(row['unit_key'] == unit_key for row in rows):
             raise ValueError('unknown unit_key')
         candidates = [row for row in rows if row['status'] != 'complete']
-        selected = next((row for row in candidates if row['unit_key'] == unit_key), None) if unit_key else next((row for row in candidates if row['status'] in {'actionable', 'blocked', 'failed', 'conflict', 'stale'} and not row['dependencies_pending']), None)
+        if unit_key:
+            selected = next((row for row in candidates if row['unit_key'] == unit_key), None)
+        else:
+            selected = _recovery_frontier(candidates) or next((row for row in candidates
+                if row['status'] in {'actionable', 'blocked', 'failed', 'conflict', 'stale'} and not row['dependencies_pending']), None)
         deferred = []
         for u in projection['units']:
             current_report = effective.get(u['client_unit_key']) if u['client_unit_key'] in done else None
@@ -893,12 +1002,19 @@ class ExternalWorkService:
                                  if (v['criterion'], v['kind'], v['statement']) == (intent['criterion'], intent['kind'], intent['statement'])), None)
                 deferred.append({'unit_key': u['client_unit_key'], **intent, 'state': 'host_reported_' + evidence['status'] if evidence else 'verification_pending',
                                  'evidence': evidence, 'attestation': 'not_inferred'})
-        if selected:
+        recovery = bool(selected and selected['status'] == 'recovery_required' and not selected['dependencies_pending'])
+        execution = {}
+        if recovery:
+            gate = self._recovery_gate(snapshot, projection, selected)
+            execution = {'reason': _RECOVERY_REQUIRED, 'execution_allowed': False}
+        elif selected:
             operation = 'reconcile_outcome' if selected['status'] == 'conflict' else 'resolve_external_blocker' if selected['status'] in {'blocked', 'failed', 'stale'} and not selected['dependencies_pending'] else 'execute_unit' if selected['status'] == 'actionable' else 'complete_predecessors'
             gate = ({'tool': 'fow_external_work', 'operation': 'reconcile_outcome'} if operation == 'reconcile_outcome' else
                     {'action_kind': 'external_agent_execution' if operation == 'execute_unit' else 'external_obligation', 'external_operation': operation,
                      'report_route': {'tool': 'fow_external_work', 'operation': 'report_outcome'}})
             gate.update({'unit_key': selected['unit_key'], 'reason': selected['status']})
+            if unit_key and operation == 'execute_unit':
+                execution = {'execution_allowed': True}
         elif candidates:
             gate = {'action_kind': 'external_obligation', 'external_operation': 'complete_predecessors', 'reason': 'dependencies_pending',
                     'inspect_route': {'tool': 'fow_external_work', 'operation': 'todo'}}
@@ -919,8 +1035,8 @@ class ExternalWorkService:
                 'todos': rows, 'current_unit': selected, 'deferred_verification': deferred, 'next_gate': gate,
                 'packet_dependencies': self._packet_dependencies(snapshot), 'repository_review': snapshot['repository_review'],
                 'acceptance': 'not_inferred', 'historical_reports': [r['report_key'] for r in snapshot['external']['reports']
-                    if r['authority_fingerprint'] != current or r['disposition'] == 'stale'
-                    or r['spec_revision'] != projection['spec_revision'] or r['plan_revision'] != projection['plan_revision']],
+                    if not _report_matches_authority(r, projection)],
+                **execution,
                 'criterion_traceability': criterion_traceability}
 
     def _report(self, snapshot, payload, actor):
@@ -1071,6 +1187,12 @@ class ExternalWorkService:
         projection = self._projection(snapshot)
         try:
             self._assert_execution_allowed(snapshot)
+            if projection['status'] == 'closed' and snapshot['external']['consumption_mode'] == 'external_agent':
+                dependencies = self._packet_dependencies(snapshot)
+                if dependencies['ready']:
+                    recovery = self._pending_historical_gate(snapshot, projection, dependencies)
+                    if recovery is not None:
+                        raise ChangeControlBlockedError(_RECOVERY_REQUIRED, details={'next_gate': recovery})
         except ChangeControlBlockedError as exc:
             if not allow_draft:
                 raise
@@ -1101,14 +1223,15 @@ class ExternalWorkService:
 def resolve_current_reports(snapshot, projection, *, packet_dependencies=None):
     dependencies = ExternalWorkService._packet_dependencies(snapshot) if packet_dependencies is None else packet_dependencies
     current = projection['authority_fingerprint']
+    historical = _historical_materializations(snapshot, projection)
     rows = []
     done = set()
     effective = {}
     conflicts = set()
     for unit in projection['units']:
         key = unit['client_unit_key']
-        reports = [r for r in snapshot['external']['reports'] if r['unit_key'] == key and r['authority_fingerprint'] == current and r['disposition'] != 'stale'
-                   and r['spec_revision'] == projection['spec_revision'] and r['plan_revision'] == projection['plan_revision']]
+        reports = [r for r in snapshot['external']['reports']
+                   if r['unit_key'] == key and _report_matches_authority(r, projection)]
         if any(r['disposition'] == 'conflict' and not r['reconciled'] for r in reports):
             conflicts.add(key)
         selection = next((s for s in snapshot['external']['selections'] if s['unit_key'] == key and s['authority_fingerprint'] == current), None)
@@ -1138,6 +1261,9 @@ def resolve_current_reports(snapshot, projection, *, packet_dependencies=None):
         status = 'complete' if key in done else 'conflict' if key in conflicts else 'stale' if key in evidence_stale else 'blocked' if dependencies else 'actionable'
         if report and key not in done and status == 'actionable':
             status = report['payload']['outcome']
+        original = historical.get(key) if report is None and key not in conflicts else None
+        if original is not None:
+            status = 'recovery_required'
         contracts = []
         for use in unit['resolved_requires']:
             producer_report = effective.get(use['producer_unit_key'])
@@ -1145,5 +1271,10 @@ def resolve_current_reports(snapshot, projection, *, packet_dependencies=None):
                               'producer_report': producer_report['report_key'] if producer_report else '',
                               'provenance': 'external_agent_report' if producer_report else 'accepted_plan'})
         rows.append({'unit_number': unit['unit_number'], 'unit_key': key, 'status': status, 'dependencies_pending': dependencies,
-                     'unit': {**unit, 'resolved_requires': contracts}, 'report_key': report['report_key'] if report else ''})
+                     'unit': {**unit, 'resolved_requires': contracts}, 'report_key': report['report_key'] if report else '',
+                     **({'historical_outcome': {**_authority_pin(original), 'report_identity': original.get('report_identity'),
+                                                'report_key': original['report_key'],
+                                                'source_revision': original['payload']['source_revision'],
+                                                'recorded_disposition': original['disposition'],
+                                                'provenance': 'external_agent_report'}} if original else {})})
     return rows, effective, done, conflicts, evidence_stale

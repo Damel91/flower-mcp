@@ -4,9 +4,11 @@ import sqlite3
 
 import pytest
 
-from flow_of_work_mcp import HandoverDraft, LifecycleStatus, MilestoneDraft, RequirementService
+from flow_of_work_mcp import HandoverDraft, LifecycleStatus, MilestoneDraft, RequirementDraft, RequirementService
 from flow_of_work_mcp.application.dashboard import DashboardProjectionService, MAXIMUM_EVIDENCE_BYTES
+from flow_of_work_mcp.application.engineering_cycle import DIMENSIONS, RepositoryReviewService
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind
+from flow_of_work_mcp.core.domain.lifecycle_control import PhaseAuditScope
 from flow_of_work_mcp.mcp_runtime import build_runtime
 from tests.test_campaign_authority import _complete_typed_ir_fields, _start
 from tests.test_external_work import report
@@ -163,6 +165,86 @@ def test_retained_evidence_is_same_project_exact_and_never_generates(tmp_path):
         with pytest.raises(ValueError, match='not found'):
             service.evidence('other', 'artifact', artifact_id)
         assert dump(runtime) == before
+    finally:
+        runtime.close()
+
+
+def test_verification_channels_keep_independent_evidence_and_exact_original_pins(tmp_path):
+    runtime, ids, revs, _, _ = prepared(tmp_path)
+    project_id, change_id, packet_id = ids
+    requirement_id = 'REQ-000001'
+    try:
+        payload = report(runtime.external_work, ids, revs)
+        runtime.external_work.call(*ids, 'report_outcome', actor='agent', request_id='reported', payload=payload)
+        first = runtime.ledger.record_verification(project_id, requirement_id, kind='tested_deterministically',
+            outcome='failed', reference='host:failed-attempt', actor='agent')
+        second = runtime.ledger.record_verification(project_id, requirement_id, kind='tested_deterministically',
+            outcome='passed', reference='host:corrected-attempt', actor='agent')
+        runtime.lifecycle.audit_phase(project_id, PhaseAuditScope('unrelated-phase'), actor='engineer')
+        context = RepositoryReviewService(runtime.ledger).context(*ids)
+        review = {"contract_version": "flow.repository-review.v1", "change_id": change_id, "packet_id": packet_id,
+                  "expected_basis_fingerprint": context['basis_fingerprint'], "source_identity": "host:repo",
+                  "source_revision": "git:exact-review-source", "coverage": [
+                      {"dimension": dimension, "state": "aligned", "rationale": "Confirmed within the issued scope.",
+                       "evidence_refs": [f"host:{dimension}"]} for dimension in DIMENSIONS]}
+        job = RepositoryReviewService(runtime.ledger).submit(
+            project_id, PhaseAuditScope(context['scope_id'], tuple(context['requirement_ids'])), review,
+            actor='engineer', request_id='review', jobs=runtime.jobs, lifecycle=runtime.lifecycle)
+        assert runtime.jobs.wait(project_id, job.job_id, timeout=10).status.value == 'completed'
+        audit_id = runtime.ledger.latest_phase_audit(project_id, context['scope_id'])['phase_audit_id']
+        runtime.requirements.create_project('other', 'Other project', actor='human')
+        before = dump(runtime)
+        service = DashboardProjectionService(runtime)
+        campaigns = service.project(project_id, 'verification')
+        assert campaigns['items'] == []
+        assert campaigns['summary']['evidence_channels'] == {
+            'campaign': 0, 'verification': 2, 'external_report': 1, 'repository_review': 1}
+
+        direct = service.project(project_id, 'verification', channel='verification', scope_id=requirement_id, limit=1)
+        next_page = service.project(project_id, 'verification', channel='verification', scope_id=requirement_id,
+                                    offset=direct['bounds']['next_offset'], limit=1)
+        assert direct['items'][0]['evidence_id'] == second['evidence_id']
+        assert next_page['items'][0]['evidence_id'] == first['evidence_id']
+        assert next_page['items'][0]['outcome'] == 'failed'
+
+        external = service.project(project_id, 'verification', channel='external_report', scope_id=packet_id)['items'][0]
+        assert external['recorded_disposition'] == 'current'
+        assert external['authority_fingerprint'] == payload['authority_fingerprint']
+        retained_report = service.evidence(project_id, external['kind'], external['identity'])
+        assert json.loads(retained_report['content'])['report'] == payload
+        reviews = service.project(project_id, 'verification', channel='repository_review', scope_id=packet_id)
+        assert reviews['bounds']['total'] == 1 and reviews['items'][0]['phase_audit_id'] == audit_id
+        retained_review = service.evidence(project_id, 'repository_review', str(audit_id))
+        assert json.loads(retained_review['content'])['repository_review'] == review
+        for kind, identity in [('verification', str(first['evidence_id'])), ('external_report', external['identity']),
+                               ('repository_review', str(audit_id))]:
+            with pytest.raises(ValueError, match='not found'):
+                service.evidence('other', kind, identity)
+        assert service.project(project_id, 'verification', channel='external_report', scope_id='PACKET-999999')['items'] == []
+        packet = service.project(project_id, 'packets')['items'][0]
+        assert packet['report_history'][0]['currentness'] == 'current_authority'
+        assert packet['repository_review']['latest_audit_id'] == audit_id
+        assert packet['requirement_evidence'] == [{'requirement_id': requirement_id, 'recorded_count': 2}]
+        assert packet['acceptance'] == 'not_inferred'
+        assert dump(runtime) == before
+    finally:
+        runtime.close()
+
+
+def test_packet_card_keeps_historical_reports_after_requirement_revision(tmp_path):
+    runtime, ids, revs, _, _ = prepared(tmp_path)
+    try:
+        payload = report(runtime.external_work, ids, revs)
+        runtime.external_work.call(*ids, 'report_outcome', actor='agent', request_id='old-outcome', payload=payload)
+        RequirementService(runtime.ledger).revise(ids[0], 'REQ-000001', RequirementDraft(
+            title='Scoped behavior', statement='The producer shall now double before exposing increment.', category='functional'),
+            actor='human', rationale='A new requirement definition is separately governed.')
+        packet = DashboardProjectionService(runtime).project(ids[0], 'packets', limit=1)['items'][0]
+        assert packet['report_history'][0]['currentness'] == 'historical_on_original_pin'
+        assert packet['report_history'][0]['authority_fingerprint'] == payload['authority_fingerprint']
+        assert packet['report_history_bounds']['total'] == 1
+        assert packet['requirement_evidence'] == [{'requirement_id': 'REQ-000001', 'recorded_count': 0}]
+        assert packet['acceptance'] == 'not_inferred'
     finally:
         runtime.close()
 

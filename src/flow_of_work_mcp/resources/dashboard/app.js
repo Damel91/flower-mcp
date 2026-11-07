@@ -5,9 +5,13 @@
     overview: { label: "Panoramica", description: "L’intento, il lavoro attuale e i punti che richiedono attenzione." },
     roadmap: { label: "Roadmap", description: "Milestone e dipendenze nel loro ordine di realizzazione." },
     packets: { label: "Pacchetti", description: "Il lavoro dichiarato, le unità e le condizioni per procedere." },
-    verification: { label: "Verifiche", description: "Campaign, Oracle ed evidenze con il loro stato effettivo." },
+    verification: { label: "Verifiche", description: "Campagne, prove di requisito, report delle unità e review del repository." },
     architecture: { label: "Architettura", description: "Componenti, interfacce e decisioni adottate per il progetto." },
     evidence: { label: "Evidenze", description: "Riferimenti, documenti e handover conservati da Flower." },
+  };
+  const verificationChannels = {
+    campaign: "Campagne", verification: "Prove di requisito", external_report: "Report delle unità",
+    repository_review: "Review del repository",
   };
   const labels = {
     project_id: "ID progetto", name: "Nome", title: "Titolo", description: "Descrizione", status: "Stato",
@@ -40,6 +44,12 @@
     evidence_id: "ID evidenza", kind: "Tipo", outcome: "Esito", summary: "Riepilogo",
     recorded_at: "Registrato", created_at: "Creato", updated_at: "Aggiornato", occurred_at: "Data",
     observed_at: "Osservato", source_revision: "Revisione sorgente", source_ledger_version: "Evento requisiti",
+    recorded_disposition: "Classificazione registrata all’origine", currentness: "Applicabilità attuale",
+    reported_units: "Unità complete sul pin corrente", report_history: "Report conservati sui rispettivi pin",
+    requirement_evidence: "Prove dirette per requisito", recorded_count: "Prove registrate",
+    historical_outcome: "Esito storico", original_report: "Report originale", effect_policy: "Effetti consentiti",
+    verification_recovery: "Recupero della verifica", failed_evidence: "Prove fallite",
+    linked_exception: "Eccezione collegata", live_execution_authorized: "Nuova esecuzione live autorizzata",
     authority_fingerprint: "Fingerprint dell’autorità", current: "Corrente", fingerprint: "Fingerprint",
     components: "Componenti", interfaces: "Interfacce", decisions: "Decisioni", definition: "Definizione",
     responsibility: "Responsabilità", boundaries: "Confini", links: "Collegamenti", clauses: "Clausole",
@@ -64,6 +74,10 @@
     prepared: "Preparato", deleting: "Eliminazione in corso", ledger_deleted: "Dati rimossi, pulizia da completare",
     scrubbed: "Pulizia verificata", absent: "Assente", unprepared: "Da preparare",
     host_reported: "Dichiarata dall’host", external_agent_report: "Report dell’agente esterno",
+    host_declared: "Dichiarata dall’host", recorded_verification_evidence: "Prova di requisito registrata",
+    historical_on_original_pin: "Storico sul pin originale", current_authority: "Autorità attuale",
+    inspect_historical_outcome: "Esamina l’esito storico", inspection_and_review_only: "Sola ispezione e revisione",
+    not_evaluated: "Non valutata",
     deterministic: "Deterministica", live: "Live", unit_check: "Controllo locale", human: "Umana",
     visible_milestones: "Milestone visibili in questa pagina",
   };
@@ -135,6 +149,7 @@
   const state = {
     ready: false, initializing: false, authBusy: false, authGeneration: 0, availability: "unavailable", retryUntil: 0, retryTimer: null, csrf: "", maintenance: { state: "ready" }, project: null,
     section: "overview", projectOffset: 0, sectionOffset: 0, projects: null, sectionData: null,
+    verificationChannel: "verification", verificationScope: "",
     createBusy: false, createUncertain: "", createIdEdited: false,
     settings: null, settingsBusy: false, settingsEpoch: 0,
     network: null, networkBusy: false, networkEpoch: 0,
@@ -1129,6 +1144,9 @@
       return;
     }
     state.section = Object.hasOwn(sections, view) ? view : "overview";
+    const channel = parameters.get("channel");
+    state.verificationChannel = Object.hasOwn(verificationChannels, channel) ? channel : "verification";
+    state.verificationScope = state.verificationChannel === "campaign" ? "" : parameters.get("scope_id") || "";
     state.sectionOffset = 0;
     state.sectionData = null;
     if (projectId) {
@@ -1147,12 +1165,14 @@
     updateArchiveControls();
   }
 
-  function navigate(projectId, section = "overview") {
+  function navigate(projectId, section = "overview", { channel, scope } = {}) {
     const url = new URL(location.href);
     url.search = "";
     if (projectId) {
       url.searchParams.set("project", projectId);
       url.searchParams.set("view", section);
+      if (section === "verification" && channel) url.searchParams.set("channel", channel);
+      if (section === "verification" && scope) url.searchParams.set("scope_id", scope);
     }
     if (!projectId && (section === "settings" || section === "backups")) url.searchParams.set("view", section);
     history.pushState(null, "", url);
@@ -1314,7 +1334,7 @@
   }
 
   function itemState(item) {
-    return item.status || item.state || item.packet?.status || item.lifecycle_status || item.qualification;
+    return item.status || item.state || item.packet?.status || item.lifecycle_status || item.qualification || item.outcome;
   }
 
   function renderItem(item, index) {
@@ -1332,9 +1352,13 @@
     if (identity && identity !== itemTitle(item, index)) main.append(element("div", "item-caption identifier", identity));
     heading.append(main);
     const status = itemState(item);
-    if (typeof status === "string") heading.append(badge(status));
+    if (typeof status === "string") {
+      const statusBadge = badge(status);
+      if (state.section === "packets" || state.section === "roadmap") statusBadge.prepend("Stato registrato · ");
+      heading.append(statusBadge);
+    }
     const dimensions = element("div", "dimension-line");
-    for (const [key, title] of [["reported_units", "Unità dichiarate"], ["implementation", "Implementazione"], ["local_verification", "Verifica locale"]]) {
+    for (const [key, title] of [["reported_units", "Unità complete sul pin corrente"], ["implementation", "Implementazione dichiarata"], ["local_verification", "Verifica locale"]]) {
       const value = item[key];
       if (value && typeof value.completed === "number" && typeof value.total === "number") {
         const dimension = element("span", "", title);
@@ -1344,22 +1368,75 @@
         dimensions.append(dimension);
       }
     }
+    if (state.section === "packets" && item.acceptance === "not_inferred") {
+      dimensions.append(element("span", "", item.next_gate?.external_operation === "request_human_acceptance"
+        ? "Accettazione pendente" : "Accettazione non dedotta"));
+    }
     if (dimensions.childElementCount) main.append(dimensions);
+    if (state.section === "packets" && item.next_gate?.external_operation === "inspect_historical_outcome") {
+      main.append(element("p", "item-caption", "Recupero richiesto. Verifica l’esito conservato prima di procedere."));
+    }
     const body = element("div", "item-body");
-    body.append(fields(item));
     const retained = evidenceAddress(item);
     if (retained) body.append(button("Apri contenuto conservato", "button-secondary evidence-action", () => loadEvidence(retained)));
+    if (state.section === "overview" && item.requirement_id) {
+      body.append(verificationLink("Apri prove di requisito", "verification", item.requirement_id));
+    }
+    if (state.section === "packets" && item.packet_id) {
+      const links = element("div", "verification-channels");
+      const original = item.next_gate?.original_report?.report_identity;
+      if (original) {
+        links.append(button("Apri il report originale da riesaminare", "button-secondary", () =>
+          loadEvidence({ kind: "external_report", identity: original })));
+      }
+      if (item.report_history_bounds?.total) {
+        links.append(verificationLink(`Apri report conservati (${item.report_history_bounds.total})`, "external_report", item.packet_id));
+      }
+      const auditId = item.repository_review?.latest_audit_id;
+      if (auditId) {
+        links.append(button("Apri review del repository", "button-secondary", () =>
+          loadEvidence({ kind: "repository_review", identity: auditId })));
+      }
+      for (const proof of item.requirement_evidence || []) {
+        const count = proof.recorded_count ? `${proof.recorded_count} prove dirette` : "Nessuna prova diretta registrata";
+        links.append(verificationLink(`${proof.requirement_id} · ${count}`, "verification", proof.requirement_id));
+      }
+      if (links.childElementCount) body.append(links);
+    }
+    body.append(fields(item));
     details.append(heading, body);
     return details;
   }
 
   function evidenceAddress(item) {
+    if (state.section === "verification") {
+      return item.kind && item.identity !== undefined ? { kind: item.kind, identity: item.identity } : null;
+    }
     if (state.section !== "evidence") return null;
     if (item.kind && item.identity !== undefined) return { kind: item.kind, identity: item.identity };
     if (item.evidence_id !== undefined) return { kind: "verification", identity: item.evidence_id };
     if (item.handover_id) return { kind: "handover", identity: item.handover_id };
     if (item.generation_id !== undefined) return { kind: "artifact", identity: item.generation_id };
     return null;
+  }
+
+  function verificationLink(title, channel, scope = "") {
+    return button(title, "button-secondary", () => navigate(state.project.project_id, "verification", { channel, scope }));
+  }
+
+  function renderVerificationChannels(summary) {
+    const nav = element("nav", "verification-channels");
+    nav.setAttribute("aria-label", "Canali di verifica");
+    for (const [channel, title] of Object.entries(verificationChannels)) {
+      const count = summary.evidence_channels?.[channel] ?? 0;
+      const link = verificationLink(`${title} (${count})`, channel);
+      if (summary.channel === channel) link.setAttribute("aria-current", "page");
+      nav.append(link);
+    }
+    if (summary.scope_id) {
+      nav.append(verificationLink(`Mostra tutti · filtro ${summary.scope_id}`, summary.channel));
+    }
+    return nav;
   }
 
   function markdownLink(href) {
@@ -1542,9 +1619,19 @@
       const detail = element("details", "nested-detail");
       detail.append(element("summary", "", "Vedi obbligo e riferimenti"), fields(gate));
       attention.append(detail);
+      const failures = gate.verification_recovery?.failed_evidence || [];
+      for (const proof of failures) {
+        if (proof.evidence_id) attention.append(button(`Apri prova fallita ${proof.evidence_id}`, "button-secondary evidence-action", () =>
+          loadEvidence({ kind: "verification", identity: proof.evidence_id })));
+      }
       container.append(attention);
     }
-    if (Object.keys(summary).length) {
+    if (state.section === "verification") {
+      container.append(renderVerificationChannels(summary));
+      if (["external_report", "repository_review"].includes(summary.channel)) {
+        container.append(element("p", "state-note", "Questi record conservano il pin e la provenienza originali. Il pacchetto mostra separatamente l’applicabilità attuale."));
+      }
+    } else if (Object.keys(summary).length) {
       const block = element("details", "summary-block");
       block.append(element("summary", "summary-disclosure", "Contesto e stato registrato"), fields(summary));
       container.append(block);
@@ -1556,6 +1643,8 @@
       const list = element("div", state.section === "roadmap" ? "item-list roadmap" : "item-list");
       result.items.forEach((item, index) => list.append(renderItem(item, index)));
       container.append(list);
+    } else if (state.section === "verification") {
+      container.append(empty("Nessun elemento in questo canale", "Consulta gli altri canali per vedere le prove e le review già conservate."));
     } else if (!Object.keys(summary).length) {
       container.append(empty("Nessun elemento registrato in questa sezione", "La vista si popolerà quando Flower avrà registrato le relative autorità o evidenze."));
     }
@@ -1575,7 +1664,12 @@
     const section = state.section;
     loading($("section-content"), "Lettura dello stato registrato…");
     try {
-      const result = await request(`projects/${encodeURIComponent(projectId)}/sections/${section}?offset=${state.sectionOffset}&limit=25`);
+      const query = new URLSearchParams({ offset: state.sectionOffset, limit: 25 });
+      if (section === "verification") {
+        query.set("channel", state.verificationChannel);
+        if (state.verificationScope) query.set("scope_id", state.verificationScope);
+      }
+      const result = await request(`projects/${encodeURIComponent(projectId)}/sections/${section}?${query}`);
       if (epoch !== state.loadingEpoch) return;
       state.sectionData = result;
       state.project = result.project || state.project;

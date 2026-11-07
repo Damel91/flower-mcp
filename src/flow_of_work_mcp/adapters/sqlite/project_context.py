@@ -10,6 +10,48 @@ from flow_of_work_mcp.core.domain.project_context import ProjectContextBinding
 from flow_of_work_mcp.core.domain.interaction_projection import CapabilityLensBinding
 
 
+_DASHBOARD_REPOSITORY_REVIEWS = """
+    FROM requirement_events e JOIN phase_audits a ON a.project_id = e.project_id
+       AND a.phase_audit_id = json_extract(e.payload_json, '$.phase_audit_id')
+    WHERE e.project_id = ? AND e.event_type = 'phase_audit_recorded'
+      AND json_type(e.payload_json, '$.repository_review') = 'object'
+"""
+
+_DASHBOARD_VERIFICATION_CHANNELS = {
+    "campaign": (
+        "SELECT campaign_id, change_id, title, status FROM verification_campaigns WHERE project_id = ?",
+        "ordinal, campaign_id", "",
+    ),
+    "verification": (
+        """SELECT 'verification' AS kind, CAST(evidence_id AS TEXT) AS identity,
+                  verification_kind AS title, evidence_id, requirement_id, outcome, reference,
+                  recorded_at, actor, 'recorded_verification_evidence' AS provenance
+             FROM verification_evidence WHERE project_id = ?""",
+        "evidence_id DESC", "requirement_id",
+    ),
+    "external_report": (
+        """SELECT 'external_report' AS kind, CAST(report_identity AS TEXT) AS identity,
+                  unit_key AS title, unit_key, packet_id, change_id, report_key,
+                  spec_revision, plan_revision, authority_fingerprint, disposition AS recorded_disposition,
+                  json_extract(payload_json, '$.source_revision') AS source_revision,
+                  json_extract(payload_json, '$.outcome') AS outcome,
+                  occurred_at AS recorded_at, actor, 'host_reported' AS provenance
+             FROM external_work_reports WHERE project_id = ?""",
+        "report_identity DESC", "packet_id",
+    ),
+    "repository_review": (
+        """SELECT 'repository_review' AS kind, CAST(a.phase_audit_id AS TEXT) AS identity,
+                  a.scope_id AS title, a.phase_audit_id, a.created_at AS recorded_at, a.created_by AS actor,
+                  json_extract(e.payload_json, '$.repository_review.change_id') AS change_id,
+                  json_extract(e.payload_json, '$.repository_review.packet_id') AS packet_id,
+                  json_extract(e.payload_json, '$.repository_review.source_revision') AS source_revision,
+                  json_extract(e.payload_json, '$.repository_review.expected_basis_fingerprint') AS basis_fingerprint,
+                  'host_declared' AS provenance""" + _DASHBOARD_REPOSITORY_REVIEWS,
+        "a.phase_audit_id DESC", "json_extract(e.payload_json, '$.repository_review.packet_id')",
+    ),
+}
+
+
 class ProjectContextStoreMixin:
     def dashboard_projects(self, *, search: str, offset: int, limit: int) -> Mapping[str, object]:
         """Read one literal-search catalog page without hydrating project state."""
@@ -43,7 +85,6 @@ class ProjectContextStoreMixin:
             "overview": ("requirements", "requirement_id, title, statement, category, lifecycle_status, current_revision, source_anchor", "ordinal"),
             "roadmap": ("milestones", "milestone_id, name, status", "ordinal"),
             "packets": ("implementation_packets", "packet_id, change_id, title, status, spec_revision", "ordinal"),
-            "verification": ("verification_campaigns", "campaign_id, change_id, title, status", "ordinal"),
         }
         if section == "evidence":
             return self._dashboard_evidence_items(project_id, offset=offset, limit=limit)
@@ -59,6 +100,48 @@ class ProjectContextStoreMixin:
                 f"SELECT {columns} FROM {table} WHERE project_id = ? ORDER BY {ordering} LIMIT ? OFFSET ?",
                 (project_id, limit, offset),
             ).fetchall()
+            return {"items": [dict(row) for row in rows], "total": total}
+
+    def dashboard_verification_items(self, project_id: str, *, channel: str, scope_id: str,
+                                     offset: int, limit: int) -> Mapping[str, object]:
+        """Page one proof channel without treating host records as direct verification."""
+        project_id = validate_project_id(project_id)
+        query, order, scope_column = _DASHBOARD_VERIFICATION_CHANNELS[channel]
+        parameters = (project_id,)
+        with self._read_connection() as connection:
+            self._ensure_project(connection, project_id)
+            counts = {
+                kind: connection.execute("SELECT COUNT(*) FROM (" + query + ")", parameters).fetchone()[0]
+                for kind, (query, _, _) in _DASHBOARD_VERIFICATION_CHANNELS.items()
+            }
+            total = counts[channel]
+            if scope_id:
+                query += f" AND {scope_column} = ?"
+                parameters = (project_id, scope_id)
+                total = connection.execute("SELECT COUNT(*) FROM (" + query + ")", parameters).fetchone()[0]
+            rows = connection.execute(query + f" ORDER BY {order} LIMIT ? OFFSET ?",
+                                      (*parameters, limit, offset)).fetchall()
+            return {"items": [dict(row) for row in rows], "total": total, "counts": counts}
+
+    def dashboard_packet_requirement_evidence(self, project_id: str, packet_id: str, *, limit: int) -> Mapping[str, object]:
+        """Count retained typed proofs for the packet's exact requirement scope."""
+        with self._read_connection() as connection:
+            packet = connection.execute(
+                """SELECT CASE WHEN json_array_length(p.requirement_ids_json) > 0
+                          THEN p.requirement_ids_json ELSE c.requirement_ids_json END AS requirement_ids_json
+                   FROM implementation_packets p JOIN change_units c USING(project_id, change_id)
+                   WHERE p.project_id = ? AND p.packet_id = ?""",
+                (project_id, packet_id),
+            ).fetchone()
+            requirement_ids = packet["requirement_ids_json"]
+            rows = connection.execute(
+                """SELECT scope.value AS requirement_id,
+                          (SELECT COUNT(*) FROM verification_evidence v
+                           WHERE v.project_id = ? AND v.requirement_id = scope.value) AS recorded_count
+                   FROM json_each(?) scope ORDER BY scope.key LIMIT ?""",
+                (project_id, requirement_ids, limit),
+            ).fetchall()
+            total = connection.execute("SELECT json_array_length(?)", (requirement_ids,)).fetchone()[0]
             return {"items": [dict(row) for row in rows], "total": total}
 
     def _dashboard_evidence_items(self, project_id: str, *, offset: int, limit: int) -> Mapping[str, object]:
@@ -97,6 +180,14 @@ class ProjectContextStoreMixin:
                          "WHERE project_id = ? AND handover_id = ?"),
             "verification": ("SELECT metadata_json AS content, requirement_id, verification_kind, outcome, reference, actor, recorded_at "
                              "FROM verification_evidence WHERE project_id = ? AND evidence_id = ?"),
+            "external_report": ("SELECT payload_json AS content, unit_key AS title, packet_id, change_id, report_key, "
+                                "spec_revision, plan_revision, authority_fingerprint, disposition AS recorded_disposition, "
+                                "occurred_at AS recorded_at, actor, 'host_reported' AS provenance "
+                                "FROM external_work_reports WHERE project_id = ? AND report_identity = ?"),
+            "repository_review": ("SELECT json_extract(e.payload_json, '$.repository_review') AS content, "
+                                  "a.scope_id AS title, a.created_at AS recorded_at, a.created_by AS actor, "
+                                  "'host_declared' AS provenance" + _DASHBOARD_REPOSITORY_REVIEWS +
+                                  " AND a.phase_audit_id = ?"),
         }
         if kind not in queries:
             raise ValueError("unsupported dashboard evidence kind")

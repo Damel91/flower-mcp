@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from itertools import islice
+from math import isfinite
 from typing import Callable, Any, Mapping, Protocol
 
 from flow_of_work_mcp.core.domain import (
     ActionExecutionClass,
+    FindingDisposition,
     LifecyclePolicy,
     LifecycleStatus,
     MilestoneDraft,
@@ -21,10 +24,11 @@ from flow_of_work_mcp.core.domain import (
     PACKET_TERMINAL_STATUS_VALUES,
     ValidationAuditRecord,
     ValidationDisposition,
+    VerificationKind,
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
 from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 from flow_of_work_mcp.core.ports import (
     AssuranceRepository,
     ChangeControlRepository,
@@ -45,6 +49,7 @@ _PHASE_CHANGE_ORDER = (
     PhaseChangeType.UNVERIFIED,
     PhaseChangeType.BLOCKED,
 )
+_VERIFICATION_DETAIL_TEXT_LIMIT = 2_048
 
 
 class _CampaignAuthority(Protocol):
@@ -416,16 +421,7 @@ class LifecycleControlService:
             verification = dict(row.get("verification") or {})
             outcomes = set(value for value in verification.values() if value)
             if "failed" in outcomes:
-                actions.append(
-                    self._action(
-                        action_id=f"repair-verification:{requirement_id}",
-                        kind=NextActionKind.REPAIR_FAILED_VERIFICATION,
-                        execution_class=ActionExecutionClass.ORCHESTRATION,
-                        priority=10,
-                        rationale="latest verification evidence contains a failed outcome",
-                        requirement_ids=(requirement_id,),
-                    )
-                )
+                actions.append(self._verification_repair_action(project_id, row, verification))
             if lifecycle_status == LifecycleStatus.PARTIAL:
                 actions.append(
                     self._action(
@@ -1217,6 +1213,7 @@ class LifecycleControlService:
         required_inputs: tuple[str, ...] = (),
         state: str = "pending",
         decision_class: str = "",
+        verification_recovery: Mapping[str, object] | None = None,
     ) -> NextAction:
         automatic_eligible = (
             execution_class == ActionExecutionClass.DETERMINISTIC
@@ -1246,7 +1243,102 @@ class LifecycleControlService:
             required_inputs=required_inputs,
             state=state,
             decision_class=decision_class,
+            verification_recovery=verification_recovery or {},
         )
+
+    def _verification_repair_action(
+        self, project_id: str, row: Mapping[str, Any], verification: Mapping[str, Any],
+    ) -> NextAction:
+        requirement_id = str(row["requirement_id"])
+        latest = {record["verification_kind"]: record for record in row.get("evidence", [])}
+        failed = [
+            self._failed_verification_evidence(project_id, requirement_id, record)
+            for kind, record in latest.items()
+            if verification.get(kind) == "failed" and record["outcome"] == "failed"
+        ]
+        failed.sort(key=lambda record: record["evidence_id"], reverse=True)
+        route = failed[0]["next_tool_call"] if failed else {}
+        next_step = "Inspect the recorded failure and compare its scope and limits with the current requirement to plan remediation."
+        if verification.get(VerificationKind.LIVE) == "failed":
+            next_step += " Check the separate live execution authority before rerunning live work."
+        recovery = {
+            "current_requirement_revision": row.get("current_revision"),
+            "failed_evidence": failed,
+            "live_execution_authorized": False,
+            "establishes_global_admission": False,
+            "next_step": next_step,
+        }
+        return self._action(
+            action_id=f"repair-verification:{requirement_id}",
+            kind=NextActionKind.REPAIR_FAILED_VERIFICATION,
+            execution_class=ActionExecutionClass.ORCHESTRATION,
+            priority=10,
+            rationale="latest verification evidence contains a failed outcome",
+            requirement_ids=(requirement_id,),
+            tool=route.get("tool", ""),
+            operation="call" if route else "",
+            arguments=route.get("arguments"),
+            verification_recovery=recovery,
+        )
+
+    def _failed_verification_evidence(
+        self, project_id: str, requirement_id: str, record: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        evidence_id = record["evidence_id"]
+        metadata = record.get("metadata")
+        if not isinstance(metadata, Mapping):
+            metadata = {}
+        view = {
+            "evidence_id": evidence_id,
+            "requirement_id": requirement_id,
+            "verification_kind": record["verification_kind"],
+            "outcome": record["outcome"],
+            "reference": record["reference"],
+            "recorded_at": record["recorded_at"],
+            "next_tool_call": {
+                "tool": "fow_traceability",
+                "arguments": {"project_id": project_id, "detail_level": "audit", "evidence_id": evidence_id},
+            },
+        }
+        for field, keys in (
+            ("source_revision", ("source_revision", "source_runtime_implementation", "code_commit")),
+            ("profile", ("profile", "model_profile", "server_profile")),
+            ("provenance", ("provenance",)),
+            ("recorded_disposition", ("disposition",)),
+        ):
+            value = next(
+                (metadata[key] for key in keys if isinstance(metadata.get(key), str) and metadata[key]),
+                "",
+            )
+            if value:
+                view[field] = value
+        thresholds = metadata.get("numerical_thresholds")
+        if isinstance(thresholds, Mapping):
+            view["numerical_thresholds"] = {
+                key: value for key, value in islice(thresholds.items(), 16)
+                if isinstance(key, str) and len(key) <= 128
+                and (type(value) is int or type(value) is float and isfinite(value))
+            }
+        finding_id = metadata.get("finding_id")
+        if self._assurance is not None and isinstance(finding_id, str) and finding_id:
+            try:
+                finding = self._assurance.finding_state(project_id, finding_id)
+            except (ValueError, RequirementConflictError):
+                finding = {}
+            if (finding.get("disposition") == FindingDisposition.ACCEPTED_EXCEPTION
+                    and record["reference"] in finding.get("evidence_refs", [])):
+                exception = {
+                    key: finding[key] for key in (
+                        "finding_id", "disposition", "scope_kind", "scope_ref", "change_id", "packet_id",
+                        "disposition_reference", "disposition_rationale",
+                    )
+                }
+                exception["next_tool_call"] = {
+                    "tool": "fow_assurance",
+                    "arguments": {"project_id": project_id, "operation": "get_finding", "finding_id": finding_id},
+                }
+                view["linked_exception"] = _bounded_verification_text(exception)
+        return _bounded_verification_text(view)
 
     @staticmethod
     def _deduplicate(actions: Iterable[NextAction]) -> tuple[NextAction, ...]:
@@ -1254,6 +1346,17 @@ class LifecycleControlService:
         for action in actions:
             by_id.setdefault(action.action_id, action)
         return tuple(by_id.values())
+
+
+def _bounded_verification_text(fields: dict[str, Any]) -> dict[str, Any]:
+    shortened = []
+    for key, value in fields.items():
+        if isinstance(value, str) and len(value) > _VERIFICATION_DETAIL_TEXT_LIMIT:
+            fields[key] = value[:_VERIFICATION_DETAIL_TEXT_LIMIT] + "…"
+            shortened.append(key)
+    if shortened:
+        fields["truncated_fields"] = shortened
+    return fields
 
 
 def _packet_by_id(change: Mapping[str, object], packet_id: str) -> Mapping[str, object]:

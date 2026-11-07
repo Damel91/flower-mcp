@@ -191,6 +191,8 @@ input::placeholder { color: var(--subtle); }
 .observation { font-size: 12px; color: var(--subtle); font-variant-numeric: tabular-nums; }
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 20px; margin-bottom: 20px; padding-top: 22px; border-top: 1px solid var(--line); }
 .section-intro { color: var(--muted); margin-bottom: 24px; max-width: 72ch; }
+.verification-channels { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.verification-channels button[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .attention { background: var(--warning-soft); border-left: 3px solid var(--warning); padding: 18px 21px; margin-bottom: 24px; border-radius: 0 8px 8px 0; }
 .attention h3 { color: var(--warning); }
 .attention p:last-child { margin-bottom: 0; }
