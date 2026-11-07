@@ -280,6 +280,14 @@ it. Technical investigation does not automatically require human approval.
    with the current revisions and grounded rationale when ordinary reconciliation
    is appropriate; do not rewrite old report provenance or relabel it as current.
 
+When TODO reports `inspect_historical_outcome`, use its full validation
+route to inspect the original report and compare its issued authority with
+the current pin. Review the corresponding repository source and effects
+before recording a new current outcome. Reassess the affected plan if its
+obligations changed. A stored success receipt remains evidence of its
+original recording. A historical retry also reports its current applicability
+and points to inspection.
+
 Requirement progress through `planned`, `partial` and `implemented` preserves
 executable authority, including linked architecture and Oracle dependencies.
 Requirement revisions and retirement still invalidate affected authority.

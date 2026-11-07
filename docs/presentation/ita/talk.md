@@ -48,7 +48,7 @@ dell'autore. I ritagli mostrano il metodo, non certificano i risultati dei test.
 
 ## Tre minuti nella dashboard
 
-Aprire in anticipo `/dashboard` sull’indirizzo locale di Flower 0.12.0, in streamable HTTP su
+Aprire in anticipo `/dashboard` sull’indirizzo locale di Flower 0.13.0, in streamable HTTP su
 un profilo dimostrativo. Accedere prima con l’account locale. Durante il talk mostrare un progetto, il prossimo gate,
 un packet e un Markdown già conservato: **Lettura**, indice, poi **Sorgente**.
 Cambiare tema consente di mostrare la preferenza chiara/scura e il default di

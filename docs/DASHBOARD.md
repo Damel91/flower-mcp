@@ -1,6 +1,6 @@
 # Flower browser dashboard
 
-Flower 0.12.0 lets the local owner create and inspect projects, prepare profile
+Flower 0.13.0 lets the local owner create and inspect projects, prepare profile
 settings, manage backups, and export a project's lifecycle records. The dashboard
 also provides password-confirmed project deletion under whole-instance maintenance.
 See the [owner-login guide](OWNER-LOGIN.md) for account and platform prerequisites.
@@ -103,8 +103,8 @@ pages contain at most 25 top-level items per page. Use **Precedenti** and
 | --- | --- |
 | **Panoramica** | Requirements, current work, the next gate, blockers and open decisions |
 | **Roadmap** | Registered milestones, dependencies and their canonical progress dimensions |
-| **Pacchetti** | Specification and plan revisions, execution gates, unit reports and pending dependencies |
-| **Verifiche** | Campaigns, Oracles, questions and the available evidence |
+| **Pacchetti** | Stored lifecycle, current reported units, execution or recovery gate, dependencies and links to report and review evidence |
+| **Verifiche** | Campaigns and Oracles, direct requirement proofs, unit reports and repository reviews in separate evidence views |
 | **Architettura** | Adopted components, interfaces and decisions |
 | **Evidenze** | Retained documents, handovers and verification records |
 
@@ -119,6 +119,15 @@ visible. Reading a page does not start coding work, contact an inference provide
 or change acceptance. Reported implementation, local checks, campaign verification
 and human acceptance keep their separate meanings. A zero criterion denominator
 appears as **Nessun criterio**, with the original numbers available in the details.
+
+A historical outcome can require reconciliation before more work. Inspect the
+original report, the issued authority and the current gate in **Pacchetti**.
+A prior successful receipt describes its original recording. Its current
+applicability is shown separately when it is replayed through MCP.
+
+For failed verification, **Panoramica** exposes the retained proof and any
+explicitly linked exception. A publication exception retains its original scope.
+Follow the current recovery action to inspect the relevant requirement and proof.
 
 In **Evidenze**, **Apri contenuto conservato** retrieves an existing record.
 **Scarica documento** saves the already retrieved content in the browser. These

@@ -1,8 +1,22 @@
 # Upgrade Flower without losing project data
 
+<a id="preparing-a-0130-upgrade"></a>
+
+## Preparing a 0.13.0 upgrade
+
+Stop Flower and use the [0.13.0 installer](https://github.com/Damel91/flower-mcp/releases/tag/v0.13.0)
+with `--upgrade --dry-run` to inspect the selected environment and profile.
+Apply with `--upgrade` using the same selection. The installer backs up
+SQLite and the profile YAML before replacing the package. The ledger stays
+on schema 55 and the selected profile, client and LAN settings are retained.
+
+After startup, use the dashboard or MCP to inspect historical reports and
+the current recovery gate. Existing reports retain the authority under
+which they were recorded. [Dashboard guide](DASHBOARD.md)
+
 <a id="preparing-a-0120-upgrade"></a>
 
-## Preparing a 0.12.0 upgrade
+## Historical 0.12.0 upgrade checkpoint
 
 Stop Flower and use the [0.12.0 installer](https://github.com/Damel91/flower-mcp/releases/tag/v0.12.0)
 with `--upgrade --dry-run` to review the existing environment and profile.
