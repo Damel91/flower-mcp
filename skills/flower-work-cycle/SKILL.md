@@ -31,14 +31,15 @@ that reference.
    new scope and the current request authorizes creation. Then rediscover and
    select it. Keep locators and interaction state in their proper scope. Global
    instructions contain no project state.
-3. Read `fow_capabilities` summary and `fow_handover` project-state snapshot.
+3. Call `fow_capabilities(view="summary")` and
+   `fow_handover(project_id=..., operation="project_state_snapshot")`.
    Use the current lens for attention. Follow the single current `next_gate`
    within authorized scope, and refresh after lifecycle mutations. An idle
    focus means no next action there. A suggested gate, lens or resolved
    `next_tool_call` proposes an action; check its authority and inputs before
    calling it.
 
-Use the current recipe for the phase:
+Request the current recipe with `fow_capabilities(view="recipe", recipe_name=...)`.
 
 | Phase | Recipe to request from `fow_capabilities` |
 | --- | --- |
@@ -56,6 +57,8 @@ the intended server and selection before mutations. Use a public probe only
 when the host authorizes it and the exact endpoint is known. Keep lifecycle
 operations on the public surface. If a gate lacks an exact continuation, read
 its scoped object and request public operation help for the intended action.
+Read a known milestone through the snapshot with `focus_kind="milestone"`
+and `focus_ref` set to its ID.
 
 ## Choose the next increment
 
@@ -81,6 +84,7 @@ its scoped object and request public operation help for the intended action.
   exist without admission, use the recovery branch below. Otherwise reuse a
   matching change and packet, or use exact help for `fow_change create_change`
   and `fow_packet_author start_packet` to open what is missing for that result.
+  Use your actor and a new request ID for the intended write.
   Link the affected requirements and architecture. Keep later work at roadmap
   level until a dependency or the next increment needs it.
 
@@ -98,6 +102,11 @@ its scoped object and request public operation help for the intended action.
   criterion as an observable outcome. State who implements it and how it will
   be checked. For verification-only work, bind the exact existing baseline or
   producing criterion and order its verifier after that producer.
+- Include the packet scope and invariants, then resolve current required
+  engineering questions. If validation reports
+  `packet_validation_upgrade_required`, follow its repair route to initialize
+  criterion numbers with `fow_external_work upgrade_validation` at the current
+  spec and plan revisions. Plan revision 0 means the plan has yet to be drafted.
 - On strict PVP, save the complete classification with the current spec and plan
   revisions through `fow_external_work classify_criteria` before plan acceptance.
   Use `implementation` for changed behavior, `verification_only` for a linked
