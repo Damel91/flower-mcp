@@ -58,7 +58,8 @@ when the host authorizes it and the exact endpoint is known. Keep lifecycle
 operations on the public surface. If a gate lacks an exact continuation, read
 its scoped object and request public operation help for the intended action.
 Read a known milestone through the snapshot with `focus_kind="milestone"`
-and `focus_ref` set to its ID.
+and `focus_ref` set to its ID. Use `fow_traceability` for its requirement
+mapping and `fow_get_requirement` for individual requirement text.
 
 ## Choose the next increment
 
@@ -97,6 +98,11 @@ and `focus_ref` set to its ID.
   Each unit needs explicit criterion ownership, dependencies, producer and
   consumer contracts, and checks. Future outputs are declarations. Keep
   campaign, Oracle and other deferred verification separately visible.
+- Use the exact `fow_architecture propose` example to shape the definition.
+  Include the `components`, `interfaces` and `decisions` arrays. Use
+  `links: []` on an entity with no links and leave other lists empty only
+  where they do not apply. Correct the fields identified by a rejected proposal,
+  then submit the intended definition and read its revision before adoption.
 - For external coding, select the external agent before drafting units. Read
   the current criterion numbers and the exact authoring contract. Write each
   criterion as an observable outcome. State who implements it and how it will
