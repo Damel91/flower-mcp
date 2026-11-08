@@ -176,6 +176,10 @@ read [Authoring examples](references/authoring-examples.md) when that need arise
   and local checks visible while closure or dependent admission waits.
   Use the durable handover to preserve unresolved work and its evidence.
 - Before presenting acceptance, inspect the exact packet or milestone scope.
+  For a change, read `fow_assurance inspect_change_acceptance` when advertised.
+  Use `fow_campaign_inspect` with `view: summary` to see the current phase and
+  outstanding Oracle fields before committing to campaign work. Answer the
+  current question and refresh the gate.
   Separate applicable prerequisites, missing registrations and awaited human
   evidence. Compare the agreed scenario with one material failure path and
   reuse existing proof where it covers that behavior. Report only the remaining
