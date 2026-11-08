@@ -139,6 +139,16 @@ conversation and use a new one for a genuinely new conversation. Discover
 Flower projects with `fow_interaction` and explicitly select the intended project. Read `fow_capabilities` and the current `fow_handover`
 project-state snapshot. Follow its current next gate and refresh after lifecycle
 mutations. Inspect current state before retrying any uncertain effect.
+After roadmap confirmation, follow the skill to choose the next bounded result
+and its change/packet, then record each admitted unit outcome before advancing.
+Recover previously ungoverned work as observations with their original evidence
+and provenance. Admit only the work that remains.
+Keep the bounded diagnostic and its recovery route intact across host tools.
+Before asking for acceptance, read the selected packet or milestone evidence
+and distinguish reported work, missing proof and the decision still required.
+Before drafting an external plan, select the executor and distinguish who
+implements each outcome from who verifies it. Read the current PVP guidance
+and follow the scoped Markdown recovery if a declaration is missing.
 
 For new engineering scope, use the current `engineering-bootstrap` recipe.
 For architecture, bounded completion and context recovery, use
