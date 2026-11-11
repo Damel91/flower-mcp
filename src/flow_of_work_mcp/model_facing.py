@@ -599,7 +599,8 @@ def _compact_snapshot_markdown(snapshot: Mapping[str, Any], output_budget: int |
             "known_inputs": route["arguments"], "inputs_to_supply": route["required_inputs"],
         }
     if context := snapshot.get("acceptance_context"):
-        current["packet_checkpoint"] = context["packet_checkpoint"]["state"]
+        if packet := context.get("packet_checkpoint"):
+            current["packet_checkpoint"] = packet["state"]
         acceptance = context["milestone_acceptance"]
         current["milestone_acceptance"] = acceptance["state"]
         current["acceptance_prerequisites"] = [row["reason"] for row in acceptance["blockers"][:3]]

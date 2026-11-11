@@ -160,6 +160,23 @@ def test_direct_proofs_keep_ids_outcomes_and_counts_without_claiming_live_or_acc
     assert result["milestone_acceptance"]["state"] == "blocked"
 
 
+def test_public_milestone_snapshot_renders_without_a_packet_checkpoint(scoped_work):
+    runtime, _requirements, ids, milestone_id, _identities = scoped_work
+
+    async def run():
+        reply = await create_app(runtime).call_tool("fow_handover", {
+            "project_id": ids[0], "operation": "project_state_snapshot",
+            "focus_kind": "milestone", "focus_ref": milestone_id,
+        })
+        assert reply.isError is False
+        body = reply.structuredContent["result"]["result"]["project_state_snapshot"]
+        assert body["acceptance_context"]["packet_checkpoint"] is None
+        assert "**Milestone Acceptance:**" in reply.content[0].text
+        assert "**Packet Checkpoint:**" not in reply.content[0].text
+
+    asyncio.run(run())
+
+
 def test_public_snapshot_audit_only_expands_markdown_and_progress_names_its_basis(scoped_work):
     runtime, _requirements, ids, milestone_id, _identities = scoped_work
 
