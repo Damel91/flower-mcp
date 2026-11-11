@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           cd "$RUNNER_TEMP"
-          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_dashboard_http.py" "$GITHUB_WORKSPACE/tests/test_dashboard_maintenance.py" "$GITHUB_WORKSPACE/tests/test_dashboard_restore_http.py" "$GITHUB_WORKSPACE/tests/test_dashboard_projection.py" "$GITHUB_WORKSPACE/tests/test_dashboard_markdown.py" "$GITHUB_WORKSPACE/tests/test_semantic_requirement_fingerprint.py" "$GITHUB_WORKSPACE/tests/test_jobs.py"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_dashboard_http.py" "$GITHUB_WORKSPACE/tests/test_dashboard_maintenance.py" "$GITHUB_WORKSPACE/tests/test_dashboard_restore_http.py" "$GITHUB_WORKSPACE/tests/test_ledger_project_import.py" "$GITHUB_WORKSPACE/tests/test_manual_dashboard_upgrade.py" "$GITHUB_WORKSPACE/tests/test_dashboard_projection.py" "$GITHUB_WORKSPACE/tests/test_dashboard_markdown.py" "$GITHUB_WORKSPACE/tests/test_semantic_requirement_fingerprint.py" "$GITHUB_WORKSPACE/tests/test_jobs.py"
       - name: Upgrade the published baseline while preserving public lifecycle state
         if: matrix.python == '3.11'
         run: python tools/smoke_upgrade.py --assets dist --root "$RUNNER_TEMP/flower-upgrade" --output "$RUNNER_TEMP/flower-upgrade-smoke.json"

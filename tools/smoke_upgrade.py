@@ -31,7 +31,7 @@ REPOSITORY = "https://github.com/Damel91/flower-mcp"
 PROJECT = "flower-upgrade-smoke"
 PROFILE = "upgrade-smoke"
 
-# Independent qualification oracle for the additive IMPL-63 persistence contract.
+# Independent qualification oracle for the additive IMPL-63 and IMPL112 persistence contracts.
 # Do not obtain this from the implementation being tested or accept arbitrary DDL.
 ADDITIVE_SCHEMA_SQL = '''
 CREATE TABLE architecture_revisions (
@@ -85,10 +85,24 @@ CREATE TABLE packet_provider_admissions (
     FOREIGN KEY(project_id,change_id,packet_id) REFERENCES implementation_packets(project_id,change_id,packet_id));
 CREATE INDEX packet_provider_admissions_context
     ON packet_provider_admissions(project_id,change_id,packet_id,unit_key,context_sha256);
+CREATE TABLE project_import_origins (
+    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    origin_digest TEXT NOT NULL, source_project_id TEXT NOT NULL, imported_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, origin_digest));
+CREATE TABLE project_import_identities (
+    project_id TEXT NOT NULL, origin_digest TEXT NOT NULL, identity_kind TEXT NOT NULL,
+    source_id INTEGER NOT NULL, local_id INTEGER NOT NULL,
+    PRIMARY KEY(project_id, origin_digest, identity_kind, source_id),
+    FOREIGN KEY(project_id, origin_digest) REFERENCES project_import_origins(project_id, origin_digest) ON DELETE CASCADE);
+CREATE TABLE project_import_originals (
+    project_id TEXT NOT NULL, origin_digest TEXT NOT NULL, table_name TEXT NOT NULL,
+    row_key TEXT NOT NULL, column_name TEXT NOT NULL, original_value TEXT NOT NULL,
+    PRIMARY KEY(project_id, origin_digest, table_name, row_key, column_name),
+    FOREIGN KEY(project_id, origin_digest) REFERENCES project_import_origins(project_id, origin_digest) ON DELETE CASCADE);
 '''
 NEW_TABLES = frozenset({"architecture_revisions", "architecture_adoptions", "architecture_requests",
     "packet_executor_selections", "packet_provider_capabilities", "packet_executor_requests",
-    "packet_provider_admissions"})
+    "packet_provider_admissions", "project_import_origins", "project_import_identities", "project_import_originals"})
 ARCHITECTURE_TABLES = ("implementation_packets", "implementation_packet_revisions")
 ARCHITECTURE_COLUMN = "architecture_refs_json TEXT NOT NULL DEFAULT '[]'"
 
@@ -251,7 +265,7 @@ def database_authority(path: Path) -> dict:
 
 
 def require_additive_migration(path: Path, before: dict) -> dict:
-    """Qualify exactly52→55, keeping every historical field and clock intact."""
+    """Qualify exactly 52→56, keeping every historical field and clock intact."""
     require(max(row[0] for row in before["rows"]["schema_migrations"]) == 52,
             "Upgrade fixture must begin with the exact schema52 predecessor")
     require(not NEW_TABLES.intersection(before["columns"]), "Predecessor already contains new authority tables")
@@ -290,11 +304,15 @@ def require_additive_migration(path: Path, before: dict) -> dict:
             require(actual_rows == before["rows"][table], "Migration changed original rows or clocks: " + table)
     old_migrations = dict(before["rows"]["schema_migrations"])
     new_migrations = dict(after["rows"]["schema_migrations"])
-    require(set(new_migrations) == set(old_migrations) | {53, 54, 55}, "Migration versions differ from exact53..55 contract")
+    expected_versions = (53, 54, 55, 56)
+    require(set(new_migrations) == set(old_migrations).union(expected_versions),
+            "Migration versions differ from exact 53–56 contract")
     require(all(new_migrations[key] == value for key, value in old_migrations.items()), "Historical migration timestamps changed")
-    require(all(isinstance(new_migrations[key], str) and new_migrations[key] for key in (53, 54, 55)), "New migration timestamp is absent")
-    require(all(after["rows"][table] == [] for table in NEW_TABLES), "Migration invented architecture or executor authority")
-    return {"status": "passed", "previous_schema": 52, "current_schema": 55,
+    require(all(isinstance(new_migrations[key], str) and new_migrations[key] for key in expected_versions),
+            "New migration timestamp is absent")
+    require(all(after["rows"][table] == [] for table in NEW_TABLES),
+            "Migration invented architecture, executor or import authority")
+    return {"status": "passed", "previous_schema": 52, "current_schema": 56,
             "historical_tables_preserved": len(before["columns"]), "new_tables": sorted(NEW_TABLES),
             "added_packet_columns": list(ARCHITECTURE_TABLES), "invented_authority": False}
 

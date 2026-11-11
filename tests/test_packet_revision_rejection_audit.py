@@ -12,6 +12,7 @@ import pytest
 
 from flow_of_work_mcp import GovernedChangeDraft, ImplementationPacketDraft, RequirementDraft
 from flow_of_work_mcp.mcp_runtime import build_runtime
+from tests.schema_fixtures import retain_schema55
 
 TOOL = Path(__file__).resolve().parents[1] / 'tools/audit_packet_revision_rejection.py'
 spec = importlib.util.spec_from_file_location('packet_revision_audit', TOOL)
@@ -43,6 +44,7 @@ def owned(tmp_path, monkeypatch):
     packet = runtime.changes.add_packet('owned', change['change_id'], ImplementationPacketDraft(title='Owned packet',
         objective='Inspect source', completion_criteria=('State retained',), target_policy='documental_only'), actor='engineer')['packets'][0]
     database = runtime.ledger.database_path
+    retain_schema55(database)
     before = tmp_path / 'before.json';before.write_text(json.dumps(snapshot(database)))
     request = tmp_path / 'request.json';request.write_text(json.dumps({'tool':'fow_packet_author','arguments':{
         'operation':'revise_packet','project_id':'owned','packet_id':packet['packet_id'],'actor':'engineer','request_id':'original',

@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 
 from flow_of_work_mcp.adapters.sqlite.campaign_host import CampaignHostStoreMixin
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
+from flow_of_work_mcp.adapters.sqlite.import_history import original_integer_keyed_cells
 from flow_of_work_mcp.core.domain.assurance import (
     CampaignStatus,
     validate_campaign_id,
@@ -92,6 +93,17 @@ _ORACLE_EXPLICIT_EMPTY_FIELDS = frozenset(
         "oracle_violation_conditions",
     }
 )
+
+
+def _completion_input(propagation: Mapping[str, object], source_revision: str) -> dict[str, object]:
+    value = {
+        "propagation_fingerprint": semantic_fingerprint(propagation),
+        "propagated_count": len(propagation.get("propagated", [])),
+        "diagnostic_count": len(propagation.get("diagnostics", [])),
+    }
+    if source_revision:
+        value["observed_source_revision"] = source_revision
+    return value
 
 
 class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
@@ -736,13 +748,7 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
         campaign_id = validate_campaign_id(campaign_id)
         actor = required_text(actor, "actor")
         propagation = canonical_semantic_value(dict(propagation or {}))
-        input_payload = {
-            "propagation_fingerprint": semantic_fingerprint(propagation),
-            "propagated_count": len(propagation.get("propagated", [])),
-            "diagnostic_count": len(propagation.get("diagnostics", [])),
-        }
-        if observed_source_revision:
-            input_payload["observed_source_revision"] = observed_source_revision
+        input_payload = _completion_input(propagation, observed_source_revision)
         with self._transaction() as connection:
             replay = self._mutation_replay(
                 connection,
@@ -4306,15 +4312,39 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
             raise RequirementConflictError(
                 "campaign request_id conflicts across campaigns"
             )
-        self._assert_replay_fingerprint(
-            replay,
-            semantic_fingerprint(input_payload),
-            event_type=event_type,
-            input_payload=input_payload,
-        )
+        if event_type != "campaign_completion_recorded" or not self._imported_completion_matches(
+            connection, project_id, replay, input_payload,
+        ):
+            self._assert_replay_fingerprint(
+                replay,
+                semantic_fingerprint(input_payload),
+                event_type=event_type,
+                input_payload=input_payload,
+            )
         return self._campaign_authority_value(connection, project_id, campaign_id) | {
             "replayed": True
         }
+
+    @staticmethod
+    def _imported_completion_matches(connection, project_id, event, input_payload) -> bool:
+        # Compare against the exact local projection only when an immutable
+        # source envelope still authenticates the original replay fingerprint.
+        projected = json.loads(event["payload_json"])
+        propagation = projected.get("propagation")
+        if not isinstance(propagation, Mapping) or input_payload != _completion_input(
+            propagation, str(projected.get("observed_source_revision") or ""),
+        ):
+            return False
+        for raw in original_integer_keyed_cells(
+            connection, project_id, "campaign_authority_events", int(event["event_id"]), "payload_json",
+        ):
+            original = json.loads(raw)
+            original_propagation = original.get("propagation")
+            if isinstance(original_propagation, Mapping) and projected.get("input_fingerprint") == semantic_fingerprint(
+                _completion_input(original_propagation, str(original.get("observed_source_revision") or "")),
+            ):
+                return True
+        return False
 
     @staticmethod
     def _campaign_authority_request_event(

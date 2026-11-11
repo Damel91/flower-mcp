@@ -18,10 +18,15 @@ from flow_of_work_mcp.runtime_ownership import (
 
 FENCE_CONTRACT = "flower.dedicated-installation.v1"
 UPGRADE_CONTRACT = "flower.managed-upgrade.v1"
+MANUAL_UPGRADE_CONTRACT = "flower.manual-dashboard-upgrade.v1"
 _CONTROL = ".flower-installation"
 _RECEIPT = ".flower-release-install.json"
 _PHASES = {"queued", "stopping", "installing", "restarting", "complete", "failed", "preflight_failed"}
 _SETTLED = {"complete", "preflight_failed"}
+_MANUAL_PHASES = {"queued", "preparing", "stopping", "installing", "complete", "preflight_failed", "failed"}
+_MANUAL_KEYS = {"contract", "id", "version", "phase", "backup_directory", "reason",
+                "previous_version", "installed_receipt", "config", "config_revision",
+                "config_identity", "database", "database_identity"}
 
 
 class InstallationFenceError(ValueError):
@@ -193,7 +198,42 @@ def environment_lease(binding: DedicatedInstallation) -> RuntimeOwnership:
         raise
 
 
-def manual_upgrade_lease() -> RuntimeOwnership | None:
+def read_manual_upgrade(environment: Path) -> dict | None:
+    path = environment / _CONTROL / "manual-upgrade.json"
+    if not _present(path):
+        return None
+    _private_control(environment)
+    record = _record(path)
+    strings = _MANUAL_KEYS - {"config_identity", "database_identity"}
+    if (set(record) != _MANUAL_KEYS or any(not isinstance(record[key], str) for key in strings)
+            or record["contract"] != MANUAL_UPGRADE_CONTRACT
+            or not re.fullmatch(r"[a-f0-9]{32}", record["id"])
+            or record["phase"] not in _MANUAL_PHASES):
+        raise _unsafe()
+    if (any(not re.fullmatch(r"[a-f0-9]{64}", record[key]) for key in ("installed_receipt", "config_revision"))
+            or any(not Path(record[key]).is_absolute() or "\0" in record[key] for key in ("config", "database"))
+            or any(not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", record[key])
+                   or len(record[key]) > 64 for key in ("version", "previous_version"))
+            or len(record["backup_directory"]) > 4096 or len(record["reason"]) > 96):
+        raise _unsafe()
+    for key, count in (("config_identity", 6), ("database_identity", 2)):
+        identity = record[key]
+        if not isinstance(identity, list) or len(identity) != count or any(type(part) is not int for part in identity):
+            raise _unsafe()
+    return record
+
+
+def _assert_manual_admitted(environment: Path, operation_id: str | None = None) -> None:
+    pending = read_manual_upgrade(environment)
+    if operation_id is not None:
+        if pending is None or pending["id"] != operation_id or pending["phase"] != "stopping":
+            raise _unsafe()
+    elif pending is not None and pending["phase"] not in _SETTLED:
+        raise InstallationFenceError("installation_manual_upgrade_pending",
+            "Flower has a pending or unresolved dashboard update. Inspect the installation's manual-upgrade.json receipt.")
+
+
+def manual_upgrade_lease(*, operation_id: str | None = None) -> RuntimeOwnership | None:
     """Serialize package changes and offline enrollment in an unenrolled environment."""
     environment = _environment()
     if environment is None:
@@ -202,6 +242,7 @@ def manual_upgrade_lease() -> RuntimeOwnership | None:
     try:
         if _read_enrollment(environment) is not None:
             raise InstallationFenceError("installation_managed_upgrade_required", "Use the managed upgrade workflow for this dedicated Flower installation.")
+        _assert_manual_admitted(environment, operation_id)
         return lease
     except BaseException:
         lease.close()
@@ -216,6 +257,7 @@ def enroll_installation(config: Path, database: Path, *, host: str, port: int, s
     if environment is None:
         raise InstallationFenceError("installation_enrollment_unavailable", "Dedicated managed upgrades require an installer-owned Flower environment on macOS.")
     with _lease(environment, shared=False):
+        _assert_manual_admitted(environment)
         if _installation().target != environment:
             raise _unsafe()
         config, database = _owned_path(config), _owned_path(database)
@@ -257,6 +299,7 @@ def read_upgrade(binding: DedicatedInstallation) -> dict | None:
 class StartupLease:
     lease: RuntimeOwnership
     binding: DedicatedInstallation | None
+    environment: Path
 
     def assert_config(self, config: Path) -> None:
         if self.binding is not None:
@@ -268,6 +311,8 @@ class StartupLease:
 
     def assert_admitted(self, *, transport: str, host: str, port: int, managed_restart: str | None) -> None:
         binding = self.binding
+        if binding is None:
+            _assert_manual_admitted(self.environment)
         pending = read_upgrade(binding) if binding is not None else None
         if pending is not None and pending["phase"] not in _SETTLED:
             if (pending["phase"] != "restarting" or managed_restart != pending["id"]
@@ -293,7 +338,7 @@ def startup_lease(config: Path | None = None, database: Path | None = None, *, t
         return None
     lease = _lease(environment, shared=True)
     try:
-        admission = StartupLease(lease, _read_enrollment(environment))
+        admission = StartupLease(lease, _read_enrollment(environment), environment)
         admission.assert_admitted(transport=transport, host=host, port=port, managed_restart=managed_restart)
         if config is not None:
             admission.assert_config(config)

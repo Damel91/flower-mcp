@@ -13,6 +13,7 @@ import pytest
 from flow_of_work_mcp.adapters.sqlite import SQLiteRequirementLedger
 from flow_of_work_mcp import ledger_archive
 from flow_of_work_mcp.native_project_purge import _scope
+from tests.schema_fixtures import retain_schema55
 from tests.test_native_project_purge import _seed_all_tables
 
 
@@ -66,7 +67,7 @@ def test_backup_captures_committed_wal_and_all_logical_rows(tmp_path):
         assert ledger_archive.read_archive(output, restored) == manifest
         assert manifest["kind"] == "backup"
         assert manifest["project_id"] is None
-        assert manifest["schema_version"] == 55
+        assert manifest["schema_version"] == 56
         assert manifest["database_sha256"] == hashlib.sha256(restored.read_bytes()).hexdigest()
         with closing(sqlite3.connect(restored)) as target:
             for name, in writer.execute("SELECT name FROM sqlite_schema WHERE type = 'table'"):
@@ -112,6 +113,94 @@ def test_project_roundtrip_preserves_owned_rows_and_excludes_other_projects(tmp_
     assert b"interaction_session_ref-project-a" not in restored.read_bytes()
 
 
+@pytest.mark.parametrize("project_id", [None, "project-a"])
+def test_schema55_archives_keep_the_legacy_shape_and_roundtrip(tmp_path, project_id):
+    source = _ledger(tmp_path)
+    retain_schema55(source)
+    archive, restored = tmp_path / "legacy.zip", tmp_path / "restored.sqlite3"
+    manifest = ledger_archive.create_archive(source, archive, project_id=project_id)
+    assert manifest["schema_version"] == 55
+    assert ledger_archive.read_archive(archive, restored) == manifest
+    with closing(sqlite3.connect(restored)) as target:
+        assert target.execute("SELECT MAX(version) FROM schema_migrations").fetchone() == (55,)
+        assert not target.execute("SELECT 1 FROM sqlite_schema WHERE name LIKE 'project_import_%'").fetchone()
+        assert target.execute("SELECT count(*) FROM projects").fetchone() == (1 if project_id else 2,)
+
+
+def test_backup_refuses_import_alias_that_resolves_to_another_project(tmp_path):
+    source = _ledger(tmp_path, rich=True)
+    with closing(sqlite3.connect(source)) as connection, connection:
+        connection.execute("UPDATE project_import_identities SET local_id = 2 WHERE project_id = 'project-a'")
+    with pytest.raises(ledger_archive.ArchiveError) as error:
+        ledger_archive.create_archive(source, tmp_path / "invalid.zip")
+    assert error.value.code == "archive_scope_invalid"
+
+
+def test_backup_refuses_two_original_ids_for_one_local_id_in_the_same_origin(tmp_path):
+    source = _ledger(tmp_path, rich=True)
+    with closing(sqlite3.connect(source)) as connection, connection:
+        connection.execute(
+            "INSERT INTO project_import_identities VALUES (?, ?, ?, ?, ?)",
+            ("project-a", "1" * 64, "requirement_events", 1002, 1),
+        )
+    with pytest.raises(ledger_archive.ArchiveError) as error:
+        ledger_archive.create_archive(source, tmp_path / "ambiguous.zip")
+    assert error.value.code == "archive_scope_invalid"
+
+
+@pytest.mark.parametrize("conflict", ["cross-origin", "local-shadow"])
+def test_backup_refuses_ambiguous_imported_identity(tmp_path, conflict):
+    source = _ledger(tmp_path, rich=True)
+    with closing(sqlite3.connect(source)) as connection, connection:
+        connection.execute(
+            """INSERT INTO requirement_events
+               (project_id, requirement_id, event_type, actor, request_id, payload_json, occurred_at)
+               SELECT project_id, requirement_id, event_type, actor, '', payload_json, occurred_at
+               FROM requirement_events WHERE project_id = 'project-a' LIMIT 1"""
+        )
+        source_id, local_id = connection.execute(
+            "SELECT source_id, local_id FROM project_import_identities WHERE project_id = 'project-a'"
+        ).fetchone()
+        other, = connection.execute(
+            "SELECT event_id FROM requirement_events WHERE project_id = 'project-a' AND event_id <> ?",
+            (local_id,),
+        ).fetchone()
+        digest = "3" * 64
+        connection.execute(
+            "INSERT INTO project_import_origins VALUES (?, ?, ?, ?)",
+            ("project-a", digest, "old-project", "2026-11-11T00:00:00Z"),
+        )
+        pair = (source_id, other) if conflict == "cross-origin" else (other, local_id)
+        connection.execute(
+            "INSERT INTO project_import_identities VALUES (?, ?, ?, ?, ?)",
+            ("project-a", digest, "requirement_events", *pair),
+        )
+    with pytest.raises(ledger_archive.ArchiveError) as error:
+        ledger_archive.create_archive(source, tmp_path / "ambiguous.zip")
+    assert error.value.code == "archive_scope_invalid"
+
+
+def test_reexport_resolves_original_row_keys_from_the_pre_rename_project(tmp_path):
+    source = _ledger(tmp_path, rich=True)
+    with closing(sqlite3.connect(source)) as connection, connection:
+        request_id, result = connection.execute(
+            "SELECT request_id, result_json FROM external_work_requests WHERE project_id = 'project-a'"
+        ).fetchone()
+        connection.execute(
+            "UPDATE project_import_origins SET source_project_id = 'previous-id' WHERE project_id = 'project-a'"
+        )
+        key = json.dumps(["previous-id", request_id])
+        connection.execute("INSERT INTO project_import_originals VALUES (?, ?, ?, ?, ?, ?)",
+                           ("project-a", "1" * 64, "external_work_requests", key, "result_json", result))
+    archive, restored = tmp_path / "reexport.zip", tmp_path / "restored.sqlite3"
+    manifest = ledger_archive.create_archive(source, archive, project_id="project-a")
+    assert ledger_archive.read_archive(archive, restored) == manifest
+    with closing(sqlite3.connect(restored)) as connection:
+        assert connection.execute(
+            "SELECT original_value FROM project_import_originals WHERE row_key = ?", (key,)
+        ).fetchone() == (result,)
+
+
 @pytest.mark.parametrize("change", ["phase", "evidence"])
 def test_project_export_refuses_references_outside_selected_project(tmp_path, change):
     source = _ledger(tmp_path, rich=True)
@@ -141,7 +230,7 @@ def test_create_refuses_missing_project_and_never_overwrites(tmp_path):
     assert error.value.code == "archive_project_not_found"
 
 
-@pytest.mark.parametrize("tamper", ["digest", "kind", "extra_entry", "zip_tail", "noncanonical_sql", "project_scope"])
+@pytest.mark.parametrize("tamper", ["digest", "kind", "extra_entry", "zip_tail", "noncanonical_sql", "project_scope", "manifest_schema"])
 def test_read_refuses_tampered_or_inconsistent_archives(tmp_path, tamper):
     source = _ledger(tmp_path)
     archive = tmp_path / "full.zip"
@@ -163,6 +252,8 @@ def test_read_refuses_tampered_or_inconsistent_archives(tmp_path, tamper):
         with closing(sqlite3.connect(source)) as connection, connection:
             connection.execute("CREATE INDEX unexpected_expression ON projects (lower(name))")
         _repack_image(archive, manifest, source)
+    elif tamper == "manifest_schema":
+        _repack(archive, dict(manifest, schema_version=55), payload)
     else:
         _repack(archive, dict(manifest, kind="project", project_id="project-a"), payload)
     with pytest.raises(ledger_archive.ArchiveError):

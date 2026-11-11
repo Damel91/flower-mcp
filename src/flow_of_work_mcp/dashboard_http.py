@@ -18,6 +18,7 @@ from pathlib import Path
 from threading import Lock
 
 from starlette.applications import Starlette
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
@@ -32,10 +33,12 @@ from flow_of_work_mcp.core.errors import ProjectNotFoundError, RequirementConfli
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.dashboard_auth import DashboardAuth, DashboardAuthError
 from flow_of_work_mcp.dashboard_network import DashboardNetworkError, DashboardNetworkSettings
+from flow_of_work_mcp.installation_identity import installed_distribution_identity
 from flow_of_work_mcp.profile_settings import DashboardSettings, SettingsError
 from flow_of_work_mcp.ledger_archive import (
-    ArchiveError, MAX_ARCHIVE_BYTES, assert_private_archive_directory, create_archive,
+    ArchiveError, MAX_ARCHIVE_BYTES, assert_private_archive_directory, create_archive, read_archive,
 )
+from flow_of_work_mcp.ledger_project_import import import_project_image
 from flow_of_work_mcp.ledger_recovery import inspect_or_restore
 from flow_of_work_mcp.dashboard_backups import DashboardBackups
 from flow_of_work_mcp.managed_service import ServiceError
@@ -180,7 +183,7 @@ class _ArchiveResponse(Response):
 class DashboardHTTP:
     def __init__(self, runtime, config_path: Path, *, port: int, host: str = '127.0.0.1',
                  loaded_config_revision: str | None = None, network_active: dict | None = None,
-                 network_urls=None):
+                 network_urls=None, manual_shutdown=None):
         from flow_of_work_mcp.managed_upgrade import UpgradeController
         self.projection = DashboardProjectionService(runtime)
         self.requirements = runtime.requirements
@@ -197,7 +200,14 @@ class DashboardHTTP:
         self.database_path = runtime.ledger.database_path
         self.backups = DashboardBackups(self.database_path)
         self._archive_gate = Lock()
-        self.upgrade = UpgradeController(self.maintenance.config_path, self.host, self.port, self.auth.instance_id)
+        self._distribution = installed_distribution_identity()
+        self._manual_upgrade = manual_shutdown is not None
+        if self._manual_upgrade:
+            from flow_of_work_mcp.manual_dashboard_upgrade import ManualUpgradeController
+            self.upgrade = ManualUpgradeController(self.maintenance.config_path, self.database_path,
+                                                   self.maintenance, manual_shutdown)
+        else:
+            self.upgrade = UpgradeController(self.maintenance.config_path, self.host, self.port, self.auth.instance_id)
 
     def local_url(self, host: str) -> str:
         local = '[::1]' if ':' in host else '127.0.0.1'
@@ -479,7 +489,21 @@ class DashboardHTTP:
             raise
         return {'profile_name': profile_name, 'kind': manifest['kind'], 'project_id': manifest['project_id']}
 
-    async def _receive_restore(self, request, profile_name, cookie, csrf):
+    def _import_archive(self, lifetime, archive, cookie, csrf):
+        self._reauthorize(cookie, csrf)
+        self._assert_runtime_lease()
+        database = archive.with_name('ledger.sqlite3')
+        manifest = read_archive(archive, database)
+        if manifest['kind'] != 'project':
+            raise ArchiveError('archive_project_required', 'Select a single-project export to import.')
+        with self.maintenance.exclusive():
+            self._reauthorize(cookie, csrf)
+            self._assert_runtime_lease()
+            lifetime.assert_open()
+            imported = import_project_image(self.database_path, database, manifest)
+        return {'project_id': imported['project_id']}
+
+    async def _receive_archive(self, request, cookie, csrf, *, profile_name=None):
         types = request.headers.getlist('content-type')
         if len(types) != 1 or types[0].split(';', 1)[0].strip().lower() != 'application/zip':
             raise ArchiveError('archive_restore_media_type', 'Upload a Flower ZIP archive.', 415)
@@ -495,7 +519,8 @@ class DashboardHTTP:
             raise _archive_busy()
         lifetime = _ArchiveLifetime(self._archive_gate)
         try:
-            destination = await run_in_threadpool(self._restore_destination, profile_name)
+            if profile_name is not None:
+                destination = await run_in_threadpool(self._restore_destination, profile_name)
             archive = await run_in_threadpool(lifetime.run, lifetime.open_upload)
             size = 0
             try:
@@ -511,14 +536,16 @@ class DashboardHTTP:
             if not size or (declared_size is not None and declared_size != size):
                 raise ArchiveError('archive_invalid', 'The upload is empty or incomplete.')
             await run_in_threadpool(lifetime.run, lifetime.stream.close)
+            if profile_name is None:
+                return await run_in_threadpool(lifetime.run, self._import_archive, lifetime, archive, cookie, csrf)
             return await run_in_threadpool(lifetime.run, self._restore_archive,
                                             lifetime, archive, destination, profile_name, cookie, csrf)
         except ClientDisconnect as exc:
             raise ArchiveError('archive_restore_interrupted', 'The upload was interrupted.') from exc
         except secure.ServiceSecurityError as exc:
-            raise ArchiveError('archive_workspace_unsafe', 'The server cannot stage or restore the archive safely.', 409) from exc
+            raise ArchiveError('archive_workspace_unsafe', 'The server cannot stage or process the archive safely.', 409) from exc
         except OSError as exc:
-            raise ArchiveError('archive_io_failure', 'The server could not stage the archive or write the new profile.', 500) from exc
+            raise ArchiveError('archive_io_failure', 'The server could not stage the archive or write the database.', 500) from exc
         finally:
             lifetime.close()
 
@@ -564,18 +591,25 @@ class DashboardHTTP:
             upgrade_action = path in (['upgrade', 'preview'], ['upgrade', 'apply'])
             archive_route = path == ['archive']
             restore_route = len(path) == 2 and path[0] == 'restore'
+            import_route = path == ['projects', 'import']
             backups_route = path == ['backups']
             backup_action = (len(path) == 3 and path[0] == 'backups'
                              and path[2] in ('download', 'delete'))
             if not (request.method == 'GET' and read_route
                     or request.method == 'POST' and (admin_route or create_route or settings_route or upgrade_action
-                                                      or archive_route or restore_route or backups_route or backup_action or network_route)):
+                                                      or archive_route or restore_route or import_route or backups_route
+                                                      or backup_action or network_route)):
                 return self._json(status=404, reason='dashboard_route_not_found', message='Unknown dashboard route.')
             csrf = await run_in_threadpool(self.auth.authorize, cookie, submitted_csrf,
                                            write=request.method == 'POST')
             if request.method == 'POST':
                 if restore_route:
-                    result = await self._receive_restore(request, path[1], cookie, submitted_csrf)
+                    result = await self._receive_archive(request, cookie, submitted_csrf, profile_name=path[1])
+                    return self._json(result, status=201)
+                if import_route:
+                    if request.query_params:
+                        raise ValueError('archive_import_query_invalid')
+                    result = await self._receive_archive(request, cookie, submitted_csrf)
                     return self._json(result, status=201)
                 body = await self._body(request)
                 if create_route:
@@ -592,7 +626,12 @@ class DashboardHTTP:
                     return self._json(await run_in_threadpool(self._network_view, cookie, csrf, body))
                 if upgrade_action:
                     result = await run_in_threadpool(self._upgrade_operation, path[1], body, cookie, submitted_csrf)
-                    return self._json(result, status=202 if path[1] == 'apply' else 200)
+                    response = self._json(result, status=202 if path[1] == 'apply' else 200)
+                    if (self._manual_upgrade and path[1] == 'apply'
+                            and result['operation']['phase'] == 'queued'):
+                        response.background = BackgroundTask(self.upgrade.after_response, result['operation']['id'],
+                                                            partial(self._reauthorize, cookie, submitted_csrf))
+                    return response
                 if archive_route:
                     if set(body) != {'project_id'} or (
                         body['project_id'] is not None and not isinstance(body['project_id'], str)
@@ -626,7 +665,8 @@ class DashboardHTTP:
                                                  recheck_session=partial(self._reauthorize, cookie, submitted_csrf))
                 return self._json(result)
             if path == ['status']:
-                return self._json({**self.maintenance.status(), 'csrf_token': csrf})
+                return self._json({**self.maintenance.status(), 'csrf_token': csrf,
+                                   'distribution': self._distribution})
             if path == ['settings']:
                 return self._json(await run_in_threadpool(self.maintenance.read, self.settings.snapshot))
             if network_route:
@@ -697,6 +737,9 @@ class DashboardHTTP:
             if path[0] == 'restore':
                 return self._json(status=500, reason='archive_io_failure',
                     message='The restore outcome could not be confirmed. Inspect the new profile before retrying.')
+            if path == ['projects', 'import']:
+                return self._json(status=500, reason='archive_io_failure',
+                    message='The import outcome could not be confirmed. Check the project list before retrying.')
             if path == ['projects'] and request.method == 'POST':
                 return self._json(status=500, reason='dashboard_operation_failed',
                     message='Project creation could not be confirmed. Inspect the chosen identifier in the catalog before another attempt.')

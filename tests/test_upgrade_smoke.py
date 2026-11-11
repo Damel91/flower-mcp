@@ -57,7 +57,8 @@ class UpgradeSmokeTests(unittest.TestCase):
             connection.executescript(smoke.ADDITIVE_SCHEMA_SQL)
             for table in smoke.ARCHITECTURE_TABLES:
                 connection.execute('ALTER TABLE "' + table + '" ADD COLUMN ' + smoke.ARCHITECTURE_COLUMN)
-            connection.executemany("INSERT INTO schema_migrations VALUES(?,?)", [(53, "new53"), (54, "new54"), (55, "new55")])
+            connection.executemany("INSERT INTO schema_migrations VALUES(?,?)",
+                                   [(version, f"new{version}") for version in range(53, 57)])
         return path, before
 
     def test_exact_additive_migration_preserves_all_original_fields_and_is_read_only(self):
@@ -66,7 +67,7 @@ class UpgradeSmokeTests(unittest.TestCase):
             original_bytes = path.read_bytes()
             result = smoke.require_additive_migration(path, before)
             self.assertEqual(path.read_bytes(), original_bytes)
-            self.assertEqual((result["previous_schema"], result["current_schema"]), (52, 55))
+            self.assertEqual((result["previous_schema"], result["current_schema"]), (52, 56))
             self.assertEqual(set(result["new_tables"]), smoke.NEW_TABLES)
             self.assertFalse(result["invented_authority"])
 
@@ -100,11 +101,13 @@ class UpgradeSmokeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "schema (object|definition)"):
                     smoke.require_additive_migration(path, before)
 
-    def test_migration_rejects_invented_architecture_and_missing_or_rewritten_checkpoints(self):
+    def test_migration_rejects_invented_authority_and_missing_or_rewritten_checkpoints(self):
         mutations = (
             ("UPDATE implementation_packets SET architecture_refs_json='[{\"revision\":1}]'", "historical architecture"),
-            ("INSERT INTO architecture_requests VALUES('alpha','invented','propose','hash','{}','model','now')", "invented architecture or executor"),
+            ("INSERT INTO architecture_requests VALUES('alpha','invented','propose','hash','{}','model','now')", "invented architecture"),
+            ("INSERT INTO project_import_origins VALUES('alpha','invented','sent-project','now')", "invented architecture"),
             ("DELETE FROM schema_migrations WHERE version=55", "Migration versions"),
+            ("DELETE FROM schema_migrations WHERE version=56", "Migration versions"),
             ("UPDATE schema_migrations SET applied_at='rewritten' WHERE version=52", "Historical migration timestamps"),
         )
         for sql, expected in mutations:

@@ -101,6 +101,7 @@ class SQLiteRequirementLedger(
         self.migrate_architecture()
         self.migrate_packet_executor()
         self.migrate_packet_provider_admissions()
+        self._migrate_project_imports()
         self.recover_interrupted_runs()
         self.recover_interrupted_packet_provider_commands()
         self.recover_interrupted_test_provider_commands()

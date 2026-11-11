@@ -19,12 +19,13 @@ import pytest
 
 from flow_of_work_mcp import SQLiteRequirementLedger
 from flow_of_work_mcp.application.external_work import ExternalWorkService
+from flow_of_work_mcp.native_purge_schema import PROJECT_IMPORT_TABLE_HASHES
 
 
 _SCHEMA_PATH = 'src/flow_of_work_mcp/adapters/sqlite/schema.py'
 _NEW_TABLES = ('architecture_revisions', 'architecture_adoptions', 'architecture_requests',
                'packet_executor_selections', 'packet_provider_capabilities', 'packet_executor_requests',
-               'packet_provider_admissions')
+               'packet_provider_admissions', *PROJECT_IMPORT_TABLE_HASHES)
 
 
 def _tables(path):
@@ -126,7 +127,7 @@ def test_actual_schema52_upgrade_preserves_records_clocks_legacy_authority_and_r
     assert todo['authority_fingerprint'] == metadata['authority_fingerprint']
     assert todo['current_unit'] is None
     with closing(sqlite3.connect(target)) as connection:
-        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 55
+        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 56
         assert connection.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
         for table in _NEW_TABLES:
@@ -138,7 +139,7 @@ def test_actual_schema52_upgrade_preserves_records_clocks_legacy_authority_and_r
     assert _tables(target) == after_schema and _rows(target, after_schema) == after_rows
 
 
-def test_recorded_schema54_gains_only_empty_admissions_and_preserves_authority(tmp_path, old_ledger):
+def test_recorded_schema54_gains_empty_new_tables_and_preserves_authority(tmp_path, old_ledger):
     original, metadata, _, _ = old_ledger
     target = tmp_path / 'recorded54.sqlite'
     shutil.copyfile(original, target)
@@ -147,6 +148,9 @@ def test_recorded_schema54_gains_only_empty_admissions_and_preserves_authority(t
         def migrate_packet_provider_admissions(self):
             # Execute the unchanged53/54 migrations and stop before the new55
             # checkpoint, reproducing the already-recorded integration prototype.
+            pass
+
+        def _migrate_project_imports(self):
             pass
 
     previous = Recorded54Ledger(target)
@@ -161,20 +165,20 @@ def test_recorded_schema54_gains_only_empty_admissions_and_preserves_authority(t
     assert upgraded.ledger_version('alpha') == metadata['requirement_clock']
     assert ExternalWorkService(upgraded).todo(*metadata['ids'])['authority_fingerprint'] == metadata['authority_fingerprint']
     with closing(sqlite3.connect(target)) as connection:
-        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 55
+        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 56
         assert connection.execute('SELECT COUNT(*) FROM packet_provider_admissions').fetchone()[0] == 0
         assert connection.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
         assert connection.execute('PRAGMA foreign_key_check').fetchall() == []
 
 
-@pytest.mark.parametrize('failed_version', [53, 54, 55])
+@pytest.mark.parametrize('failed_version', [53, 54, 55, 56])
 def test_new_migration_failure_rolls_back_its_ddl_and_resumes_safely(tmp_path, old_ledger, failed_version):
     original, metadata, schema, before = old_ledger
     target = tmp_path / f'rollback-{failed_version}.sqlite'
     shutil.copyfile(original, target)
     class FailingConnection(sqlite3.Connection):
         def execute(self, sql, parameters=(), /):
-            if 'INSERT OR IGNORE INTO schema_migrations' in sql and f'VALUES({failed_version},' in sql:
+            if 'INTO schema_migrations' in sql and f'VALUES({failed_version},' in sql:
                 raise RuntimeError('injected migration checkpoint failure')
             return super().execute(sql, parameters)
     class FailingLedger(SQLiteRequirementLedger):
@@ -188,8 +192,9 @@ def test_new_migration_failure_rolls_back_its_ddl_and_resumes_safely(tmp_path, o
         FailingLedger(target)
     assert _rows(target, schema) == before
     remaining = _tables(target)
-    rolled_back_tables = _NEW_TABLES[:3] if failed_version == 53 else (
-        _NEW_TABLES[3:6] if failed_version == 54 else _NEW_TABLES[6:])
+    rolled_back_tables = {
+        53: _NEW_TABLES[:3], 54: _NEW_TABLES[3:6], 55: _NEW_TABLES[6:7], 56: _NEW_TABLES[7:],
+    }[failed_version]
     assert not any(table in remaining for table in rolled_back_tables)
     with closing(sqlite3.connect(target)) as connection:
         assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == failed_version - 1

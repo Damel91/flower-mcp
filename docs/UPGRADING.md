@@ -1,5 +1,21 @@
 # Upgrade Flower without losing project data
 
+## Preparing a 1.1.0 upgrade
+
+Choose the [1.1.0 release assets](https://github.com/Damel91/flower-mcp/releases/tag/v1.1.0)
+and verify the installer against that release's `SHA256SUMS`. For an existing
+official installation, stop Flower and preview with `--upgrade --dry-run`.
+Use the same environment and profile, then apply without the dry-run option.
+The installer backs up the database and profile YAML before pip. On first
+start, Flower adds the project import metadata and advances schema 55 to 56.
+Retain the backup. Resolve any unfinished native deletion before restarting
+on the new version.
+
+Once running a version that offers the dashboard update, use **Impostazioni →
+Aggiornamento Flower** to review and start later updates on a supported
+official macOS installation. After updating a manually started instance,
+open it again with your usual launcher. [Release notes](RELEASE-NOTES-1.1.0.md)
+
 <a id="preparing-a-100-upgrade"></a>
 
 ## Preparing a 1.0.0 upgrade

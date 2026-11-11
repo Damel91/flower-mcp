@@ -25,7 +25,9 @@ import yaml
 
 from flow_of_work_mcp.config import load_config
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
-from flow_of_work_mcp.native_purge_schema import SCHEMA55_TABLE_HASHES
+from flow_of_work_mcp.native_purge_schema import (
+    PROJECT_IMPORT_TABLE_HASHES, SUPPORTED_LEDGER_TABLE_HASHES,
+)
 from flow_of_work_mcp.profiles import profile_config_path
 from flow_of_work_mcp.runtime_ownership import (
     RuntimeOwnership, RuntimeOwnershipError, acquire_runtime_ownership,
@@ -152,15 +154,17 @@ def _shape(connection: sqlite3.Connection, name: str) -> tuple[list, list, list]
 def _validate_schema(connection: sqlite3.Connection) -> dict[str, tuple[str, ...]]:
     objects = list(connection.execute("SELECT type, name, sql FROM sqlite_master WHERE type IN ('table','view','trigger')"))
     names = {row[1] for row in objects if row[1] != "sqlite_sequence"}
-    if names != set(SCHEMA55_TABLE_HASHES) or any(row[0] != "table" or "VIRTUAL TABLE" in str(row[2]).upper() for row in objects):
-        raise _Problem("purge_schema_unsupported", "The ledger has unexpected or missing tables, views, triggers or virtual schema.", "Use a supported exact schema55 ledger; do not remove unknown schema to force deletion.", status="blocked")
-    if connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] != 55:
-        raise _Problem("purge_schema_unsupported", "Native deletion supports schema55 only.", "Keep this ledger intact and obtain a separately qualified native gateway for its schema.", status="blocked")
+    if "schema_migrations" not in names or any(row[0] != "table" or "VIRTUAL TABLE" in str(row[2]).upper() for row in objects):
+        raise _Problem("purge_schema_unsupported", "The ledger has unexpected or missing tables, views, triggers or virtual schema.", "Use an exact supported ledger schema; do not remove unknown schema to force deletion.", status="blocked")
+    version = connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+    table_hashes = SUPPORTED_LEDGER_TABLE_HASHES.get(version)
+    if table_hashes is None or names != set(table_hashes):
+        raise _Problem("purge_schema_unsupported", "The ledger tables do not match its supported schema version.", "Keep this ledger intact and obtain a separately qualified native gateway for its schema.", status="blocked")
     columns = {}
-    for name, expected in SCHEMA55_TABLE_HASHES.items():
+    for name, expected in table_hashes.items():
         shape = _shape(connection, name)
         if _digest(shape) != expected:
-            raise _Problem("purge_schema_unsupported", "A schema55 table has an unsupported structure.", "Inspect schema drift and use the native gateway matching the ledger's actual structure.", status="blocked")
+            raise _Problem("purge_schema_unsupported", "A ledger table has an unsupported structure.", "Inspect schema drift and use the native gateway matching the ledger's actual structure.", status="blocked")
         columns[name] = tuple(row[0] for row in shape[0])
     if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
         raise _Problem("purge_foreign_key_corruption", "The ledger has foreign-key corruption.", "Reconcile ledger integrity before destructive native management.", status="blocked")
@@ -182,13 +186,27 @@ def _sql_value(value: object) -> object:
     return [type(value).__name__, value]
 
 
-def _inventory(connection: sqlite3.Connection, columns: dict, project_id: str) -> dict[str, Any]:
+def _inventory(
+    connection: sqlite3.Connection, columns: dict, project_id: str, *, journal_version: int | None = None,
+) -> dict[str, Any]:
     digest = hashlib.sha256()
     counts = {}
+    version = 56 if "project_import_origins" in columns else 55
+    if journal_version is not None and journal_version > version:
+        raise _Problem("purge_schema_unsupported", "The ledger predates the deletion journal's schema.",
+                       "Recover with a compatible native gateway and the original ledger.", status="blocked")
     for name in sorted(set(columns) - {"schema_migrations"}):
         names = columns[name]
-        digest.update(_encoded([name, names]))
         where, parameters = _scope(name, project_id)
+        if journal_version == 55 and name in PROJECT_IMPORT_TABLE_HASHES:
+            # Schema56 only adds these tables. An old fingerprint is usable
+            # precisely when the target has no ownership in the new tables.
+            if connection.execute(f"SELECT 1 FROM {name} WHERE {where} LIMIT 1", parameters).fetchone():
+                raise _Problem("purge_preparation_stale", "Import records changed the original prepared scope.",
+                               "Inspect the target and create a new explicit preparation ID.")
+            counts[name] = 0
+            continue
+        digest.update(_encoded([name, names]))
         ordering = tuple(row[1] for row in sorted(connection.execute(f"PRAGMA table_xinfo({name})"), key=lambda row: row[5]) if row[5])
         order = ",".join(ordering or names)
         count = 0
@@ -200,6 +218,7 @@ def _inventory(connection: sqlite3.Connection, columns: dict, project_id: str) -
         counts[name] = count
     project = connection.execute("SELECT project_id, created_at, created_by FROM projects WHERE project_id = ?", (project_id,)).fetchone()
     return {"fingerprint": digest.hexdigest(), "counts": counts, "project_present": project is not None,
+            "schema_version": version,
             "project_identity": _digest(list(project)) if project is not None else ""}
 
 
@@ -457,9 +476,11 @@ def _decode_journal(content: bytes) -> dict:
         config_hash = journal["config_identity"]["sha256"]
         if not isinstance(config_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", config_hash):
             raise ValueError()
-        if journal["schema_version"] != 55 or journal["schema_fingerprint"] != _digest(SCHEMA55_TABLE_HASHES) or not re.fullmatch(r"[0-9a-f]{64}", journal["prepared_fingerprint"]) or not re.fullmatch(r"[0-9a-f]{64}", journal["project_identity"]):
+        version = journal["schema_version"]
+        table_hashes = SUPPORTED_LEDGER_TABLE_HASHES.get(version) if type(version) is int else None
+        if table_hashes is None or journal["schema_fingerprint"] != _digest(table_hashes) or not re.fullmatch(r"[0-9a-f]{64}", journal["prepared_fingerprint"]) or not re.fullmatch(r"[0-9a-f]{64}", journal["project_identity"]):
             raise ValueError()
-        if not isinstance(journal["counts"], dict) or set(journal["counts"]) != set(SCHEMA55_TABLE_HASHES) - {"schema_migrations"} or any(type(value) is not int or value < 0 for value in journal["counts"].values()):
+        if not isinstance(journal["counts"], dict) or set(journal["counts"]) != set(table_hashes) - {"schema_migrations"} or any(type(value) is not int or value < 0 for value in journal["counts"].values()):
             raise ValueError()
         if journal["provenance"] not in {"", "host_declared"} or not isinstance(journal["host_quiescence_ref"], str) or len(journal["host_quiescence_ref"]) > 256 or not isinstance(journal["host_stopped_run_ids"], list) or len(journal["host_stopped_run_ids"]) > 64:
             raise ValueError()
@@ -573,7 +594,7 @@ class _Gateway:
         if self.journal is None:
             return
         stage = self.journal["stage"]
-        self.result.update(deletion_state=stage, schema_version=55,
+        self.result.update(deletion_state=stage, schema_version=self.journal["schema_version"],
             prepared_fingerprint=self.journal["prepared_fingerprint"],
             fingerprint=self.journal["prepared_fingerprint"],
             project_effect_state="applied" if stage in {"ledger_deleted", "scrubbed"} else "unknown" if stage == "deleting" else "none")
@@ -614,7 +635,7 @@ class _Gateway:
         self._write_journal({**self.journal, "stage": stage, "updated_at": _now(), **extra})
 
     def _observe(self, inventory: dict) -> None:
-        self.result.update(project_present=inventory["project_present"], schema_version=55,
+        self.result.update(project_present=inventory["project_present"], schema_version=inventory["schema_version"],
             current_fingerprint=inventory["fingerprint"], counts=inventory["counts"])
         if self.journal is None:
             self.result.update(fingerprint=inventory["fingerprint"], deletion_state="unprepared" if inventory["project_present"] else "absent")
@@ -643,7 +664,7 @@ class _Gateway:
 
     def _verify_absence(self, connection: sqlite3.Connection, columns: dict, *, observe: bool = True) -> dict:
         self._assert_identity()
-        inventory = _inventory(connection, columns, self.args.project_id)
+        inventory = self._inventory(connection, columns)
         if observe:
             self._observe(inventory)
         if inventory["project_present"] or any(inventory["counts"].values()):
@@ -651,6 +672,12 @@ class _Gateway:
         if connection.execute("PRAGMA foreign_key_check").fetchone() is not None or [row[0] for row in connection.execute("PRAGMA integrity_check")] != ["ok"]:
             raise _Problem("purge_integrity_failed", "Post-deletion integrity could not be established.", "Preserve the minimal journal and inspect ledger integrity before claiming completion.", status="blocked")
         return inventory
+
+    def _inventory(self, connection: sqlite3.Connection, columns: dict) -> dict:
+        return _inventory(
+            connection, columns, self.args.project_id,
+            journal_version=self.journal["schema_version"] if self.journal is not None else None,
+        )
 
     def _compact(self, connection: sqlite3.Connection) -> None:
         self._checkpoint_wal(connection)
@@ -707,7 +734,7 @@ class _Gateway:
         try:
             self._assert_identity()
             _validate_schema(connection)
-            fresh = _inventory(connection, columns, self.args.project_id)
+            fresh = self._inventory(connection, columns)
             self._validate_target(fresh)
             if not fresh["project_present"]:
                 raise _Problem("purge_target_changed", "The target changed during native preflight.", "Inspect the current ledger and original intent; no deletion was performed.", status="blocked")
@@ -791,7 +818,7 @@ class _Gateway:
                 connection.execute("BEGIN")
                 try:
                     columns = _validate_schema(connection)
-                    inventory = _inventory(connection, columns, self.args.project_id)
+                    inventory = self._inventory(connection, columns)
                     self._observe(inventory)
                     if not inventory["project_present"] and any(inventory["counts"].values()):
                         if self.journal is None:
@@ -806,8 +833,8 @@ class _Gateway:
                     _fsync_directory(self.database.parent)
                     self._write_journal({"contract": CONTRACT, "deletion_id": self.args.deletion_id,
                         "project_id": self.args.project_id, "database_identity": self.database_identity,
-                        "config_identity": self.config_identity, "schema_version": 55,
-                        "schema_fingerprint": _digest(SCHEMA55_TABLE_HASHES),
+                        "config_identity": self.config_identity, "schema_version": inventory["schema_version"],
+                        "schema_fingerprint": _digest(SUPPORTED_LEDGER_TABLE_HASHES[inventory["schema_version"]]),
                         "prepared_fingerprint": inventory["fingerprint"], "project_identity": inventory["project_identity"],
                         "counts": inventory["counts"], "stage": "prepared", "created_at": _now(), "updated_at": _now(),
                         "host_quiescence_ref": "", "host_stopped_run_ids": [], "provenance": ""})
@@ -947,3 +974,28 @@ def pending_project_purges(config_path: Path, ownership: RuntimeOwnership) -> li
             pending.append({"project_id": args.project_id, "deletion_id": path.stem,
                             "deletion_state": gateway.journal["stage"]})
     return pending
+
+
+def require_project_import_migration_ready(config_path: Path, database: Path, ownership: RuntimeOwnership) -> None:
+    """Keep an unfinished schema55 deletion on its original inventory."""
+    ownership.assert_resource(database)
+    directory = database.with_name(database.name + ".project-purge")
+    if not directory.exists() and not directory.is_symlink():
+        return
+    try:
+        with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=1)) as connection:
+            connection.execute("PRAGMA trusted_schema = OFF")
+            version = connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+        if version != 55:
+            return
+        pending = pending_project_purges(config_path, ownership)
+    except (OSError, sqlite3.DatabaseError, ValueError, _Problem) as exc:
+        raise RuntimeOwnershipError(
+            "ledger_migration_purge_unverified",
+            "Verify the original native deletion journal before starting the ledger migration.",
+        ) from exc
+    if pending:
+        raise RuntimeOwnershipError(
+            "ledger_migration_purge_pending",
+            "Resolve the unfinished native project deletion on schema55 before starting Flower.",
+        )

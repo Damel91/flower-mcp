@@ -3,7 +3,7 @@
 set -euo pipefail
 
 FLOWER_REPOSITORY="https://github.com/Damel91/flower-mcp"
-FLOWER_VERSION="1.0.0"
+FLOWER_VERSION="1.1.0"
 UV_VERSION="0.12.21"
 selection=""
 has_client_config=0

@@ -142,7 +142,7 @@ def test_legacy_and_review_audits_restart_without_new_tables_or_clock_staleness(
     audit = reopened.all_phase_audits(ids[0])[-1]
     assert audit["repository_review"] == normalize_repository_review(value)
     with sqlite3.connect(runtime.ledger.database_path) as connection:
-        assert max(row[0] for row in connection.execute("SELECT version FROM schema_migrations")) == 55
+        assert max(row[0] for row in connection.execute("SELECT version FROM schema_migrations")) == 56
         payload = json.loads(connection.execute("SELECT payload_json FROM requirement_events WHERE event_type='phase_audit_recorded' ORDER BY event_id DESC LIMIT 1").fetchone()[0])
         assert payload["repository_review"] == normalize_repository_review(value)
 

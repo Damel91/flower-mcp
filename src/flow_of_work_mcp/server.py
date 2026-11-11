@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import signal
 import sys
 import threading
@@ -6550,6 +6551,9 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
         dashboard = None
         if args.transport == "streamable-http":
             from flow_of_work_mcp.dashboard_http import DashboardHTTP
+            def stop_manual_dashboard() -> None:
+                os.kill(os.getpid(), signal.SIGTERM)
+
             mode = "local"
             if https_options is not None:
                 mode = "lan" if https_options["bind"] == "0.0.0.0" else "explicit"
@@ -6557,7 +6561,8 @@ def main(argv: list[str] | None = None, *, dashboard_created=None, managed_resta
                               "cli_override": cli_dashboard_override}
             dashboard = DashboardHTTP(runtime, Path(config_path).absolute(), port=args.port, host=args.host,
                                       loaded_config_revision=loaded_config_revision, network_active=network_active,
-                                      network_urls=(lambda: dashboard_https_urls(dashboard_tls)) if dashboard_tls else None)
+                                      network_urls=(lambda: dashboard_https_urls(dashboard_tls)) if dashboard_tls else None,
+                                      manual_shutdown=stop_manual_dashboard if dashboard_created is None else None)
         app = create_app(runtime, host=args.host, port=args.port, dashboard=dashboard)
         if dashboard_tls is not None:
             https_listener = DashboardHTTPSListener(dashboard.remote_dashboard_app(dashboard_tls), dashboard_tls)

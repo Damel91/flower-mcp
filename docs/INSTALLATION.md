@@ -1,17 +1,16 @@
 # Install Flower MCP
 
 The [latest published release](https://github.com/Damel91/flower-mcp/releases/latest)
-lists the version currently available. The version-specific examples below use
-Flower **1.0.0**. Use those commands once its assets are listed on the
-[1.0.0 release page](https://github.com/Damel91/flower-mcp/releases/tag/v1.0.0).
-The [release notes](RELEASE-NOTES-1.0.0.md) and [engineering cycle](ENGINEERING-CYCLE.md)
+lists the version currently available. For Flower **1.1.0**, select the assets on the
+[1.1.0 release page](https://github.com/Damel91/flower-mcp/releases/tag/v1.1.0).
+The [release notes](RELEASE-NOTES-1.1.0.md) and [engineering cycle](ENGINEERING-CYCLE.md)
 describe its workflow.
 
 Verify downloaded assets against the selected release's `SHA256SUMS`.
-Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-100-upgrade),
+Existing installations follow the [SQLite-preserving upgrade](UPGRADING.md#preparing-a-110-upgrade),
 using the same environment, profile, database and client configuration.
-The ledger stays at schema 55. Installing the package and reconnecting a client
-are separate steps.
+The first 1.1.0 start advances schema 55 to 56. Examples explicitly pinned to
+1.0.0 still select that earlier release.
 
 For the local dashboard, start Flower in streamable HTTP mode and sign in with
 the local account that owns the selected profile. The [dashboard guide](DASHBOARD.md)

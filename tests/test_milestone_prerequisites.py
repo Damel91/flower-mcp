@@ -54,7 +54,7 @@ def test_first_empty_and_successor_previous_owners_do_not_infer_acceptance(tmp_p
     with sqlite3.connect(ledger.database_path) as connection:
         assert json.loads(connection.execute('SELECT dependency_closure_ids_json FROM milestones WHERE milestone_id=?',
             (successor['milestone_id'],)).fetchone()[0]) == [second, first]
-        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 55
+        assert connection.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0] == 56
 
 
 @pytest.mark.parametrize('patch,code', [

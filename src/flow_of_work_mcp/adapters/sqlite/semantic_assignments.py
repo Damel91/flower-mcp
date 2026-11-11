@@ -20,6 +20,25 @@ def _fingerprint(value: object) -> str:
     return hashlib.sha256(_encoded(value).encode("utf-8")).hexdigest()
 
 
+def _imported_preparation_matches(connection: sqlite3.Connection, row: sqlite3.Row, fingerprint: str) -> bool:
+    basis = {"role": row["role"], "execution_mode": row["execution_mode"]}
+    if _fingerprint({**basis, "preparation": json.loads(row["preparation_json"])}) != fingerprint:
+        return False
+    originals = connection.execute(
+        """SELECT cell.original_value FROM project_import_originals AS cell
+           JOIN project_import_origins AS origin
+             ON origin.project_id = cell.project_id AND origin.origin_digest = cell.origin_digest
+           WHERE cell.project_id = ? AND cell.table_name = 'semantic_assignments'
+             AND cell.column_name = 'preparation_json'
+             AND cell.row_key = json_array(origin.source_project_id, ?)""",
+        (row["project_id"], row["assignment_id"]),
+    )
+    return any(
+        _fingerprint({**basis, "preparation": json.loads(original[0])}) == row["preparation_fingerprint"]
+        for original in originals
+    )
+
+
 class SemanticAssignmentStoreMixin:
     def ensure_semantic_project(self, project_id: str) -> None:
         with self._read_connection() as connection:
@@ -102,7 +121,9 @@ class SemanticAssignmentStoreMixin:
                     (project_id, request_id),
                 ).fetchone()
                 if row is not None:
-                    if row["preparation_fingerprint"] != fingerprint:
+                    if row["preparation_fingerprint"] != fingerprint and not _imported_preparation_matches(
+                        connection, row, fingerprint,
+                    ):
                         raise RequirementConflictError("semantic prepare request_id conflicts with durable input")
                     return self._semantic_view(connection, row)
             assignment_id = f"SEM-{uuid4().hex}"

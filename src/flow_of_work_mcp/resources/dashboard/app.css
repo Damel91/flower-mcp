@@ -115,6 +115,7 @@ p { max-width: 72ch; }
 .section-navigation button[aria-current="page"]::before { content: ""; position: absolute; left: 10px; top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--accent); }
 .sidebar-note { margin: auto 12px 0; padding-top: 56px; font-size: 13px; color: var(--muted); }
 .sidebar-note p { margin-bottom: 10px; }
+.sidebar-version { margin: 12px 12px 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .note-line { display: block; height: 3px; width: 28px; background: var(--accent); margin-bottom: 15px; border-radius: 2px; }
 .main-content { max-width: 1510px; width: 100%; padding: 43px clamp(24px, 4vw, 64px) 40px; }
 .main-content:focus { outline: none; }
@@ -353,6 +354,7 @@ input::placeholder { color: var(--subtle); }
   .section-navigation button { white-space: nowrap; padding: 8px 11px; font-size: 12px; }
   .section-navigation button[aria-current="page"]::before { display: none; }
   .sidebar-note { display: none; }
+  .sidebar-version { margin: 8px 5px 0; }
   .main-content { padding: 28px 19px; }
   .page-heading { gap: 18px; align-items: flex-start; flex-wrap: wrap; }
   .page-heading p { font-size: 14px; }

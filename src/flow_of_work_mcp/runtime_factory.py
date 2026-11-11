@@ -32,6 +32,7 @@ from flow_of_work_mcp.config import (
 from flow_of_work_mcp.core.domain import ImplementationProviderKind
 from flow_of_work_mcp.core.ports import ModelGateway
 from flow_of_work_mcp.mcp_runtime import McpRuntime, RuntimeCompositionCleanupError, build_runtime
+from flow_of_work_mcp.native_project_purge import require_project_import_migration_ready
 from flow_of_work_mcp.runtime_ownership import RuntimeOwnership, acquire_runtime_ownership
 
 
@@ -215,6 +216,7 @@ def build_runtime_from_config(
             lease.close()
         raise
     try:
+        require_project_import_migration_ready(config.source_path, config.runtime.database_path, lease)
         return _compose_runtime_from_config(config, ownership=lease)
     except RuntimeCompositionCleanupError:
         raise

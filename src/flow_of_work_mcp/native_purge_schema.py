@@ -1,4 +1,4 @@
-"""Audited structural schema55 hashes for the native project purge gateway.
+"""Audited structural ledger hashes for native project management.
 
 Hashes cover sorted column identities/types/defaults/keys, grouped foreign keys
 and unique-index structure. They do not depend on DDL formatting, physical column
@@ -137,3 +137,12 @@ SCHEMA55_TABLE_HASHES = {
     'verification_campaigns': '83646b4c41d3731765071213a693b65ec895018fcfac0fe80ae83c6f74e13067',
     'verification_evidence': 'b2e8aa95e3c509b29970eca542358b90e36f95d3ad75475f136f9b61a002372a',
 }
+
+PROJECT_IMPORT_TABLE_HASHES = {
+    "project_import_origins": "6d079c485890c70b6910fade12bec631a32a50f45f41b5af2a73b9a08f1e9d59",
+    "project_import_identities": "a56ff6a8449320d9f400c6103a1fb70d42485b3e2b7920431b324c1eb0610fbb",
+    "project_import_originals": "6de3db1b7eb4e3f029111f417ca392972d6810e8d815bdb131f7d51c54a60e6d",
+}
+
+SCHEMA56_TABLE_HASHES = {**SCHEMA55_TABLE_HASHES, **PROJECT_IMPORT_TABLE_HASHES}
+SUPPORTED_LEDGER_TABLE_HASHES = {55: SCHEMA55_TABLE_HASHES, 56: SCHEMA56_TABLE_HASHES}

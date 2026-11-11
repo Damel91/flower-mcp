@@ -104,6 +104,29 @@ class DashboardMaintenance:
                 self._state = 'ready'
             raise MaintenanceUnavailable('maintenance_jobs_busy')
 
+    @contextmanager
+    def exclusive(self, *, authorize: Callable[[], None] | None = None, until_shutdown: bool = False):
+        """Drain admitted requests and pause idle workers for an owner operation."""
+        if not self._administration.acquire(blocking=False):
+            raise MaintenanceUnavailable('server_maintenance')
+        try:
+            if self._state != 'ready':
+                raise MaintenanceUnavailable('maintenance_native_recovery_required')
+            if authorize is not None:
+                authorize()
+            self._begin()
+            completed = False
+            try:
+                yield
+                completed = True
+            finally:
+                if not (completed and until_shutdown):
+                    self.runtime.jobs.resume()
+                    with self._condition:
+                        self._state = 'ready'
+        finally:
+            self._administration.release()
+
     def operate(self, project_id: str, operation: str, body: dict, *,
                 authorize_delete: Callable[[], None] | None = None,
                 recheck_session: Callable[[], None] | None = None) -> dict:
@@ -114,23 +137,10 @@ class DashboardMaintenance:
             raise ValueError('dashboard_deletion_fields_invalid')
         if authorize_delete is None:
             raise ValueError('dashboard_delete_authorization_required')
-        if not self._administration.acquire(blocking=False):
-            raise MaintenanceUnavailable('server_maintenance')
-        try:
-            if self._state != 'ready':
-                raise MaintenanceUnavailable('maintenance_native_recovery_required')
-            authorize_delete()
-            self._begin()
-            try:
-                if recheck_session is not None:
-                    recheck_session()
-                result, _ = run_dashboard_project_purge(
-                    self.config_path, project_id, ownership=self.runtime.runtime_ownership,
-                )
-            finally:
-                self.runtime.jobs.resume()
-                with self._condition:
-                    self._state = 'ready'
-            return {'maintenance': self.status(), 'deletion': result}
-        finally:
-            self._administration.release()
+        with self.exclusive(authorize=authorize_delete):
+            if recheck_session is not None:
+                recheck_session()
+            result, _ = run_dashboard_project_purge(
+                self.config_path, project_id, ownership=self.runtime.runtime_ownership,
+            )
+        return {'maintenance': self.status(), 'deletion': result}

@@ -50,6 +50,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     upgrade.add_argument("--version", required=True, help="exact newer official version, without v")
     upgrade.add_argument("--dry-run", action="store_true", help="inspect the upgrade without changing the installation")
     upgrade.add_argument("--backup-root", type=Path, help="select an absolute directory for the installer backup")
+    commands.add_parser("upgrade-status", help="read the retained receipt of an update from a manually started dashboard")
     data = commands.add_parser("data", help="back up, export and restore lifecycle data")
     data_actions = data.add_subparsers(dest="data_operation", required=True)
     for operation in ("backup", "export"):
@@ -122,6 +123,10 @@ def main(argv: list[str] | None = None) -> None:
                 profile_root=args.profile_root, backup_root=args.backup_root, dry_run=args.dry_run)
             if status:
                 raise SystemExit(status)
+            return
+        if args.operation == "upgrade-status":
+            from flow_of_work_mcp.manual_dashboard_upgrade import manual_upgrade_status
+            print(json.dumps(manual_upgrade_status(), ensure_ascii=False, indent=2))
             return
         if args.operation == "data":
             from flow_of_work_mcp.ledger_recovery import backup_profile, inspect_or_restore

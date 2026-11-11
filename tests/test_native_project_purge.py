@@ -14,8 +14,12 @@ import yaml
 
 from flow_of_work_mcp.adapters.sqlite import SQLiteRequirementLedger
 from flow_of_work_mcp.cli import build_cli_parser
+from flow_of_work_mcp.config import load_config
 from flow_of_work_mcp import native_project_purge as purge
-from flow_of_work_mcp.runtime_ownership import acquire_runtime_ownership
+from flow_of_work_mcp.native_purge_schema import SCHEMA55_TABLE_HASHES, SCHEMA56_TABLE_HASHES
+from flow_of_work_mcp.runtime_factory import build_runtime_from_config
+from flow_of_work_mcp.runtime_ownership import RuntimeOwnershipError, acquire_runtime_ownership
+from tests.schema_fixtures import retain_schema55
 
 
 def _fixture(root: Path, *, rich: bool = False) -> tuple[Path, Path]:
@@ -63,7 +67,7 @@ def _seed_all_tables(database: Path) -> None:
     This fixture is intentionally separate from the public-MCP campaign.
     """
     with sqlite3.connect(database) as connection:
-        names = set(purge.SCHEMA55_TABLE_HASHES) - {"schema_migrations"}
+        names = set(SCHEMA55_TABLE_HASHES) - {"schema_migrations"}
         parent_names = {name: {row[2] for row in connection.execute(f"PRAGMA foreign_key_list({name})") if row[2] != name} for name in names}
         order = []
         while names:
@@ -130,11 +134,20 @@ def _seed_all_tables(database: Path) -> None:
                 values = tuple(row[column[1]] for column in columns)
                 connection.execute(f"INSERT INTO {name} ({','.join(item[1] for item in columns)}) VALUES ({','.join('?' for _ in columns)})", values)
                 data[name] = row
+            digest = str(number) * 64
+            event_id = data["requirement_events"]["event_id"]
+            connection.execute("INSERT INTO project_import_origins VALUES (?, ?, ?, ?)",
+                               (project, digest, project, "2026-11-11T00:00:00Z"))
+            connection.execute("INSERT INTO project_import_identities VALUES (?, ?, ?, ?, ?)",
+                               (project, digest, "requirement_events", event_id + 1000, event_id))
+            connection.execute("INSERT INTO project_import_originals VALUES (?, ?, ?, ?, ?, ?)",
+                               (project, digest, "requirement_events", json.dumps([event_id + 1000]),
+                                "payload_json", data["requirement_events"]["payload_json"]))
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
         assert connection.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
 
 
-def test_full_schema55_ownership_purge_and_private_journal(tmp_path):
+def test_full_current_schema_ownership_purge_and_private_journal(tmp_path):
     config, database = _fixture(tmp_path, rich=True)
     before = _rows(database)
     config_bytes = config.read_bytes()
@@ -144,7 +157,7 @@ def test_full_schema55_ownership_purge_and_private_journal(tmp_path):
     prepared, code = _call(config, "prepare", deletion)
     assert code == 0, prepared
     assert prepared["deletion_state"] == "prepared"
-    assert len(prepared["counts"]) == 128
+    assert set(prepared["counts"]) == SCHEMA56_TABLE_HASHES.keys() - {"schema_migrations"}
     assert all(count >= 1 for count in prepared["counts"].values())
     journal_path = database.with_name(database.name + ".project-purge") / (deletion + ".json")
     journal = json.loads(journal_path.read_text())
@@ -159,7 +172,7 @@ def test_full_schema55_ownership_purge_and_private_journal(tmp_path):
     after = _rows(database)
     assert after["sqlite_sequence"] == before["sqlite_sequence"]
     assert after["schema_migrations"] == before["schema_migrations"]
-    for name in set(purge.SCHEMA55_TABLE_HASHES) - {"schema_migrations"}:
+    for name in SCHEMA56_TABLE_HASHES.keys() - {"schema_migrations"}:
         assert len(after[name]) == (0 if name == "interaction_project_context_events" else 1), name
         if after[name]:
             assert after[name] == [before[name][1]], name
@@ -172,6 +185,62 @@ def test_full_schema55_ownership_purge_and_private_journal(tmp_path):
     repeated, code = _call(config, "reconcile", deletion, ack=True)
     assert code == 0 and repeated["deletion_state"] == "absent"
     assert repeated["project_effect_state"] == "unknown"
+
+
+def test_schema55_prepared_journal_survives_additive_migration(tmp_path):
+    config, database = _fixture(tmp_path)
+    retain_schema55(database)
+    deletion = str(uuid4())
+    prepared, code = _call(config, "prepare", deletion)
+    assert code == 0 and prepared["schema_version"] == 55
+
+    SQLiteRequirementLedger(database)
+    result, code = _call(config, "delete", deletion, fingerprint=prepared["prepared_fingerprint"])
+    assert code == 0 and result["deletion_state"] == "scrubbed", result
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone() == (56,)
+        assert connection.execute("SELECT project_id FROM projects").fetchall() == [("project-b",)]
+
+
+@pytest.mark.parametrize("stage", ["deleting", "ledger_deleted"])
+def test_startup_holds_migration_until_schema55_deletion_is_resolved(tmp_path, monkeypatch, stage):
+    config, database = _fixture(tmp_path)
+    retain_schema55(database)
+    deletion = str(uuid4())
+    prepared, code = _call(config, "prepare", deletion)
+    assert code == 0 and prepared["schema_version"] == 55
+    fingerprint = prepared["prepared_fingerprint"]
+
+    def interrupt(*args):
+        raise OSError("owned deletion interruption")
+
+    with monkeypatch.context() as failure:
+        if stage == "deleting":
+            failure.setattr(purge, "_delete_rows", interrupt)
+        else:
+            failure.setattr(purge._Gateway, "_checkpoint_wal", interrupt)
+        _result, code = _call(config, "delete", deletion, fingerprint=fingerprint)
+    assert code == 4
+    journal = database.with_name(database.name + ".project-purge") / (deletion + ".json")
+    assert json.loads(journal.read_text())["stage"] == stage
+    before = _rows(database)
+    with pytest.raises(RuntimeOwnershipError) as blocked:
+        build_runtime_from_config(load_config(config))
+    assert blocked.value.code == "ledger_migration_purge_pending"
+    assert _rows(database) == before
+
+    if stage == "deleting":
+        recovered, code = _call(config, "delete", deletion, fingerprint=fingerprint)
+    else:
+        recovered, code = _call(config, "reconcile", deletion)
+    assert code == 0 and recovered["deletion_state"] == "scrubbed", recovered
+    runtime = build_runtime_from_config(load_config(config))
+    try:
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone() == (56,)
+            assert connection.execute("SELECT project_id FROM projects").fetchall() == [("project-b",)]
+    finally:
+        runtime.close()
 
 
 def test_source_stdout_exact_json_and_exit_codes(tmp_path):
@@ -235,7 +304,7 @@ def test_schema_drift_fails_closed(tmp_path, drift):
         elif drift == "trigger":
             connection.execute("CREATE TRIGGER unexpected AFTER DELETE ON projects BEGIN DELETE FROM project_sequences; END")
         elif drift == "schema":
-            connection.execute("INSERT INTO schema_migrations VALUES(56,'test')")
+            connection.execute("INSERT INTO schema_migrations VALUES(57,'test')")
         else:
             connection.execute("ALTER TABLE projects ADD COLUMN hidden_data TEXT")
     result, code = _call(config, "prepare", str(uuid4()))

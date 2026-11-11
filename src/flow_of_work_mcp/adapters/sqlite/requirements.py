@@ -23,6 +23,7 @@ from flow_of_work_mcp.core.errors import (
 )
 
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
+from flow_of_work_mcp.adapters.sqlite.import_history import local_identity
 
 
 
@@ -536,7 +537,7 @@ class RequirementStoreMixin:
                 """SELECT evidence_id, project_id, requirement_id, verification_kind,
                           outcome, reference, actor, metadata_json, recorded_at
                    FROM verification_evidence WHERE project_id = ? AND evidence_id = ?""",
-                (project_id, evidence_id),
+                (project_id, local_identity(connection, project_id, "verification_evidence", evidence_id)),
             ).fetchone()
             if row is None:
                 raise ValueError("verification evidence not found in the selected project")

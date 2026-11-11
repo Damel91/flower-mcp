@@ -104,7 +104,7 @@
     dashboard_evidence_too_large: "L’evidenza supera il limite di 2 MiB di questa vista. Il suo riferimento rimane visibile nel progetto.",
     dashboard_document_not_found: "Il documento selezionato non è disponibile in questo progetto. Aggiorna la vista e selezionalo di nuovo.",
     dashboard_document_too_large: "Il documento completo supera il limite di 2 MiB. Se disponibile, seleziona un ambito più piccolo.",
-    dashboard_archive_busy: "È già in corso la preparazione o il download di un archivio. Attendi che finisca e riprova.",
+    dashboard_archive_busy: "È già in corso un’altra operazione su un archivio. Attendi che finisca e riprova.",
     dashboard_archive_failed: "Flower non ha potuto preparare l’archivio. Controlla lo spazio disponibile e riprova.",
     dashboard_backup_failed: "Flower non ha potuto completare l’operazione sui backup. Rileggi l’elenco prima di riprovare.",
     archive_backup_not_found: "Il backup non è più presente. Aggiorna l’elenco.",
@@ -114,16 +114,22 @@
     archive_backup_inventory_limit: "Flower non può mostrare tutti i backup conservati. Controlla la cartella dei backup del profilo.",
     archive_project_not_found: "Il progetto non è più presente. Aggiorna l’elenco prima di esportarlo.",
     archive_size_exceeded: "I dati superano il limite di dimensione dell’archivio.",
-    archive_scope_invalid: "Non è possibile esportare il progetto senza i riferimenti necessari. Controlla i dati del profilo.",
+    archive_scope_invalid: "L’archivio o il progetto contiene riferimenti che Flower non può verificare.",
     archive_schema_unsupported: "Il formato del registro non è supportato da questa versione di Flower.",
     archive_source_unavailable: "Il registro non è disponibile. Controlla il profilo e riprova.",
     archive_io_failure: "Flower non ha potuto leggere o scrivere l’archivio. Controlla lo spazio disponibile e i permessi del profilo.",
     archive_invalid: "L’archivio non ha superato il controllo di integrità.",
-    archive_profile_name_invalid: "Scegli un nome valido per il nuovo profilo.",
-    archive_destination_exists: "Esiste già un profilo con questo nome. Scegli un altro nome.",
+    archive_profile_name_invalid: "Scegli un nome valido per il nuovo database.",
+    archive_destination_exists: "Esiste già un database con questo nome. Scegli un altro nome.",
     archive_restore_media_type: "Seleziona un archivio ZIP di Flower.",
     archive_restore_timeout: "Il caricamento dell’archivio ha impiegato troppo tempo. Riprova.",
-    archive_workspace_unsafe: "La cartella dei profili non è disponibile per il ripristino. Controlla la configurazione e i permessi di Flower.",
+    archive_workspace_unsafe: "Flower non può preparare l’archivio in sicurezza. Controlla la configurazione e i permessi.",
+    archive_project_required: "Scegli lo ZIP di un singolo progetto esportato da Flower.",
+    archive_import_unsupported: "Questo progetto contiene attività da riconciliare o riferimenti che Flower non può trasferire. Puoi aprire l’archivio in un database separato.",
+    archive_import_conflict: "Il database ha rifiutato l’importazione. Controlla lo stato del progetto e del database.",
+    archive_import_busy: "Il database è occupato. Attendi la fine delle operazioni in corso e riprova.",
+    maintenance_jobs_busy: "Ci sono lavori Flower in corso. Riprova quando terminano.",
+    maintenance_requests_busy: "Ci sono richieste Flower in corso. Riprova fra poco.",
   };
   const markdownTags = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote",
     "pre", "code", "strong", "em", "s", "hr", "br", "a", "table", "thead", "tbody", "tr", "th", "td", "span"]);
@@ -134,7 +140,7 @@
     reader_response_limit: "La vista di lettura supera il limite della risposta. Il sorgente completo e il download restano disponibili.",
   };
   const upgradePhases = {
-    queued: "Richiesta registrata", stopping: "Arresto del servizio",
+    queued: "Richiesta registrata", preparing: "Verifica del rilascio", stopping: "Arresto di Flower",
     installing: "Backup e installazione in corso", restarting: "Verifica del riavvio",
     complete: "Aggiornamento completato", preflight_failed: "Controlli preliminari non superati",
     failed: "Aggiornamento interrotto",
@@ -145,12 +151,16 @@
     upgrade_version_invalid: "Inserisci una versione stabile nel formato X.Y.Z.",
     upgrade_version_not_newer: "Scegli una versione successiva a quella installata.",
     upgrade_asset_unavailable: "Gli asset della versione scelta non sono raggiungibili.",
-    upgrade_already_pending: "Il servizio ha già un aggiornamento da completare o verificare.",
-    upgrade_platform_unsupported: "L’aggiornamento automatico del servizio è disponibile su macOS.",
+    upgrade_already_pending: "Flower ha già un aggiornamento da completare o verificare.",
+    upgrade_platform_unsupported: "L’aggiornamento da questa dashboard è disponibile su macOS.",
     upgrade_service_not_ready: "Avvia il servizio gestito e controlla di nuovo lo stato.",
     upgrade_preview_expired: "L’anteprima è scaduta. Verifica di nuovo la versione.",
     upgrade_selection_changed: "Il servizio o la configurazione sono cambiati. Verifica di nuovo la versione.",
     upgrade_dispatch_failed: "Flower non ha potuto avviare il processo di aggiornamento.",
+    upgrade_installation_unproved: "L’aggiornamento dalla dashboard richiede un’installazione ufficiale di Flower.",
+    upgrade_profile_unproved: "L’aggiornamento richiede il file flower.yaml di un profilo Flower standard.",
+    upgrade_stop_not_authorized: "Flower non ha ottenuto la conferma o non ha potuto fermarsi. Nessuna installazione è iniziata.",
+    upgrade_shutdown_unconfirmed: "Flower non ha potuto confermare l’arresto. Nessuna installazione è iniziata.",
     upgrade_worker_unconfirmed: "Flower non riesce a confermare che l’aggiornamento sia ancora in corso. Leggi la ricevuta con flower-mcp service upgrade-status usando lo stesso profilo e la stessa porta.",
   };
   const state = {
@@ -330,6 +340,10 @@
     $("backup-delete-submit").disabled = disabled || !$("backup-delete-password").value;
     $("backup-delete-password").readOnly = state.archiveBusy;
     $("backup-delete-close").disabled = state.archiveBusy;
+    $("import-open").disabled = disabled;
+    $("import-submit").disabled = disabled || !$("import-file").files.length;
+    $("import-file").disabled = state.archiveBusy;
+    $("import-close").disabled = $("import-cancel").disabled = state.archiveBusy;
     const profileName = $("restore-profile").value.trim();
     $("restore-open").disabled = disabled;
     $("restore-submit").disabled = disabled || !$("restore-file").files.length
@@ -382,6 +396,40 @@
     return error.message;
   }
 
+  function openImport() {
+    if (!state.ready || $("import-open").disabled) return;
+    $("import-form").reset();
+    formMessage("import-message", "");
+    updateArchiveControls();
+    $("import-dialog").showModal();
+    $("import-file").focus();
+  }
+
+  function importProject(event) {
+    event.preventDefault();
+    if ($("import-submit").disabled) return;
+    const archive = $("import-file").files[0];
+    const dialog = $("import-dialog");
+    return archiveTask(async () => {
+      formMessage("import-message", "Caricamento e verifica dell’archivio in corso…");
+      try {
+        const { project_id: projectId } = await request("projects/import", archive,
+          { zipUpload: true, timeoutMs: restoreTimeoutMs });
+        if (!dialog.open || state.authBusy) return;
+        if (!projectIdPattern.test(projectId || "")) throw new Error("Importazione non confermata.");
+        dialog.close();
+        navigate(projectId);
+        notice(`Progetto «${projectId}» importato.`);
+      } catch (error) {
+        if (!dialog.open || error.stale) return;
+        const message = !error.status || error.status >= 500
+          ? "L’importazione non è confermata. Controlla l’elenco dei progetti prima di riprovare."
+          : archiveError(error);
+        formMessage("import-message", message, true);
+      }
+    });
+  }
+
   function openRestore() {
     if (!state.ready || $("restore-open").disabled) return;
     $("restore-form").reset();
@@ -405,12 +453,12 @@
         if (!dialog.open || state.authBusy) return;
         if (result.profile_name !== profileName) throw new Error("Ripristino non confermato.");
         dialog.close();
-        notice(`Archivio ripristinato nel nuovo profilo «${profileName}». Il profilo è spento.`);
+        notice(`Archivio ripristinato nel nuovo database «${profileName}». Per aprirlo, avvia un’istanza Flower con quel database.`);
         $("backups-title").focus();
       } catch (error) {
         if (!dialog.open || error.stale) return;
         const message = !error.status || error.status >= 500
-          ? `Il ripristino del profilo «${profileName}» non è confermato. Controlla se il profilo esiste prima di riprovare.`
+          ? `Il ripristino del database «${profileName}» non è confermato. Controlla se il database esiste prima di riprovare.`
           : archiveError(error);
         formMessage("restore-message", message, true);
       }
@@ -941,7 +989,7 @@
     state.upgradeStatus = snapshot;
     $("upgrade-installed").textContent = snapshot.installed_version ? `Versione installata ${snapshot.installed_version}` : "";
     $("upgrade-availability").textContent = snapshot.available === false
-      ? upgradeErrors[snapshot.reason] || "L’aggiornamento automatico richiede un servizio Flower compatibile e un’installazione dedicata."
+      ? upgradeErrors[snapshot.reason] || "L’aggiornamento richiede un’installazione ufficiale compatibile di Flower."
       : "";
     const receipt = $("upgrade-receipt");
     const operation = snapshot.operation;
@@ -991,8 +1039,12 @@
       renderUpgradeStatus(snapshot);
     } catch (error) {
       if (!error.stale && epoch === state.upgradeEpoch) {
+        const manual = state.upgradeStatus?.mode === "manual";
         formMessage("upgrade-message", state.rememberedUpgrade
-          ? "La ricevuta sarà disponibile al ritorno del servizio. Se il servizio resta fermo, usa flower-mcp service upgrade-status con lo stesso profilo e la stessa porta." : error.message, true);
+          ? manual
+            ? "L’aggiornamento continua dopo l’arresto. Puoi controllare la ricevuta con flower-mcp upgrade-status e riaprire Flower al termine."
+            : "La ricevuta sarà disponibile al ritorno del servizio. Se il servizio resta fermo, usa flower-mcp service upgrade-status con lo stesso profilo e la stessa porta."
+          : error.message, true);
       }
     } finally {
       state.upgradeReading = false;
@@ -1023,6 +1075,9 @@
       if (epoch !== state.upgradeEpoch) return;
       state.upgradePreview = preview;
       $("upgrade-preview-version").textContent = `Da ${preview.installed_version} a ${preview.version}`;
+      $("upgrade-preview-help").textContent = preview.mode === "manual"
+        ? "Flower verifica il rilascio, si arresta e crea un backup di SQLite e della configurazione prima di installare."
+        : "Flower ferma il servizio, crea un backup di SQLite e della configurazione, installa la versione scelta e verifica il riavvio.";
     } catch (error) {
       if (!error.stale && epoch === state.upgradeEpoch) {
         formMessage("upgrade-message", upgradeErrors[error.reason] || error.message, true);
@@ -1036,6 +1091,9 @@
   function openUpgrade() {
     if (!canPreviewUpgrade() || !state.upgradePreview) return;
     $("upgrade-dialog-version").textContent = `Versione ${state.upgradePreview.version}`;
+    $("upgrade-dialog-help").textContent = state.upgradePreview.mode === "manual"
+      ? "Flower verifica il rilascio, si arresta e salva un backup prima di installarlo. Al termine, riaprilo come fai di solito."
+      : "La dashboard si disconnette durante l’aggiornamento. Accedi di nuovo per vedere il risultato.";
     $("upgrade-password").value = "";
     formMessage("upgrade-dialog-message", "");
     $("upgrade-dialog").showModal();
@@ -1065,7 +1123,9 @@
         rememberUpgrade(null);
         formMessage("upgrade-message", "Il servizio è ancora disponibile. Consulta la ricevuta prima di riprovare.", true);
       } else {
-        formMessage("upgrade-message", "Richiesta registrata. Accedi di nuovo dopo il riavvio per vedere il risultato.");
+        formMessage("upgrade-message", result.mode === "manual"
+          ? "Aggiornamento avviato. Flower si fermerà durante l’installazione. Riaprilo al termine."
+          : "Richiesta registrata. Accedi di nuovo dopo il riavvio per vedere il risultato.");
       }
     } catch (error) {
       if (error.stale || epoch !== state.upgradeEpoch) return;
@@ -1092,7 +1152,7 @@
   }
 
   function closePrivateDialogs() {
-    for (const name of ["create-dialog", "delete-dialog", "evidence-dialog", "archive-dialog", "backup-delete-dialog", "restore-dialog", "upgrade-dialog"]) {
+    for (const name of ["create-dialog", "delete-dialog", "evidence-dialog", "archive-dialog", "backup-delete-dialog", "import-dialog", "restore-dialog", "upgrade-dialog"]) {
       if ($(name).open) $(name).close();
     }
   }
@@ -1935,12 +1995,19 @@
       : "Flower è in manutenzione per la gestione di un progetto. Le chat possono riprovare al termine.";
   }
 
+  function updateDashboardStatus(status) {
+    const version = status.distribution?.distribution_version;
+    $("sidebar-version").textContent = typeof version === "string" && version
+      ? `Flower MCP ${version}` : "Versione Flower non disponibile";
+    updateMaintenance(status.maintenance || status);
+  }
+
   async function checkMaintenance() {
     if (document.visibilityState !== "visible" || state.adminBusy || state.authBusy) return;
     if (!state.ready) { await startDashboard(); return; }
     try {
       const result = await request("status");
-      updateMaintenance(result.maintenance || result);
+      updateDashboardStatus(result);
       if (state.upgradeStatus?.operation?.reason !== "upgrade_worker_unconfirmed"
           && (state.rememberedUpgrade || upgradeInProgress())) loadUpgrade();
       if (state.connectionWarning) { notice(""); state.connectionWarning = false; }
@@ -2052,7 +2119,7 @@
       const status = await request("status");
       showWorkspace();
       restoreUpgrade();
-      updateMaintenance(status);
+      updateDashboardStatus(status);
       notice("");
       route();
     } catch (error) {
@@ -2079,7 +2146,7 @@
       const status = await request("status");
       showWorkspace();
       restoreUpgrade();
-      updateMaintenance(status);
+      updateDashboardStatus(status);
       route();
       if (result.evicted_session) notice("La sessione meno recente è stata chiusa perché è stato raggiunto il limite delle sessioni aperte.");
     } catch (error) {
@@ -2155,6 +2222,13 @@
   });
   $("backups-refresh").addEventListener("click", loadBackups);
   $("backup-create").addEventListener("click", createBackup);
+  $("import-open").addEventListener("click", openImport);
+  $("import-form").addEventListener("input", updateArchiveControls);
+  $("import-form").addEventListener("submit", importProject);
+  $("import-close").addEventListener("click", () => $("import-dialog").close());
+  $("import-cancel").addEventListener("click", () => $("import-dialog").close());
+  $("import-dialog").addEventListener("cancel", (event) => { if (state.archiveBusy) event.preventDefault(); });
+  $("import-dialog").addEventListener("close", () => $("import-form").reset());
   $("restore-open").addEventListener("click", openRestore);
   $("restore-form").addEventListener("input", updateArchiveControls);
   $("restore-form").addEventListener("submit", restoreArchive);

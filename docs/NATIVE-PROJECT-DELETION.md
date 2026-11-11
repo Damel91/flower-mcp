@@ -7,7 +7,9 @@ stopping actual workers, local chat/session cleanup and overall completion.
 Do not expose this command to a model through a shell or tool dispatcher.
 An actor string or same-user OS invocation does not authenticate a human.
 
-Use a current Flower installation against an existing owned schema55 ledger.
+Use a current Flower installation against an existing owned schema 55 or 56
+ledger. Reconcile an unfinished schema 55 deletion before starting a runtime
+that would migrate it.
 The command never creates a profile, boots an old server, migrates a database,
 runs lifecycle recovery, initializes a model/provider or stops remote work.
 It preserves other projects, global sequences, configuration, source repositories,

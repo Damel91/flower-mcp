@@ -9,10 +9,53 @@ import sqlite3
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
 
 
-CURRENT_SCHEMA_VERSION = 55
+CURRENT_SCHEMA_VERSION = 56
 
 
 class SchemaMixin:
+    def _migrate_project_imports(self) -> None:
+        with self._transaction() as connection:
+            version = connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+            if version >= 56:
+                return
+            connection.execute("""
+                CREATE TABLE project_import_origins (
+                    project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+                    origin_digest TEXT NOT NULL,
+                    source_project_id TEXT NOT NULL,
+                    imported_at TEXT NOT NULL,
+                    PRIMARY KEY(project_id, origin_digest)
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE project_import_identities (
+                    project_id TEXT NOT NULL,
+                    origin_digest TEXT NOT NULL,
+                    identity_kind TEXT NOT NULL,
+                    source_id INTEGER NOT NULL,
+                    local_id INTEGER NOT NULL,
+                    PRIMARY KEY(project_id, origin_digest, identity_kind, source_id),
+                    FOREIGN KEY(project_id, origin_digest)
+                        REFERENCES project_import_origins(project_id, origin_digest) ON DELETE CASCADE
+                )
+            """)
+            connection.execute("""
+                CREATE TABLE project_import_originals (
+                    project_id TEXT NOT NULL,
+                    origin_digest TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    row_key TEXT NOT NULL,
+                    column_name TEXT NOT NULL,
+                    original_value TEXT NOT NULL,
+                    PRIMARY KEY(project_id, origin_digest, table_name, row_key, column_name),
+                    FOREIGN KEY(project_id, origin_digest)
+                        REFERENCES project_import_origins(project_id, origin_digest) ON DELETE CASCADE
+                )
+            """)
+            connection.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES(56, ?)", (_utc_now(),),
+            )
+
     def _migrate(self) -> None:
         connection = self._connect()
         try:

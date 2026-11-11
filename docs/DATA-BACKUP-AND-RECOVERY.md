@@ -7,21 +7,40 @@ to transfer that project alone. An archive contains Flower's SQLite data,
 including retained evidence and history. It can contain sensitive information.
 
 A full backup includes all projects and SQLite ledger state. A project export
-includes the selected project's lifecycle records, including existing IDs,
-revision history, evidence and receipts. The new profile does not inherit chat
-selections or lens state from a project export. Neither archive copies profile
+includes the selected project's lifecycle records, including original IDs,
+revision history, evidence and receipts. Project transfer omits chat
+selections and lens state. Neither archive copies profile
 settings, credentials, client registrations, repository files, local import
 files or provider storage. Recorded external links can require reconciliation
 on the destination.
 
+## Import a project into the current database
+
+Send the ZIP from **Esporta progetto** to the recipient. In their Flower
+dashboard, open **Progetti → Importa progetto** and select that ZIP. Flower
+adds the project to the database already open in the dashboard and opens
+the imported project. If its ID is taken, Flower picks the first available
+suffix such as `-2` or `-3`. A new successful upload can create another
+copy. After an interrupted response, check the project list before retrying.
+
+Flower maps internal IDs to keep evidence and history linked in the
+destination and preserves the original receipt material and provenance.
+Use a trusted archive. The ZIP digest detects damage; the recipient decides
+whether to trust the sender. External resources and a sender's live
+execution authority do not move with the project. A full backup uses the
+separate recovery action.
+
+If a project archive still carries unfinished execution or packet/test
+provider dispatch records, use separate-database recovery. Adding that
+archive to a running database would require reconciling its external work.
+
 ## Restore from the dashboard
 
-Open **Backup → Ripristina archivio**. Choose a Flower backup or
-single-project export from your device and enter the name of a new profile.
+Open **Backup → Ripristina in un altro database**. Choose a Flower backup or
+single-project export from your device and enter the name of the new database.
 Flower validates the archive and places the recovered data in the installation's
-profiles directory. It refuses an existing name and leaves the new profile
-inactive. Use a trusted archive. Its digest detects damage, while the source
-of the file remains your responsibility.
+profiles directory with a separate startup configuration. It refuses an
+existing name and leaves the recovered database inactive.
 
 ## Terminal workflow
 
@@ -35,7 +54,7 @@ flower-mcp data export --config /path/to/flower.yaml --project-id my-project --o
 
 Inspect the archive and restore it to an unused directory under an existing
 private parent. These commands accept archives in the Flower archive v1 format
-with the supported schema55 ledger. Use archives from a trusted source;
+with supported schema 55 or 56. Use archives from a trusted source;
 the digest detects corruption and does not authenticate the sender.
 
 ```sh

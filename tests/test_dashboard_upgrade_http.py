@@ -1,4 +1,4 @@
-"""Owner approval and receipt observation at the managed upgrade HTTP boundary."""
+"""Owner approval and receipt observation at the dashboard upgrade boundary."""
 from uuid import uuid4
 
 from starlette.testclient import TestClient
@@ -99,5 +99,39 @@ def test_upgrade_submission_respects_project_maintenance_without_hiding_receipt(
                 assert not probe.previews and not probe.applies
 
             delete_while_checking_maintenance(client, headers, monkeypatch, check)
+    finally:
+        runtime.close()
+
+
+def test_manual_upgrade_shutdown_handoff_follows_http_acknowledgement(tmp_path):
+    runtime, dashboard, mcp = fixture(tmp_path)
+    dashboard._manual_upgrade = True
+    events = []
+
+    class ManualProbe(UpgradeProbe):
+        def after_response(self, operation_id, authorize):
+            assert operation_id == self.preview_id
+            authorize()
+            events.append('handoff')
+
+    probe = dashboard.upgrade = ManualProbe()
+    endpoint = '/dashboard/api/upgrade/apply'
+    app = mcp.streamable_http_app()
+
+    async def observe(scope, receive, send):
+        async def send_observed(message):
+            await send(message)
+            if (scope.get('path') == endpoint and message['type'] == 'http.response.body'
+                    and not message.get('more_body')):
+                events.append('response')
+        await app(scope, receive, send_observed)
+
+    try:
+        with TestClient(observe, base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+            headers = {'Origin': 'http://127.0.0.1:18760', 'X-Flower-CSRF': request_csrf(client)}
+            response = client.post(endpoint, headers=headers,
+                                   json={'id': probe.preview_id, 'password': 'synthetic-fixture-only'})
+            assert response.status_code == 202
+            assert events == ['response', 'handoff']
     finally:
         runtime.close()

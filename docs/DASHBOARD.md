@@ -139,18 +139,25 @@ limit is 2 MiB; an oversized record retains its reference and reports that limit
 Open **Backup** and select **Crea backup** to retain a consistent SQLite copy.
 Use **Scarica** to keep a copy elsewhere. **Elimina** removes the selected
 retained archive after password confirmation. Use **Esporta progetto** on a
-project overview to download that project's lifecycle records. To restore either
-kind of archive, choose **Backup → Ripristina archivio**, select the ZIP and enter
-a new profile name. Flower validates the archive and leaves the new profile
-inactive. See the [backup and recovery guide](DATA-BACKUP-AND-RECOVERY.md).
+project overview to download that project's lifecycle records. The recipient
+chooses **Progetti → Importa progetto** to add the ZIP to the current database.
+Flower keeps history, evidence and receipts and adds a suffix when the project
+ID is in use. Choose **Backup → Ripristina in un altro database** to recover a
+full backup or project ZIP to a separate, inactive database. The sidebar
+shows the Flower version serving this dashboard.
+See the [backup and recovery guide](DATA-BACKUP-AND-RECOVERY.md).
 
-## Upgrade a dedicated macOS service
+## Start an update from the dashboard
 
-Open **Impostazioni Flower → Aggiornamento del servizio** on an enrolled macOS
-service. Review an exact compatible newer release and confirm with the local
-account password. Sign in again after restart to see the result, or read it
-using the native command. See the [operator upgrade guide](OPERATOR-UPGRADE.md)
-for enrollment, manual upgrades and recovery.
+Open **Impostazioni Flower → Aggiornamento di Flower** on a supported official
+macOS installation. Enter the newer release version, choose **Verifica versione**
+and confirm **Avvia aggiornamento** with the local account password.
+Flower prepares the release, stops the current instance and backs up SQLite
+and the profile YAML before installing it. After a manual update, reopen
+Flower using your usual launcher. A managed service restarts through its
+existing service registration. For an offline manual update receipt, use
+`flower-mcp upgrade-status` from the same installation.
+See the [operator upgrade guide](OPERATOR-UPGRADE.md).
 
 ## Read retained Markdown
 

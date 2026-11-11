@@ -81,6 +81,7 @@
           <p>Segui il lavoro, le verifiche e le decisioni nel loro contesto.</p>
           <p class="small muted">La selezione riguarda questa finestra.</p>
         </div>
+        <p id="sidebar-version" class="sidebar-version small muted"></p>
       </aside>
 
       <main id="main-content" class="main-content" tabindex="-1">
@@ -89,6 +90,7 @@
             <div><span class="section-label">Il lavoro in corso</span><h1 id="catalog-title">Progetti</h1><p>Apri un progetto per vedere roadmap, pacchetti e verifiche.</p></div>
             <div class="project-actions">
               <button id="catalog-refresh" class="button button-secondary" type="button">Aggiorna</button>
+              <button id="import-open" class="button button-secondary" type="button">Importa progetto</button>
               <button id="create-open" class="button button-primary" type="button">Nuovo progetto</button>
             </div>
           </div>
@@ -124,7 +126,7 @@
             <div><span class="section-label">Profilo locale</span><h1 id="backups-title" tabindex="-1">Backup</h1><p>Crea e conserva una copia dell’intero registro SQLite del profilo.</p></div>
             <div class="project-actions">
               <button id="backups-refresh" class="button button-secondary" type="button">Aggiorna</button>
-              <button id="restore-open" class="button button-secondary" type="button">Ripristina archivio</button>
+              <button id="restore-open" class="button button-secondary" type="button">Ripristina in un altro database</button>
               <button id="backup-create" class="button button-primary" type="button">Crea backup</button>
             </div>
           </div>
@@ -180,7 +182,7 @@
           </form>
           <section class="upgrade-panel" aria-labelledby="upgrade-title">
             <div class="section-heading">
-              <div><h2 id="upgrade-title">Aggiornamento del servizio</h2><p id="upgrade-installed" class="muted small"></p></div>
+              <div><h2 id="upgrade-title">Aggiornamento di Flower</h2><p id="upgrade-installed" class="muted small"></p></div>
               <button id="upgrade-refresh" class="button button-secondary" type="button">Controlla lo stato</button>
             </div>
             <p id="upgrade-availability" class="muted" role="status"></p>
@@ -194,7 +196,7 @@
             </form>
             <div id="upgrade-preview" class="upgrade-receipt" hidden>
               <p id="upgrade-preview-version"></p>
-              <p class="muted small">Flower ferma il servizio, salva una copia del database SQLite e della configurazione, installa la versione scelta e verifica il riavvio.</p>
+              <p id="upgrade-preview-help" class="muted small"></p>
               <button id="upgrade-open" class="button button-primary" type="button">Apri conferma</button>
             </div>
             <p id="upgrade-message" class="form-message" role="status" hidden></p>
@@ -240,7 +242,7 @@
         <p id="archive-includes">Include la cronologia, le verifiche e le evidenze salvate per questo progetto. Esclude le sessioni dei client e il loro stato di navigazione e ripresa.</p>
         <p class="muted small">Conserva l’archivio in un luogo privato. Non copia i file di lavoro, la configurazione o le credenziali esterne al registro. I riferimenti esterni restano riferimenti.</p>
         <p class="muted small">Se il browser non riesce a gestire un archivio grande, ferma il profilo e usa il terminale: <code>flower-mcp data export --help</code>.</p>
-        <p class="muted small">Per ripristinare un progetto esportato, apri <strong>Backup</strong> e scegli <strong>Ripristina archivio</strong>.</p>
+        <p class="muted small">Per aggiungerlo al database aperto, scegli <strong>Importa progetto</strong> nella pagina Progetti.</p>
         <p id="archive-message" class="form-message" role="status" hidden></p>
       </div>
       <div class="dialog-actions">
@@ -290,21 +292,42 @@
       </form>
     </dialog>
 
+    <dialog id="import-dialog" class="dialog" aria-labelledby="import-title" aria-describedby="import-help">
+      <form id="import-form" method="dialog">
+        <div class="dialog-heading">
+          <h2 id="import-title">Importa progetto</h2>
+          <button id="import-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="dialog-content">
+          <p id="import-help">Scegli lo ZIP di un progetto esportato da Flower. Il progetto, lo storico e le evidenze verranno aggiunti al database aperto in questa dashboard.</p>
+          <div class="login-field">
+            <label for="import-file">Archivio ZIP del progetto</label>
+            <input id="import-file" type="file" accept=".zip,application/zip" required>
+          </div>
+          <p id="import-message" class="form-message" role="status" hidden></p>
+        </div>
+        <div class="dialog-actions">
+          <button id="import-cancel" class="button button-secondary" type="button">Annulla</button>
+          <button id="import-submit" class="button button-primary" type="submit" disabled>Importa progetto</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="restore-dialog" class="dialog" aria-labelledby="restore-title" aria-describedby="restore-help">
       <form id="restore-form" method="dialog">
         <div class="dialog-heading">
-          <h2 id="restore-title">Ripristina archivio</h2>
+          <h2 id="restore-title">Ripristina in un altro database</h2>
           <button id="restore-close" class="icon-button" type="button" aria-label="Chiudi finestra">×</button>
         </div>
         <div class="dialog-content">
-          <p id="restore-help">Seleziona un backup Flower o un progetto esportato. Flower creerà un nuovo profilo separato e lo lascerà spento.</p>
+          <p id="restore-help">Seleziona un backup Flower o un progetto esportato. Flower prepara un database separato per un avvio successivo.</p>
           <div class="login-field">
             <label for="restore-file">Archivio ZIP di Flower</label>
             <input id="restore-file" type="file" accept=".zip,application/zip" required>
           </div>
           <div class="login-field">
-            <label for="restore-profile">Nome del nuovo profilo</label>
-            <input id="restore-profile" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="profilo-ripristinato" aria-describedby="restore-profile-help" required>
+            <label for="restore-profile">Nome del nuovo database</label>
+            <input id="restore-profile" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="database-ripristinato" aria-describedby="restore-profile-help" required>
             <small id="restore-profile-help" class="muted">Inizia con una lettera o un numero. Puoi usare trattini, underscore e punti nel nome.</small>
           </div>
           <p id="restore-message" class="form-message" role="status" hidden></p>
