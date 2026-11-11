@@ -141,6 +141,29 @@ Use the endpoint you actually started; the example does not launch it. See the
 [server startup](INSTALLATION.md#profiles-and-server-startup) and
 [existing-data upgrade instructions](UPGRADING.md).
 
+## Recover Flower context after compaction
+
+Flower 1.0.0 includes an optional OpenCode V2 plugin. Install it in the
+project where you use Flower, then reopen the OpenCode session.
+
+```sh
+flower-mcp opencode-recovery --directory /absolute/path/to/project
+```
+
+The command writes `.opencode/plugins/flower-compaction.js` in that project.
+Use the loopback HTTP `flower` entry above. The plugin supplies an
+`opencode:<session ID>` interaction reference. Select the project through
+`fow_interaction` with that reference to bind the session. On the first
+operational request after successful compaction, the plugin reads the current
+Flower project snapshot and includes its Markdown alongside OpenCode's
+summary. It checks the binding again before presenting the result.
+
+An unbound session, an unavailable server or a stdio registration leaves the
+manual recovery path available. Use `fow_interaction` with `operation=discover`
+and the host reference, confirm the project, then read `fow_handover` with
+`operation=project_state_snapshot` in that scope. The plugin uses read-only
+operations. Decisions and approvals remain explicit Flower operations.
+
 The adapter does not change SQLite schema or the upgrade procedure. Keep the
 same profile and database paths during an ordinary Flower upgrade.
 

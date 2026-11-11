@@ -195,6 +195,18 @@ read [Authoring examples](references/authoring-examples.md) when that need arise
   Use `fow_campaign_inspect` with `view: summary` to see the current phase and
   outstanding Oracle fields before committing to campaign work. Answer the
   current question and refresh the gate.
+  Continue through scope, proof obligations, case and Oracle, execution,
+  observed results and closure in that order. Use `view=obligations` and its
+  current fingerprint when the gate admits `author_obligations`. For an
+  eligible check run by your own tools, select the host lane in the campaign
+  scope. Issue the current check, run it on the declared source, and report
+  the observed result with the issued attempt ID and evidence. Follow the
+  gate for a retry, a finding or coverage reconciliation. Use an authorized
+  provider when an obligation requires independent proof. Read `host_attempts`
+  or `evidence` for provenance and `fow_capabilities` for exact inputs.
+  After compaction, use the same host interaction reference. Confirm the bound
+  project and read its current `fow_handover project_state_snapshot` if the
+  client has not supplied fresh recovery context.
   Separate applicable prerequisites, missing registrations and awaited human
   evidence. Compare the agreed scenario with one material failure path and
   reuse existing proof where it covers that behavior. Report only the remaining
