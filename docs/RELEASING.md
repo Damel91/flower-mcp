@@ -117,9 +117,10 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `tools/install_flower.py`
    together. Label candidate instructions separately from available published
    downloads; do not present unpublished URLs as working installation commands.
-   Update current download examples, release notes and
-   [upgrade instructions](UPGRADING.md); retain historical release notes and tags.
-   Document material compatibility changes.
+   Update current download examples, release notes, the
+   [upgrade instructions](UPGRADING.md) and both editions of
+   `docs/presentation/{eng,ita}/try-flower.md`. Retain historical release notes,
+   tags and reader provenance. Document material compatibility changes.
 2. Preserve the official Apache-2.0 LICENSE and attribution in NOTICE.
 3. Prepare the complete source and selective guidance on an isolated candidate
    branch/worktree. Preserve the public bootstrap/CLI, attribution, installer
@@ -131,6 +132,20 @@ distribution remains `flow-of-work-mcp`, the import package remains
    and runs an installed-wheel smoke check outside the checkout. The installed
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
+
+Before pushing a version bump for CI, regenerate and check the bilingual reader
+using Python 3.11 or newer in the release environment:
+
+```sh
+python -m pip install markdown-it-py==4.0.0
+python docs/presentation/build_reader.py
+python -m unittest discover -s docs/presentation/tests -p test_reader.py -v
+```
+
+The generated-file check can pass with stale versioned Markdown. The suite
+also compares both editions' download URLs, upgrade examples and local
+inference wheel path to the version declared in `pyproject.toml`. Commit the
+generated HTML and reports with the Markdown changes.
 
 To qualify a `1.0.0` candidate locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not

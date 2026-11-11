@@ -35,11 +35,11 @@ No server or network access is needed to read the presentation.
 ## Dashboard del progetto / Project dashboard
 
 Il reader offline racconta Flower senza collegarsi al server. La dashboard di
-Flower 0.14.0 mostra i progetti del profilo in esecuzione, apre i Markdown
+Flower mostra i progetti del profilo in esecuzione, apre i Markdown
 conservati, ripristina archivi in un nuovo profilo e permette di eliminare un
 progetto confermando ID e password. Il capitolo Operate spiega come usarla.
 
-The offline reader presents Flower without a server connection. Flower 0.14.0's
+The offline reader presents Flower without a server connection. Flower's
 dashboard shows the projects in a running profile, opens retained Markdown,
 restores archives into a new profile and confirms project deletion by ID and
 password. Each edition's Operate chapter explains that local workflow.
