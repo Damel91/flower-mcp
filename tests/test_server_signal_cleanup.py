@@ -88,9 +88,11 @@ def cli(monkeypatch, tmp_path):
         step("app")
         return state.app
 
-    def dashboard(runtime, config_path, *, port, host, loaded_config_revision, network_active, network_urls):
+    def dashboard(runtime, config_path, *, port, host, loaded_config_revision, network_active, network_urls,
+                  manual_shutdown=None):
         assert runtime is state.runtime
         assert host == "127.0.0.1"
+        assert callable(manual_shutdown)
         state.network_active = network_active
         state.network_urls = network_urls
         return SimpleNamespace(
