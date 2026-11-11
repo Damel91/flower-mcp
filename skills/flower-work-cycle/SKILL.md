@@ -198,8 +198,10 @@ read [Authoring examples](references/authoring-examples.md) when that need arise
   Continue through scope, proof obligations, case and Oracle, execution,
   observed results and closure in that order. Use `view=obligations` and its
   current fingerprint when the gate admits `author_obligations`. For an
-  eligible check run by your own tools, select the host lane in the campaign
-  scope. Issue the current check, run it on the declared source, and report
+  eligible check run by your own tools, set `scope.execution_lane=host` at
+  campaign start. Use `deterministic_regression` with `execution_class=deterministic`,
+  or `live_sequence` with `execution_class=live` and current Goal grounding.
+  Issue the current check, run it on the declared source, and report
   the observed result with the issued attempt ID and evidence. Follow the
   gate for a retry, a finding or coverage reconciliation. Use an authorized
   provider when an obligation requires independent proof. Read `host_attempts`
