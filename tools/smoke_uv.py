@@ -15,10 +15,11 @@ import subprocess
 import sys
 
 
-DASHBOARD_RESOURCES = frozenset({
+BUNDLED_RESOURCES = frozenset({
     "resources/dashboard/index.html",
     "resources/dashboard/app.css",
     "resources/dashboard/app.js",
+    "resources/opencode/flower-compaction.js",
 })
 
 
@@ -38,8 +39,8 @@ def copy_source(source: Path, destination: Path) -> dict[str, str]:
         if not path.is_file():
             raise ValueError("source build inputs must be regular files")
         if (path.is_relative_to(package) and path.suffix not in {".py", ".yaml", ".md"}
-                and path.relative_to(package).as_posix() not in DASHBOARD_RESOURCES):
-            raise ValueError("unapproved package input; only Python/YAML/Markdown and the three bundled dashboard assets are selected")
+                and path.relative_to(package).as_posix() not in BUNDLED_RESOURCES):
+            raise ValueError("unapproved package input; select Python/YAML/Markdown or an exact bundled asset")
         relative = path.relative_to(source)
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)

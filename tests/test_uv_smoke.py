@@ -22,19 +22,20 @@ def source_fixture(root):
 
 
 class UvQualifierTests(unittest.TestCase):
-    def test_source_copy_preserves_exact_dashboard_bytes_and_manifest_hashes(self):
+    def test_source_copy_preserves_exact_bundled_bytes_and_manifest_hashes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, package = source_fixture(root)
             assets = {"resources/dashboard/index.html": b"<main>document</main>",
                       "resources/dashboard/app.css": b"body { color: blue; }",
-                      "resources/dashboard/app.js": b"document.title = 'Flower';"}
+                      "resources/dashboard/app.js": b"document.title = 'Flower';",
+                      "resources/opencode/flower-compaction.js": b"export default { id: 'fixture' };"}
             for name, content in assets.items():
                 path = package / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(content)
             copied = uv.copy_source(source, root / "copy")
-            self.assertEqual(len(copied), 8)
+            self.assertEqual(len(copied), 9)
             for name, content in assets.items():
                 relative = "src/flow_of_work_mcp/" + name
                 self.assertEqual((root / "copy" / relative).read_bytes(), content)
@@ -43,7 +44,7 @@ class UvQualifierTests(unittest.TestCase):
     def test_dashboard_extensions_do_not_admit_unlisted_package_paths(self):
         for name in ("resources/dashboard/extra.html", "resources/dashboard/extra.css",
                      "resources/dashboard/extra.js", "resources/elsewhere/app.js",
-                     "resources/dashboard/nested/app.js"):
+                     "resources/dashboard/nested/app.js", "resources/opencode/extra.js"):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 source, package = source_fixture(root)
