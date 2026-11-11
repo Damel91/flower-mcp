@@ -1,6 +1,6 @@
 # Flower browser dashboard
 
-Flower 0.14.0 lets the local owner create and inspect projects, prepare profile
+Flower lets the local owner create and inspect projects, prepare profile
 settings, manage backups and export a project's lifecycle records. The dashboard
 restores Flower archives to separate profiles and confirms project deletion with
 the exact project ID and the local owner password.

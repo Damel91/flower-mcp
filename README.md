@@ -14,7 +14,7 @@ Flower gives your agent a lasting project memory and a structured way to move
 from an idea to verified work. It keeps requirements, plans, decisions and
 evidence connected, even when the conversation changes.
 
-**In testing** · Python **3.11+** · [Latest release](https://github.com/Damel91/flower-mcp/releases/latest) · [Apache-2.0](LICENSE)
+**Stable public interface from 1.0.0** · Python **3.11+** · [Latest release](https://github.com/Damel91/flower-mcp/releases/latest) · [Apache-2.0](LICENSE)
 
 [Quick start](#quick-start) · [First project](#start-your-first-project) · [English walkthrough](docs/presentation/eng/README.md) · [Presentazione italiana](docs/presentation/ita/README.md)
 
@@ -85,10 +85,10 @@ The launcher finds or prepares a supported Python environment.
 See prerequisite setup for [macOS](docs/INSTALLATION.md#macos-prerequisite-setup)
 or [Linux](docs/INSTALLATION.md#linux-prerequisite-setup) if a command is missing.
 
-Review the [installer](https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh), then run:
+Review the [installer](https://github.com/Damel91/flower-mcp/releases/latest/download/install.sh), then run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh | bash
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/latest/download/install.sh | bash
 ```
 
 Choose your client when prompted, or choose installation without registration.
@@ -100,7 +100,7 @@ trusted HTTPS certificates. This route uses `Invoke-WebRequest`; curl is not
 required. See the [Windows prerequisites](docs/INSTALLATION.md#windows-prerequisite-setup).
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.ps1" -OutFile ".\install.ps1"
+Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Damel91/flower-mcp/releases/latest/download/install.ps1" -OutFile ".\install.ps1"
 # Review install.ps1, then run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
@@ -200,9 +200,9 @@ A real project managed with Flower is
 milestones, implementation plans, verification evidence and handovers are
 maintained in Flower's project ledger.
 
-Flower remains in testing. Its gates govern lifecycle operations; the coding
-agent and its host remain responsible for code, execution and reporting.
-Host-declared evidence keeps that provenance and is not an independent source
+Flower’s gates govern lifecycle operations. The coding agent and its host
+remain responsible for code, execution and reporting. Host-declared evidence
+keeps its provenance so readers can distinguish it from an independent source
 audit. See the [sources and limits](docs/presentation/eng/sources.md).
 Report problems in the [issue tracker](https://github.com/Damel91/flower-mcp/issues),
 including your version, operating system, client and the affected operation.

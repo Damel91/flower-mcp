@@ -103,8 +103,8 @@ meaning, historical gap handling and replay/effect recovery before updating user
 Tags use the `v` prefix,
 for example `v0.4.1`. Version `0.x` means the public interface is still evolving;
 document compatibility changes before incrementing the minor version. Use patch
-increments for fixes that preserve the advertised interface. A future `1.0.0`
-requires a deliberately declared stable public interface.
+increments for fixes that preserve the advertised interface. Version `1.0.0` begins the declared stable public interface. Record any
+compatibility changes in the versioned release notes.
 
 The public product and repository are Flower MCP / `flower-mcp`. The Python
 distribution remains `flow-of-work-mcp`, the import package remains
@@ -132,13 +132,13 @@ distribution remains `flow-of-work-mcp`, the import package remains
    `bootstrap` command must print its bundled instructions without creating a
    profile or configuration.
 
-To qualify a `0.6.0` candidate locally, use Python 3.11 or newer in an
+To qualify a `1.0.0` candidate locally, use Python 3.11 or newer in an
 isolated environment and a fresh output directory. These commands do not
 publish a release; use the declared version for the release being prepared:
 
 ```sh
 python -m pip install build
-python tools/build_release.py --version 0.6.0 --output dist
+python tools/build_release.py --version 1.0.0 --output dist
 ```
 
 This creates wheel and source distributions, copies the Bash, PowerShell and Python installer scripts and
@@ -148,7 +148,7 @@ Flower assets or either package. Stale or unexpected files in the output directo
 build. To verify the resulting asset bytes again without rebuilding:
 
 ```sh
-python tools/build_release.py --version 0.6.0 --output dist --verify-only
+python tools/build_release.py --version 1.0.0 --output dist --verify-only
 ```
 
 The source archive also includes the complete `docs/presentation` corpus: both
@@ -157,9 +157,9 @@ reader build/test helpers. Release verification checks those packaged bytes
 against the checkout. Extract the archive and open `docs/presentation/index.html`
 to read it offline. These documentation assets are not runtime wheel dependencies.
 
-Use the versioned `docs/RELEASE-NOTES-0.6.0.md` as the reviewed notes source;
+Use the versioned `docs/RELEASE-NOTES-1.0.0.md` as the reviewed notes source;
 `--notes /absolute/private/candidate-notes.md` preserves its prose, Markdown and
-newlines while resolving relative guide links to the exact `v0.6.0` tag. The
+newlines while resolving relative guide links to the exact `v1.0.0` tag. The
 generated body therefore has its own digest. The source archive must contain
 the exact original guide bytes. Keep pending installed,
 upgrade, CI and anonymous HTTPS checkpoints explicit until they have actually run.

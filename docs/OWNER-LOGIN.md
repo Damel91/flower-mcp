@@ -1,6 +1,6 @@
 # Local owner login and optional startup
 
-Flower 0.14.0 uses native account verification for its local dashboard. The
+Flower uses native account verification for its local dashboard. The
 operating system account that owns the selected profile signs in with its local
 password. The optional per-user startup commands select the same profile.
 

@@ -16,7 +16,7 @@ backup of the deleted project's contents.
 
 ## Browser administration and offline CLI
 
-Flower 0.14.0 offers direct deletion in its [browser dashboard](DASHBOARD.md).
+The [browser dashboard](DASHBOARD.md) has offered direct deletion since Flower 0.14.0.
 Confirm the exact project ID with the local owner password. Flower briefly
 enters maintenance under the running owner's ledger lease. The browser path
 removes Flower records for the selected project, and the operator owns any

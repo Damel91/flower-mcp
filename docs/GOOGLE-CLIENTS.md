@@ -15,17 +15,17 @@ sha256sum or shasum. Windows uses PowerShell 5.1+ and Invoke-WebRequest; curl is
 not needed for that PowerShell route. Network access is needed to download
 release assets and Python dependencies.
 
-Select either client with the release installer:
+Once the 1.0.0 assets are available, select either client with the release installer:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh | bash -s -- --platform antigravity
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v1.0.0/install.sh | bash -s -- --platform antigravity
 # For Gemini CLI, replace antigravity with gemini-cli.
 ```
 
 On Windows, download and inspect install.ps1 as described in the main guide:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 0.14.0 -Platform antigravity
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 1.0.0 -Platform antigravity
 # For Gemini CLI, use -Platform gemini-cli.
 ```
 
