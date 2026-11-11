@@ -135,7 +135,7 @@ def test_catalog_exact_wire_complete_registry_and_unique_membership(runtime):
     }
     source = {(item["tool"], item["operation"]): item for item in registry.operation_contract_index()}
     operations = {(item["tool"], item["operation"]): item for item in catalog["operations"]}
-    assert len(catalog["operations"]) == len(operations) == catalog["operation_count"] == 186
+    assert len(catalog["operations"]) == len(operations) == catalog["operation_count"] == 191
     assert set(operations) == set(source)
     assert operations["fow_architecture", "export"]["risk"] == "read"
     assert len({tool for tool, _operation in operations}) == 37
@@ -189,7 +189,7 @@ def test_public_schema_help_and_markdown_keep_machine_catalog_separate(runtime):
         return tools, result, help_result
     tools, response, help_response = asyncio.run(inspect())
     assert len(tools) == 37
-    assert sum(len(tool.inputSchema["properties"]) for tool in tools) == 447
+    assert sum(len(tool.inputSchema["properties"]) for tool in tools) == 452
     interaction = next(tool for tool in tools if tool.name == "fow_interaction")
     operation_schema = interaction.inputSchema["properties"]["operation"]
     if "$ref" in operation_schema:

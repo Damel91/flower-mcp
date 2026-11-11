@@ -169,7 +169,9 @@ def test_finding_and_campaign_exact_help_matches_public_conditions_and_labels(tm
             "view": "operation", "operation_tool": "fow_campaign_author", "operation_name": "attest_source",
         })
         source_help = attestation_help.content[0].text
-        assert "reserved for this case" in source_help and "source bytes and paths unchanged" in source_help
+        assert "choose one unused destination for this case" in source_help
+        assert "Keep an already bound destination on retry" in source_help
+        assert "source bytes and paths unchanged" in source_help
         assert "Reuse the original request_id only to read back that exact recorded request" in source_help
         transition_help = operation_contract("fow_change", "transition_packet")
         assert "including punctuation" in transition_help["guidance"]["criterion_results"]

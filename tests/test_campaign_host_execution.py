@@ -6,7 +6,7 @@ from flow_of_work_mcp import (
 )
 from flow_of_work_mcp.core.domain.campaign_authority import CampaignScopeDraft
 from flow_of_work_mcp.server import handle_campaign_advance, handle_campaign_author, handle_campaign_inspect
-from tests.test_campaign_authority import _case, _complete_fields, _runtime
+from tests.test_campaign_authority import _case, _complete_fields, _complete_typed_ir_fields, _runtime
 
 
 ACTOR = "engineer"
@@ -14,7 +14,7 @@ PROJECT = "alpha"
 SOURCE = "git:feature-verified"
 
 
-def _ready(tmp_path, *, live=False, independent=False, provider=False):
+def _ready(tmp_path, *, live=False, independent=False, provider=False, mixed=False):
     runtime, change_id, requirement_id = _runtime(tmp_path)
     goals = []
     if live:
@@ -31,8 +31,9 @@ def _ready(tmp_path, *, live=False, independent=False, provider=False):
         graph.link(PROJECT, source_goal_id=goals[0], target_goal_id=goals[1], relation="realized_by", actor=ACTOR)
     scope = CampaignScopeDraft(
         change_id=change_id, requirement_ids=(requirement_id,), goal_ids=tuple(goals),
-        execution_lane="provider" if provider else "host",
+        execution_lane="" if provider else "host",
         independent_proof_refs=(requirement_id,) if independent else (),
+        invariants=("Other behavior remains stable.",) if mixed else (),
     )
     state = runtime.ledger.start_campaign_authority(
         PROJECT, title="Campaign", scope=scope,
@@ -44,20 +45,29 @@ def _ready(tmp_path, *, live=False, independent=False, provider=False):
             PROJECT, campaign, replace(_case("Live sequence"), case_kind="live_sequence", execution_class="live"),
             actor=ACTOR,
         )
+    elif mixed:
+        runtime.ledger.add_campaign_authority_case(
+            PROJECT, campaign,
+            replace(_case("Independent provider case"), case_kind="deterministic_regression", execution_lane="provider"),
+            actor=ACTOR,
+        )
     state = runtime.ledger.derive_campaign_obligations(PROJECT, campaign, actor=ACTOR)
     decisions = []
     bindings = []
     for item in state["obligations"]:
         obligation = item["obligation_id"]
         decisions.append({"obligation_id": obligation, "decision": "required", "rationale": "Current scope."})
-        if item["source_kind"] == "requirement":
+        if mixed:
+            case_id = "CASE-000002" if item["source_kind"] == "requirement" else "CASE-000001"
+            bindings.append({"obligation_id": obligation, "case_id": case_id, "coverage_intent": "Observe output."})
+        elif item["source_kind"] == "requirement":
             bindings.append({"obligation_id": obligation, "case_id": "CASE-000001", "coverage_intent": "Observe output."})
         if live:
             bindings.append({"obligation_id": obligation, "case_id": "CASE-000002", "coverage_intent": "Observe live sequence."})
     _author(runtime, campaign, "author_obligations", "group", expected_fingerprint=state["fingerprint"],
             obligation_batch={"decisions": decisions, "bindings": bindings})
-    for index in range(1, 3 if live else 2):
-        fields = _complete_fields() | {"execution_class": "live" if index == 2 else "deterministic"}
+    for index in range(1, 3 if live or mixed else 2):
+        fields = _complete_fields() | {"execution_class": "live" if live and index == 2 else "deterministic"}
         _author(
             runtime, campaign, "author_oracle", f"oracle-{index}", case_id=f"CASE-{index:06d}",
             oracle={"oracle_kind": "behavior", "subject_bindings": [requirement_id],
@@ -188,5 +198,72 @@ def test_host_failure_routes_preserve_the_attempt_and_require_corrected_basis(tm
         stale = _report(runtime, campaign, new, "stale", source="git:corrected", expected="rejected")
         assert stale["effect_state"] == "none"
         assert _inspect(runtime, campaign)["lifecycle_gate"]["next_action"]["operation"] == "issue_host_check"
+    finally:
+        runtime.close()
+
+
+def test_oracle_ir_only_offers_materialization_for_provider_case(tmp_path):
+    for provider in (False, True):
+        runtime, campaign, _, requirement_id, _ = _ready(tmp_path / str(provider), provider=provider)
+        try:
+            oracle = _inspect(runtime, campaign, "oracles")["oracles"][0]
+            _author(
+                runtime, campaign, "author_oracle", "typed-oracle", case_id="CASE-000001",
+                oracle_id=oracle["oracle_id"],
+                oracle={"oracle_kind": "behavior", "subject_bindings": [requirement_id],
+                        "authority_reference": "confirmed campaign scope",
+                        "semantic_fields": _complete_typed_ir_fields()},
+            )
+            row = _inspect(runtime, campaign, "oracle_ir")["oracle_ir"][0]
+            assert row["constructible"] is True
+            assert row["refinement_applicable"] is provider
+            assert row["next_action"]["operation"] == ("authorize_materialization" if provider else "issue_host_check")
+        finally:
+            runtime.close()
+
+
+def test_exception_targets_only_missing_independent_proof_after_host_pass(tmp_path):
+    runtime, campaign, _, _, _ = _ready(tmp_path, independent=True, mixed=True)
+    try:
+        attempt = _issue(runtime, campaign, "CASE-000001", "issue")["host_attempt"]
+        _report(runtime, campaign, attempt, "pass")
+        scope = {
+            "evidence_gaps": ["Independent proof is unavailable in this isolated fixture."],
+            "risk_authority": "fixture:stakeholder-review",
+            "disposition_reference": "fixture:recorded-independent-gap",
+        }
+        too_broad = _author(
+            runtime, campaign, "accept_exception", "too-broad", expected="blocked",
+            exception_obligation_ids=["OBL-000001", "OBL-000002"], **scope,
+        )
+        assert too_broad
+        accepted = _author(
+            runtime, campaign, "accept_exception", "exact-gap",
+            exception_obligation_ids=["OBL-000001"], **scope,
+        )
+        assert accepted["campaign"]["status"] == "accepted_exception"
+        state = runtime.ledger.campaign_authority_state(PROJECT, campaign)
+        assert state["exception"]["current"] is True
+        assert state["exception"]["obligation_ids"] == ["OBL-000001"]
+        assert state["completion"] is None
+    finally:
+        runtime.close()
+
+
+def test_independent_proof_cannot_be_omitted_through_ordinary_authoring(tmp_path):
+    runtime, campaign, _, _, _ = _ready(tmp_path, independent=True)
+    try:
+        basis = _inspect(runtime, campaign)["campaign"]["fingerprint"]
+        decision = {"obligation_id": "OBL-000001", "decision": "waived", "rationale": "No provider."}
+        direct = _author(runtime, campaign, "decide_obligation", "direct", expected="rejected", **decision)
+        grouped = _author(
+            runtime, campaign, "author_obligations", "grouped", expected="rejected",
+            expected_fingerprint=basis, obligation_batch={"decisions": [decision]},
+        )
+        assert direct["effect_state"] == grouped["effect_state"] == "none"
+        assert grouped["diagnostics"][0]["field"] == "obligation_batch.decisions[0].decision"
+        current = _inspect(runtime, campaign)
+        assert current["campaign"]["fingerprint"] == basis
+        assert current["lifecycle_gate"]["state"] == "independent_proof_boundary"
     finally:
         runtime.close()

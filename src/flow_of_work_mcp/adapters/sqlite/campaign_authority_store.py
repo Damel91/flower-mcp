@@ -16,7 +16,14 @@ from flow_of_work_mcp.core.domain.assurance import (
     validate_case_id,
 )
 from flow_of_work_mcp.core.domain.campaign_authoring import ObligationAuthoringBatch, batch_rejection
-from flow_of_work_mcp.core.domain.campaign_host import campaign_case_lane, host_rejection, required_host_cases
+from flow_of_work_mcp.core.domain.campaign_host import (
+    OMITTED_CAMPAIGN_DECISIONS,
+    campaign_case_lane,
+    host_rejection,
+    obligation_requires_independent_proof,
+    required_host_cases,
+)
+from flow_of_work_mcp.core.domain.grounding_readiness import goal_scope_from_case, live_grounding_readiness
 from flow_of_work_mcp.core.domain.campaign_authority import (
     CAMPAIGN_PLAN_CONTRACT_VERSION,
     ORACLE_SNAPSHOT_CONTRACT_VERSION,
@@ -565,7 +572,7 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
             )
             if not state["obligation_applicability"]["current"]:
                 raise AssuranceBlockedError("campaign_obligation_basis_changed")
-            unresolved = _unresolved_campaign_obligation_ids(state)
+            unresolved = self._campaign_unresolved_obligations(project_id, state)
             received = set(obligations)
             if received != unresolved:
                 raise AssuranceBlockedError(
@@ -1253,6 +1260,11 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
                     raise batch_rejection(
                         f"{path}.case_id", item["case_id"], "The case is not active in this campaign."
                     )
+                if "decision" in item:
+                    self._guard_independent_obligation_decision(
+                        current_plan["scope"], obligations[item["obligation_id"]], item["decision"],
+                        field=f"{path}.decision",
+                    )
             touched_cases: set[str] = set()
             outcomes = []
             occurred_at = _utc_now()
@@ -1379,9 +1391,12 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
             )
             if replay is not None:
                 return replay
-            self._obligation_row(connection, project_id, campaign_id, obligation_id)
+            obligation = self._obligation_row(connection, project_id, campaign_id, obligation_id)
             if obligation_id not in self._current_obligation_ids(connection, project_id, campaign_id):
                 raise AssuranceBlockedError("campaign_obligation_stale")
+            self._guard_independent_obligation_decision(
+                self._current_scope(connection, project_id, campaign_id), obligation, decision.value,
+            )
             self._write_obligation_decision(
                 connection, project_id, campaign_id, input_payload, actor, str(request_id or ""), _utc_now(),
             )
@@ -1394,6 +1409,15 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
                 event_payload=input_payload,
                 actor=actor,
                 request_id=request_id,
+            )
+
+    @staticmethod
+    def _guard_independent_obligation_decision(scope, obligation, decision, *, field="decision"):
+        if decision in OMITTED_CAMPAIGN_DECISIONS and obligation_requires_independent_proof(scope, obligation):
+            raise host_rejection(
+                field, decision,
+                f"{obligation['obligation_id']} requires independent proof. Keep it required, "
+                "or use a separately authorized campaign exception for the actual gap.",
             )
 
     def bind_campaign_case_obligation(
@@ -2788,6 +2812,8 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
                 CampaignObligationDecision.UNCLASSIFIED.value,
                 CampaignObligationDecision.INVESTIGATE.value,
             }
+            or (item["decision"] in OMITTED_CAMPAIGN_DECISIONS
+                and obligation_requires_independent_proof(scope, item))
         ]
         if undecided:
             return CampaignConstructibility.NEEDS_OBLIGATIONS, [
@@ -3332,18 +3358,11 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
         exception = None
         if exception_row is not None:
             exception_payload = json.loads(str(exception_row["payload_json"]))
-            covered = set(exception_payload["obligation_ids"])
-            unresolved = _unresolved_campaign_obligation_ids({**plan_payload, "evidence": evidence})
-            same_basis = (int(exception_row["semantic_revision"]) == int(head["current_revision"])
-                          and applicability["current"] and covered <= current_obligation_ids
-                          and unresolved <= covered)
             exception = {
                 **exception_payload,
                 "event_id": int(exception_row["event_id"]),
                 "semantic_revision": int(exception_row["semantic_revision"]),
                 "request_id": str(exception_row["request_id"]),
-                "current": same_basis,
-                "applicability": "current" if same_basis else "historical_on_original_basis",
                 "occurred_at": str(exception_row["occurred_at"]),
                 "actor": str(exception_row["actor"]),
             }
@@ -3430,7 +3449,39 @@ class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
                     and current_host_ids == completion.get("host_receipt_ids")
                     and len(current_host_ids) == len(required_host_cases(value))
                 )
+        if exception is not None:
+            covered = set(exception["obligation_ids"])
+            unresolved = self._campaign_unresolved_obligations(project_id, value)
+            same_basis = (
+                exception["semantic_revision"] == int(head["current_revision"])
+                and applicability["current"] and covered <= current_obligation_ids
+                and unresolved <= covered
+            )
+            exception["current"] = same_basis
+            exception["applicability"] = "current" if same_basis else "historical_on_original_basis"
         return value
+
+    def _campaign_unresolved_obligations(self, project_id, state):
+        receipts = state.get("host_execution", {}).get("current_receipts", {})
+        accepted_host_cases = set()
+        audits = None
+        for case in required_host_cases(state):
+            case_id = case["case_id"]
+            receipt = receipts.get(case_id, {})
+            if receipt.get("outcome") != "passed":
+                continue
+            if receipt["evidence_kind"] == "live_test":
+                if not case.get("covered_use_case_goal_node_ids") or not case.get("covered_sequence_goal_node_ids"):
+                    continue
+                if audits is None:
+                    audits = self.grounding_audits(project_id)
+                grounding = live_grounding_readiness(
+                    project_id=project_id, goal_node_ids=goal_scope_from_case(case), audits=audits,
+                )
+                if not grounding.get("ready") or grounding.get("source_revision") != receipt["source_revision"]:
+                    continue
+            accepted_host_cases.add(case_id)
+        return _unresolved_campaign_obligation_ids(state, accepted_host_cases=accepted_host_cases)
 
     def _campaign_case_runtime_values(
         self,
@@ -4501,6 +4552,8 @@ def _initial_oracle_field_authority(
 
 def _unresolved_campaign_obligation_ids(
     state: Mapping[str, object],
+    *,
+    accepted_host_cases: set[str],
 ) -> set[str]:
     """Return every current obligation an exception must explicitly own."""
 
@@ -4525,7 +4578,7 @@ def _unresolved_campaign_obligation_ids(
         and str(promotion.get("acceptance_disposition") or "") == "passed"
         and str(promotion.get("promotion_evidence_id") or "")
         == str(run.get("evidence_id") or "")
-    }
+    } | accepted_host_cases
     required_cases = {
         str(item.get("case_id") or "")
         for item in state.get("cases", [])
@@ -4539,17 +4592,12 @@ def _unresolved_campaign_obligation_ids(
             str(item.get("obligation_id") or ""), set()
         ).add(str(item.get("case_id") or ""))
     unresolved: set[str] = set()
-    omitted = {
-        CampaignObligationDecision.OUT_OF_SCOPE.value,
-        CampaignObligationDecision.DUPLICATE.value,
-        CampaignObligationDecision.WAIVED.value,
-    }
     for item in state.get("obligations", []):
         if not isinstance(item, Mapping) or not bool(item.get("fresh")):
             continue
         obligation_id = str(item.get("obligation_id") or "")
         decision = str(item.get("decision") or "")
-        if decision in omitted:
+        if decision in OMITTED_CAMPAIGN_DECISIONS and not obligation_requires_independent_proof(state["scope"], item):
             continue
         bound_required_cases = bindings_by_obligation.get(obligation_id, set()).intersection(
             required_cases

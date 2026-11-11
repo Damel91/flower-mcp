@@ -3368,7 +3368,7 @@ def handle_campaign_author(
             ),
             propagate=(OperationPreEffectError,) if operation.strip() in {
                 "attest_source", "authorize_materialization", "retry_provider_rejection", "authorize_promotion",
-                "author_obligations", "issue_host_check", "report_host_result", "edit_scope", "edit_case",
+                "author_obligations", "decide_obligation", "issue_host_check", "report_host_result", "edit_scope", "edit_case",
             } else (),
         )
     except OperationPreEffectError as exc:

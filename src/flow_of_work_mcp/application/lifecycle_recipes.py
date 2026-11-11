@@ -575,6 +575,8 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
                 "A compiling but unattested test cannot establish authoritative product failure.",
                 "Provider identities and raw internal representations remain behind the provider boundary.",
                 "Follow the current gate in campaign summary. Use operation help for exact inputs and use a scoped view for details.",
+                "Use scope.execution_lane=host at campaign start for eligible checks you will execute with your own tools. "
+                "Use deterministic_regression with execution_class=deterministic for deterministic evidence, or live_sequence with execution_class=live and current Goal grounding for live evidence.",
                 "Host observations keep their host provenance and cannot satisfy independently required proof.",
             ),
         ),

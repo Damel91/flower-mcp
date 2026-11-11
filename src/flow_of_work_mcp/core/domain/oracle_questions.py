@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.campaign_authority import ORACLE_SNAPSHOT_CONTRACT_VERSION
+from flow_of_work_mcp.core.domain.campaign_host import campaign_case_lane
 from flow_of_work_mcp.core.domain.oracle_ir import ORACLE_IR_OPERATOR_PROFILE
 
 
@@ -52,6 +53,7 @@ def applicable_oracle_questions(state: Mapping[str, object]) -> list[dict[str, o
     """
     oracles = {o["oracle_id"]: o for o in state.get("oracles", [])}
     source: list[dict[str, object]] = []
+    cases = {case["case_id"]: case for case in state.get("cases", [])}
     ir: list[dict[str, object]] = []
     bindings = sorted(state.get("oracle_bindings", []),
                       key=lambda b: (b["case_id"], b["oracle_id"]))
@@ -69,7 +71,8 @@ def applicable_oracle_questions(state: Mapping[str, object]) -> list[dict[str, o
         source.extend({**question, **identity} for question in source_questions)
         if oracle.get("status") != "constructible":
             source_incomplete = True
-        if not source_questions and oracle_ir_refinement_applicable(oracle):
+        lane = campaign_case_lane(state.get("scope", {}), cases.get(binding["case_id"], {}))
+        if lane == "provider" and not source_questions and oracle_ir_refinement_applicable(oracle):
             ir.extend({**question, **identity} for question in oracle.get("oracle_ir_questions", []))
     if source:
         return source

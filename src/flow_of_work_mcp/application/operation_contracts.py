@@ -1728,6 +1728,7 @@ _CAMPAIGN_CASE_HELP = {
         "compatibility": "The listed labels include legacy aliases such as regression, normalized as deterministic_regression for coverage. Nonempty custom labels such as automated are retained; coverage normalizes unrecognized labels as tool_smoke.",
     },
     "oracle_kind": "behavior is the default and supported Oracle IR profile. Other nonempty labels are accepted as source data; they do not gain that IR qualification.",
+    "host_execution": "For a host deterministic check use case_kind=deterministic_regression and execution_class=deterministic. For a host live check use case_kind=live_sequence and execution_class=live, with the governed use-case, sequence and current grounding. The case inherits scope.execution_lane unless case.execution_lane is explicit.",
 }
 
 _CAMPAIGN_AUTHOR = {
@@ -1748,7 +1749,10 @@ _CAMPAIGN_AUTHOR = {
             "case",
         ),
         enums={"scope.execution_lane": ("host", "provider")},
-        guidance={"initial_case": "Optional initial case uses the same case fields as add_case."},
+        guidance={
+            "initial_case": "Optional initial case uses the same case fields as add_case.",
+            "scope.execution_lane": "Set scope.execution_lane=host when eligible checks will be run with your own tools. This works without a configured provider. Use provider for independent proof, and omit the field only to retain legacy provider behavior.",
+        },
     ),
     "edit_scope": _c(
         "fow_campaign_author",
@@ -2909,6 +2913,8 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
         result["source_anchor"] = "src/example.py:20"
     if contract.tool == "fow_assurance" and contract.operation == "set_finding_disposition":
         result.update(disposition="resolved", evidence_refs=["verification:targeted-regression"])
+    if contract.tool == "fow_campaign_author" and contract.operation == "start":
+        result["scope"]["execution_lane"] = "host"
     if contract.tool == "fow_campaign_author" and contract.operation in {"add_case", "edit_case"}:
         result["case"]["case_kind"] = "regression"
     if contract.tool == "fow_campaign_author" and contract.operation == "author_obligations":

@@ -10,6 +10,7 @@ from flow_of_work_mcp.core.errors import OperationPreEffectError
 
 
 HOST_CAMPAIGN_OUTCOMES = ("passed", "product_failed", "test_invalid", "environment_failed")
+OMITTED_CAMPAIGN_DECISIONS = frozenset({"waived", "out_of_scope", "duplicate"})
 
 
 def host_rejection(field: str, value: object, message: str) -> OperationPreEffectError:
@@ -95,7 +96,7 @@ def required_host_cases(state: Mapping[str, object]) -> list[Mapping[str, object
 
 
 def independent_host_obligations(state: Mapping[str, object], case_id: str) -> list[str]:
-    refs = set(state.get("scope", {}).get("independent_proof_refs", ()))
+    scope = state.get("scope", {})
     linked = {
         item["obligation_id"] for item in state.get("obligation_bindings", ())
         if item["case_id"] == case_id
@@ -103,8 +104,15 @@ def independent_host_obligations(state: Mapping[str, object], case_id: str) -> l
     return [
         str(item["obligation_id"]) for item in state.get("obligations", ())
         if item["obligation_id"] in linked and item["decision"] == "required"
-        and (item["source_ref"] in refs or item["subject_ref"] in refs)
+        and obligation_requires_independent_proof(scope, item)
     ]
+
+
+def obligation_requires_independent_proof(
+    scope: Mapping[str, object], obligation: Mapping[str, object],
+) -> bool:
+    refs = scope.get("independent_proof_refs", ())
+    return obligation["source_ref"] in refs or obligation["subject_ref"] in refs
 
 
 def next_host_case(

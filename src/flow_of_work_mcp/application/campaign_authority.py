@@ -6,12 +6,14 @@ from typing import Mapping, Protocol, Sequence
 
 from flow_of_work_mcp.core.domain.campaign_authoring import ObligationAuthoringBatch
 from flow_of_work_mcp.core.domain.campaign_host import (
+    OMITTED_CAMPAIGN_DECISIONS,
     HostCampaignCheck,
     HostCampaignResult,
     campaign_case_lane,
     host_case_supported,
     independent_host_obligations,
     next_host_case,
+    obligation_requires_independent_proof,
     required_host_cases,
 )
 from flow_of_work_mcp.core.domain.campaign_authority import (
@@ -939,6 +941,7 @@ def _question_action(state: Mapping[str, object], question: Mapping[str, object]
 
 def _oracle_ir_projections(state: Mapping[str, object]) -> list[dict[str, object]]:
     oracles = {item["oracle_id"]: item for item in state.get("oracles", [])}
+    cases = {item["case_id"]: item for item in state.get("cases", [])}
     selected = current_oracle_question(state)
     source_pending = selected is not None and selected["scope"] == "source"
     gate = _campaign_gate(state)
@@ -950,7 +953,8 @@ def _oracle_ir_projections(state: Mapping[str, object]) -> list[dict[str, object
         projection = compile_oracle_ir(oracle)
         value = dict(projection.as_payload())
         value["case_id"] = binding["case_id"]
-        value["refinement_applicable"] = oracle_ir_refinement_applicable(oracle)
+        lane = campaign_case_lane(state.get("scope", {}), cases.get(binding["case_id"], {}))
+        value["refinement_applicable"] = lane == "provider" and oracle_ir_refinement_applicable(oracle)
         # Residuals describe this Oracle; only the shared current selection is
         # actionable. Never suggest a different local question to a global writer.
         value["next_question"] = None
@@ -1058,10 +1062,13 @@ def _campaign_lifecycle_gate(
         if isinstance(exception, Mapping) and exception.get("current") is False:
             effect = "The exception belongs to its original scope. Assess current scope through an ordinary campaign."
     elif constructibility == CampaignConstructibility.NEEDS_OBLIGATIONS.value:
+        scope = state.get("scope", {})
         undecided = [
             item
             for item in obligations
             if item.get("decision") in {"unclassified", "investigate"}
+            or (item.get("decision") in OMITTED_CAMPAIGN_DECISIONS
+                and obligation_requires_independent_proof(scope, item))
         ]
         if not obligations or applicability.get("current") is False:
             gate_state = "mechanical_progress"
@@ -1083,15 +1090,13 @@ def _campaign_lifecycle_gate(
                     "revision": item["source_revision"],
                 },
             }
+            choices = (
+                ("required", "investigate") if obligation_requires_independent_proof(scope, item)
+                else ("required", "out_of_scope", "duplicate", "investigate", "waived")
+            )
             allowed = [
                 {"value": value, "requires": ["rationale"]}
-                for value in (
-                    "required",
-                    "out_of_scope",
-                    "duplicate",
-                    "investigate",
-                    "waived",
-                )
+                for value in choices
             ]
             effect = "persist one explicit obligation decision"
             next_action = {

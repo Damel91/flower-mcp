@@ -55,8 +55,8 @@ def test_actual_catalog_has_explicit_complete_bounded_help(app, tools):
                for item in asyncio.run(app.list_tools())]
     assert len(catalog) == len(tools) == 37
     fields = [name for item in catalog for name in item["inputSchema"]["properties"]]
-    assert len(fields) == 447
-    assert set(fields) == set(FIELD_HELP) and len(FIELD_HELP) == 234
+    assert len(fields) == 452
+    assert set(fields) == set(FIELD_HELP) and len(FIELD_HELP) == 238
     assert set(TOOL_GUIDANCE) == set(TOOL_EFFECTS) == set(tools)
     for item in catalog:
         assert item["description"] == registry.tool_description(item["name"])
@@ -83,7 +83,7 @@ def test_missing_semantic_definition_fails_without_name_fallback():
 
 def test_published_signature_and_schema_keep_raw_handler_validation(tools):
     contracts = registry.operation_contract_catalog()
-    assert len(contracts) == 186
+    assert len(contracts) == 191
     checked_routes = set()
     for name, tool in tools.items():
         raw = tool.fn.__wrapped__
@@ -158,7 +158,7 @@ def test_required_selector_and_inspect_examples_are_actionable():
 
 def test_all_canonical_examples_match_unchanged_sdk_input_shapes(tools):
     contracts = registry.operation_contract_catalog()
-    assert len(contracts) == 186
+    assert len(contracts) == 191
     for contract in contracts:
         tool = tools[contract["tool"]]
         # This checks shape/selector compatibility only. Example identities and
