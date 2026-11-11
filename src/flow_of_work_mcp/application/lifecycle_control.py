@@ -969,8 +969,11 @@ class LifecycleControlService:
             for finding in findings:
                 disposition = str(finding["disposition"])
                 finding_id = str(finding["finding_id"])
+                severity = str(finding.get("severity") or "info")
                 if disposition in {"open", "confirmed", "deferred"}:
                     unresolved_findings.append(finding_id)
+                    advisory = (disposition == "deferred" and severity in {"info", "low"}
+                                and finding.get("finding_kind") == "informational")
                     kind = (
                         NextActionKind.TRIAGE_FINDING
                         if disposition == "open"
@@ -981,19 +984,15 @@ class LifecycleControlService:
                             action_id=f"{kind.value}:{change_id}:{finding_id}",
                             kind=kind,
                             execution_class=ActionExecutionClass.ORCHESTRATION,
-                            priority=_finding_priority(
-                                str(finding.get("severity") or "info"),
-                                disposition,
-                            ),
-                            rationale=(
-                                f"{str(finding.get('severity') or 'info')} finding "
-                                f"disposition is {disposition}"
-                            ),
+                            priority=_finding_priority(severity, disposition),
+                            rationale=f"{severity} finding disposition is {disposition}",
                             requirement_ids=tuple(
                                 str(item) for item in change.get("requirement_ids", [])
                             ),
                             change_ids=(change_id,),
                             finding_ids=(finding_id,),
+                            state="advisory" if advisory else "pending",
+                            decision_class="informational" if advisory else "",
                         )
                     )
             if str(change.get('milestone_id') or '') in invalid_milestones:

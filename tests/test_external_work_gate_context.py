@@ -7,7 +7,10 @@ from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.application.operation_contracts import operation_contract
 from flow_of_work_mcp.model_facing import project_markdown
 from flow_of_work_mcp.mcp_runtime import build_runtime
-from flow_of_work_mcp.server import handle_external_work, handle_packet_advance, handle_packet_inspect
+from flow_of_work_mcp.server import (
+    handle_assurance, handle_external_work, handle_handover, handle_packet_advance,
+    handle_packet_inspect, handle_what_next,
+)
 from tests.test_external_work import fixture
 from tests.test_packet_executor import fixture as unselected_executor_fixture
 from tests.test_guided_bootstrap import prepared, confirm
@@ -15,6 +18,52 @@ from tests.test_plan_authoring_repair import dump, revise
 
 CHECK = 'npm run typecheck and npm test both resolve to declared scripts and exit without unknown-script errors.'
 CANDIDATE = 'The declared typecheck and test scripts exist and resolve, so the automated assertions required by this packet are actually executable.'
+
+
+@pytest.mark.parametrize(('severity', 'finding_kind', 'advisory'), [
+    ('low', 'informational', True), ('high', 'informational', False), ('low', 'engineering', False),
+])
+def test_deferred_informational_finding_does_not_replace_actionable_packet(tmp_path, severity, finding_kind, advisory):
+    ledger, _, ids, _ = fixture(tmp_path)
+    runtime = build_runtime(database_path=ledger.database_path, import_root=tmp_path, ledger=ledger)
+    try:
+        address = dict(zip(('project_id', 'change_id', 'packet_id'), ids))
+        scope = dict(project_id=ids[0], operation='project_state_snapshot', focus_kind='packet', focus_ref=ids[2])
+        before = handle_handover(runtime, **scope)['result']['project_state_snapshot']
+        assert before['next_gate']['route']['operation'] == 'todo'
+
+        finding = handle_assurance(runtime, project_id=ids[0], change_id=ids[1], actor='engineer',
+            operation='record_finding', request_id='record-optional-coverage', severity=severity, finding_kind=finding_kind,
+            title='Optional capability', rationale='The harness omits this diagnostic.',
+            expected_correction='Retain the stated limit.', scope_kind='change', scope_ref=ids[1],
+            source_anchor='fixture:optional-capability')
+        assert finding['status'] == 'success'
+        finding_id = finding['result']['assurance']['finding_id']
+        deferred = handle_assurance(runtime, project_id=ids[0], change_id=ids[1], finding_id=finding_id,
+            actor='engineer', operation='set_finding_disposition', request_id='defer-optional-coverage',
+            disposition='deferred', disposition_reference='fixture:scope', rationale='Assess separately.')
+        assert deferred['status'] == 'success'
+
+        todo = handle_external_work(runtime, **address, operation='todo')['result']
+        assert todo['status'] == 'success' and todo['todos']
+        handover = handle_handover(runtime, **scope)
+        after = handover['result']['project_state_snapshot']
+        finding_action = f'resolve_finding:{ids[1]}:{finding_id}'
+        if advisory:
+            assert after['next_gate']['route'] == before['next_gate']['route']
+            assert any(item['action_id'] == finding_action and item['advisory'] for item in after['secondary_actions'])
+            markdown = project_markdown('fow_handover', handover, arguments=scope)
+            assert '**Tool:** fow_external_work' in markdown and '**Operation:** todo' in markdown
+        else:
+            assert after['next_gate']['action_id'] == finding_action
+        audit = handle_what_next(runtime, project_id=ids[0], detail_level='audit')['result']
+        assert finding_action in str(audit)
+        explicit = handle_handover(runtime, project_id=ids[0], operation='project_state_snapshot',
+            focus_kind='gate', focus_ref=finding_action)['result']['project_state_snapshot']
+        assert explicit['next_gate']['action_id'] == finding_action
+        assert bool(explicit['next_gate'].get('advisory')) is advisory
+    finally:
+        runtime.close()
 
 
 @pytest.mark.parametrize('count', [0, 1, 12])
