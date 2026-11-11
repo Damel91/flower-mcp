@@ -25,7 +25,7 @@ at `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corrects complete recovery cost. E
 [advanced configuration guide](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 is operational documentation, not a claim that it existed at the frozen pin. That checkpoint
 linked to published `0.5.2` downloads. Operational commands in
-[Now try Flower](try-flower.md) select 1.0.0. Historical `0.4.1` retains runtime
+[Now try Flower](try-flower.md) select 1.1.0. Historical `0.4.1` retains runtime
 `0.4.0`; this editorial snapshot does not qualify binaries. Published `0.3.1`,
 `0.4.0`, `0.4.1`, `0.5.0` and `0.5.1` remain immutable.
 The reader is rebuilt from Markdown; product references must be reassessed when
@@ -41,7 +41,7 @@ recovery and evidence views introduced in 0.13.0 remain available. Links follow
 the current `main` branch.
 
 - [Dashboard guide](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): startup, local owner sign-in, themes, reading and maintenance.
-- [1.0.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-1.0.0.md): release scope, install and upgrade.
+- [1.1.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-1.1.0.md): release scope, install and upgrade.
 - [0.14.0 release notes](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.14.0.md) document the earlier deletion and restore changes.
 - [Currentness recovery](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprints and review of earlier snapshots.
 
