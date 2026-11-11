@@ -314,13 +314,32 @@ def historical_requirement(current: dict, project: str) -> dict:
     return value
 
 
-def require_public_state_preserved(requirement: dict, handover: dict, traceability: dict, before: dict) -> None:
-    """Compare the full 0.3.1 public payloads, including established guidance."""
+def require_public_state_preserved(
+    requirement: dict, handover: dict, traceability: dict, verification_evidence: dict, before: dict,
+) -> None:
+    """Compare stored authority and the explicitly revised traceability projection."""
     historical_requirement(before["requirement"], PROJECT)
     historical_requirement(requirement, PROJECT)
     require(requirement == before["requirement"], "Original requirement changed through upgrade")
     require(handover == before["handover"], "Frozen HAND changed through upgrade")
-    require(traceability == before["traceability"], "Original verification evidence changed through upgrade")
+    require(verification_evidence == before["verification_evidence"],
+            "Original verification evidence changed through upgrade")
+    historical_traceability = before["traceability"]
+    projection = historical_traceability["projection"]
+    require(projection["scope"] == "project" and projection["milestone_id"] == "",
+            "Unexpected baseline traceability scope")
+    # Flower 1.0 identifies the exact scope and relation it checked for this
+    # derived gap. Keep every other field, including the full audit evidence.
+    gaps = [
+        {
+            **gap, "milestone_id": "", "relation": "current_packet_requirement_scope",
+            "scope_kind": "project",
+        } if gap["reason"] == "no_packet_for_requirement" else gap
+        for gap in projection["gaps"]
+    ]
+    expected_traceability = {**historical_traceability, "projection": {**projection, "gaps": gaps}}
+    require(traceability == expected_traceability,
+            "Traceability changed beyond the expected derived packet-scope diagnostics")
 
 
 async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> dict:
@@ -364,12 +383,13 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
                 "title": "Retain the integer successor scenario", "statement": "The API shall return the integer successor.",
                 "category": "functional", "rationale": "Synthetic upgrade qualification only.", "request_id": "upgrade-requirement"})
             requirement_id = requirement["requirement_id"]
-            await call(session, "fow_record_verification", {**address, "requirement_id": requirement_id,
+            verification = await call(session, "fow_record_verification", {**address, "requirement_id": requirement_id,
                 "verification_kind": "tested_deterministically", "outcome": "passed", "reference": "synthetic:upgrade-fixture",
                 "metadata": {"provenance": "declared_host_fixture", "original_detail": "Keep this exact evidence through upgrade."},
                 "request_id": "upgrade-evidence"})
             handover = await call(session, "fow_handover", {**address, "operation": "create_handover", "request_id": "upgrade-handover"})
-            identity = {"project_id": PROJECT, "requirement_id": requirement_id, "handover_id": handover["handover"]["handover_id"]}
+            identity = {"project_id": PROJECT, "requirement_id": requirement_id, "evidence_id": verification["evidence_id"],
+                        "handover_id": handover["handover"]["handover_id"]}
             (root / "fixture.json").write_text(json.dumps(identity, indent=2) + "\n", encoding="utf-8")
         else:
             identity = read_json(root / "fixture.json")
@@ -378,6 +398,8 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
         handover = await call(session, "fow_handover", {
             "project_id": PROJECT, "operation": "get_handover", "handover_id": identity["handover_id"]})
         traceability = await call(session, "fow_traceability", {"project_id": PROJECT, "detail_level": "audit"})
+        verification_evidence = await call(session, "fow_traceability", {
+            "project_id": PROJECT, "detail_level": "audit", "evidence_id": identity["evidence_id"]})
         if phase == "before" and assets is not None:
             # Keep the real MCP foreground process alive while an actual upgrade
             # attempts its ownership gate. No service is stopped by the installer.
@@ -399,14 +421,15 @@ async def public_fixture(root: Path, phase: str, assets: Path | None = None) -> 
             require(not (root / "profiles" / "upgrade-backups").exists(), "Busy upgrade created a backup before obtaining ownership")
         if phase != "before":
             before = read_json(root / "before-mcp.json")
-            require_public_state_preserved(requirement, handover, traceability, before)
+            require_public_state_preserved(requirement, handover, traceability, verification_evidence, before)
             resumed = await call(session, "fow_handover", {
                 "project_id": PROJECT, "operation": "resume_context", "handover_id": identity["handover_id"]})
             comparison = resumed["handover"]["historical_comparison"]
             require(comparison["state"] == "legacy_without_recovery" and comparison["historical_payload_unchanged"] is True,
                     "Legacy HAND recovery did not identify unchanged historical authority")
     return {"status": "passed", "phase": phase, "catalog": catalog_values, "receipts": receipts,
-            "requirement": requirement, "handover": handover, "traceability": traceability, "busy_upgrade": busy}
+            "requirement": requirement, "handover": handover, "traceability": traceability,
+            "verification_evidence": verification_evidence, "busy_upgrade": busy}
 
 
 def qualify(args) -> dict:

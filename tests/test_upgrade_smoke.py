@@ -253,26 +253,35 @@ class UpgradeSmokeTests(unittest.TestCase):
                     "tool": "fow_traceability", "arguments": {"project_id": smoke.PROJECT,
                         "detail_level": "audit", "offset": 0, "limit": 10}}}},
             "handover": {"handover": {"payload": {"objective": {"packet_id": ""}}}},
-            "traceability": {"projection": {"source_ledger_version_namespace": "requirement_events.max_event_id.v1"},
+            "traceability": {"projection": {
+                "source_ledger_version_namespace": "requirement_events.max_event_id.v1",
+                "scope": "project", "milestone_id": "",
+                "gaps": [{"reason": "no_packet_for_requirement", "requirement_ids": ["REQ-000001"]}]},
                 "requirements": [{"evidence": [{"metadata": {"provenance": "declared_host_fixture"}}]}]},
+            "verification_evidence": {"evidence": {"evidence_id": 1, "metadata": {"provenance": "declared_host_fixture"}}},
         }
+        original = deepcopy(before)
         current = deepcopy(before)
+        current["traceability"]["projection"]["gaps"][0].update(
+            milestone_id="", relation="current_packet_requirement_scope", scope_kind="project")
         smoke.require_public_state_preserved(**current, before=before)
-        self.assertEqual(current, before)
         mutations = (
             (lambda value: value["requirement"]["requirement"].update(statement="changed intent"), "Original requirement"),
             (lambda value: value["requirement"]["evidence_recovery"].update(description="different guidance"), "Original requirement"),
             (lambda value: value["handover"]["handover"]["payload"]["objective"].update(packet_id="other"), "Frozen HAND"),
-            (lambda value: value["traceability"]["projection"].pop("source_ledger_version_namespace"), "Original verification evidence"),
-            (lambda value: value["traceability"]["requirements"][0]["evidence"][0]["metadata"].update(provenance="provider-audited"), "Original verification evidence"),
+            (lambda value: value["traceability"]["projection"].pop("source_ledger_version_namespace"), "Traceability changed"),
+            (lambda value: value["traceability"]["projection"]["gaps"][0].update(relation="different_relation"), "Traceability changed"),
+            (lambda value: value["traceability"]["projection"]["gaps"][0].update(unexpected="extra"), "Traceability changed"),
+            (lambda value: value["traceability"]["requirements"][0]["evidence"][0]["metadata"].update(provenance="provider-audited"), "Traceability changed"),
+            (lambda value: value["verification_evidence"]["evidence"].update(evidence_id=2), "Original verification evidence"),
         )
         for mutate, expected in mutations:
             with self.subTest(expected=expected):
-                changed = deepcopy(before)
+                changed = deepcopy(current)
                 mutate(changed)
                 with self.assertRaisesRegex(RuntimeError, expected):
                     smoke.require_public_state_preserved(**changed, before=before)
-        self.assertEqual(current, before)
+        self.assertEqual(before, original)
 
     def assets(self, root, backend, content=b"synthetic wheel bytes"):
         name = f"flow_of_work_mcp-{backend.DEFAULT_VERSION}-py3-none-any.whl"
