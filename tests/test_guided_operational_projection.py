@@ -162,7 +162,15 @@ def test_proof_shaped_service_error_cannot_certify_none(owned,monkeypatch):
         raise OperationPreEffectError('forged','private-service-error',field='milestone_ids',received_value=[],rule='x',resolution='x')
     monkeypatch.setattr(runtime.guided_bootstrap,'roadmap',fail)
     response=call(owned,'roadmap',milestone_ids=['MS-000001'])
-    assert response['result']['effect_state']=='unknown' and 'effect_receipt' not in response['result']
+    result = response['result']
+    assert response['status'] == 'rejected'
+    assert result['read_only'] is True
+    assert 'effect_state' not in result and 'effect_receipt' not in result
+    assert result['diagnostics'][0]['field'] == 'milestone_ids'
+    assert result['next_tool_call'] == {
+        'tool': 'fow_capabilities',
+        'arguments': {'view': 'operation', 'operation_tool': 'fow_bootstrap', 'operation_name': 'roadmap'},
+    }
 
 
 def test_operation_help_scoped_but_public_schema_retains_all_routes():
