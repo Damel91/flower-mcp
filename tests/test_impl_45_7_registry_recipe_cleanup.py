@@ -113,15 +113,21 @@ def test_capability_views_are_progressive_and_exact_help_retains_unit_shape(
     assert docs["result"]["areas"] == list(work_area_catalog())
     assert "fow_packet_author" in docs["result"]["tool_reference"]
     exact = operation["result"]["operation_contract"]
-    assert exact["guidance"]["unit"]["required_fields"] == (
+    unit_guidance = exact["guidance"]["unit"]
+    assert unit_guidance["required_fields"] == (
         "client_unit_key",
         "operation_kind",
         "instructions",
-        "unit_checks",
     )
+    assert {"unit_checks", "unit_checks_from_verifies", "verifies"} <= set(unit_guidance["optional_fields"])
+    compact = unit_guidance["compact_local_checks"]["example"]
+    assert compact["unit_checks_from_verifies"] is True
+    assert "unit_checks" not in compact
+    assert [check["kind"] for check in compact["verifies"]] == ["unit_check"]
     assert "example" in exact
     assert exact["example"]["unit"]["operation_kind"] == "new_file"
     assert exact["example"]["unit"]["instructions"]
+    assert exact["example"]["unit"]["unit_checks"]
     assert all("example" not in item for item in full["result"]["operation_contracts"])
 
 

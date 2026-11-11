@@ -229,8 +229,13 @@ def test_committed_add_replay_accepts_original_stale_revisions_but_rejects_chang
     assert replay["unit_authoring"]["replayed"] is True
     assert replay["semantic_delta"]["affected_unit_key"] == "extra"
     assert snapshot(runtime) == before
+    changed_unit = {**extra_unit(), "instructions": ["Different work."]}
+    rejected = call(runtime, ids, "add_unit", "committed-add", **{**arguments, "unit": changed_unit})
+    assert_add_unit_rejection(rejected, ids, reason="state_conflict", request_id="committed-add")
     with pytest.raises(RequirementConflictError, match="another authoring intent"):
-        call(runtime, ids, "add_unit", "committed-add", **{**arguments, "unit": {**extra_unit(), "instructions": ["Different work."]}})
+        runtime.packet_unit_authoring.add_unit(
+            *ids, unit=changed_unit, actor="engineer", request_id="committed-add", **current(runtime, ids),
+        )
     assert snapshot(runtime) == before
 
 
@@ -238,10 +243,14 @@ def test_stale_uncommitted_add_creates_no_intent_or_partial_authority(authored):
     runtime, ids = authored
     revisions = current(runtime, ids)
     before = snapshot(runtime)
-    with pytest.raises(ChangeControlBlockedError, match="stale_packet_revision"):
-        call(runtime, ids, "add_unit", "stale-new-unit", unit=extra_unit(),
-             expected_spec_revision=revisions["expected_spec_revision"] - 1,
-             expected_plan_revision=revisions["expected_plan_revision"])
+    stale_spec = revisions["expected_spec_revision"] - 1
+    blocked = call(runtime, ids, "add_unit", "stale-new-unit", unit=extra_unit(),
+                   expected_spec_revision=stale_spec, expected_plan_revision=revisions["expected_plan_revision"])
+    result = assert_add_unit_rejection(
+        blocked, ids, status="blocked", reason="stale_packet_revision", request_id="stale-new-unit",
+    )
+    assert result["expected_spec_revision"] == revisions["expected_spec_revision"]
+    assert result["received_spec_revision"] == stale_spec
     assert runtime.ledger.packet_unit_authoring_intent(*ids, "extra") is None
     assert snapshot(runtime) == before
 
@@ -315,8 +324,12 @@ def test_pending_selection_stale_resume_preserves_intent_and_plan(authored):
     assert response["result"]["unit_authoring"]["state"] == "navigation_audit_has_no_candidates"
     call(runtime, ids, "revise_unit", "head-after-pending", **mutation_arguments("revise_unit"), **current(runtime, ids))
     before = snapshot(runtime)
-    with pytest.raises(ChangeControlBlockedError, match="stale_packet_revision"):
-        call(runtime, ids, "add_unit", "pending-resume", client_unit_key="pending", **revisions)
+    blocked = call(runtime, ids, "add_unit", "pending-resume", client_unit_key="pending", **revisions)
+    result = assert_add_unit_rejection(
+        blocked, ids, status="blocked", reason="stale_packet_revision", request_id="pending-resume",
+    )
+    assert result["expected_spec_revision"] == current(runtime, ids)["expected_spec_revision"]
+    assert result["received_spec_revision"] == revisions["expected_spec_revision"]
     assert snapshot(runtime) == before
 
 
@@ -435,6 +448,10 @@ def test_failed_authoring_preserves_all_durable_authority(authored, operation, a
     if operation == "revise_unit":
         rejected = call(runtime, ids, operation, "invalid-author-" + operation, **arguments, **current(runtime, ids))
         assert_unknown_rejection(rejected, reason="invalid_input", request_id="invalid-author-revise_unit")
+    elif operation == "add_unit":
+        rejected = call(runtime, ids, operation, "invalid-author-add_unit", **arguments, **current(runtime, ids))
+        result = assert_add_unit_rejection(rejected, ids, reason="invalid_input", request_id="invalid-author-add_unit")
+        assert "target_selection is provider-owned" in result["diagnostics"][0]["message"]
     else:
         with pytest.raises((ValueError, ChangeControlBlockedError, RequirementConflictError)):
             call(runtime, ids, operation, "invalid-author-" + operation, **arguments, **current(runtime, ids))
@@ -471,10 +488,24 @@ def test_cross_packet_request_reuse_rejects_before_ancillary_lifecycle_repair(au
     assert runtime.packet_construction.audit_for_packet(*scoped) is None
 
 
-def assert_unknown_rejection(response, *, reason, request_id, status="rejected"):
+def assert_unknown_rejection(response, *, reason, request_id, status="rejected", operation="revise_unit"):
     assert response["status"] == status and response["reason"] == reason
     result = response["result"]
     assert result["effect_state"] == "unknown" and result["operation_state"] == "unknown"
     assert "effect_receipt" not in result
-    assert result["original_request"]["operation"] == "revise_unit"
+    assert result["original_request"]["operation"] == operation
     assert result["original_request"]["request_id"] == request_id
+
+
+def assert_add_unit_rejection(response, ids, *, reason, request_id, status="rejected"):
+    assert_unknown_rejection(response, reason=reason, request_id=request_id, status=status, operation="add_unit")
+    result = response["result"]
+    project_id, change_id, packet_id = ids
+    assert result["original_request"] == response["audit_reference"] == {
+        "tool": "fow_packet_author", "operation": "add_unit", "project_id": project_id, "request_id": request_id,
+    }
+    assert result["next_tool_call"] == {
+        "tool": "fow_packet_inspect",
+        "arguments": {"project_id": project_id, "change_id": change_id, "packet_id": packet_id, "view": "working_sheet"},
+    }
+    return result
