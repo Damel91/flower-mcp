@@ -5,8 +5,8 @@ its coding tools; Flower supplies durable requirements, architecture, plans,
 evidence and continuation. No Flower-side model or optional inference package
 is required.
 
-**Availability:** included in Flower 0.8.0. Earlier 0.7.6 assets remain unchanged
-and do not contain this adapter.
+Flower supports native MCP registration for OpenCode V2. The optional
+compaction recovery plugin is available from Flower 1.0.0.
 
 ## Prerequisites and installation
 
@@ -18,14 +18,14 @@ instructions before selecting this adapter.
 For a new installation on macOS or Linux, review the installer and run:
 
 ```sh
-curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.sh | bash -s -- --platform opencode
+curl -fsSL https://github.com/Damel91/flower-mcp/releases/download/v1.0.0/install.sh | bash -s -- --platform opencode
 ```
 
 On Windows, from PowerShell:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v0.14.0/install.ps1' -OutFile '.\install.ps1'
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '0.14.0' -Platform opencode
+Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Damel91/flower-mcp/releases/download/v1.0.0/install.ps1' -OutFile '.\install.ps1'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version '1.0.0' -Platform opencode
 ```
 
 The Python release backend also accepts `--platform opencode`. Check the
@@ -34,12 +34,12 @@ The source and wheel installation routes remain available in that guide.
 Native OpenCode execution on Windows/Linux requires its own qualification;
 installer CI and macOS connection checks are distinct from model usability.
 
-For an existing installation, first use the [ordinary upgrade](UPGRADING.md#preparing-a-080-upgrade)
+For an existing installation, first use the [ordinary upgrade](UPGRADING.md#preparing-a-100-upgrade)
 with the same environment/profile/database. Then run its returned installed
 command with `install --platform opencode` to add the registration, retaining
-the original `--profile` and `--profile-root` values. Do not combine client
-registration with `--upgrade`. If Flower
-0.8.0 or later is already installed, only registration is needed; no database replacement.
+the original `--profile` and `--profile-root` values. Run registration as a
+separate command after the upgrade. An existing Flower 1.0.0 installation
+only needs registration to add OpenCode.
 
 ## Select the configuration and profile
 
