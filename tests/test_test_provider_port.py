@@ -295,6 +295,7 @@ def test_materialization_uses_public_tool_and_private_provider_correlation() -> 
     assert metadata["flow_session_ref"] == "flow-project"
     assert metadata["campaign_ref"] == "CAMP-000001"
     assert metadata["case_ref"] == "CASE-000001"
+    assert metadata["attestation_intent_ref"] == "ATTEST-000001"
     assert metadata["oracle"]["fingerprint"] == "oracle-fingerprint"
     assert metadata["semantic_input"]["harness"] == {
         "disposition": "repository",
@@ -303,6 +304,30 @@ def test_materialization_uses_public_tool_and_private_provider_correlation() -> 
     assert receipt.command_id == "TCMD-000001"
     assert receipt.materialization_ref == "TEST-000001"
     assert receipt.provider_test_ref == "TEST-000001"
+
+
+@pytest.mark.parametrize("operation", ["edit", "run", "promote"])
+def test_source_retry_uses_one_provider_binding_without_changing_ledger_identity(operation):
+    original = _command()
+    attempt = "ATTEST-000001/retry/TCMD-000001"
+    command = replace(
+        original,
+        operation=operation,
+        command_id="TCMD-000002",
+        semantic_input={
+            **original.semantic_input,
+            "provider_test_ref": "TEST-000001",
+            "source_provider_attempt_ref": attempt,
+        },
+    )
+    client = _Client(_response(command_ref=command.command_id))
+    receipt = _provider(client).execute(command)
+    metadata = client.metas[0][FLOW_TEST_PROVIDER_METADATA_KEY]
+    assert metadata["attestation_intent_ref"] == attempt
+    assert metadata["authority_input_fingerprint"] == command.authority_input_fingerprint
+    assert "source_provider_attempt_ref" not in metadata["semantic_input"]
+    assert command.attestation_intent_ref == original.attestation_intent_ref
+    assert receipt.command_id == command.command_id
 
 
 @pytest.mark.parametrize("operation", ["materialize", "edit", "validate", "run", "promote", "discard", "report"])
@@ -390,13 +415,35 @@ def test_current_flow_oracle_kinds_map_to_closed_provider_kinds(
     assert client.calls[0][1]["oracle"]["test_kind"] == provider_kind
 
 
-def test_unknown_oracle_kind_fails_before_provider_side_effect() -> None:
+@pytest.mark.parametrize("operation", ("materialize", "edit"))
+def test_source_oracle_label_uses_case_kind_on_the_wire(operation: str) -> None:
+    client = _Client(_response())
+    command = _command(operation=operation)
+    semantic = dict(command.semantic_input)
+    oracle = dict(semantic["oracle_snapshot"])
+    oracle["oracle_kind"] = "pytest_source"
+    semantic["oracle_snapshot"] = oracle
+    semantic["case"] = {"oracle_kind": "behavior"}
+    if operation == "edit":
+        semantic["provider_test_ref"] = "TEST-000001"
+    command = replace(command, semantic_input=semantic)
+
+    _provider(client).execute(command)
+
+    assert client.calls[0][1]["oracle"]["test_kind"] == "unit_contract"
+    assert command.semantic_input["oracle_snapshot"]["oracle_kind"] == "pytest_source"
+
+
+@pytest.mark.parametrize("case", (None, {"oracle_kind": "unsupported-case"}))
+def test_unknown_oracle_kind_fails_before_provider_side_effect(case) -> None:
     client = _Client(_response())
     command = _command()
     semantic = dict(command.semantic_input)
     oracle = dict(semantic["oracle_snapshot"])
     oracle["oracle_kind"] = "unsupported-kind"
     semantic["oracle_snapshot"] = oracle
+    if case is not None:
+        semantic["case"] = case
     command = ProviderCommand(**{**command.__dict__, "semantic_input": semantic})
 
     with pytest.raises(

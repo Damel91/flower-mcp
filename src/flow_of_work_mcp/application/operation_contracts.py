@@ -12,6 +12,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from flow_of_work_mcp.core.domain.assurance import (
+    CampaignCaseKind,
     FindingDisposition,
     ReviewFindingSeverity,
 )
@@ -21,6 +22,7 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
     TEST_HARNESS_DISPOSITIONS,
     TEST_HARNESS_PARTICIPANT_FIELDS,
 )
+from flow_of_work_mcp.core.domain.campaign_host import HOST_CAMPAIGN_OUTCOMES
 from flow_of_work_mcp.core.domain.change_control import (
     PacketReadinessState,
     PacketStatus,
@@ -43,8 +45,9 @@ from flow_of_work_mcp.core.domain.provider_surfaces import (
 from flow_of_work_mcp.core.domain.bootstrap import BootstrapPath
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
 from flow_of_work_mcp.core.domain.enums import LifecycleStatus, VerificationKind, VerificationOutcome
+from flow_of_work_mcp.core.domain.external_work import CONTRACT_KINDS
 from flow_of_work_mcp.application.tool_help import (
-    FIELD_HELP, FIELD_OVERRIDES, TOOL_EFFECTS, TOOL_GUIDANCE,
+    FIELD_HELP, FIELD_OVERRIDES, NESTED_FIELD_HELP, TOOL_EFFECTS, TOOL_GUIDANCE,
 )
 
 
@@ -113,11 +116,13 @@ class OperationContract:
             },
             "example": _example(self),
             "field_descriptions": {
-                name: parameter_help(self.tool, name,
-                    selected_operation=self.operation if self.tool == "fow_bootstrap" else "")["description"]
+                name: parameter_help(self.tool, name, selected_operation=self.operation)["description"]
                 for name in dict.fromkeys(
                     path.split(".", 1)[0] for path in (*self.required, *self.optional)
                 )
+            } | {
+                path: NESTED_FIELD_HELP[path] for path in (*self.required, *self.optional)
+                if path in NESTED_FIELD_HELP
             },
             **({"owner": self.owner} if self.owner else {}),
             "area": self.area,
@@ -234,6 +239,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "view",
         "get_change",
         "get_finding",
+        "inspect_change_acceptance",
         "get_run",
         "get_handover",
         "resume_context",
@@ -260,6 +266,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
         "constructibility",
         "oracle_ir",
         "attestation",
+        "host_attempts",
         "evidence",
         "residuals",
         "discover",
@@ -365,7 +372,7 @@ def _operation_metadata(tool: str, operation: str) -> Mapping[str, object]:
 _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         "fow_architecture", "project_bootstrap",
-        'Define and select the project technical architecture: components, interfaces and engineering decisions. Inspect current authority, propose a complete revision, then explicitly adopt it.',
+        'Define and select the project technical architecture: components, interfaces and engineering decisions. Inspect, propose, adopt, or export a revision as Markdown.',
     ),
     ToolDescriptor(
         "fow_external_work", "packet_lifecycle",
@@ -467,12 +474,12 @@ _PUBLIC_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         "fow_generate_artifacts",
         "handover",
-        'Render and retain project lifecycle documents using an existing artifact profile in a durable local job. The host publishes or saves returned artifacts separately.',
+        'Render and retain project lifecycle documents in a durable local job. Use profile_id=fow-srs-markdown-v1 for the requirements catalogue.',
     ),
     ToolDescriptor(
         "fow_get_artifacts",
         "handover",
-        'Retrieve retained artifact generations and optionally their document contents, filtered by generation or artifact kind.',
+        'Retrieve retained artifact generations. For a complete requirements Markdown export, select its generation_id, artifact_kind=requirements_catalogue and include_content=true.',
     ),
     ToolDescriptor(
         "fow_ground_intent",
@@ -653,14 +660,22 @@ _BOOTSTRAP.update({
         enums={"correspondence.disposition": tuple(bootstrap_input_schema("correspondence")["properties"]["disposition"]["enum"])},
         guidance={"input_schema": {"correspondence": bootstrap_input_schema("correspondence")}, "currentness": "Use the current recorded answer revision and existing canonical IDs. Supply all three reference lists; at least one list must contain a current canonical reference. Replace example IDs with IDs returned by canonical authoring. This records correspondence, not semantic truth or acceptance."}),
     "roadmap": _c("fow_bootstrap", "roadmap", _P + ("bootstrap_id", "milestone_ids"),
-        guidance={"continuation": "Extend only an active guided cycle through ordinary canonical authoring and explicit milestone_ids, then confirm_roadmap against its current fingerprint and actual confirmation. Completed preparation is historical; use a new guided cycle for newly authorized scope."}),
+        guidance={"continuation": "Extend only an active guided cycle through ordinary canonical authoring and explicit milestone_ids. Use revise_draft_milestone with the observed revision and fingerprint to correct an existing draft milestone, then confirm_roadmap against the current fingerprint and actual confirmation. Completed preparation is historical; use a new guided cycle for newly authorized scope."}),
+    "revise_draft_milestone": _c("fow_bootstrap", "revise_draft_milestone",
+        _P + ("bootstrap_id", "milestone_ids", "roadmap_fingerprint", "request_id",
+              "milestone_revision.milestone_id", "milestone_revision.expected_revision"),
+        tuple("milestone_revision." + key for key in bootstrap_input_schema("milestone_revision")["properties"]
+              if key not in bootstrap_input_schema("milestone_revision")["required"]),
+        guidance={"input_schema": {"milestone_revision": bootstrap_input_schema("milestone_revision")},
+                  "draft": "Copy the exact selected roadmap and the milestone's current revision. Supply at least one replacement. The ID and ordinal persist. A prior confirmation or affected governed work protects the scope.",
+                  "recovery": "Read roadmap after a successful edit; refresh stale correspondence before confirmation. Exact request replay returns the original outcome, including its prior snapshot for a material edit. Read roadmap again for current authority."}),
     "confirm_roadmap": _c("fow_bootstrap", "confirm_roadmap", _P + ("bootstrap_id", "milestone_ids", "roadmap_fingerprint", "confirmation_reference", "request_id")),
     "record_continuation": _c("fow_bootstrap", "record_continuation", _P + ("bootstrap_id", "continuation_choice", "continuation_reference", "roadmap_fingerprint", "progress_revision", "reason", "request_id"), enums={"continuation_choice": ("continue", "review")}),
 })
 
 # Applicability is explanatory authority, not another gate or mode dispatcher.
 for _name in ("record_intake", "confirm_intake", "derive_behavior", "record_answer",
-              "record_correspondence", "roadmap", "confirm_roadmap", "record_continuation"):
+              "record_correspondence", "roadmap", "revise_draft_milestone", "confirm_roadmap", "record_continuation"):
     _contract = _BOOTSTRAP[_name]
     _path_help = (
         "code_import only, after confirmed intake; requires a configured bootstrap-behavior provider and internal model. It is not a guided_engineering step."
@@ -896,7 +911,17 @@ _CHANGE = {
         optional,
         enums=_CHANGE_ENUMS.get(operation),
         owner=_CHANGE_OWNER[operation],
-        guidance={"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE} if operation == "revise_packet" else {},
+        guidance={
+            "revise_packet": {"architecture_refs": _ARCHITECTURE_REFS_GUIDANCE},
+            "transition_packet": {
+                "criterion_results": (
+                    "For packet_status=implemented, copy each completion criterion verbatim, "
+                    "including punctuation, from fow_packet_inspect with view=summary. "
+                    "Use its exact text as a key and its observed result or evidence reference "
+                    "as the value. Supply every criterion that lacks a recorded result."
+                ),
+            },
+        }.get(operation),
     )
     for operation, (required, optional) in _CHANGE_FIELDS.items()
 }
@@ -956,10 +981,24 @@ _ASSURANCE = {
             "engineer_gate": "Technical investigation/architecture/reuse are engineer-owned. Semantic mismatch requires current canonical reread and a linked ordinary corrective with explicit regression; human clarification concerns intended behavior or requested scope change.",
             "assessment_schema": {"expected_intent_fingerprint": "from get_finding", "expected_finding_fingerprint": "from get_finding", "classification": "correction_within_intent|intent_change_required|needs_clarification", "rationale": "bounded host judgment after canonical reread", "technical_decisions": ["selected technical realization"], "evidence_refs": ["declared source evidence"]} if operation == "reassess_intent" else {},
             "provenance": "Host-declared reassessment is not provider-audited semantic truth or human acceptance. Exact request replay returns original history before currentness.",
+            **({"require_any_of": ["source_anchor", "implementation_ref"],
+                "anchors": "Supply at least one actual source anchor or implementation reference. Both can be supplied."}
+               if operation == "record_finding" else {}),
+            **({"requires_if": {
+                "disposition_reference": {"disposition": ["accepted_exception", "deferred", "superseded", "cancelled"]},
+                "evidence_refs": {"disposition": ["resolved"]},
+            }} if operation == "set_finding_disposition" else {}),
         },
     )
     for operation, (required, optional) in _ASSURANCE_FIELDS.items()
 }
+_ASSURANCE["inspect_change_acceptance"] = _c(
+    "fow_assurance", "inspect_change_acceptance", _P + ("change_id",), (),
+    guidance={
+        "scope": "Read the same current technical prerequisites as request_change_acceptance for one existing change.",
+        "effect": "Read-only. A satisfied preflight is not a stakeholder decision and grants no acceptance.",
+    },
+)
 
 _RUN_FIELDS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "create_run": (
@@ -1016,7 +1055,7 @@ _HANDOVER = {
         "fow_handover",
         "project_state_snapshot",
         ("project_id", "operation"),
-        ("focus_kind", "focus_ref", "limit"),
+        ("focus_kind", "focus_ref", "limit", "projection_kind"),
         enums={
             "focus_kind": (
                 "project",
@@ -1027,9 +1066,16 @@ _HANDOVER = {
                 "gate",
             )
         },
+        guidance={
+            "acceptance_context": "Focus a packet or milestone for scoped recorded state, evidence and actual acceptance blockers. The packet checkpoint does not establish milestone eligibility. Distinguish awaited human input from technical prerequisites and advisory registrations.",
+            "presentation": "Default Markdown is compact. Use projection_kind=audit for service metadata and full bounded detail on the same focus. Both presentations return the same structured snapshot contract and leave the ledger unchanged.",
+        },
     ),
 }
-_HANDOVER["project_progress"] = _c("fow_handover", "project_progress", ("project_id", "operation", "milestone_ids"))
+_HANDOVER["project_progress"] = _c(
+    "fow_handover", "project_progress", ("project_id", "operation", "milestone_ids"),
+    guidance={"provenance": "Progress totals use the recorded criterion scope. Completed implementation and local checks count matching current host reports. Milestone acceptance uses separately recorded evidence and status. This read does not inspect code or run tests."},
+)
 
 
 _GOAL = {
@@ -1119,7 +1165,6 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "client_unit_key",
             "operation_kind",
             "instructions",
-            "unit_checks",
         ),
         "optional_fields": (
             "target_description",
@@ -1134,6 +1179,8 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "provides",
             "requires",
             "verifies",
+            "unit_checks",
+            "unit_checks_from_verifies",
         ),
         "operation_kinds": (
             "modify_existing",
@@ -1163,12 +1210,13 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "the provider surface exactly; Flower does not infer it from a path."
         ),
         "instruction_rule": (
-            "Instructions state ordered work to perform; an objective, identifier, "
+            "Supply instructions as an array of ordered actions. An objective, identifier, "
             "or expected outcome never substitutes for those actions."
         ),
         "unit_check_rule": (
             "Keep unit_checks local to this unit instead of copying packet-wide "
-            "completion criteria into every unit. An empty list is allowed only "
+            "completion criteria into every unit. Supply unit_checks explicitly "
+            "unless using the advertised compact local-check input. An empty list is allowed only "
             "with nonempty verifies containing exclusively deferred intents; "
             "do not invent a local check to satisfy authoring."
         ),
@@ -1180,6 +1228,14 @@ _PACKET_UNIT_GUIDANCE: Mapping[str, object] = MappingProxyType(
             "coverage can be legitimate. Never delete, weaken or defer an obligation "
             "merely to close PVP."
         ),
+        "compact_local_checks": {
+            "scope": "Only for a packet already in explicit external_agent mode. Available on complete unit input and revise_unit unit_patch.",
+            "rule": "Set unit_checks_from_verifies to true and supply the full verifies array, without unit_checks. Flower copies distinct normalized statements of same-unit unit_check declarations in their original order; choose the criterion numbers yourself. Include at least one local declaration. Preserve applicable deferred declarations in verifies; they never become local. Use explicit empty unit_checks for exclusively deferred units.",
+            "example": {"unit_checks_from_verifies": True, "verifies": [
+                {"criterion": 1, "kind": "unit_check", "statement": "The API exposes the declared behavior."},
+            ]},
+            "result": "The input marker is not stored or exported. The canonical unit, PVP and verification evidence use the existing checks and declarations.",
+        },
         "authoring_cycle": (
             "Open PVP holds affected repository effects while technical investigation "
             "and ordinary authoring continue within confirmed intent. Array patches "
@@ -1259,6 +1315,15 @@ _WORKSPACE_REVIEW_GUIDANCE: Mapping[str, object] = MappingProxyType(
 
 _CAMPAIGN_SOURCE_ATTESTATION_GUIDANCE: Mapping[str, object] = MappingProxyType(
     {
+        "source_files": (
+            "Send the complete source text inline as the value in source_files. The key is a "
+            "destination in the provider-managed test harness. Leave the product checkout unchanged. "
+            "For a new CodingCastle test, choose one unused destination for this case, separate "
+            "from product files and other cases. Keep an already bound destination on retry. "
+            "Include a discoverable test for the selected "
+            "framework. For Python, pytest collects test_* functions and unittest collects "
+            "unittest.TestCase methods named test_*. A helper function alone is not a runnable test."
+        ),
         "harness": {
             "required_fields": ("disposition", "participants"),
             "accepted_values": {
@@ -1287,8 +1352,29 @@ _CAMPAIGN_SOURCE_ATTESTATION_GUIDANCE: Mapping[str, object] = MappingProxyType(
             ),
             "example": {"language": "python", "framework": "pytest"},
         },
+        "recovery": (
+            "If the campaign gate reports a finished technical invalidation and offers same-source recovery, "
+            "submit one fresh request with the original source files, harness and capability. The new "
+            "provider attempt checks readiness. Keep the source bytes and paths unchanged and inspect its result. "
+            "Reuse the original request_id only to read back that exact recorded request and "
+            "command. An unresolved delivery must be reconciled before a new attempt."
+        ),
     }
 )
+
+_SOURCE_ORACLE_FIELDS_EXAMPLE = {
+    "preconditions": ["The target command can run in a clean working directory."],
+    "stimulus": "Invoke the command with the case input.",
+    "input_domain": {"argument": "One valid text argument"},
+    "expected_observations": ["The command exits successfully and emits the expected text."],
+    "invariants": [],
+    "forbidden_effects": ["Writing files into the working directory."],
+    "tolerances": {},
+    "expected_failure_transitions": [],
+    "oracle_violation_conditions": ["The exit status or output differs from the expected observation."],
+    "execution_class": "deterministic",
+    "verification_intent": "Check the exact observable output and exit status.",
+}
 
 _PACKET_AUTHOR = {
     "start_packet": _c(
@@ -1431,8 +1517,8 @@ _PACKET_AUTHOR = {
         ),
         ("expected_spec_revision",),
         guidance={"unit": dict(_PACKET_UNIT_GUIDANCE),
-                  "unit_patch": {"declaration_fields": ["unit_checks", "implements", "provides", "requires", "verifies"],
-                      "patch_rule": "Omitted fields remain unchanged; each provided array replaces the entire previous array. Preserve applicable existing declarations. Use current CAS, then review/accept the proposed revision and revalidate."}},
+                  "unit_patch": {"declaration_fields": ["unit_checks", "unit_checks_from_verifies", "implements", "provides", "requires", "verifies"],
+                      "patch_rule": "Omitted fields remain unchanged; each provided array replaces the entire previous array. The compact opt-in replaces both verifies and the derived unit_checks. Preserve applicable existing declarations. Use current CAS, then review/accept the proposed revision and revalidate."}},
     ),
     "remove_unit": _c(
         "fow_packet_author",
@@ -1477,6 +1563,12 @@ _PACKET_AUTHOR = {
             "expected_plan_revision",
         ),
         ("expected_spec_revision",),
+        guidance={
+            "expected_plan_revision": "Use the current work-plan revision from fow_packet_inspect view=working_sheet. This revision controls the dependency update.",
+            "expected_spec_revision": "When provided, use the current packet specification revision. It is independent of the work-plan revision.",
+            "depends_on": "Supply the complete replacement list of predecessor unit keys in the same plan. Use an empty list to clear dependencies.",
+            "recovery": "A stale revision identifies the precise revision field and a read-only inspection of the same packet. Inspect both revisions and compare the original request before deciding whether to submit a new update. The mutation receipt reports the resulting plan_revision and replayed; a replay keeps the original result while current_authority describes the head.",
+        },
     ),
 }
 
@@ -1492,6 +1584,7 @@ _PACKET_ADVANCE = {
             "sync_boundary": "provider_synchronized means current authoring deltas are synchronized, not that execution has never started or been accepted. Review and explicitly call mode=advance to start. Continued synchronization next actions retain mode=sync_only.",
             "controls": "Pending, delivering, unknown or explicitly retried rejected START/STOP are held unchanged as provider_control_pending with exact pending_control identity. Inspect gates; sync_only never claims, retries, supersedes or delivers controls. Conflicting control/semantic decisions are rejected before effects.",
             "authority": "Existing selection, negotiation, PVP, currentness, generation and exact ACK/recovery guards still apply. Unknown delta delivery never falls through to START. Mode is not persisted and changes no provider wire or acceptance authority.",
+            "decision_recovery": "In ordinary advance, known decision or revision conflicts return a blocked application result with the failed comparison and a scoped packet gates read. The request may have earlier effects; inspect before retrying and retain the original request and evidence. The expected operation describes the rejection check, not new authority.",
         },
     ),
     "accept_work_plan": _c(
@@ -1506,6 +1599,7 @@ _PACKET_ADVANCE = {
             "request_id",
         ),
         ("change_id", "expected_spec_revision", "expected_plan_revision"),
+        guidance={"recovery": "On a blocked decision or revision conflict, read the returned packet gates and recover the original request before any retry. A failed comparison does not prove the whole request had no effect."},
     ),
     "reject_work_plan": _c(
         "fow_packet_advance",
@@ -1616,6 +1710,7 @@ _PACKET_INSPECT = {
         ("project_id", "packet_id", "view"),
         ("change_id", "detail_level", "offset", "limit"),
         enums={"detail_level": ("standard", "audit")},
+        guidance={"acceptance_context": "At an external work acceptance or deferred-verification checkpoint, summary shows the selected milestone's actual blockers and existing evidence. Use a focused project_state_snapshot for explicit inspection at other stages."} if view == "summary" else None,
     )
     for view in (
         "summary",
@@ -1625,6 +1720,14 @@ _PACKET_INSPECT = {
         "history",
         "requirements",
     )
+}
+
+_CAMPAIGN_CASE_HELP = {
+    "case_kind": {
+        "recognized_labels": [kind.value for kind in CampaignCaseKind],
+        "compatibility": "The listed labels include legacy aliases such as regression, normalized as deterministic_regression for coverage. Nonempty custom labels such as automated are retained; coverage normalizes unrecognized labels as tool_smoke.",
+    },
+    "oracle_kind": "behavior is the default and supported Oracle IR profile. Other nonempty labels are accepted as source data; they do not gain that IR qualification.",
 }
 
 _CAMPAIGN_AUTHOR = {
@@ -1640,8 +1743,12 @@ _CAMPAIGN_AUTHOR = {
             "scope.finding_ids",
             "scope.invariants",
             "scope.environment_assumptions",
+            "scope.execution_lane",
+            "scope.independent_proof_refs",
             "case",
         ),
+        enums={"scope.execution_lane": ("host", "provider")},
+        guidance={"initial_case": "Optional initial case uses the same case fields as add_case."},
     ),
     "edit_scope": _c(
         "fow_campaign_author",
@@ -1655,8 +1762,11 @@ _CAMPAIGN_AUTHOR = {
             "scope.finding_ids",
             "scope.invariants",
             "scope.environment_assumptions",
+            "scope.execution_lane",
+            "scope.independent_proof_refs",
             "expected_fingerprint",
         ),
+        enums={"scope.execution_lane": ("host", "provider")},
     ),
     "add_case": _c(
         "fow_campaign_author",
@@ -1677,11 +1787,14 @@ _CAMPAIGN_AUTHOR = {
             "case.setup",
             "case.cleanup",
             "case.execution_class",
+            "case.execution_lane",
             "case.required",
             "case.obligation_ids",
             "case.oracle_kind",
             "expected_fingerprint",
         ),
+        guidance=_CAMPAIGN_CASE_HELP,
+        enums={"case.execution_lane": ("host", "provider")},
     ),
     "edit_case": _c(
         "fow_campaign_author",
@@ -1703,11 +1816,14 @@ _CAMPAIGN_AUTHOR = {
             "case.setup",
             "case.cleanup",
             "case.execution_class",
+            "case.execution_lane",
             "case.required",
             "case.obligation_ids",
             "case.oracle_kind",
             "expected_fingerprint",
         ),
+        guidance=_CAMPAIGN_CASE_HELP,
+        enums={"case.execution_lane": ("host", "provider")},
     ),
     "remove_case": _c(
         "fow_campaign_author",
@@ -1720,6 +1836,32 @@ _CAMPAIGN_AUTHOR = {
         "reorder_cases",
         _P + ("request_id", "campaign_id", "case_order"),
         ("expected_fingerprint",),
+    ),
+    "author_obligations": _c(
+        "fow_campaign_author",
+        "author_obligations",
+        _P + ("request_id", "campaign_id", "expected_fingerprint", "obligation_batch"),
+        guidance={
+            "decisions": "Each entry has obligation_id, decision and rationale.",
+            "bindings": "Each entry has an existing case_id, obligation_id and coverage_intent.",
+            "bounds": "Send 1 to 64 entries total. The group is atomic and the request ID replays its original receipt.",
+        },
+    ),
+    "issue_host_check": _c(
+        "fow_campaign_author", "issue_host_check",
+        _P + (
+            "request_id", "campaign_id", "case_id", "host_check.source_revision",
+            "host_check.execution_profile", "host_check.check_reference",
+        ),
+        ("expected_fingerprint",),
+    ),
+    "report_host_result": _c(
+        "fow_campaign_author", "report_host_result",
+        _P + (
+            "request_id", "campaign_id", "host_result.attempt_id", "host_result.source_revision",
+            "host_result.outcome", "host_result.evidence_reference", "host_result.observation",
+        ),
+        enums={"host_result.outcome": HOST_CAMPAIGN_OUTCOMES},
     ),
     "decide_obligation": _c(
         "fow_campaign_author",
@@ -1753,6 +1895,31 @@ _CAMPAIGN_AUTHOR = {
             "oracle.semantic_fields",
         ),
         ("oracle.goal_bindings", "oracle_id"),
+        guidance={
+            "oracle_kind": "Supply a nonempty oracle.oracle_kind explicitly. Use behavior for the supported Oracle IR profile. Other labels are accepted as source data without that IR qualification.",
+            "subject_bindings": "Use one or more exact IDs for the case subject, such as the scoped requirement ID, and cite actual authority in oracle.authority_reference.",
+            "semantic_fields": {
+                "required_keys": list(_SOURCE_ORACLE_FIELDS_EXAMPLE),
+                "nonempty_values": (
+                    "stimulus", "expected_observations", "execution_class", "verification_intent",
+                ),
+                "conditional_nonempty_keys": {
+                    "state": ("initial_state", "terminal_state", "cleanup_state"),
+                    "async": ("ordering", "timeout", "observation_timing"),
+                    "integration": ("participants", "real_mock_boundaries"),
+                    "boundary": ("partitions", "boundary_points"),
+                    "failure": ("failure_trigger", "forbidden_terminal_effects"),
+                },
+                "value_shape": (
+                    "The example uses source descriptions. Keep every required key, using an "
+                    "explicit empty value for an inapplicable key outside nonempty_values. "
+                    "If oracle_kind contains a conditional label, also fill those keys. "
+                    "The campaign gate will identify any missing source field. "
+                    "A current attest_source gate can proceed with these source fields. "
+                    "Optional deterministic IR fields are separate."
+                ),
+            },
+        },
     ),
     "answer_question": _c(
         "fow_campaign_author",
@@ -1770,7 +1937,7 @@ _CAMPAIGN_AUTHOR = {
         ("waiver_scope", "expected_fingerprint"),
         enums={"answer_authority": tuple(item.value for item in OracleAnswerAuthority)},
         guidance={
-            "current_question": "Use the exact case/Oracle/question/scope and Oracle revision projected by the current gate. All source questions precede optional deterministic IR refinement across the campaign. Inspect oracle_ir for the currently actionable optional refinement; live/unsupported profiles retain the source-authored path.",
+            "current_question": "Use the exact case/Oracle/question/scope and Oracle revision projected by the current gate. All source questions precede optional deterministic IR refinement across the campaign. Inspect view=oracle_ir for the exact current optional question and its shape. A question in the remaining-work preview alone is not an answer slot.",
             "currentness": "Optional expected_fingerprint is the current campaign fingerprint returned by inspection. A new stale request is blocked; exact original semantic replay is checked first. Omission preserves sequential authoring and does not prove a remembered question revision is current.",
             "recovery": "On a question conflict, read the exact campaign using next_tool_call; preserve original request identity for reconciliation. Host evidence, source construction, IR materialization and human acceptance remain distinct.",
         },
@@ -1859,7 +2026,8 @@ _CAMPAIGN_ADVANCE = {
         "fow_campaign_advance",
         "advance",
         ("project_id", "actor", "request_id"),
-        ("campaign_id", "change_id", "transition_budget"),
+        ("campaign_id", "change_id", "transition_budget", "source_revision"),
+        guidance={"source_revision": "Supply the observed source revision before reconciling host-reported coverage."},
     )
 }
 
@@ -1869,6 +2037,7 @@ _CAMPAIGN_INSPECT = {
         view,
         ("project_id", "view"),
         ("campaign_id", "change_id", "offset", "limit"),
+        guidance={"selector": "Select this projection with view; operation and other unknown arguments are rejected before reading."},
     )
     for view in (
         "summary",
@@ -1879,6 +2048,7 @@ _CAMPAIGN_INSPECT = {
         "constructibility",
         "oracle_ir",
         "attestation",
+        "host_attempts",
         "evidence",
         "residuals",
         "history",
@@ -2017,6 +2187,18 @@ _SIMPLE = {
     )
     for tool, (required, optional) in _SIMPLE_FIELDS.items()
 }
+_SIMPLE["fow_generate_artifacts"] = _c(
+    "fow_generate_artifacts", "call", *_SIMPLE_FIELDS["fow_generate_artifacts"],
+    guidance={
+        "requirements_catalogue": "Use profile_id=fow-srs-markdown-v1. Read fow_get_job with the returned job_id until completed, then copy the generation_id from the completed job result into fow_get_artifacts. No repository file is needed.",
+    },
+)
+_SIMPLE["fow_get_artifacts"] = _c(
+    "fow_get_artifacts", "call", *_SIMPLE_FIELDS["fow_get_artifacts"],
+    guidance={
+        "requirements_catalogue": "Select artifact_kind=requirements_catalogue, include_content=true and the generation_id from a successful generation job or this project's metadata listing. The model-facing response includes the exact stored Markdown and generation identity. No client-side file is required.",
+    },
+)
 _SIMPLE["fow_what_next"] = _c(
     "fow_what_next", "call", *_SIMPLE_FIELDS["fow_what_next"],
     enums=_SIMPLE_ENUMS["fow_what_next"],
@@ -2053,7 +2235,8 @@ _SIMPLE["fow_traceability"] = _c(
 _SIMPLE["fow_audit_phase"] = _c(
     "fow_audit_phase", "call", *_SIMPLE_FIELDS["fow_audit_phase"],
     guidance={
-        "scope": "A plain audit compares requirement traceability only. For a repository review, copy scope_id, requirement_ids and basis_fingerprint from the current repository_review projection; do not invent scope identities. Changed requirement membership needs its newly issued scope.",
+        "plain_scope": "Omit repository_review for a traceability-only audit. Choose a nonempty project-local scope_id (for example project-default for all requirements). Omitted or empty requirement_ids selects the whole project; otherwise pass existing requirement IDs. Reuse scope_id only with the identical selection and order; choose a new label when the selection changes.",
+        "review_scope": "With repository_review, copy the issued scope_id, requirement_ids and basis_fingerprint from the current packet repository_review projection. Supply that fingerprint as repository_review.expected_basis_fingerprint. Changed requirement membership needs the newly issued scope.",
         "repository_review": {
             "contract_version": "flow.repository-review.v1",
             "required_fields": ("contract_version", "change_id", "packet_id", "expected_basis_fingerprint", "source_identity", "source_revision", "coverage"),
@@ -2212,9 +2395,11 @@ _ARCHITECTURE_GUIDANCE = {
         {"kind": "packet", "change_id": "current-change-id", "packet_id": "current-packet-id"},
         {"kind": "evidence", "evidence_id": 1},
     ],
-    "interface_kinds": ["symbol", "api", "data_shape", "protocol", "behavioral_boundary"],
+    "interface_kinds": sorted(CONTRACT_KINDS),
+    "interface_kind_field": "payload.definition.interfaces[].kind accepts " + ", ".join(sorted(CONTRACT_KINDS)) + ".",
     "field_types": "Collections, boundaries, invariants, clauses, failure_contract, compatibility and subject/consumer IDs are lists; links contain the exact typed objects below. Other entity fields are strings. supersedes_decision_id is an empty string when no predecessor exists. evidence_id is a positive integer. The complete definition example shows every required entity field.",
-    "bounds": "At most128 entities,512 total links,256KiB canonical UTF-8,128 items per list and4096 characters per string. IDs match [A-Za-z][A-Za-z0-9_.-]{0,79}, unique within kind. Unknown fields/duplicate identities/dangling endpoints/foreign links fail atomically.",
+    "bounds": "At most128 entities,512 total links,256KiB canonical UTF-8 including Markdown,128 items per list and4096 characters per entity string. IDs match [A-Za-z][A-Za-z0-9_.-]{0,79}, unique within kind. Unknown fields/duplicate identities/dangling endpoints/foreign links fail atomically.",
+    "markdown": "Optional payload.definition.markdown is free-form Markdown up to 64 KiB of UTF-8, preserved as authored with the revision. A complete definition that omits it has no narrative. Fenced Mermaid is stored as text. Packet references and their currentness still select the structured entities.",
     "authority": "Proposals are immutable complete definitions and never executable authority. Adoption is an ordinary engineer decision, not product acceptance or verification. Adopted decision bodies are immutable; a changed choice gets a new ID, explicitly supersedes the retained predecessor and cannot form a cycle.",
     "replay": "Mutations require actor/request_id and expected current adopted revision (0 initially). Exact requests replay the historical receipt; changed actor/operation/payload under the same request ID conflicts. A proposal's base must still match the adopted head at adoption.",
     "effect_receipt": "Only flow.operation-effect.v1 with basis=pre_effect_validation and mutation_started=false certifies that this invocation started no mutation. Match tool=fow_architecture, operation=propose|adopt, project_id and request_id in both receipt and audit_reference. Structural rejection returns effect_state=none, operation_state=rejected and exact-operation help. It does not erase earlier effects under the same ID. Errors during/after dispatch, generic invalid_input, rollback, timeout or lost response remain unknown; inspect original evidence before any explicit new mutation. Historical owner recovery is a separate source audit, never a fabricated original receipt or automatic replay.",
@@ -2230,12 +2415,21 @@ _ARCHITECTURE = {
     "propose": _c(
         "fow_architecture", "propose",
         ("project_id", "operation", "actor", "request_id", "payload.expected_revision", "payload.definition"),
+        ("payload.definition.markdown",),
+        enums={"payload.definition.interfaces[].kind": tuple(sorted(CONTRACT_KINDS))},
         guidance=_ARCHITECTURE_GUIDANCE,
     ),
     "adopt": _c(
         "fow_architecture", "adopt",
         ("project_id", "operation", "actor", "request_id", "payload.expected_revision", "payload.revision", "payload.rationale"),
         guidance=_ARCHITECTURE_GUIDANCE,
+    ),
+    "export": _c(
+        "fow_architecture", "export", ("project_id", "operation"), ("payload.revision",),
+        guidance={
+            "revision": "Omit payload.revision or use 0 for the current adopted revision. Use a positive revision for an exact historical or proposed definition. If no adopted revision exists, inspect history for proposals.",
+            "output": "Returns complete Markdown with the project, selected revision, state, fingerprint, canonical components, interfaces, decisions and authored narrative. This read grants no authority and requires no file. The structured result retains the same Markdown and revision data.",
+        },
     ),
 }
 
@@ -2245,12 +2439,13 @@ _EXTERNAL_WORK_FIELDS = {
     "select_executor": (("payload.executor", "payload.expected_spec_revision", "payload.expected_plan_revision"), ("payload.provider_kind",)),
     "negotiate_provider": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ()),
     "upgrade_validation": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ()),
+    "classify_criteria": (("payload.expected_spec_revision", "payload.expected_plan_revision", "payload.dispositions"), ()),
     "criteria": ((), ()),
     "reconcile_criteria": (("payload.expected_spec_revision", "payload.rationale", "payload.criteria"), ("payload.new_statements",)),
     "add_criterion": (("payload.statement", "payload.expected_spec_revision"), ()),
     "edit_criterion": (("payload.number", "payload.statement", "payload.expected_spec_revision"), ()),
     "remove_criterion": (("payload.number", "payload.expected_spec_revision"), ()),
-    "validation": ((), ("payload.detail", "payload.history_offset")),
+    "validation": ((), ("payload.detail", "payload.history_offset", "payload.observed_source")),
     "provider_validation": ((), ("payload.detail",)),
     "export_plan": (("payload.expected_spec_revision", "payload.expected_plan_revision"), ("payload.allow_draft",)),
     "todo": ((), ("payload.unit_key",)),
@@ -2267,6 +2462,9 @@ _EXTERNAL_WORK = {
             **({"payload.detail": ("standard", "full")} if op in {"validation", "provider_validation"} else {}),
             **({"payload.executor": ("external_agent", "provider")} if op == "select_executor" else {}),
             **({"payload.mode": ("external_agent",)} if op == "set_mode" else {}),
+            **({"payload.dispositions[].disposition": ("implementation", "verification_only", "external_authority"),
+                "payload.dispositions[].target.kind": ("baseline", "criterion", "authority")}
+               if op == "classify_criteria" else {}),
         },
         effect_class="provider_probe_and_ledger_mutation" if op == "negotiate_provider" else "",
         guidance={
@@ -2293,8 +2491,18 @@ _EXTERNAL_WORK = {
             **({"verification_identity": "Copy the exact criterion/kind/statement from this unit's issued plan/TODO declarations used for the work. No approximate matching is accepted. Rejections identify the input field, unit, expected and received declaration and a bounded public recovery call; invalid reports persist no outcome."} if op == "report_outcome" else {}),
             **({"replay_applicability": "An exact request or identical report retry does not repeat effects. When current authority differs or a recorded execute_unit gate is obsolete, receipt_applicability describes the original pin and recorded disposition and the primary next_gate is inspection only. An exact request also retains its immutable recorded_receipt. A success or next_gate from that recorded receipt does not grant current permission."} if op == "report_outcome" else {}),
             **({"durable_export": "export_plan records an immutable artifact generation and a durable receipt. Nonempty actor and request_id are required. Retry the identical operation, actor and payload with the same request_id to recover the original receipt, including after authority changes; changed request contents under that ID conflict. A new request uses current specification/plan revisions. The aggregate tool schema also serves pure criteria/validation/provider_validation/todo reads, which may omit identity; exact operation help defines the mutation requirements. Flower does not generate request IDs. The host saves returned Markdown with its file tools."} if op == "export_plan" else {}),
-            **({"upgrade_recovery": "upgrade_validation initializes stable criterion identities once. An identical original request replays its historical receipt; changed contents under the same request ID conflict. A new request at current revisions for an already upgraded packet remains rejected with packet_validation_already_upgraded and read-only validation/criteria recovery. Stale revision failures take precedence. Read current validation and criteria before deciding whether actual criterion-authority drift requires explicit reconcile_criteria; never repeat initialization to rewrite identities or invent a mapping/rationale."} if op == "upgrade_validation" else {}),
+            **({"upgrade_recovery": "upgrade_validation initializes stable criterion identities once. New implementation-packet enrollments use validation_version=2; only external_agent applies the strict classification policy. An identical original request replays its historical receipt; changed contents under the same request ID conflict. A new request at current revisions for an already upgraded packet remains rejected with packet_validation_already_upgraded and read-only validation/criteria recovery. Stale revision failures take precedence. Read current validation and criteria before deciding whether actual criterion-authority drift requires explicit reconcile_criteria; never repeat initialization to rewrite identities or invent a mapping/rationale."} if op == "upgrade_validation" else {}),
+            **({"criterion_responsibility": "For a version 2 external-agent packet before current plan acceptance, classify every active stable criterion number exactly once at the current specification and plan revisions. Read criteria and validation first. A material specification edit requires new classification. Identical requests replay their original receipts. Classification records intent and never supplies repository evidence or acceptance.",
+                "disposition_schema": {
+                    "implementation": {"number": 1, "disposition": "implementation"},
+                    "verification_only_baseline": {"number": 2, "disposition": "verification_only", "target": {"kind": "baseline", "ref": "exact recorded change baseline"}},
+                    "verification_only_criterion": {"number": 2, "disposition": "verification_only", "target": {"kind": "criterion", "criterion": 1, "packet_id": "optional declared predecessor PACKET-000001"}},
+                    "external_authority": {"number": 3, "disposition": "external_authority", "target": {"kind": "authority", "ref": "exact accepted scoped engineering answer reference"}},
+                },
+                "unit_responsibility": "Use implements and bounded verifies for an implementation criterion. A verification-only criterion has a verifier and no implementation owner. For an in-plan target, the verifier is its producer or depends transitively on one. External-authority criteria require verifies with kind=explicit_authority and the same authority_ref. Never target the criterion itself."}
+               if op == "classify_criteria" else {}),
             **({"history": "detail=full includes bounded original report_history and page completeness. history_offset defaults0 and must be a nonnegative integer, never bool; page size20. This read remains available outside guided execution admission. Authority composition failures retain original report provenance and an explicit diagnostic; currentness/readiness are not_evaluated, not success. Historical reports are not promoted and reading does not extend the confirmed roadmap."} if op == "validation" else {}),
+            **({"source_applicability": "Optionally supply payload.observed_source with exactly identity and revision, the repository and source pin actually observed by the host. Flower compares that declaration with the stored review pin and retains the original review. With no observation, source comparison is not_observed. The host checks evidence locators on the reviewed tree."} if op == "validation" else {}),
             "engineering_cycle": "Newly accepted plans require adopted architecture and current selected architecture_refs. Cycle1 external plans require bounded current repository_review at final closure and for affected dependencies. Unit implementation/local verification, review closure and human acceptance stay distinct; human_acceptance=false is review non-attestation, not a new approval gate for each subsequent confirmed milestone. Secondary actions are options/context, not conjunctive prerequisites; follow actual scoped entry/admission and explicit human gates; report_outcome records facts even while review is open. Historical issued plans are not silently upgraded.",
         },
     ) for op, (required, optional) in _EXTERNAL_WORK_FIELDS.items()
@@ -2475,6 +2683,8 @@ def parameter_help(tool: str, name: str, *, selected_operation: str = "") -> Map
     if tool not in _BY_TOOL:
         raise KeyError(f"missing_tool_help:{tool}")
     description = FIELD_OVERRIDES.get((tool, name), FIELD_HELP[name])
+    if selected_operation and name == "payload":
+        description = "Structured input for the selected operation. Use its listed dotted fields."
     contracts = ((_BY_TOOL[tool][selected_operation],) if selected_operation
                  else tuple(_BY_TOOL[tool].values()))
     selectors = (selected_operation,) if selected_operation else operation_names(tool)
@@ -2487,7 +2697,7 @@ def parameter_help(tool: str, name: str, *, selected_operation: str = "") -> Map
     if name == "operation":
         description += " Canonical values: " + ", ".join(selectors) + "."
     elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
-        description += " Canonical values: " + ", ".join(operation_names(tool)) + "."
+        description += " Canonical values: " + ", ".join(selectors) + "."
     elif len(contracts) > 1 and name not in {"actor", "request_id", "project_id", "change_id", "packet_id"}:
         if applicable and len(applicable) != len(contracts):
             description += " Applies to: " + ", ".join(applicable) + "."
@@ -2498,14 +2708,14 @@ def parameter_help(tool: str, name: str, *, selected_operation: str = "") -> Map
     ))
     if values and name != "operation":
         description += " Canonical values: " + ", ".join(values) + "."
-    if name in {"payload", "decision", "unit", "unit_patch", "work_plan", "answer", "answers", "response", "case", "scope", "oracle", "harness", "assessment", "correspondence", "intake", "contradiction", "host_evidence", "result", "association_receipt"}:
+    if not selected_operation and name in {"payload", "decision", "unit", "unit_patch", "work_plan", "answer", "answers", "response", "case", "scope", "oracle", "harness", "assessment", "correspondence", "intake", "contradiction", "host_evidence", "result", "association_receipt"}:
         description += " Exact required/optional dotted fields and guidance: fow_capabilities(view=operation, operation_tool=" + tool + ", operation_name=<selected route>)."
     metadata: dict[str, object] = {"description": description}
     if name in {"operation", "view", "mode", "payload", "decision", "association_receipt", "result", "answer", "correspondence", "unit"}:
         if name == "operation":
             metadata["examples"] = [selectors[0]]
         elif name == "view" and tool in {"fow_packet_inspect", "fow_campaign_inspect"}:
-            metadata["examples"] = [operation_names(tool)[0]]
+            metadata["examples"] = [selectors[0]]
         elif values:
             metadata["examples"] = [values[0]]
         else:
@@ -2691,6 +2901,60 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
                 contract.enums.get(field_path, ()),
             ),
         )
+    if contract.tool == "fow_generate_artifacts":
+        result["profile_id"] = "fow-srs-markdown-v1"
+    if contract.tool == "fow_get_artifacts":
+        result.update(generation_id=1, artifact_kind="requirements_catalogue", include_content=True)
+    if contract.tool == "fow_assurance" and contract.operation == "record_finding":
+        result["source_anchor"] = "src/example.py:20"
+    if contract.tool == "fow_assurance" and contract.operation == "set_finding_disposition":
+        result.update(disposition="resolved", evidence_refs=["verification:targeted-regression"])
+    if contract.tool == "fow_campaign_author" and contract.operation in {"add_case", "edit_case"}:
+        result["case"]["case_kind"] = "regression"
+    if contract.tool == "fow_campaign_author" and contract.operation == "author_obligations":
+        result["obligation_batch"] = {
+            "decisions": [{
+                "obligation_id": "OBL-000001", "decision": "required",
+                "rationale": "This behavior is in the current scope.",
+            }],
+            "bindings": [{
+                "case_id": "CASE-000001", "obligation_id": "OBL-000001",
+                "coverage_intent": "Observe the result at the public interface.",
+            }],
+        }
+    if contract.tool == "fow_campaign_author" and contract.operation == "issue_host_check":
+        result["host_check"] = {
+            "source_revision": "commit:01234567", "execution_profile": "local fixture / Python 3.11",
+            "check_reference": "pytest tests/test_feature.py::test_case",
+        }
+    if contract.tool == "fow_campaign_author" and contract.operation == "report_host_result":
+        result["host_result"] = {
+            "attempt_id": "HOST-0123456789abcdef", "source_revision": "commit:01234567",
+            "outcome": "passed", "evidence_reference": "run:check-42",
+            "observation": "The response matched the expected observation.",
+        }
+    if contract.tool == "fow_campaign_author" and contract.operation == "author_oracle":
+        result["oracle"].update(
+            oracle_kind="behavior",
+            subject_bindings=["REQ-000001"],
+            authority_reference="REQ-000001 and the confirmed campaign case",
+            semantic_fields=deepcopy(_SOURCE_ORACLE_FIELDS_EXAMPLE),
+        )
+    if contract.tool == "fow_campaign_author" and contract.operation == "attest_source":
+        result.update(
+            source_files={
+                "tests/test_campaign_case.py": (
+                    "from example import normalize\n\ndef test_normalization():\n"
+                    "    assert normalize(' A ') == 'a'\n"
+                ),
+            },
+            requested_capability={"language": "python", "framework": "pytest"},
+            authority_reference="Current oracle and confirmed campaign case",
+        )
+    if contract.tool == "fow_change" and contract.operation == "transition_packet":
+        result.update(packet_status="implemented", criterion_results={
+            "Exact criterion text copied from packet inspection.": "Observed result and evidence reference",
+        })
     if contract.tool == "fow_packet_author" and contract.operation == "add_unit":
         result["unit"] = {
             "client_unit_key": "supporting-module",
@@ -2720,14 +2984,22 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
         else:
             result["client_unit_key"] = "supporting-module"
             result["unit_patch"] = {"verifies": [verification]}
+    if contract.tool == "fow_packet_author" and contract.operation == "set_dependencies":
+        result.update(client_unit_key="consumer", depends_on=["producer"],
+                      expected_spec_revision=3, expected_plan_revision=2)
     if contract.tool == "fow_promote_milestone":
         result.update(name="First milestone", requirement_ids=["REQ-000001"],
             prerequisite_requirement_ids=[], entry_policy={"requires_milestone": []},
             exit_policy={"verification": "Replace with declared checks for the requirement realized by this milestone."},
             risk_disposition="Known risks reviewed")
+    if contract.tool == "fow_bootstrap" and contract.operation == "revise_draft_milestone":
+        result.update(milestone_ids=["MILE-000001"], milestone_revision={
+            "milestone_id": "MILE-000001", "expected_revision": 1, "name": "Refine the first milestone"})
     if contract.tool == "fow_architecture":
         if contract.operation == "inspect":
             result["payload"] = {"revision": 0, "kind": "all", "offset": 0, "limit": 20}
+        elif contract.operation == "export":
+            result["payload"] = {"revision": 0}
         elif contract.operation == "propose":
             result["payload"].update(
                 expected_revision=0,
@@ -2788,6 +3060,8 @@ def _example(contract: OperationContract) -> Mapping[str, object]:
             result["payload"]["executor"] = "external_agent"
         elif contract.operation == "provider_validation":
             result["payload"] = {"detail": "full"}
+        elif contract.operation == "classify_criteria":
+            result["payload"]["dispositions"] = [{"number": 1, "disposition": "implementation"}]
         elif contract.operation == "reconcile_criteria":
             result["payload"]["criteria"] = [{"number": 1, "statement": "Accepted completion criterion", "active": True}]
         elif contract.operation == "report_outcome":

@@ -21,7 +21,9 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
     TestProviderReceipt,
     deterministic_materialization_failure_receipt,
     semantic_fingerprint,
+    source_materialization_failure_receipt,
     source_manifest_digest,
+    source_provider_attempt_ref,
     validate_test_command_id,
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text, validate_project_id
@@ -115,6 +117,7 @@ class TestProviderSocketStoreMixin:
                 predecessor_command = TestProviderCommand.from_payload(
                     json.loads(str(predecessor["command_json"]))
                 )
+                source_successor = False
                 if predecessor_state == "delivered":
                     receipt = connection.execute(
                         """
@@ -129,23 +132,27 @@ class TestProviderSocketStoreMixin:
                         if receipt is not None
                         else {}
                     )
-                    if (
-                        predecessor_command.operation
-                        != TestProviderOperation.MATERIALIZE
+                    receipt_state = str(receipt["attestation_state"]) if receipt is not None else ""
+                    source_successor = (
+                        _source_materialization_retry_matches(
+                            predecessor_command, command, context, receipt_payload, retry_of_command_id,
+                        )
+                        and source_materialization_failure_receipt(
+                            receipt_payload,
+                            reconciled_attestation_state=receipt_state,
+                        )
+                    )
+                    if not source_successor and (
+                        predecessor_command.operation != TestProviderOperation.MATERIALIZE
                         or command.operation != TestProviderOperation.MATERIALIZE
                         or not deterministic_materialization_failure_receipt(
-                            receipt_payload,
-                            reconciled_attestation_state=(
-                                str(receipt["attestation_state"])
-                                if receipt is not None
-                                else ""
-                            ),
+                            receipt_payload, reconciled_attestation_state=receipt_state,
                         )
                     ):
                         raise AssuranceBlockedError(
                             "test_provider_technical_retry_predecessor_invalid"
                         )
-                if _test_provider_retry_basis(predecessor_command) != (
+                if not source_successor and _test_provider_retry_basis(predecessor_command) != (
                     _test_provider_retry_basis(command)
                 ):
                     raise AssuranceBlockedError("test_provider_retry_basis_mismatch")
@@ -153,15 +160,21 @@ class TestProviderSocketStoreMixin:
                     """
                     SELECT command_id FROM test_provider_outbox
                     WHERE project_id = ? AND campaign_id = ?
-                      AND case_id = ? AND operation = ? AND ordinal > ?
+                      AND case_id = ? AND ordinal > ?
+                      AND (
+                          (? <> 0 AND operation IN ('materialize', 'edit', 'validate'))
+                          OR (? = 0 AND operation = ?)
+                      )
                     ORDER BY ordinal LIMIT 1
                     """,
                     (
                         project_id,
                         command.campaign_id,
                         command.case_id,
-                        command.operation.value,
                         int(predecessor["ordinal"]),
+                        int(source_successor),
+                        int(source_successor),
+                        command.operation.value,
                     ),
                 ).fetchone()
                 if later_lineage is not None:
@@ -232,6 +245,20 @@ class TestProviderSocketStoreMixin:
                 validate_test_command_id(command_id),
             )
             return self._test_provider_outbox_value(row)
+
+    def test_provider_outbox_for_request(
+        self, project_id: str, request_id: str
+    ) -> Mapping[str, Any] | None:
+        with self._read_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM test_provider_outbox
+                WHERE project_id = ? AND request_id = ?
+                ORDER BY ordinal LIMIT 1
+                """,
+                (validate_project_id(project_id), required_text(request_id, "request_id")),
+            ).fetchone()
+            return self._test_provider_outbox_value(row) if row is not None else None
 
     def test_provider_recoverable_commands(
         self,
@@ -430,6 +457,8 @@ class TestProviderSocketStoreMixin:
             ).fetchone()
             if attestation is None:
                 raise AssuranceBlockedError("test_provider_attestation_intent_missing")
+            if self._source_command_superseded_by_retry(connection, attestation, command_row["ordinal"]):
+                raise AssuranceBlockedError("test_provider_command_stale")
             authority_current = bool(
                 str(attestation["state"])
                 in {
@@ -629,6 +658,8 @@ class TestProviderSocketStoreMixin:
                 "test_provider_command_stale",
                 details={"expected_oracle_revision": expected[1]},
             )
+        if command.semantic_input.get("source_provider_attempt_ref", "") != source_provider_attempt_ref(attestation):
+            raise AssuranceBlockedError("test_provider_source_attempt_stale")
         if str(attestation.get("state") or "") not in {
             MaterializationAttestationState.PENDING_TECHNICAL_VALIDATION.value,
             MaterializationAttestationState.ATTESTED_CURRENT.value,
@@ -956,6 +987,7 @@ class TestProviderSocketStoreMixin:
         *,
         case_id: str = "",
         limit: int | None = 100,
+        current_obligation_ids: set[str] | None = None,
     ) -> list[Mapping[str, Any]]:
         params: list[object] = [project_id, campaign_id]
         case_clause = ""
@@ -968,7 +1000,7 @@ class TestProviderSocketStoreMixin:
             limit_clause = " LIMIT ?"
         rows = connection.execute(
             f"""
-            SELECT e.*, o.command_json AS command_json
+            SELECT e.*, o.command_json AS command_json, o.ordinal AS command_ordinal
             FROM campaign_execution_evidence e
             JOIN test_provider_outbox o
               ON o.project_id = e.project_id AND o.command_id = e.command_id
@@ -977,6 +1009,8 @@ class TestProviderSocketStoreMixin:
             """,
             tuple(params),
         ).fetchall()
+        if rows and current_obligation_ids is None:
+            current_obligation_ids = self._current_obligation_ids(connection, project_id, campaign_id)
         values: list[Mapping[str, Any]] = []
         for row in rows:
             current_case = connection.execute(
@@ -1005,8 +1039,10 @@ class TestProviderSocketStoreMixin:
                 (project_id, campaign_id, str(row["case_id"])),
             ).fetchone()
             bindings = self._case_obligation_binding_snapshot(
-                connection, project_id, campaign_id, str(row["case_id"])
+                connection, project_id, campaign_id, str(row["case_id"]),
+                current_obligation_ids=current_obligation_ids,
             )
+            obligation_basis_current = semantic_fingerprint(bindings) == str(row["obligation_binding_fingerprint"])
             semantic_current = bool(
                 current_case is not None
                 and int(current_case["revision"]) == int(row["case_revision"])
@@ -1024,8 +1060,10 @@ class TestProviderSocketStoreMixin:
                 and self._oracle_ir_attestation_dependency_current(
                     connection, latest_attestation
                 )
-                and semantic_fingerprint(bindings)
-                == str(row["obligation_binding_fingerprint"])
+                and not self._source_command_superseded_by_retry(
+                    connection, latest_attestation, row["command_ordinal"],
+                )
+                and obligation_basis_current
             )
             authoritative = bool(row["authoritative_at_recording"]) and semantic_current
             effective = str(row["effective_disposition"])
@@ -1070,6 +1108,7 @@ class TestProviderSocketStoreMixin:
                     "evidence_kind": str(row["evidence_kind"]),
                     "evidence_reference": str(row["evidence_reference"]),
                     "current": semantic_current,
+                    **({"currentness_reason": "obligation_basis_changed"} if not obligation_basis_current else {}),
                     "authoritative": authoritative,
                     "complete": bool(row["complete"]),
                     "integrity_preserved": bool(row["integrity_preserved"]),
@@ -1080,12 +1119,31 @@ class TestProviderSocketStoreMixin:
         return values
 
     @staticmethod
+    def _source_command_superseded_by_retry(
+        connection: sqlite3.Connection, attestation: sqlite3.Row, command_ordinal: int
+    ) -> bool:
+        if str(attestation["materialization_mode"]) != TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value:
+            return False
+        retry = json.loads(str(attestation["basis_json"])).get("technical_retry")
+        if not isinstance(retry, Mapping):
+            return False
+        predecessor = connection.execute(
+            "SELECT ordinal FROM test_provider_outbox WHERE project_id = ? AND command_id = ?",
+            (str(attestation["project_id"]), str(retry["predecessor_command_id"])),
+        ).fetchone()
+        return predecessor is not None and command_ordinal <= int(predecessor["ordinal"])
+
     def _case_obligation_binding_snapshot(
+        self,
         connection: sqlite3.Connection,
         project_id: str,
         campaign_id: str,
         case_id: str,
+        *,
+        current_obligation_ids: set[str] | None = None,
     ) -> list[dict[str, object]]:
+        if current_obligation_ids is None:
+            current_obligation_ids = self._current_obligation_ids(connection, project_id, campaign_id)
         return [
             {
                 "obligation_id": str(row["obligation_id"]),
@@ -1110,6 +1168,7 @@ class TestProviderSocketStoreMixin:
                 """,
                 (project_id, campaign_id, case_id),
             ).fetchall()
+            if str(row["obligation_id"]) in current_obligation_ids
         ]
 
 
@@ -1118,6 +1177,47 @@ def _test_provider_retry_basis(command: TestProviderCommand) -> str:
     payload.pop("command_ref", None)
     payload.pop("delivery_fingerprint", None)
     return exact_fingerprint(payload)
+
+
+def _source_materialization_retry_matches(
+    predecessor: TestProviderCommand,
+    successor: TestProviderCommand,
+    context: Mapping[str, object],
+    receipt: Mapping[str, object],
+    predecessor_id: str,
+) -> bool:
+    if (
+        predecessor.materialization_mode != TestProviderMaterializationMode.ORCHESTRATOR_SOURCE
+        or successor.materialization_mode != TestProviderMaterializationMode.ORCHESTRATOR_SOURCE
+        or predecessor.operation not in {TestProviderOperation.MATERIALIZE, TestProviderOperation.EDIT}
+        or successor.operation not in {TestProviderOperation.MATERIALIZE, TestProviderOperation.EDIT}
+    ):
+        return False
+    attestation = context["attestation"]
+    basis = attestation.get("basis") if isinstance(attestation, Mapping) else None
+    retry = basis.get("technical_retry") if isinstance(basis, Mapping) else None
+    if not isinstance(retry, Mapping) or retry.get("predecessor_command_id") != predecessor_id:
+        return False
+    retained_ref = receipt.get("provider_test_ref") or predecessor.semantic_input.get("provider_test_ref")
+    expected_operation = TestProviderOperation.EDIT if retained_ref else TestProviderOperation.MATERIALIZE
+    route_fields = ("language", "framework", "harness")
+    return (
+        successor.operation == expected_operation
+        and successor.semantic_input.get("provider_test_ref") == retained_ref
+        and predecessor.flow_session_ref == successor.flow_session_ref
+        and predecessor.campaign_id == successor.campaign_id
+        and predecessor.case_id == successor.case_id
+        and predecessor.oracle_id == successor.oracle_id
+        and predecessor.oracle_revision == successor.oracle_revision
+        and predecessor.oracle_fingerprint == successor.oracle_fingerprint
+        and predecessor.attestation_intent_ref == successor.attestation_intent_ref
+        and predecessor.source_manifest_digest == successor.source_manifest_digest
+        and predecessor.authority_input_fingerprint == successor.authority_input_fingerprint
+        and all(
+            predecessor.semantic_input.get(field) == successor.semantic_input.get(field)
+            for field in route_fields
+        )
+    )
 
 
 def _validate_oracle_ir_materialization_evidence(

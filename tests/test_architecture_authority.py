@@ -7,6 +7,7 @@ import pytest
 from flow_of_work_mcp import SQLiteRequirementLedger
 from flow_of_work_mcp.application.architecture import ArchitectureService
 from flow_of_work_mcp.core.domain.architecture import normalize_definition
+from flow_of_work_mcp.core.domain.external_work import fingerprint
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 
 
@@ -60,6 +61,46 @@ def test_absent_inspection_is_bounded_read_only_and_proposals_are_not_authority(
     assert remainder['complete'] and remainder['count'] == 3
     with pytest.raises(ChangeControlBlockedError, match='not_adopted'):
         ledger.validate_architecture_refs('alpha', [{'revision': proposal['revision'], 'kind': 'component', 'entity_id': 'Pi'}])
+
+
+def test_revisioned_narrative_does_not_change_an_issued_entity_selection(tmp_path):
+    ledger, service = setup(tmp_path)
+    first = adopt(service)
+    legacy = service.call('alpha', 'export')
+    assert legacy['definition_fingerprint'] == first['definition_fingerprint'] == fingerprint(legacy['definition'])
+    assert 'markdown' not in legacy['definition']
+    refs = [{'revision': first['revision'], 'kind': 'interface', 'entity_id': 'Lifecycle'}]
+    selected = ledger.resolve_architecture_refs('alpha', refs)
+
+    narrative = '  Authority in Flower.\r\n\r\n~~~mermaid\r\ngraph LR\r\nPi --> Flower\r\n~~~\r\n'
+    payload = {'expected_revision': first['revision'], 'definition': {**definition(), 'markdown': narrative}}
+    proposal = service.call('alpha', 'propose', payload=payload, actor='engineer', request_id='narrative')
+    pin = {'revision': proposal['revision']}
+    before = ledger.ledger_version('alpha')
+    draft = service.call('alpha', 'export', payload=pin)
+    assert draft['state'] == 'proposed' and '**State:** proposed' in draft['markdown']
+    assert draft['definition']['markdown'] == narrative and draft['markdown'].endswith(narrative)
+    assert service.call('alpha', 'export')['revision'] == first['revision']
+    assert service.call('alpha', 'propose', payload=payload, actor='engineer', request_id='narrative') == proposal
+    with pytest.raises(RequirementConflictError):
+        changed = {**payload, 'definition': {**payload['definition'], 'markdown': 'A different narrative.'}}
+        service.call('alpha', 'propose', payload=changed, actor='engineer', request_id='narrative')
+    with pytest.raises(ChangeControlBlockedError, match='not_adopted'):
+        service.call('beta', 'export')
+    with pytest.raises(ChangeControlBlockedError, match='revision_not_found'):
+        service.call('beta', 'export', payload=pin)
+    assert ledger.ledger_version('alpha') == before
+
+    service.call('alpha', 'adopt', actor='engineer', request_id='adopt-narrative',
+                 payload={**pin, 'expected_revision': first['revision'], 'rationale': 'Document the observed design.'})
+    reopened = ArchitectureService(SQLiteRequirementLedger(tmp_path / 'architecture.sqlite'))
+    current = reopened.call('alpha', 'export')
+    assert current['revision'] == pin['revision'] and current['state'] == 'adopted'
+    assert current['definition_fingerprint'] != legacy['definition_fingerprint']
+    assert current['markdown'].endswith(narrative)
+    assert current['provenance']['proposed_by'] == current['provenance']['adopted_by'] == 'engineer'
+    assert reopened.call('alpha', 'export', payload={'revision': first['revision']})['markdown'] == legacy['markdown']
+    assert ledger.resolve_architecture_refs('alpha', refs) == selected
 
 
 def test_exact_replay_actor_payload_and_operation_conflicts_and_restart(tmp_path):

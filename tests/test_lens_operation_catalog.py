@@ -135,8 +135,9 @@ def test_catalog_exact_wire_complete_registry_and_unique_membership(runtime):
     }
     source = {(item["tool"], item["operation"]): item for item in registry.operation_contract_index()}
     operations = {(item["tool"], item["operation"]): item for item in catalog["operations"]}
-    assert len(catalog["operations"]) == len(operations) == catalog["operation_count"] == 183
+    assert len(catalog["operations"]) == len(operations) == catalog["operation_count"] == 186
     assert set(operations) == set(source)
+    assert operations["fow_architecture", "export"]["risk"] == "read"
     assert len({tool for tool, _operation in operations}) == 37
     for pair, item in operations.items():
         assert set(item) == OPERATION_KEYS

@@ -8,6 +8,7 @@ from hashlib import sha256
 import json
 from typing import Mapping
 
+from flow_of_work_mcp.application.acceptance_context import AcceptanceContextService
 from flow_of_work_mcp.application.grounding_readiness import (
     live_grounding_readiness,
 )
@@ -60,6 +61,7 @@ class ProjectStateSnapshotService:
         packet_guards,
         packet_next_actions: PacketNextActionProjectionService,
         packet_lifecycle: PacketLifecycleProjectionService,
+        acceptance: AcceptanceContextService,
         provider_enabled: bool,
     ) -> None:
         self._consistent_reads = consistent_reads
@@ -75,7 +77,13 @@ class ProjectStateSnapshotService:
         self._packet_guards = packet_guards
         self._packet_next_actions = packet_next_actions
         self._packet_lifecycle = packet_lifecycle
+        self._acceptance = acceptance
         self._provider_enabled = bool(provider_enabled)
+
+    def acceptance_context(self, project_id: str, *, packet_id: str = "", milestone_id: str = "",
+                           limit: int = 10, packet_frontier: Mapping[str, object] | None = None) -> Mapping[str, object]:
+        return self._acceptance.read(project_id, packet_id=packet_id, milestone_id=milestone_id,
+                                     limit=limit, packet_frontier=packet_frontier)
 
     def snapshot(
         self,
@@ -160,7 +168,12 @@ class ProjectStateSnapshotService:
             )
             focus = context.validate_focus(focus)
             focused_actions = context.actions_for_focus(focus)
-            primary_action = focused_actions[0] if focused_actions else None
+            primary_action = next(
+                (action for action in focused_actions if action.get("state") != "advisory"),
+                None,
+            )
+            if focus["kind"] == "gate" and primary_action is None and focused_actions:
+                primary_action = focused_actions[0]
             next_gate = _next_gate(project_id, primary_action, traceability)
             active = context.active_work(focus, primary_action)
             packet_lifecycle = self._active_packet_lifecycle(project_id, active)
@@ -179,9 +192,10 @@ class ProjectStateSnapshotService:
                 all_goal_reach, focus, primary_action
             )
             goal_projection = _bounded_goal_projection(focused_goal_reach, limit)
+            secondary_candidates = [action for action in focused_actions if action is not primary_action]
             secondary_actions = [
                 _next_gate(project_id, item, traceability)
-                for item in focused_actions[1 : limit + 1]
+                for item in secondary_candidates[:limit]
             ]
             blockers = context.blockers(
                 active, next_gate=next_gate, packet_lifecycle=packet_lifecycle, limit=limit
@@ -196,6 +210,27 @@ class ProjectStateSnapshotService:
                 packet_lifecycle=packet_lifecycle,
                 limit=limit,
             )
+            acceptance_context = None
+            acceptance_packet = ""
+            acceptance_milestone = ""
+            if focus["kind"] == "packet":
+                acceptance_packet = focus["ref"]
+            elif focus["kind"] == "milestone":
+                acceptance_milestone = focus["ref"]
+            elif next_gate["kind"] in {"acceptance", "packet_disposition"}:
+                action_scope = next_gate["scope"]
+                packet_ids = action_scope.get("packet_ids", [])
+                milestone_ids = action_scope.get("milestone_ids", [])
+                acceptance_packet = action_scope.get("packet_id") or (packet_ids[0] if len(packet_ids) == 1 else "")
+                if not acceptance_packet and len(milestone_ids) == 1:
+                    acceptance_milestone = milestone_ids[0]
+            if acceptance_packet or acceptance_milestone:
+                acceptance_context = self._acceptance.read(
+                    project_id, packet_id=acceptance_packet, milestone_id=acceptance_milestone, limit=limit,
+                    packet_frontier=(external_frontier if acceptance_packet == active["packet_id"]
+                                     and isinstance(external_frontier, Mapping) else None),
+                    goal_graph=graph, grounding_audits=grounding_audits,
+                )
 
             canonical_project_basis = {
                 "profile_version": SNAPSHOT_PROFILE_VERSION,
@@ -235,9 +270,10 @@ class ProjectStateSnapshotService:
             name
             for name, truncated in (
                 ("goal_reach.items", bool(goal_projection["truncated"])),
-                ("secondary_actions", len(focused_actions) > limit + 1),
+                ("secondary_actions", len(secondary_candidates) > limit),
                 ("blockers", bool(blockers["truncated"])),
                 ("open_decisions", bool(decisions["omitted_count"])),
+                ("acceptance_context", bool(acceptance_context and acceptance_context["truncated"])),
             )
             if truncated
         ]
@@ -252,6 +288,7 @@ class ProjectStateSnapshotService:
             "focus": dict(focus),
             "goal_reach": goal_projection,
             "active_work": active_work,
+            **({"acceptance_context": acceptance_context} if acceptance_context is not None else {}),
             **({"repository_review": dict(repository_review)}
                if isinstance(repository_review, Mapping) else {}),
             "next_gate": next_gate,
@@ -280,7 +317,7 @@ class ProjectStateSnapshotService:
                 "truncated_sections": truncated_sections,
                 "omitted": {
                     "goal_reach_items": int(goal_projection["omitted_count"]),
-                    "secondary_actions": max(0, len(focused_actions) - 1 - limit),
+                    "secondary_actions": max(0, len(secondary_candidates) - limit),
                     "blockers": int(blockers["omitted_count"]),
                     "open_decisions": int(decisions["omitted_count"]),
                 },
@@ -416,12 +453,13 @@ class _SnapshotContext:
             raise ValueError(f"unknown packet focus: {ref}")
         if kind == "gate":
             candidates = self.ordered_actions
+            current = next((action for action in candidates if action.get("state") != "advisory"), None)
             if not ref:
                 return {
                     "kind": "gate",
-                    "ref": _action_identity(candidates[0]) if candidates else "idle",
+                    "ref": _action_identity(current) if current is not None else "idle",
                 }
-            if ref == "idle" and not candidates:
+            if ref == "idle" and current is None:
                 return focus
             if not any(_action_matches_gate(item, ref) for item in candidates):
                 raise ValueError(f"unknown gate focus: {ref}")
@@ -687,6 +725,8 @@ class _SnapshotContext:
                        source=source, scope_kind="current_packet")
         for gap in self.traceability.get("gaps", []):
             if isinstance(gap, Mapping):
+                if "relation" in gap and active["milestone_id"] and gap.get("milestone_id") != active["milestone_id"]:
+                    continue
                 relevant = self._active_requirement_ids(active)
                 gap_requirements = {
                     str(item) for item in gap.get("requirement_ids", [])
@@ -699,6 +739,8 @@ class _SnapshotContext:
                         "requirement_ids": [
                             str(item) for item in gap.get("requirement_ids", [])[:5]
                         ],
+                        **({"relation": gap["relation"], "relationship_scope": gap["scope_kind"],
+                            "milestone_id": gap["milestone_id"]} if "relation" in gap else {}),
                     },
                     source="traceability",
                     scope_kind="lifecycle_obligation",
@@ -1116,10 +1158,13 @@ def _next_gate(
     )
     # The recorded risk kind governs its presentation, not operation metadata or
     # words such as blocked/stale inside arbitrary narrative treatment.
-    if action.get("kind") == "review_milestone_risk":
-        action_kind = "review_milestone_risk"
+    if action.get("kind") in {
+        "review_milestone_risk", "create_milestone_change", "resolve_change_packet_graph",
+    }:
+        action_kind = str(action["kind"])
     reason = str(action.get("reason") or action.get("rationale") or action_kind)
-    gate_kind = _gate_kind(action_kind, reason, traceability)
+    advisory = action.get("state") == "advisory"
+    gate_kind = "advisory" if advisory else _gate_kind(action_kind, reason, traceability)
     route = None
     if str(action.get("tool") or ""):
         route = {
@@ -1129,10 +1174,12 @@ def _next_gate(
             "required_inputs": [
                 str(item) for item in action.get("required_inputs", [])
             ],
+            **({"criterion_result_keys": list(action["criterion_result_keys"])}
+               if "criterion_result_keys" in action else {}),
             **({"repository_review_template": dict(action["repository_review_template"])}
                if isinstance(action.get("repository_review_template"), Mapping) else {}),
         }
-    else:
+    elif not advisory:
         route = {
             "tool": "fow_what_next",
             "operation": "inspect_current_action",
@@ -1142,7 +1189,7 @@ def _next_gate(
     return {
         "kind": gate_kind,
         **({"advisory": True, "establishes_global_admission": False}
-           if action_kind == "review_milestone_risk" else {}),
+           if advisory or action_kind == "review_milestone_risk" else {}),
         **({"verification_recovery": dict(action["verification_recovery"]), "establishes_global_admission": False}
            if action.get("verification_recovery") else {}),
         "state": str(action.get("state") or "pending"),
@@ -1172,14 +1219,14 @@ def _gate_kind(
         return "repository_reconciliation"
     if action_kind in {"architecture_required", "architecture_authority"}:
         return "architecture_authority"
-    if action_kind == "external_validation":
+    if action_kind in {"external_validation", "external_classify_criteria", "executor_select"}:
         return "packet_construction"
     if action_kind in {"external_todo", "external_reconcile"}:
         return "external_agent_work"
     if action_kind == "external_verification":
         return "deterministic_verification"
-    if action_kind == "external_acceptance":
-        return "acceptance"
+    if action_kind == "external_packet_disposition":
+        return "packet_disposition"
     lowered = f"{action_kind} {reason}".lower()
     if any(value in lowered for value in ("blocked", "failed", "unavailable", "stale")):
         return "technical_blockage"
@@ -1387,6 +1434,11 @@ def _bounded_goal_projection(
     )
     visible = ordered[:limit]
     return {
+        "ledger_only": True,
+        "provenance_boundary": (
+            "Ledger-only Goal coverage. Missing links or recorded verification leave "
+            "repository implementation and test results unknown."
+        ),
         "summary": {
             "total": len(ordered),
             "implementation_grounded": sum(

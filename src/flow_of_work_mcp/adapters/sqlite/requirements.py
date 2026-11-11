@@ -491,6 +491,44 @@ class RequirementStoreMixin:
                 rows.append(row)
             return rows
 
+    def scoped_requirement_evidence(self, project_id: str, requirement_ids: tuple[str, ...], *,
+                                    limit: int) -> list[Mapping[str, Any]]:
+        """Read a bounded evidence sample and exact counts for the selected requirements."""
+        if not requirement_ids:
+            return []
+        placeholders = ",".join("?" for _ in requirement_ids)
+        with self._read_connection() as connection:
+            rows = connection.execute(
+                f"""WITH scoped AS (
+                        SELECT r.requirement_id, r.lifecycle_status, r.current_revision, r.ordinal,
+                               v.evidence_id, v.verification_kind, v.outcome, v.recorded_at,
+                               SUBSTR(v.reference, 1, 512) AS reference, LENGTH(v.reference) > 512 AS reference_truncated,
+                               COUNT(v.evidence_id) OVER (PARTITION BY r.requirement_id) AS evidence_count,
+                               ROW_NUMBER() OVER (PARTITION BY r.requirement_id ORDER BY v.evidence_id DESC) AS rank
+                          FROM requirements r
+                          LEFT JOIN verification_evidence v ON v.project_id = r.project_id
+                               AND v.requirement_id = r.requirement_id
+                         WHERE r.project_id = ? AND r.requirement_id IN ({placeholders})
+                    ) SELECT * FROM scoped WHERE rank <= ? ORDER BY ordinal, rank""",
+                (project_id, *requirement_ids, limit),
+            )
+            requirements = {}
+            for row in rows:
+                identity = row["requirement_id"]
+                requirement = requirements.setdefault(identity, {
+                    "requirement_id": identity,
+                    "lifecycle_status": row["lifecycle_status"],
+                    "current_revision": row["current_revision"],
+                    "direct_evidence_count": row["evidence_count"],
+                    "direct_evidence": [],
+                })
+                if row["evidence_id"] is not None:
+                    requirement["direct_evidence"].append({key: row[key] for key in (
+                        "evidence_id", "verification_kind", "outcome", "reference", "recorded_at",
+                    )})
+                    requirement["direct_evidence"][-1]["reference_truncated"] = bool(row["reference_truncated"])
+            return list(requirements.values())
+
     def verification_evidence(self, project_id: str, evidence_id: int) -> Mapping[str, Any]:
         with self._read_connection() as connection:
             self._ensure_project(connection, project_id)

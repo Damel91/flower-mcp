@@ -102,6 +102,8 @@
     settings_draft_changed: "La bozza è cambiata. Rileggi il profilo prima di salvare.",
     dashboard_project_not_found: "Il progetto non è più presente in questo profilo. Torna ai progetti e aggiorna l’elenco.",
     dashboard_evidence_too_large: "L’evidenza supera il limite di 2 MiB di questa vista. Il suo riferimento rimane visibile nel progetto.",
+    dashboard_document_not_found: "Il documento selezionato non è disponibile in questo progetto. Aggiorna la vista e selezionalo di nuovo.",
+    dashboard_document_too_large: "Il documento completo supera il limite di 2 MiB. Se disponibile, seleziona un ambito più piccolo.",
     dashboard_archive_busy: "È già in corso la preparazione o il download di un archivio. Attendi che finisca e riprova.",
     dashboard_archive_failed: "Flower non ha potuto preparare l’archivio. Controlla lo spazio disponibile e riprova.",
     dashboard_backup_failed: "Flower non ha potuto completare l’operazione sui backup. Rileggi l’elenco prima di riprovare.",
@@ -160,7 +162,7 @@
     network: null, networkBusy: false, networkEpoch: 0,
     upgradeStatus: null, upgradePreview: null, upgradeBusy: false, upgradeReading: false, upgradeEpoch: 0, rememberedUpgrade: null,
     archive: null, archiveBusy: false, backupDeletion: null,
-    loadingEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false,
+    loadingEpoch: 0, evidenceEpoch: 0, deletion: null, adminBusy: false, connectionWarning: false,
   };
   const $ = (id) => document.getElementById(id);
 
@@ -1164,6 +1166,7 @@
   }
 
   function route() {
+    if ($("evidence-dialog").open) $("evidence-dialog").close();
     const parameters = new URLSearchParams(location.search);
     const projectId = parameters.get("project");
     const view = parameters.get("view");
@@ -1419,17 +1422,26 @@
     }
     if (state.section === "packets" && item.acceptance === "not_inferred") {
       dimensions.append(element("span", "", item.next_gate?.external_operation === "request_human_acceptance"
-        ? "Accettazione pendente" : "Accettazione non dedotta"));
+        ? "Verifica gli obblighi prima dell’accettazione" : "Accettazione non dedotta"));
     }
     if (dimensions.childElementCount) main.append(dimensions);
     if (state.section === "packets" && item.next_gate?.external_operation === "inspect_historical_outcome") {
       main.append(element("p", "item-caption", "Recupero richiesto. Verifica l’esito conservato prima di procedere."));
     }
     const body = element("div", "item-body");
+    if (state.section === "packets" && item.packet_id) {
+      body.append(button("Vedi prove e accettazione", "button-secondary", () => loadAcceptance("packets", item.packet_id)));
+    } else if (state.section === "roadmap" && item.milestone_id) {
+      body.append(button("Vedi prove e accettazione", "button-secondary", () => loadAcceptance("roadmap", item.milestone_id)));
+      body.append(button("Esporta requisiti della milestone", "button-secondary evidence-action", () =>
+        loadRequirementsDocument("milestone", item.milestone_id, `Requisiti di ${item.milestone_id}`)));
+    }
     const retained = evidenceAddress(item);
     if (retained) body.append(button("Apri contenuto conservato", "button-secondary evidence-action", () => loadEvidence(retained)));
     if (state.section === "overview" && item.requirement_id) {
       body.append(verificationLink("Apri prove di requisito", "verification", item.requirement_id));
+      body.append(button("Esporta requisito", "button-secondary evidence-action", () =>
+        loadRequirementsDocument("requirement", item.requirement_id, `Requisito ${item.requirement_id}`)));
     }
     if (state.section === "packets" && item.packet_id) {
       const links = element("div", "verification-channels");
@@ -1593,7 +1605,7 @@
     return layout;
   }
 
-  function evidenceDocument(result) {
+  function renderDocument(result) {
     if (result.content_type !== "text/markdown") return element("div", "evidence-content", result.content);
     const container = element("div", "markdown-reader");
     const toolbar = element("div", "markdown-toolbar");
@@ -1633,32 +1645,207 @@
     return container;
   }
 
-  async function loadEvidence(address) {
-    $("evidence-title").textContent = "Dettaglio";
-    loading($("evidence-content"), "Lettura dell’evidenza…");
+  function loadRequirementsDocument(scope, scopeId, title) {
+    const query = new URLSearchParams({ scope });
+    if (scopeId) query.set("scope_id", scopeId);
+    return loadDocument(`documents/requirements?${query}`, { title, label: "Esportazione Markdown" });
+  }
+
+  function loadEvidence(address) {
+    const identity = String(address.identity).replace(/[^A-Za-z0-9_-]/g, "_");
+    return loadDocument(`evidence/${encodeURIComponent(address.kind)}/${encodeURIComponent(address.identity)}`, {
+      label: "Evidenza conservata", filename: `flower-${address.kind}-${identity}`,
+    });
+  }
+
+  async function loadDocument(path, { title, label = "Esportazione Markdown", filename } = {}) {
+    if (!state.project) return;
+    const epoch = ++state.evidenceEpoch;
+    const projectId = state.project.project_id;
+    $("evidence-kind-label").textContent = label;
+    $("evidence-title").textContent = title || "Dettaglio";
+    loading($("evidence-content"), "Lettura del documento…");
     if (!$("evidence-dialog").open) $("evidence-dialog").showModal();
     try {
-      const result = await request(`projects/${encodeURIComponent(state.project.project_id)}/evidence/${encodeURIComponent(address.kind)}/${encodeURIComponent(address.identity)}`);
-      $("evidence-title").textContent = display(result.title || result.artifact_kind || result.handover_id || result.evidence_id || "Contenuto conservato");
+      const result = await request(`projects/${encodeURIComponent(projectId)}/${path}`);
+      if (epoch !== state.evidenceEpoch || !$("evidence-dialog").open || state.project?.project_id !== projectId) return;
+      $("evidence-title").textContent = display(title || result.title || result.artifact_kind || result.handover_id || result.evidence_id || "Contenuto conservato");
       $("evidence-content").replaceChildren();
       if (typeof result.content === "string") {
-        $("evidence-content").append(evidenceDocument(result));
+        $("evidence-content").append(renderDocument(result));
         $("evidence-content").append(button("Scarica documento", "button-secondary evidence-action", () => {
           const extension = result.content_type === "text/markdown" ? "md" : "json";
           downloadBlob(new Blob([result.content], { type: result.content_type || "text/plain" }),
-            `flower-${address.kind}-${String(address.identity).replace(/[^A-Za-z0-9_-]/g, "_")}.${extension}`);
+            result.filename || `${filename || "flower-document"}.${extension}`);
         }));
       } else $("evidence-content").append(fields(result));
     } catch (error) {
-      if (!state.ready || error.stale) return;
-      $("evidence-content").replaceChildren(errorPanel(error, () => loadEvidence(address)));
+      if (!state.ready || error.stale || epoch !== state.evidenceEpoch || !$("evidence-dialog").open || state.project?.project_id !== projectId) return;
+      $("evidence-content").replaceChildren(errorPanel(error, () => loadDocument(path, { title, label, filename })));
+    }
+  }
+
+  function acceptancePanel(context) {
+    const scope = context.scope || {};
+    const packet = context.packet_checkpoint;
+    const acceptance = context.milestone_acceptance || {};
+    const messages = {
+      blocked: "La milestone ha obblighi aperti",
+      awaiting_human: "La milestone attende la decisione umana",
+      ready: "La milestone è pronta per l’accettazione",
+      accepted: "La milestone è accettata",
+      unavailable: "Accettazione della milestone non disponibile",
+    };
+    const blockers = {
+      packet_unresolved: "Chiudi il pacchetto con le evidenze richieste",
+      navigation_audit_blocker: "Completa le verifiche di navigazione richieste",
+      campaign_missing: "Registra la campagna di verifica prevista",
+      campaign_not_green: "Verifica gli esiti della campagna",
+      finding_unresolved: "Esamina i problemi ancora aperti",
+      external_milestone_scope_incomplete: "Verifica la copertura del lavoro e dei controlli locali",
+      external_milestone_verification_pending: "Completa le verifiche differite richieste",
+    };
+    const panel = element("section", acceptance.state === "blocked" ? "attention" : "summary-block");
+    panel.append(element("p", "item-caption", [scope.packet_id, scope.milestone_id].filter(Boolean).join(" · ")),
+      element("h3", "", messages[acceptance.state] || messages.unavailable));
+    if (packet?.reported_units) {
+      const { completed, total } = packet.reported_units;
+      panel.append(element("p", "", `Unità dichiarate complete dall’agente ${completed}/${total}. Stato registrato del pacchetto: ${display(packet.recorded_status)}.`));
+    }
+    if (packet?.next_gate?.external_operation === "request_human_acceptance") {
+      panel.append(element("p", "item-caption", "Il pacchetto è arrivato al controllo prima dell’accettazione."));
+    }
+    if (packet?.repository_review?.latest_audit_id) {
+      const review = packet.repository_review;
+      panel.append(button(`Apri review ${review.latest_audit_id} · ${display(review.state)}`, "button-secondary evidence-action", () =>
+        loadEvidence({ kind: "repository_review", identity: review.latest_audit_id })));
+    }
+    if (acceptance.blockers?.length) {
+      const list = element("ul", "value-list");
+      for (const blocker of acceptance.blockers) {
+        const identity = blocker.packet_id || blocker.change_id;
+        list.append(element("li", "", `${blockers[blocker.reason] || display(blocker.reason)}${identity ? ` · ${identity}` : ""}`));
+      }
+      panel.append(list);
+    }
+    if (context.requirements?.length || context.goal_grounding?.length || context.deferred_obligations?.length) {
+      const details = element("details", "nested-detail");
+      details.append(element("summary", "", "Vedi requisiti, prove e Goal"));
+      for (const requirement of context.requirements || []) {
+        const proof = requirement.direct_evidence_state === "unavailable" ? "Prove non disponibili"
+          : requirement.direct_evidence_count ? `${requirement.direct_evidence_count} prove dirette registrate` : "Nessuna prova diretta registrata";
+        details.append(element("p", "", `${requirement.requirement_id} · ${display(requirement.lifecycle_status)} · ${proof}`));
+        for (const entry of requirement.direct_evidence || []) {
+          if (entry.evidence_id) details.append(button(`Apri prova ${entry.evidence_id}`, "button-secondary evidence-action", () =>
+            loadEvidence({ kind: "verification", identity: entry.evidence_id })));
+        }
+      }
+      for (const goal of context.goal_grounding || []) {
+        const grounding = goal.gaps?.includes("implementation_grounding_missing")
+          ? "Collegamento al codice non registrato" : display(goal.state);
+        details.append(element("p", "", `${goal.goal_node_id} · ${goal.title || "Goal"} · ${grounding}`));
+      }
+      for (const obligation of context.deferred_obligations || []) {
+        const timing = obligation.applicability === "acceptance_prerequisite" ? "Richiesta per l’accettazione" : "Obbligo del pacchetto";
+        details.append(element("p", "", `${timing} · ${obligation.statement} · ${display(obligation.state)}`));
+      }
+      panel.append(details);
+    }
+    if (context.truncated) panel.append(element("p", "truncation-note", "Vista parziale. Apri le prove collegate per il dettaglio."));
+    return panel;
+  }
+
+  async function loadAcceptance(section, identity) {
+    if (!state.project) return;
+    const epoch = ++state.evidenceEpoch;
+    const projectId = state.project.project_id;
+    $("evidence-kind-label").textContent = "Evidenza conservata";
+    $("evidence-title").textContent = "Prove e accettazione";
+    loading($("evidence-content"), "Lettura degli obblighi registrati…");
+    if (!$("evidence-dialog").open) $("evidence-dialog").showModal();
+    try {
+      const query = new URLSearchParams({ scope_id: identity, limit: 25 });
+      const result = await request(`projects/${encodeURIComponent(projectId)}/sections/${section}?${query}`);
+      if (epoch !== state.evidenceEpoch || !$("evidence-dialog").open || state.project?.project_id !== projectId) return;
+      $("evidence-content").replaceChildren(acceptancePanel(result.summary.acceptance_context));
+    } catch (error) {
+      if (state.ready && !error.stale && epoch === state.evidenceEpoch && $("evidence-dialog").open && state.project?.project_id === projectId) {
+        $("evidence-content").replaceChildren(errorPanel(error, () => loadAcceptance(section, identity)));
+      }
+    }
+  }
+
+  function renderArchitectureExports(current) {
+    const panel = element("section", "summary-block");
+    panel.append(element("h3", "", "Esporta architettura"));
+    const open = (revision) => loadDocument(`documents/architecture?revision=${revision}`,
+      { title: `Architettura · revisione ${revision}`, label: "Esportazione Markdown" });
+    if (current > 0) {
+      panel.append(button(`Apri revisione adottata r${current}`, "button-secondary evidence-action", () => open(current)));
+    } else {
+      panel.append(element("p", "state-note", "Nessuna revisione adottata. Consulta la cronologia per eventuali proposte."));
+    }
+    const history = element("details", "nested-detail");
+    const list = element("div", "item-list");
+    const status = element("p", "state-note");
+    status.setAttribute("aria-live", "polite");
+    let page = null;
+    const project = state.project.project_id;
+    const active = () => history.isConnected && state.section === "architecture" && state.project?.project_id === project;
+    const previous = button("Revisioni precedenti", "button-secondary evidence-action",
+      () => loadHistory(Math.max(0, page.offset - page.limit)));
+    const next = button("Altre revisioni", "button-secondary evidence-action", () => loadHistory(page.next_offset));
+    const retry = button("Riprova", "button-secondary evidence-action", () => loadHistory(requestedOffset));
+    let requestedOffset = 0;
+    previous.hidden = next.hidden = retry.hidden = true;
+    history.append(element("summary", "", "Scegli revisione"), status, list, previous, next, retry);
+    history.addEventListener("toggle", () => {
+      if (history.open && !page && !next.disabled) loadHistory(0);
+    });
+    panel.append(history);
+    return panel;
+
+    async function loadHistory(offset) {
+      if (!active()) return;
+      requestedOffset = offset;
+      previous.disabled = next.disabled = retry.disabled = true;
+      retry.hidden = true;
+      status.textContent = "Lettura delle revisioni…";
+      try {
+        const result = await request(`projects/${encodeURIComponent(project)}/documents/architecture/history?offset=${offset}`);
+        if (!active()) return;
+        list.replaceChildren();
+        for (const item of result.items) {
+          const tag = item.revision === result.current_adopted_revision ? "Adottata corrente"
+            : item.state === "adopted" ? "Adottata storica" : "Proposta";
+          const row = element("div");
+          row.append(button(`Apri r${item.revision} · ${tag}`, "button-secondary evidence-action",
+            () => open(item.revision)));
+          list.append(row);
+        }
+        page = result.bounds;
+        status.textContent = page.total === 0 ? "Nessuna revisione registrata." : "";
+        previous.hidden = page.offset === 0;
+        next.hidden = page.next_offset === null;
+      } catch (error) {
+        if (!active() || error.stale) return;
+        status.textContent = error.message;
+        retry.hidden = false;
+      } finally {
+        previous.disabled = next.disabled = retry.disabled = false;
+      }
     }
   }
 
   function renderSection(result) {
     const container = $("section-content");
     container.replaceChildren(element("p", "section-intro", sections[state.section].description));
-    const summary = result.summary || {};
+    if (state.section === "overview") {
+      container.append(button("Esporta tutti i requisiti", "button-secondary evidence-action", () =>
+        loadRequirementsDocument("project", "", "Catalogo dei requisiti")));
+    }
+    const { acceptance_context: acceptanceContext, ...summary } = result.summary || {};
+    if (state.section === "architecture") container.append(renderArchitectureExports(summary.current_adopted_revision));
     if (state.section === "overview" && summary.next_gate) {
       const attention = element("section", "attention");
       attention.append(element("h3", "", "Prossimo punto di controllo"));
@@ -1674,6 +1861,9 @@
           loadEvidence({ kind: "verification", identity: proof.evidence_id })));
       }
       container.append(attention);
+    }
+    if (state.section === "overview" && acceptanceContext) {
+      container.append(acceptancePanel(acceptanceContext));
     }
     if (state.section === "verification") {
       container.append(renderVerificationChannels(summary));
@@ -2018,6 +2208,7 @@
     closeDeletion();
   });
   $("evidence-close").addEventListener("click", () => $("evidence-dialog").close());
+  $("evidence-dialog").addEventListener("close", () => { if (!$("evidence-dialog").open) state.evidenceEpoch += 1; });
   window.addEventListener("popstate", () => { if (state.ready) route(); });
   let searchTimer;
   $("project-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { state.projectOffset = 0; loadProjects(); }, 250); });

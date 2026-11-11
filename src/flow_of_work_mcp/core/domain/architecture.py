@@ -8,9 +8,11 @@ from typing import Mapping
 from flow_of_work_mcp.core.domain.external_work import (
     CONTRACT_KINDS, canonical_json, fields, number, objects, strings, text,
 )
+from flow_of_work_mcp.core.errors import InputValidationError
 
 ARCHITECTURE_CONTRACT = 'flow.architecture.v1'
 ARCHITECTURE_CONTEXT_CONTRACT = 'flow.architecture_context.v1'
+ARCHITECTURE_MARKDOWN_MAX_BYTES = 64 * 1024
 ENTITY_KINDS = ('component', 'interface', 'decision')
 ENTITY_LISTS = {'component': 'components', 'interface': 'interfaces', 'decision': 'decisions'}
 ENTITY_ID_PATTERN = r'^[A-Za-z][A-Za-z0-9_.-]{0,79}$'
@@ -20,6 +22,10 @@ _ENTITY_FIELDS = {
     'interface': {'id', 'name', 'provider_component_id', 'consumer_component_ids', 'kind', 'clauses', 'failure_contract', 'compatibility', 'links'},
     'decision': {'id', 'statement', 'rationale', 'component_ids', 'interface_ids', 'supersedes_decision_id', 'links'},
 }
+ARCHITECTURE_EMPTY_LIST_FIELDS = frozenset({
+    'links', 'boundaries', 'invariants', 'failure_contract', 'compatibility',
+    'component_ids', 'interface_ids',
+})
 _LINK_FIELDS = {'requirement': {'kind', 'requirement_id'}, 'goal': {'kind', 'goal_node_id'},
                 'packet': {'kind', 'change_id', 'packet_id'}, 'evidence': {'kind', 'evidence_id'}}
 
@@ -66,15 +72,50 @@ def normalize_link(value: Mapping[str, object]) -> dict[str, object]:
             for key, raw in value.items()}
 
 
-def normalize_definition(value: object) -> dict[str, list[dict[str, object]]]:
+def _normalize_markdown(value: object) -> str:
+    rule = 'architecture markdown must be a UTF-8 string of at most 64 KiB'
+    if not isinstance(value, str):
+        raise InputValidationError(rule, field='markdown', received_value=type(value).__name__)
+    try:
+        size = len(value.encode('utf-8'))
+    except UnicodeEncodeError as exc:
+        raise InputValidationError(rule, field='markdown', received_value='invalid Unicode') from exc
+    if size > ARCHITECTURE_MARKDOWN_MAX_BYTES:
+        raise InputValidationError(rule, field='markdown', received_value=size,
+                                   details={'maximum_bytes': ARCHITECTURE_MARKDOWN_MAX_BYTES})
+    return value
+
+
+def normalize_definition(value: object) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise ValueError('definition must be an object')
-    _exact(value, set(ENTITY_LISTS.values()), 'definition')
+    _exact(value, set(ENTITY_LISTS.values()) | ({'markdown'} & value.keys()), 'definition')
+    collections = {name: objects(value[name], name) for name in ENTITY_LISTS.values()}
+    if sum(map(len, collections.values())) > 128:
+        raise ValueError('architecture supports at most 128 entities')
+    missing_entities = []
+    for kind, list_name in ENTITY_LISTS.items():
+        for index, item in enumerate(collections[list_name]):
+            missing = _ENTITY_FIELDS[kind] - item.keys()
+            if not missing:
+                continue
+            identity = item.get('id')
+            missing_entities.append({
+                'path': f'payload.definition.{list_name}[{index}]',
+                **({'entity_id': identity} if isinstance(identity, str) and _IDENTITY.fullmatch(identity) else {}),
+                'missing_fields': sorted(missing),
+                'empty_list_fields': sorted(missing & ARCHITECTURE_EMPTY_LIST_FIELDS),
+            })
+    if missing_entities:
+        raise InputValidationError(
+            'architecture entities are missing required fields', field='', received_value=len(missing_entities),
+            details={'missing_entity_fields': missing_entities},
+        )
     result = {}
     total_links = 0
     for kind, list_name in ENTITY_LISTS.items():
         entities = []
-        for item in objects(value[list_name], list_name):
+        for index, item in enumerate(collections[list_name]):
             _exact(item, _ENTITY_FIELDS[kind], kind)
             entity = {'id': entity_id(item['id'], kind + '.id')}
             for field in _ENTITY_FIELDS[kind] - {'id', 'links'}:
@@ -87,6 +128,16 @@ def normalize_definition(value: object) -> dict[str, list[dict[str, object]]]:
                     entity[field] = entity_id(item[field], field) if item[field] else text(item[field], field, required=False)
                 elif field == 'provider_component_id':
                     entity[field] = entity_id(item[field], field)
+                elif kind == 'interface' and field == 'kind':
+                    interface_kind = item[field]
+                    if not isinstance(interface_kind, str) or interface_kind.strip() not in CONTRACT_KINDS:
+                        raise InputValidationError(
+                            'unsupported architecture interface kind',
+                            field=f'{list_name}[{index}].kind', received_value=interface_kind,
+                            accepted_values=tuple(sorted(CONTRACT_KINDS)),
+                            details={'entity_id': entity['id']},
+                        )
+                    entity[field] = interface_kind.strip()
                 else:
                     entity[field] = text(item[field], field)
             links = [normalize_link(link) for link in objects(item['links'], 'links')]
@@ -95,18 +146,16 @@ def normalize_definition(value: object) -> dict[str, list[dict[str, object]]]:
             entity['links'] = sorted(links, key=canonical_json)
             total_links += len(links)
             if kind == 'interface':
-                if entity['kind'] not in CONTRACT_KINDS:
-                    raise ValueError('unsupported architecture interface kind')
                 if not entity['clauses'] or not entity['consumer_component_ids']:
                     raise ValueError('interface requires clauses and consumers')
             entities.append(entity)
         if len({item['id'] for item in entities}) != len(entities):
             raise ValueError(f'duplicate architecture {kind} identity')
         result[list_name] = sorted(entities, key=lambda item: item['id'])
-    if sum(len(items) for items in result.values()) > 128:
-        raise ValueError('architecture supports at most 128 entities')
     if total_links > 512:
         raise ValueError('architecture supports at most 512 links')
+    if 'markdown' in value:
+        result['markdown'] = _normalize_markdown(value['markdown'])
     if len(canonical_json(result).encode('utf-8')) > 256 * 1024:
         raise ValueError('architecture definition exceeds 256KiB')
     components = {item['id'] for item in result['components']}

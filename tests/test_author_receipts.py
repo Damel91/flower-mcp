@@ -6,7 +6,7 @@ import pytest
 
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 from flow_of_work_mcp.mcp_runtime import build_runtime
-from flow_of_work_mcp.server import handle_packet_author
+from flow_of_work_mcp.server import handle_packet_author, handle_packet_inspect
 from tests.test_external_work import fixture
 
 
@@ -118,6 +118,50 @@ def test_public_unit_receipt_retains_identity_through_finalization_and_replay(au
         assert result["mutation"]["affected_unit_key"] == "consumer"
         assert result["semantic_delta"]["affected_unit_key"] == "consumer"
     assert first["packet"]["plan_revision"] == second["packet"]["plan_revision"]
+    if operation == "set_dependencies":
+        assert first["mutation"]["plan_revision"] == second["mutation"]["plan_revision"] == first["packet"]["plan_revision"]
+        assert first["mutation"]["replayed"] is False and second["mutation"]["replayed"] is True
+
+
+@pytest.mark.parametrize("kind,reason", [("plan", "stale_current_work_plan_revision"), ("spec", "stale_packet_revision")])
+def test_dependency_revision_conflict_recovers_the_same_packet_read_only(authored, kind, reason):
+    runtime, ids = authored
+    address = {"project_id": ids[0], "change_id": ids[1], "packet_id": ids[2]}
+    revisions = current(runtime, ids)
+    revision_field = f"expected_{kind}_revision"
+    stale = {**revisions, revision_field: revisions[revision_field] + 7}
+    before = snapshot(runtime)
+    # Omit the change ID to prove recovery uses the resolved scope.
+    response = handle_packet_author(runtime, project_id=ids[0], packet_id=ids[2], operation="set_dependencies",
+        actor="engineer", request_id="stale-dependency", **mutation_arguments("set_dependencies"), **stale)
+    assert response["status"] == "blocked" and response["reason"] == reason
+    result = response["result"]
+    assert result["revision_kind"] == kind and result[revision_field] == revisions[revision_field]
+    assert result[f"received_{kind}_revision"] == stale[revision_field]
+    assert result["diagnostics"][0]["field"] == revision_field
+    assert result["effect_state"] == "unknown" and "effect_receipt" not in result
+    assert result["original_request"]["request_id"] == "stale-dependency"
+    route = result["next_tool_call"]
+    assert route == {"tool": "fow_packet_inspect", "arguments": {**address,
+        "view": "working_sheet", "detail_level": "standard", "limit": 10}}
+    recovered = handle_packet_inspect(runtime, **route["arguments"])["result"]["packet"]["working_sheet"]
+    assert {key: recovered["packet"][key.removeprefix("expected_")] for key in revisions} == revisions
+    assert next(unit for unit in recovered["units"] if unit["client_unit_key"] == "consumer")["depends_on"] == ["producer"]
+    assert snapshot(runtime) == before
+
+
+def test_dependency_recovery_does_not_relabel_ancillary_errors(authored, monkeypatch):
+    runtime, ids = authored
+
+    def ancillary_conflict(*args, **kwargs):
+        raise ChangeControlBlockedError("stale_current_work_plan_revision",
+            details={"expected_plan_revision": 2, "received_plan_revision": 1})
+
+    monkeypatch.setattr(runtime.packet_factory, "ensure_packet_lifecycle", ancillary_conflict)
+    with pytest.raises(ChangeControlBlockedError) as caught:
+        call(runtime, ids, "set_dependencies", "ancillary-dependency-error",
+             **mutation_arguments("set_dependencies"), **current(runtime, ids))
+    assert type(caught.value) is ChangeControlBlockedError
 
 
 @pytest.mark.parametrize("operation", ["replace_plan", "revise_unit", "remove_unit", "rebind_unit", "set_dependencies"])

@@ -42,6 +42,10 @@ class MilestonePreEffectError(OperationPreEffectError):
     """Milestone draft/allocating validator rejected before its first write."""
 
 
+class CampaignSourcePathPreEffectError(OperationPreEffectError):
+    """A new source attestation overlaps a known product file before any write."""
+
+
 class ProjectNotFoundError(LifecycleError):
     """Raised when a project-scoped operation has no project authority."""
 
@@ -111,8 +115,9 @@ class RequirementMutationBlockedError(LifecycleError):
 class BootstrapBlockedError(LifecycleError):
     """Raised when a resumable bootstrap requires an explicit next action."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, details: Mapping[str, object] | None = None) -> None:
         self.reason = str(reason or "").strip() or "bootstrap_blocked"
+        self.details = dict(details or {})
         super().__init__(self.reason)
 
 

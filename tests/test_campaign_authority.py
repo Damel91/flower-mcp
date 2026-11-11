@@ -185,6 +185,79 @@ def test_campaign_obligations_require_decision_and_case_binding(tmp_path):
         runtime.close()
 
 
+def test_grouped_campaign_authoring_replays_its_receipt_after_later_revision(tmp_path):
+    runtime, change_id, requirement_id = _runtime(tmp_path)
+    try:
+        state = _start(runtime, change_id, requirement_id)
+        campaign_id = state["campaign_id"]
+        state = runtime.ledger.derive_campaign_obligations(
+            "alpha", campaign_id, actor="orchestrator", request_id="derive"
+        )
+        entries = state["obligations"]
+        request = dict(
+            project_id="alpha", operation="author_obligations", campaign_id=campaign_id,
+            actor="orchestrator", request_id="group-1", expected_fingerprint=state["fingerprint"],
+            obligation_batch={
+                "decisions": [
+                    dict(obligation_id=item["obligation_id"], decision="required", rationale="In scope.")
+                    for item in entries
+                ],
+                "bindings": [
+                    dict(case_id="CASE-000001", obligation_id=item["obligation_id"], coverage_intent="Observe case output.")
+                    for item in entries
+                ],
+            },
+        )
+        result = handle_campaign_author(runtime, **request)["result"]
+        receipt = result["authoring_receipt"]
+        assert receipt["basis"]["revision"] == state["revision"]
+        assert receipt["result"]["revision"] == state["revision"] + 1
+        assert len({item["event_id"] for item in receipt["items"]}) == 4
+        assert result["campaign"]["constructibility"] == "needs_oracle"
+        later = runtime.ledger.add_campaign_authority_case(
+            "alpha", campaign_id, _case("Another case"), actor="orchestrator", request_id="later",
+        )
+        replay = handle_campaign_author(runtime, **request)["result"]
+        assert replay["replayed"] is True
+        assert replay["authoring_receipt"] == receipt
+        assert replay["campaign"]["revision"] == later["revision"]
+        conflict = handle_campaign_author(runtime, **(request | {"actor": "other"}))
+        assert conflict["status"] == "rejected"
+        assert conflict["result"]["diagnostics"][0]["field"] == "request_id"
+    finally:
+        runtime.close()
+
+
+def test_grouped_campaign_authoring_rejects_bad_final_entry_and_stale_basis(tmp_path):
+    runtime, change_id, requirement_id = _runtime(tmp_path)
+    try:
+        state = _start(runtime, change_id, requirement_id)
+        campaign_id = state["campaign_id"]
+        state = runtime.ledger.derive_campaign_obligations(
+            "alpha", campaign_id, actor="orchestrator", request_id="derive"
+        )
+        obligation_id = state["obligations"][0]["obligation_id"]
+        decision = dict(obligation_id=obligation_id, decision="required", rationale="In scope.")
+        binding = dict(case_id="CASE-000999", obligation_id=obligation_id, coverage_intent="Observe result.")
+        request = dict(
+            project_id="alpha", operation="author_obligations", campaign_id=campaign_id,
+            actor="orchestrator", request_id="group-1", expected_fingerprint=state["fingerprint"],
+            obligation_batch={"decisions": [decision], "bindings": [binding]},
+        )
+        for changes, field in (
+            ({}, "obligation_batch.bindings[0].case_id"),
+            ({"obligation_batch": {"decisions": [decision, decision]}}, "obligation_batch.decisions[1]"),
+            ({"expected_fingerprint": "stale"}, "expected_fingerprint"),
+        ):
+            rejected = handle_campaign_author(runtime, **(request | changes))
+            assert rejected["status"] == "rejected"
+            assert rejected["result"]["effect_state"] == "none"
+            assert rejected["result"]["diagnostics"][0]["field"] == field
+        assert runtime.ledger.campaign_authority_state("alpha", campaign_id) == state
+    finally:
+        runtime.close()
+
+
 def test_oracle_question_answers_create_successor_semantic_revisions(tmp_path):
     runtime, change_id, requirement_id = _runtime(tmp_path)
     try:

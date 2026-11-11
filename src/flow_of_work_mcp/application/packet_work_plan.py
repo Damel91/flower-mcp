@@ -4,8 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Mapping
+from typing import Callable, Mapping
 
 from flow_of_work_mcp.core.domain.external_work import normalize_declarations
 from flow_of_work_mcp.core.domain.packet_work_plan import (
@@ -15,13 +16,38 @@ from flow_of_work_mcp.core.domain.packet_work_plan import (
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
 from flow_of_work_mcp.core.domain.packet_construction import PacketQuestionResolutionDraft
-from flow_of_work_mcp.core.errors import ChangeControlBlockedError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError
 from flow_of_work_mcp.core.ports.change_control import ChangeControlRepository
 from flow_of_work_mcp.core.ports.navigation_audit import NavigationAuditRepository
 from flow_of_work_mcp.core.ports.packet_work_plan import PacketWorkPlanRepository
 
 
 _IDENTIFIER_ONLY_RE = re.compile(r"^(?:[A-Z][A-Z0-9_-]*-[0-9]+|[A-Za-z_][A-Za-z0-9_.:-]*)$")
+COMPACT_LOCAL_CHECKS = "unit_checks_from_verifies"
+
+
+def prepare_replacement_units(
+    work_plan: object,
+) -> tuple[tuple[Mapping[str, object], ...], tuple[WorkPlanUnit, ...]]:
+    """Validate replacement shape independently of repository effects."""
+    if not isinstance(work_plan, Mapping):
+        raise InputValidationError("work_plan must be an object", field="work_plan", received_value=work_plan)
+    try:
+        raw = _mapping_list(work_plan, "units")
+    except ValueError as exc:
+        raise InputValidationError(str(exc), field="work_plan.units", received_value=work_plan.get("units")) from exc
+    units = []
+    for index, item in enumerate(raw):
+        field = f"work_plan.units[{index}]"
+        try:
+            units.append(_unit_from_payload(item))
+        except InputValidationError as exc:
+            raise InputValidationError(str(exc), field=f"{field}.{exc.field}",
+                received_value=exc.received_value, details=exc.details) from exc
+        except (TypeError, ValueError) as exc:
+            raise InputValidationError(str(exc), field=field,
+                received_value=item.get("client_unit_key")) from exc
+    return raw, tuple(units)
 
 
 class PacketWorkPlanService:
@@ -31,13 +57,32 @@ class PacketWorkPlanService:
         *,
         changes: ChangeControlRepository,
         navigation: NavigationAuditRepository,
+        acceptance_check: Callable[[str, str, str, int], None] | None = None,
     ) -> None:
         self._repository = repository
         self._changes = changes
         self._navigation = navigation
+        self._acceptance_check = acceptance_check
 
     def authoring_history(self, project_id: str, change_id: str, packet_id: str) -> list[Mapping[str, object]]:
         return self._repository.packet_work_plan_authoring_history(project_id, change_id, packet_id)
+
+    def require_external_agent_mode(self, project_id: str, change_id: str, packet_id: str) -> None:
+        if self._repository.packet_consumption_mode(project_id, change_id, packet_id) != "external_agent":
+            raise ChangeControlBlockedError("compact_local_checks_require_external_agent_mode")
+
+    @contextmanager
+    def _compact_authoring(self, project_id: str, change_id: str, packet_id: str, *,
+                           compact: bool, request_id: str):
+        if not compact:
+            yield
+            return
+        with self._changes.atomic():
+            # Only new work needs current mode. Presence cannot grant replay:
+            # the original writer still checks exact request identity and scope.
+            if not request_id or not self._repository.packet_work_plan_request_exists(project_id, request_id):
+                self.require_external_agent_mode(project_id, change_id, packet_id)
+            yield
 
     def set_plan(
         self,
@@ -52,20 +97,23 @@ class PacketWorkPlanService:
         request_id: str = "",
         request_fingerprint: str = "",
     ) -> Mapping[str, object]:
+        units = _mapping_list(work_plan, "units")
         draft = PacketWorkPlanDraft(
             change_id=change_id,
             packet_id=packet_id,
             packet_revision=int(expected_packet_revision),
-            units=tuple(_unit_from_payload(item) for item in _mapping_list(work_plan, "units")),
+            units=tuple(_unit_from_payload(item) for item in units),
         )
-        return self._repository.create_packet_work_plan(
-            project_id,
-            draft,
-            actor=required_text(actor, "actor"),
-            request_id=str(request_id or ""),
-            expected_current_plan_revision=expected_current_plan_revision,
-            request_fingerprint=str(request_fingerprint or ""),
-        )
+        with self._compact_authoring(project_id, change_id, packet_id,
+                                     compact=any(COMPACT_LOCAL_CHECKS in item for item in units), request_id=request_id):
+            return self._repository.create_packet_work_plan(
+                project_id,
+                draft,
+                actor=required_text(actor, "actor"),
+                request_id=str(request_id or ""),
+                expected_current_plan_revision=expected_current_plan_revision,
+                request_fingerprint=str(request_fingerprint or ""),
+            )
 
     def replace_plan(
         self, project_id: str, change_id: str, packet_id: str,
@@ -78,10 +126,11 @@ class PacketWorkPlanService:
         """Bind replay to the complete normalized command, not current defaults."""
         actor = required_text(actor, "actor")
         request_id = required_text(request_id, "request_id")
+        units, prepared_units = prepare_replacement_units(work_plan)
         draft = PacketWorkPlanDraft(
             change_id=change_id, packet_id=packet_id,
             packet_revision=expected_packet_revision,
-            units=tuple(_unit_from_payload(item) for item in _mapping_list(work_plan, "units")),
+            units=prepared_units,
         )
         command = {
             "contract": "replace_plan.v1", "project_id": project_id,
@@ -94,12 +143,14 @@ class PacketWorkPlanService:
         fingerprint = "replace_plan.v1:" + hashlib.sha256(
             json.dumps(command, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
-        return self._repository.replace_packet_work_plan(
-            project_id, draft, answers=answers, command=command,
-            request_fingerprint=fingerprint,
-            expected_current_plan_revision=expected_current_plan_revision,
-            actor=actor, request_id=request_id,
-        )
+        with self._compact_authoring(project_id, change_id, packet_id,
+                                     compact=any(COMPACT_LOCAL_CHECKS in item for item in units), request_id=request_id):
+            return self._repository.replace_packet_work_plan(
+                project_id, draft, answers=answers, command=command,
+                request_fingerprint=fingerprint,
+                expected_current_plan_revision=expected_current_plan_revision,
+                actor=actor, request_id=request_id,
+            )
 
     def mutate_plan(
         self,
@@ -183,10 +234,12 @@ class PacketWorkPlanService:
             if isinstance(item, Mapping)
         ]
         key = str(client_unit_key or "").strip()
+        compact = False
         if operation == "add_unit":
             if not isinstance(unit, Mapping):
                 raise ValueError("add_unit requires unit")
-            units.append(_unit_payload(unit))
+            compact = COMPACT_LOCAL_CHECKS in unit
+            units.append(_unit_payload(materialize_compact_unit_checks(unit)))
             affected_key = str(unit.get("client_unit_key") or "").strip()
         else:
             if not key:
@@ -215,6 +268,9 @@ class PacketWorkPlanService:
             else:
                 if not isinstance(unit_patch, Mapping):
                     raise ValueError(f"{operation} requires unit_patch")
+                if operation == "revise_unit":
+                    compact = COMPACT_LOCAL_CHECKS in unit_patch
+                    unit_patch = materialize_compact_unit_checks(unit_patch)
                 allowed = (
                     _REBIND_FIELDS if operation == "rebind_unit" else _REVISION_FIELDS
                 )
@@ -230,19 +286,21 @@ class PacketWorkPlanService:
                     }
                 )
 
-        result = self.set_plan(
-            project_id,
-            change_id,
-            packet_id,
-            {"units": units},
-            expected_packet_revision=expected_packet_revision,
-            expected_current_plan_revision=(
-                None if plan_missing else expected_current_plan_revision
-            ),
-            actor=actor,
-            request_id=request_id,
-            request_fingerprint=fingerprint,
-        )
+        with self._compact_authoring(project_id, change_id, packet_id,
+                                     compact=compact, request_id=request_id):
+            result = self.set_plan(
+                project_id,
+                change_id,
+                packet_id,
+                {"units": units},
+                expected_packet_revision=expected_packet_revision,
+                expected_current_plan_revision=(
+                    None if plan_missing else expected_current_plan_revision
+                ),
+                actor=actor,
+                request_id=request_id,
+                request_fingerprint=fingerprint,
+            )
         return {
             **dict(result),
             "mutation_operation": operation,
@@ -401,6 +459,7 @@ class PacketWorkPlanService:
             raise ChangeControlBlockedError("packet_work_plan_missing")
         if str(state.get("change_id")) != change_id or str(state.get("packet_id")) != packet_id:
             raise ChangeControlBlockedError("packet_work_plan_scope_mismatch")
+        acceptance = {"acceptance_check": self._acceptance_check} if self._acceptance_check else {}
         return self._repository.transition_packet_work_plan(
             project_id,
             str(state["work_plan_id"]),
@@ -411,6 +470,7 @@ class PacketWorkPlanService:
             rationale=rationale,
             actor=required_text(actor, "actor"),
             request_id=str(request_id or ""),
+            **acceptance,
         )
 
     def _packet(
@@ -485,8 +545,27 @@ class PacketWorkPlanService:
         }
 
 
+def materialize_compact_unit_checks(payload: Mapping[str, object]) -> Mapping[str, object]:
+    """Expand explicit authoring shorthand before constructing a canonical unit."""
+    if COMPACT_LOCAL_CHECKS not in payload:
+        return payload
+    if payload[COMPACT_LOCAL_CHECKS] is not True:
+        raise ValueError(f"{COMPACT_LOCAL_CHECKS} must be true when supplied")
+    if "unit_checks" in payload:
+        raise ValueError(f"{COMPACT_LOCAL_CHECKS} cannot be combined with unit_checks")
+    if "verifies" not in payload:
+        raise ValueError(f"{COMPACT_LOCAL_CHECKS} requires an explicit full verifies array")
+    verifies = normalize_declarations({"verifies": payload["verifies"]})["verifies"]
+    unit_checks = list(dict.fromkeys(item["statement"] for item in verifies if item["kind"] == "unit_check"))
+    if not unit_checks:
+        raise ValueError(f"{COMPACT_LOCAL_CHECKS} requires at least one local unit_check verification; "
+                         "use explicit empty unit_checks for an exclusively deferred unit")
+    return {**{key: value for key, value in payload.items() if key != COMPACT_LOCAL_CHECKS},
+            "unit_checks": unit_checks, "verifies": verifies}
+
+
 def _unit_from_payload(payload: Mapping[str, object]) -> WorkPlanUnit:
-    value = dict(payload)
+    value = materialize_compact_unit_checks(payload)
     return WorkPlanUnit(
         client_unit_key=str(value.get("client_unit_key") or ""),
         operation_kind=str(value.get("operation_kind") or ""),

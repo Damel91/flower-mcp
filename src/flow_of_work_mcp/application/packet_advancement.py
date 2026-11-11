@@ -95,6 +95,14 @@ def sync_only_next_action(action: Mapping[str, object], result: Mapping[str, obj
     return action
 
 
+class PacketAdvanceConflictError(ChangeControlBlockedError):
+    """A coordinator comparison failed, without proving whole-call effects."""
+
+    def __init__(self, reason: str, *, scope: tuple[str, str, str], details: Mapping[str, object]) -> None:
+        super().__init__(reason, details=details)
+        self.scope = scope
+
+
 class PacketAdvancementCoordinator:
     def __init__(
         self,
@@ -553,9 +561,10 @@ class PacketAdvancementCoordinator:
         operation = str(
             decision.get("operation") or decision.get("decision") or ""
         ).strip()
+        scope = (project_id, change_id, packet_id)
         if operation in {"accept_work_plan", "reject_work_plan"}:
             if guard.next_operation != "accept_work_plan":
-                raise _decision_not_current(operation, guard.next_operation)
+                raise _decision_not_current(operation, guard.next_operation, scope)
             state = self._ledger.packet_work_plan_state(
                 project_id, change_id, packet_id
             )
@@ -576,17 +585,22 @@ class PacketAdvancementCoordinator:
                 if expected_plan_revision is not None
                 else int(state["plan_revision"])
             )
-            outcome = transition(
-                project_id,
-                change_id,
-                packet_id,
-                plan_revision=plan_revision,
-                expected_packet_revision=packet_revision,
-                expected_current_plan_revision=plan_revision,
-                rationale=required_text(decision.get("rationale"), "rationale"),
-                actor=actor,
-                request_id=f"{request_id}:{operation}",
-            )
+            try:
+                outcome = transition(
+                    project_id,
+                    change_id,
+                    packet_id,
+                    plan_revision=plan_revision,
+                    expected_packet_revision=packet_revision,
+                    expected_current_plan_revision=plan_revision,
+                    rationale=required_text(decision.get("rationale"), "rationale"),
+                    actor=actor,
+                    request_id=f"{request_id}:{operation}",
+                )
+            except ChangeControlBlockedError as exc:
+                if exc.reason != "packet_criterion_responsibility_unresolved":
+                    raise
+                raise PacketAdvanceConflictError(exc.reason, scope=scope, details=exc.details) from exc
             if operation == "accept_work_plan":
                 applicability = self._reconciliation.derive_applicability(
                     project_id,
@@ -602,7 +616,7 @@ class PacketAdvancementCoordinator:
             return operation, outcome
         if operation == "accept_residual_risk":
             if guard.next_operation != "decide_residual_risk":
-                raise _decision_not_current(operation, guard.next_operation)
+                raise _decision_not_current(operation, guard.next_operation, scope)
             pressure = self._pressure.latest(project_id, change_id, packet_id)
             if not pressure:
                 raise ChangeControlBlockedError("packet_pressure_missing")
@@ -617,7 +631,7 @@ class PacketAdvancementCoordinator:
             )
         if operation == "record_workspace_review":
             if guard.next_operation != "review_workspace":
-                raise _decision_not_current(operation, guard.next_operation)
+                raise _decision_not_current(operation, guard.next_operation, scope)
             review = decision.get("review")
             if not isinstance(review, Mapping):
                 raise ValueError("decision.review must be an object")
@@ -785,8 +799,9 @@ class PacketAdvancementCoordinator:
             expected_plan_revision is not None
             and int(expected_plan_revision) != current_plan_revision
         ):
-            raise ChangeControlBlockedError(
+            raise PacketAdvanceConflictError(
                 "stale_packet_revision",
+                scope=(project_id, change_id, packet_id),
                 details={
                     "expected_spec_revision": current_spec_revision,
                     "received_spec_revision": expected_spec_revision,
@@ -933,10 +948,11 @@ class PacketAdvancementCoordinator:
 
 
 def _decision_not_current(
-    received: str, expected: str
-) -> ChangeControlBlockedError:
-    return ChangeControlBlockedError(
+    received: str, expected: str, scope: tuple[str, str, str]
+) -> PacketAdvanceConflictError:
+    return PacketAdvanceConflictError(
         "packet_decision_not_current",
+        scope=scope,
         details={
             "received_operation": received,
             "expected_operation": expected,

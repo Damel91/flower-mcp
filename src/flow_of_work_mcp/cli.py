@@ -66,6 +66,8 @@ def build_cli_parser() -> argparse.ArgumentParser:
             command.add_argument("--restore-dir", type=Path, required=True)
     commands.add_parser("bootstrap", help="print the provider-neutral Flower agent bootstrap")
     commands.add_parser("probe", add_help=False, help="inspect an explicit HTTP MCP endpoint; use probe --help")
+    opencode = commands.add_parser("opencode-recovery", help="install the optional OpenCode V2 compaction plugin in one project")
+    opencode.add_argument("--directory", required=True, type=Path, help="OpenCode project directory")
     purge = commands.add_parser("project-purge", help="native user control: prepare/inspect/delete/reconcile an owned project; never a model tool")
     purge.add_argument("purge_operation", choices=("prepare", "inspect", "delete", "reconcile"))
     _location_options(purge, config=True)
@@ -107,6 +109,10 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit(exit_code)
         return
     try:
+        if args.operation == "opencode-recovery":
+            from flow_of_work_mcp.opencode_recovery import install_plugin
+            print(install_plugin(args.directory))
+            return
         if args.operation == "bootstrap":
             print(files("flow_of_work_mcp").joinpath("resources/agent-bootstrap.md").read_text(encoding="utf-8"), end="")
             return

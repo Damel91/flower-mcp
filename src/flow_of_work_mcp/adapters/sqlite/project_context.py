@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+import json
 from typing import Mapping
 
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
@@ -16,6 +18,10 @@ _DASHBOARD_REPOSITORY_REVIEWS = """
     WHERE e.project_id = ? AND e.event_type = 'phase_audit_recorded'
       AND json_type(e.payload_json, '$.repository_review') = 'object'
 """
+
+_DASHBOARD_REQUIREMENT_COLUMNS = (
+    "requirement_id, title, statement, category, lifecycle_status, current_revision, source_anchor"
+)
 
 _DASHBOARD_VERIFICATION_CHANNELS = {
     "campaign": (
@@ -82,7 +88,7 @@ class ProjectContextStoreMixin:
         """Read selected metadata only; section names never become SQL identifiers."""
         project_id = validate_project_id(project_id)
         queries = {
-            "overview": ("requirements", "requirement_id, title, statement, category, lifecycle_status, current_revision, source_anchor", "ordinal"),
+            "overview": ("requirements", _DASHBOARD_REQUIREMENT_COLUMNS, "ordinal"),
             "roadmap": ("milestones", "milestone_id, name, status", "ordinal"),
             "packets": ("implementation_packets", "packet_id, change_id, title, status, spec_revision", "ordinal"),
         }
@@ -101,6 +107,28 @@ class ProjectContextStoreMixin:
                 (project_id, limit, offset),
             ).fetchall()
             return {"items": [dict(row) for row in rows], "total": total}
+
+    def dashboard_milestone_requirements(self, project_id: str, milestone_id: str) -> tuple[str, ...] | None:
+        """Read realized membership from the scoped milestone record."""
+        with self._read_connection() as connection:
+            row = connection.execute(
+                "SELECT requirement_ids_json FROM milestones WHERE project_id = ? AND milestone_id = ?",
+                (project_id, milestone_id),
+            ).fetchone()
+            return tuple(json.loads(row["requirement_ids_json"])) if row is not None else None
+
+    def dashboard_requirement_rows(
+        self, project_id: str, requirement_ids: tuple[str, ...] | None,
+    ) -> Iterator[Mapping[str, object]]:
+        """Stream current scoped records in ledger order without loading verification history."""
+        query = f"SELECT {_DASHBOARD_REQUIREMENT_COLUMNS} FROM requirements WHERE project_id = ?"
+        parameters = (project_id,)
+        if requirement_ids is not None:
+            query += " AND requirement_id IN (SELECT value FROM json_each(?))"
+            parameters = (project_id, json.dumps(requirement_ids))
+        with self._read_connection() as connection:
+            for row in connection.execute(query + " ORDER BY ordinal", parameters):
+                yield dict(row)
 
     def dashboard_verification_items(self, project_id: str, *, channel: str, scope_id: str,
                                      offset: int, limit: int) -> Mapping[str, object]:

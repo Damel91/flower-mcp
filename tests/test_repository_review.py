@@ -17,7 +17,7 @@ from flow_of_work_mcp.core.domain.jobs import JobRecord
 from flow_of_work_mcp.core.domain.lifecycle_control import PhaseAuditScope
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, RequirementConflictError
 from flow_of_work_mcp.mcp_runtime import build_runtime
-from flow_of_work_mcp.server import handle_audit_phase
+from flow_of_work_mcp.server import handle_audit_phase, handle_external_work
 
 
 @pytest.fixture
@@ -176,6 +176,33 @@ def test_historical_classification_records_review_but_never_current_closure(owne
     runtime.jobs.wait(ids[0], job.job_id, timeout=10)
     context = RepositoryReviewService(runtime.ledger).context(*ids)
     assert context["retrospective_recorded"] and not context["complete"] and context["state"] == "open"
+
+
+def test_observed_source_pin_compares_without_rewriting_the_review(owned):
+    runtime, ids, _requirement = owned
+    scope, value = declaration(owned)
+    original = submit(owned, scope=scope, value=value)
+    runtime.jobs.wait(ids[0], original.job_id, timeout=10)
+    before = dump(runtime)
+    source = {"identity": value["source_identity"], "revision": value["source_revision"]}
+    for observation, state in (
+        (None, "not_observed"),
+        (source, "matching_revision"),
+        ({**source, "revision": "commit:observed-2"}, "changed_revision"),
+        ({**source, "identity": "host:other-repository"}, "different_repository"),
+    ):
+        result = handle_external_work(runtime, project_id=ids[0], change_id=ids[1],
+            packet_id=ids[2], operation="validation", payload={"observed_source": observation})
+        review = result["result"]["repository_review"]
+        assert review["source_applicability"]["state"] == state
+        assert review["source"] == source | {"provenance": "host_declared"}
+        assert review["basis_fingerprint"] == value["expected_basis_fingerprint"]
+        assert review["retrospective_recorded"] and not review["human_acceptance"]
+        assert review["complete"] == (state in {"not_observed", "matching_revision"})
+        if not review["complete"]:
+            assert review["next_gate"]["tool"] == "fow_audit_phase"
+    assert submit(owned, scope=scope, value=value).job_id == original.job_id
+    assert dump(runtime) == before
 
 
 class HeldJobs:

@@ -1,7 +1,7 @@
 """Internal SQLite ledger mixin extracted from ledger_store.py."""
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 import json
 import sqlite3
 from typing import Mapping
@@ -19,8 +19,9 @@ from flow_of_work_mcp.core.domain.identifiers import (
     required_text,
     validate_project_id,
 )
+from flow_of_work_mcp.core.domain.change_control import validate_milestone_id
 from flow_of_work_mcp.core.domain.external_work import fingerprint
-from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps, roadmap_correspondence
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError,
     MilestonePreEffectError,
@@ -96,6 +97,16 @@ class LifecycleStoreMixin:
                         reject("milestone_request_conflict", "request_id", request_id,
                                "A request identity must retain every original normalized planning input and actor.",
                                "Inspect the milestone recorded for this request; use a new request only for an explicitly intended new plan.")
+                    original = connection.execute(
+                        "SELECT json_extract(payload_json, '$.outcome.previous_milestone') AS snapshot FROM bootstrap_events "
+                        "WHERE project_id=? AND event_type='guided_revise_draft_milestone' "
+                        "AND json_extract(payload_json, '$.outcome.milestone.milestone_id')=? "
+                        "AND json_extract(payload_json, '$.outcome.changed')=1 ORDER BY event_id LIMIT 1",
+                        (project_id, milestone_id),
+                    ).fetchone()
+                    if original is not None:
+                        snapshot = payload.get("milestone_snapshot") or json.loads(original["snapshot"])
+                        return {key: value for key, value in snapshot.items() if key != "revision"}
                     return self._milestone_row(connection, project_id, milestone_id)
             for field, identities in (("requirement_ids", draft.requirement_ids),
                                       ("prerequisite_requirement_ids", draft.prerequisite_requirement_ids)):
@@ -163,6 +174,7 @@ class LifecycleStoreMixin:
                 """,
                 (ordinal + 1, project_id),
             )
+            milestone = self._milestone_row(connection, project_id, milestone_id)
             self._append_event(
                 connection,
                 project_id=project_id,
@@ -176,10 +188,11 @@ class LifecycleStoreMixin:
                     "prerequisite_requirement_count": len(draft.prerequisite_requirement_ids),
                     "risk_disposition": draft.risk_disposition,
                     "original_request_fingerprint": original_fingerprint,
+                    "milestone_snapshot": milestone,
                 },
                 occurred_at=occurred_at,
             )
-            return self._milestone_row(connection, project_id, milestone_id)
+            return milestone
 
     def milestones(self, project_id: str) -> list[Mapping[str, object]]:
         with self._read_connection() as connection:
@@ -196,12 +209,174 @@ class LifecycleStoreMixin:
                 """,
                 (project_id,),
             ).fetchall()
+            revisions = self._milestone_revisions(connection, project_id)
             values = []
             for row in records:
                 value = self._milestone_value(row)
+                value["revision"] = revisions.get(value["milestone_id"], 1)
                 self._milestone_prerequisites(connection, project_id, value, values)
                 values.append(value)
             return values
+
+    @staticmethod
+    def _milestone_revisions(connection, project_id):
+        rows = connection.execute(
+            "SELECT json_extract(payload_json, '$.outcome.milestone.milestone_id') AS milestone_id, "
+            "MAX(json_extract(payload_json, '$.outcome.current_revision')) AS revision "
+            "FROM bootstrap_events WHERE project_id=? AND event_type='guided_revise_draft_milestone' "
+            "AND json_extract(payload_json, '$.outcome.changed')=1 GROUP BY milestone_id", (project_id,),
+        )
+        return {row["milestone_id"]: row["revision"] for row in rows}
+
+    def revise_milestone_definition(self, project_id, milestone_id, *, expected_revision, replacements):
+        """Revise the existing row within the guided operation's write transaction."""
+
+        def reject(code, field, value, rule, resolution, **details):
+            raise MilestonePreEffectError(code, rule, field=field, received_value=value,
+                                          rule=rule, resolution=resolution, details=details)
+
+        with self._transaction() as connection:
+            milestones = {m["milestone_id"]: m for m in self.milestones(project_id)}
+            current = milestones[milestone_id]
+            if current["revision"] != expected_revision:
+                reject("milestone_draft_revision_stale", "expected_revision", expected_revision,
+                       "The milestone revision has changed.", "Read the current roadmap before proposing a revision.",
+                       current_revision=current["revision"])
+            definition = MilestoneDraft(**{key: current[key] for key in MilestoneDraft.__dataclass_fields__})
+            revised = replace(definition, **replacements)
+            prospective = {**current, **asdict(revised)}
+            for field in ("requirement_ids", "prerequisite_requirement_ids", "acceptance_evidence"):
+                prospective[field] = list(prospective[field])
+            for field in ("requirement_ids", "prerequisite_requirement_ids"):
+                for identity in prospective[field]:
+                    try:
+                        requirement = self._requirement_row(connection, project_id, identity)
+                    except RequirementNotFoundError:
+                        requirement = None
+                    if requirement is None or requirement["lifecycle_status"] == "removed":
+                        reject("milestone_requirement_not_current", field, identity,
+                               "The requirement must be current in this project.", "Inspect this project's canonical requirements.")
+            if any(m["name"] == revised.name and m is not current for m in milestones.values()):
+                reject("milestone_name_conflict", "name", revised.name,
+                       "The name is already used by another milestone.", "Choose a distinct name or inspect the other milestone.")
+            earlier = [m for m in milestones.values() if m["ordinal"] < current["ordinal"]]
+            predecessor_ids = revised.entry_policy.get("requires_milestone", [])
+            try:
+                valid_predecessors = (isinstance(predecessor_ids, list)
+                    and len(set(validate_milestone_id(m) for m in predecessor_ids)) == len(predecessor_ids)
+                    and set(predecessor_ids) <= milestones.keys() - {milestone_id})
+            except (TypeError, ValueError):
+                valid_predecessors = False
+            if not valid_predecessors:
+                reject("milestone_entry_policy_invalid", "entry_policy", predecessor_ids,
+                       "requires_milestone must list unique other milestone IDs in this project.",
+                       "Use the roadmap's predecessor IDs or an empty list.")
+            self._milestone_prerequisites(connection, project_id, prospective, earlier)
+            if gaps := milestone_prerequisite_gaps(prospective):
+                reject(gaps[0]["code"], "prerequisite_requirement_ids", gaps[0]["requirement_id"],
+                       "Each prerequisite needs a current lower-ordinal producer in this project.",
+                       "Check earlier milestones and keep realized scope separate from prerequisites.", gaps=gaps)
+
+            changed = definition != revised
+            affected = {milestone_id}
+            if changed:
+                scope_delta = set(current["requirement_ids"]) ^ set(revised.requirement_ids)
+                for dependent_id, dependent in milestones.items():
+                    if dependent["ordinal"] <= current["ordinal"]:
+                        continue
+                    if scope_delta.intersection(dependent["prerequisite_requirement_ids"]):
+                        new_previous = [prospective if m is current else m for m in milestones.values()
+                                        if m["ordinal"] < dependent["ordinal"]]
+                        new_dependent = dict(dependent)
+                        self._milestone_prerequisites(connection, project_id, new_dependent, new_previous)
+                        old_missing = {g["requirement_id"] for g in dependent["prerequisite_mapping_gaps"]}
+                        new_missing = {g["requirement_id"] for g in new_dependent["prerequisite_mapping_gaps"]}
+                        if orphaned := sorted(new_missing - old_missing):
+                            reject("milestone_draft_orphans_prerequisite", "requirement_ids", orphaned,
+                                   "The revision would remove the last producer of a downstream prerequisite.",
+                                   "Keep the producer or repair the dependent draft before retrying.",
+                                   dependent_milestone_id=dependent_id)
+                        affected.add(dependent_id)
+                while True:
+                    policy_dependents = set()
+                    for dependent_id, dependent in milestones.items():
+                        predecessors = dependent["entry_policy"].get("requires_milestone", [])
+                        if isinstance(predecessors, list) and any(isinstance(item, str) and item in affected
+                                                                 for item in predecessors):
+                            policy_dependents.add(dependent_id)
+                    if policy_dependents <= affected:
+                        break
+                    affected.update(policy_dependents)
+
+            confirmed = self._confirmed_milestone_authority(connection, project_id, milestones)
+            protected = sorted(affected & confirmed)
+            protected.extend(m for m in sorted(affected - confirmed) if milestones[m]["status"] != "planned")
+            if protected:
+                reject("milestone_draft_authority_locked", "milestone_id", milestone_id,
+                       "The milestone or an affected dependent has confirmed or accepted authority.",
+                       "Keep the recorded scope and use ordinary authorized scope change instead.",
+                       protected_milestone_ids=protected)
+            for change in connection.execute(
+                "SELECT change_id, milestone_id, status, requirement_ids_json, "
+                "EXISTS(SELECT 1 FROM implementation_packets AS p WHERE p.project_id=c.project_id "
+                "AND p.change_id=c.change_id) AS has_packets "
+                "FROM change_units AS c WHERE project_id=? AND milestone_id<>'' ORDER BY ordinal", (project_id,),
+            ):
+                linked = change["milestone_id"]
+                if linked not in affected:
+                    continue
+                scope = prospective["requirement_ids"] if linked == milestone_id else milestones[linked]["requirement_ids"]
+                if (change["status"] != "planned" or change["has_packets"]
+                        or not set(json.loads(change["requirement_ids_json"])) <= set(scope)):
+                    reject("milestone_draft_linked_work_locked", "milestone_id", milestone_id,
+                           "Linked work is governed or cannot be proved inert and scope-compatible.",
+                           "Inspect the linked change and use the ordinary scope-change route.",
+                           change_id=change["change_id"], linked_milestone_id=linked)
+
+            if changed:
+                connection.execute(
+                    "UPDATE milestones SET name=?, requirement_ids_json=?, dependency_closure_ids_json=?, "
+                    "entry_policy_json=?, exit_policy_json=?, risk_disposition=? WHERE project_id=? AND milestone_id=?",
+                    (revised.name, self._json(list(revised.requirement_ids)),
+                     self._json([*revised.requirement_ids, *revised.prerequisite_requirement_ids]),
+                     self._json(dict(revised.entry_policy)), self._json(dict(revised.exit_policy)),
+                     revised.risk_disposition, project_id, milestone_id),
+                )
+                prospective["revision"] += 1
+            return current, prospective
+
+    def _confirmed_milestone_authority(self, connection, project_id, milestones):
+        confirmed = set()
+        context = None
+        for row in connection.execute(
+            "SELECT payload_json FROM bootstrap_events WHERE project_id=? AND event_type='guided_confirm_roadmap'",
+            (project_id,),
+        ):
+            event = json.loads(row["payload_json"])
+            selected = set(event["input"]["mutation"]["milestone_ids"])
+            confirmed.update(selected)
+            if "authority_milestone_ids" in event:
+                confirmed.update(event["authority_milestone_ids"])
+                continue
+            # Older confirmations retained all draft correspondence, without a
+            # projection of which entries governed the selected scope. Protect
+            # recorded references with a positive link to that scope.
+            scope_requirements = {identity for milestone_id in selected if milestone_id in milestones
+                                  for field in ("requirement_ids", "prerequisite_requirement_ids")
+                                  for identity in milestones[milestone_id][field]}
+            mappings = event.get("guided_state", {}).get("correspondence", {})
+            if not mappings:
+                continue
+            if context is None:
+                context = self.list_changes(project_id), self.goal_graph(project_id)["edges"]
+            changes, edges = context
+            scope_goals = {goal for change in changes if change.get("milestone_id") in selected
+                           for packet in change.get("packets", [])
+                           for goal in (*packet.get("goal_ids", []), *change.get("goal_ids", []))}
+            relevant, _ = roadmap_correspondence(mappings, scope_requirements, selected, scope_goals, edges)
+            confirmed.update(milestone for mapping in relevant.values()
+                             for milestone in mapping["canonical_references"]["milestone_ids"])
+        return confirmed
 
     def accept_milestone(
         self,

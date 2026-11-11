@@ -91,7 +91,7 @@ def render_roadmap(
     parts.append("## Milestones in selected order")
     for milestone in basis["milestones"]:
         parts.append(_section(f"{milestone['milestone_id']}: {milestone['name']}", level=3))
-        fields = {}
+        fields = {"revision": milestone.get("revision", 1)}
         for key, value in milestone.items():
             if key != "milestone_id":
                 label = {"requirement_ids": "realized_requirement_ids"}.get(key, key)

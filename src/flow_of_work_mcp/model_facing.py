@@ -11,6 +11,12 @@ from typing import Annotated, Any, TypeVar, cast, get_type_hints
 from mcp.types import CallToolResult, TextContent
 from pydantic import Field
 
+from flow_of_work_mcp.application.campaign_markdown import (
+    campaign_check_lines,
+    campaign_detail_lines,
+    campaign_error_markdown,
+    campaign_receipt_lines,
+)
 from flow_of_work_mcp.application.operation_contracts import (
     operation_names,
     parameter_help,
@@ -19,6 +25,7 @@ from flow_of_work_mcp.application.operation_contracts import (
 from flow_of_work_mcp.application.external_plan_markdown import REVIEW_ACCEPTANCE_MEANING, render_assurance_result, render_external_result, repository_review_summary
 from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
 from flow_of_work_mcp.core.domain.artifacts import ArtifactKind
+from flow_of_work_mcp.core.domain.packet_validation_projection import CRITERION_RESPONSIBILITY_GAPS
 from flow_of_work_mcp.markdown_adapter import (
     MarkdownArtifact,
     MarkdownJsonIsland,
@@ -252,6 +259,203 @@ def model_facing_tool(
     return cast(F, wrapped)
 
 
+def _campaign_provider_boundary_lines(boundary: object) -> list[str]:
+    if not isinstance(boundary, Mapping):
+        return []
+    state = boundary.get("state")
+    if state not in {"provider_rejected", "provider_unknown"}:
+        return []
+    deliveries = boundary.get("deliveries") or []
+    delivery = deliveries[-1] if deliveries else boundary
+    outbox = delivery.get("outbox") or {}
+    reason = delivery.get("reason") or outbox.get("last_error") or state
+    lines = [f"- **Provider boundary:** {state}", f"- **Cause:** {safe_inline(str(reason)[:240])}"]
+    for label, key in (("Case", "case_id"), ("Command", "command_id")):
+        if identity := outbox.get(key):
+            lines.append(f"- **{label}:** {safe_inline(str(identity)[:80])}")
+
+    action = delivery.get("next_action") or boundary.get("next_action")
+    if reason == "effective_project_cross_domain_collision":
+        lines.append("- **Next step:** Inspect the provider test draft for this case and resolve its "
+                     "overlap with the product checkout. Once the colliding draft is cleared, use "
+                     "`fow_campaign_author` / `attest_source` to send the full source inline to an "
+                     "unused provider destination. Leave the product checkout unchanged.")
+    elif isinstance(action, Mapping) and action.get("tool") and action.get("operation"):
+        lines.append(f"- **Next step:** Resolve the reported cause before using "
+                     f"`{safe_inline(str(action['tool']))}` / `{safe_inline(str(action['operation']))}`.")
+        arguments = action.get("arguments") or {}
+        known = [f"`{key}={safe_inline(str(arguments[key])[:80])}`"
+                 for key in ("campaign_id", "provider_command_id") if arguments.get(key)]
+        if known:
+            lines.append("- **Known inputs:** " + ", ".join(known))
+        if required := action.get("required_inputs"):
+            lines.append("- **Inputs to supply:** " + ", ".join(f"`{safe_inline(str(key))}`" for key in required))
+    elif state == "provider_unknown":
+        lines.append("- **Next step:** Use `fow_campaign_advance` on this campaign to reconcile "
+                     "the same durable command before submitting another declaration.")
+    else:
+        lines.append("- **Next step:** Inspect the campaign and resolve the reported provider cause before retrying.")
+    return lines
+
+
+def _campaign_work_markdown(
+    result: Mapping[str, Any], *, project_id: str, change_id: str, include_horizon: bool, view: str,
+) -> str:
+    gate = result["lifecycle_gate"]
+    campaign = result.get("campaign") or {}
+    campaign_id = str(campaign.get("campaign_id") or "")
+    work = gate["work_remaining"]
+    decision = gate.get("decision_required") or {}
+    action = gate["next_action"]
+    tool, operation = action["tool"], action["operation"]
+
+    def plain(value: object) -> str:
+        return safe_inline(str(value))
+
+    lines = ["# Campaign work", "", f"- **Project:** {plain(project_id)}"]
+    if campaign_id:
+        lines.append(f"- **Campaign:** {plain(campaign_id)}")
+    if change_id := campaign.get("change_id") or change_id:
+        lines.append(f"- **Change:** {plain(change_id)}")
+    if boundary_lines := _campaign_provider_boundary_lines(result.get("provider_boundary")):
+        return "\n".join([*lines, *boundary_lines]) + "\n"
+    lines.append(f"- **Current gate:** {plain(gate['lifecycle_state'])} ({plain(gate['state'])})")
+    cause = decision.get("missing_fact") or decision.get("prompt") or decision.get("reason")
+    if not cause and decision.get("kind") == "obligation_classification":
+        cause = f"Classify {decision['obligation_id']}. {decision['statement']}"
+    if not cause and decision.get("kind") in {"independent_proof_required", "case_not_host_eligible"}:
+        cause = "The selected case needs proof outside the host execution lane."
+    if not cause and decision.get("kind") == "product_failure_route":
+        cause = decision.get("observation") or "The issued check observed a product failure."
+    if gate["lifecycle_state"] == "missing":
+        cause = "No current campaign is recorded for this selection."
+    if not cause:
+        cause = {
+            "derive_obligations": "Proof obligations have not been derived for this scope.",
+            "attest_source": "The selected case needs current attested test source.",
+            "deliver_test_command": "The selected attestation is pending technical validation.",
+            "run_test_case": "The selected case still needs current passed run evidence.",
+            "authorize_promotion": "Current passed evidence still needs promotion authority.",
+            "deliver_promotion": "Promotion is authorized and still needs accepted provider evidence.",
+            "issue_host_check": "The selected case needs an issued check for the current source revision.",
+            "report_host_result": "Flower is waiting for the observed outcome of the issued check.",
+        }.get(operation)
+    if cause:
+        lines.append(f"- **Cause:** {plain(str(cause)[:360])}")
+    elif work.get("current_phase_requirement"):
+        lines.append(f"- **Current requirement:** {plain(work['current_phase_requirement'])}")
+    if gate.get("semantic_effect"):
+        lines.append(f"- **Expected action:** {plain(gate['semantic_effect'])}")
+
+    known = dict(action.get("arguments") or {})
+    known.pop("expected_fingerprint", None)
+    known.pop("campaign_id", None)
+    if operation == "report_host_result":
+        lines.append("- **Next step:** Run the issued check with authorized host tools, then call "
+                     "`fow_campaign_author` / `report_host_result` with the observed result.")
+    elif tool == "fow_campaign_advance":
+        lines.append(f"- **Next step:** Call `fow_campaign_advance` for this campaign with your actor and request ID. "
+                     f"Its current transition is `{plain(operation)}`.")
+    elif tool == "fow_campaign_inspect":
+        lines.append(f"- **Next step:** Call `fow_campaign_inspect` for this campaign with `view={plain(operation)}`.")
+    else:
+        # The campaign gate uses the packet start action as a semantic route.
+        # Packet authoring publishes start_packet as its actual selector.
+        if tool == "fow_packet_author" and operation == "start":
+            operation = "start_packet"
+        lines.append(f"- **Next step:** Call `{plain(tool)}` / `{plain(operation)}` for this scope. "
+                     "Use `fow_capabilities` for its exact inputs.")
+    known_inputs = [f"`{key}={plain(value)}`" for key, value in known.items() if key.endswith("_id") and value]
+    capability = known.get("requested_capability")
+    if isinstance(capability, Mapping):
+        known_inputs.extend(f"`requested_capability.{key}={plain(value)}`" for key, value in capability.items())
+    if operation in {"issue_host_check", "report_host_result", "record_finding", "obligations", "advance"}:
+        for key in ("attempt_id", "source_revision", "declared_source_revision", "observed_source_revision",
+                    "check_reference", "execution_profile", "evidence_id", "last_outcome"):
+            if value := decision.get(key):
+                known_inputs.append(f"`{key}={plain(str(value)[:180])}`")
+        if obligation_ids := decision.get("obligation_ids"):
+            known_inputs.append("obligations " + ", ".join(plain(ref) for ref in obligation_ids[:6]))
+    if known_inputs:
+        label = "Transition context" if tool == "fow_campaign_advance" else "Known inputs"
+        lines.append(f"- **{label}:** " + ", ".join(known_inputs))
+    if operation == "answer_question":
+        lines.append("- **Optional revision pin:** Use the current campaign fingerprint from `fow_campaign_inspect` with `view=oracles`.")
+    elif operation == "author_obligations":
+        lines.append("- **Required revision pin:** Read `view=obligations` and pass its current fingerprint as `expected_fingerprint`.")
+    required_inputs = decision.get("required_inputs") or []
+    if required_inputs:
+        prefix = {"issue_host_check": "host_check.", "report_host_result": "host_result."}.get(operation, "")
+        lines.append("- **Inputs to supply:** " + ", ".join(f"`{prefix}{plain(key)}`" for key in required_inputs))
+    if operation == "report_host_result" and isinstance(check := decision.get("check"), Mapping):
+        lines.extend(campaign_check_lines(check))
+    allowed = gate.get("allowed_responses") or []
+    if allowed and operation != "author_oracle":
+        choices = [plain(row["value"]) for row in allowed]
+        lines.append("- **Decision choices:** " + ", ".join(choices))
+        if operation == "answer_question":
+            lines.append("- **Decision inputs:** Supply `answer`, `answer_authority` and `provenance`. "
+                         "Grounded facts and accepted decisions require nonempty provenance. "
+                         "A waiver requires `waiver_scope`.")
+        else:
+            inputs = list(dict.fromkeys(plain(key) for row in allowed for key in row.get("requires", [])))
+            if inputs:
+                lines.append("- **Decision inputs:** " + ", ".join(inputs))
+    questions = work.get("oracle_questions")
+    if questions and questions["scope"] == "oracle_ir" and operation != "answer_question":
+        lines.append("- **Optional deterministic IR:** Continue with the current gate above. "
+                     "For the separate IR route, inspect `view=oracle_ir` before answering any optional question.")
+    elif questions:
+        label = "Required source fields" if questions["scope"] == "source" else "Optional deterministic IR fields"
+        fields = [f"`{plain(row['field_name'])}` (`{plain(row['question_id'])}`)"
+                  for row in questions["ordered_missing_fields"]]
+        lines.extend(["", f"## {label} · {plain(questions['oracle_id'])} revision {questions['oracle_revision']} ({len(fields)} remaining)",
+                      "", ", ".join(fields), "",
+                      f"Current answer slot: `{plain(questions['current_question_id'])}`. "
+                      "Record one answer at a time and refresh the gate."])
+        if questions["other_pending_questions"]:
+            lines.append(f"{questions['other_pending_questions']} additional current questions belong to other Oracles. "
+                         "Use campaign inspection with `view=oracles` for details.")
+    if include_horizon and work.get("conditional_phases"):
+        lines.extend(["", "## Later phases if still applicable", ""])
+        lines.extend(f"- {plain(phase['requirement'])}" for phase in work["conditional_phases"])
+    if include_horizon and work.get("effort") == "undetermined":
+        lines.extend(["", "The total remaining calls depend on decisions and observed evidence."])
+    if result.get("transitions"):
+        lines.append("- **Transitions applied:** " + ", ".join(plain(row["operation"]) for row in result["transitions"]))
+    if (result.get("semantic_delta") or {}).get("replayed"):
+        lines.append("- **Receipt:** Exact replay of a recorded request.")
+    lines.extend(campaign_receipt_lines(result))
+    lines.extend(campaign_detail_lines(result, view))
+    return "\n".join(lines) + "\n"
+
+
+def _requirements_export_markdown(
+    result: Mapping[str, Any], *, project_id: str, generation_id: int
+) -> str:
+    """Present the pinned catalogue without repeating its machine-only mappings."""
+    heading = (
+        "# Flower Requirements Export\n\n"
+        f"- **Project:** {safe_inline(project_id)}\n"
+        f"- **Generation ID:** {generation_id}\n"
+    )
+    generations = result["generations"]
+    if not generations:
+        return (
+            heading + "\nNo requirements catalogue matches this project and generation. "
+            "Use `fow_get_artifacts` with `artifact_kind=requirements_catalogue` and omit "
+            "`generation_id` and `include_content` to list available generations.\n"
+        )
+    generation = generations[0]
+    artifact = generation["artifacts"][0]
+    return (
+        heading
+        + f"- **Source ledger version:** {generation['source_ledger_version']}\n"
+        + f"- **Content SHA-256:** `{artifact['content_sha256']}`\n\n"
+        + artifact["content"]
+    )
+
+
 def _lens_catalog_markdown(result: Mapping[str, Any]) -> str:
     """Bounded model orientation; full route membership stays machine-facing."""
     context = result["project_context"]
@@ -329,6 +533,308 @@ def _present_repository_reviews(value: Any, *, full_review: bool = False) -> Any
     return value
 
 
+def _progress_totals(progress: Mapping[str, Any]) -> dict[str, str]:
+    totals = {}
+    for key in ("implementation", "local_verification"):
+        count = progress[key]
+        percent = count["percent"]
+        proportion = "percentage unknown" if percent is None else f"{percent}%"
+        totals[count["label"]] = (
+            f"{count['completed']}/{count['total']} applicable criteria ({proportion}). "
+            f"{count['not_applicable']} excluded as inapplicable. Current host reports against the recorded criterion scope."
+        )
+    milestones = progress["milestones"]
+    accepted = sum(row["acceptance"]["state"] == "accepted" for row in milestones)
+    totals["Recorded milestone acceptance"] = (
+        f"{accepted}/{len(milestones)} selected milestones with accepted status and recorded evidence."
+    )
+    totals["Evidence boundary"] = "Ledger read. Repository state and test execution require separate evidence."
+    return totals
+
+
+_NEXT_WORK_OPERATIONS = {
+    ("fow_change", "create_change"),
+    ("fow_packet_author", "start_packet"),
+}
+
+
+def _next_work_lines(action: Mapping[str, Any]) -> list[str]:
+    route = action.get("route", action)
+    if not isinstance(route, Mapping):
+        return []
+    tool, operation = route.get("tool"), route.get("operation")
+    if (tool, operation) not in _NEXT_WORK_OPERATIONS:
+        return []
+    scope = action.get("scope", action)
+    scope_keys = ("milestone_ids", "change_ids", "requirement_ids")
+    identities = [identity for key in scope_keys for identity in scope.get(key, ())]
+    known = [
+        f"{key}={value}" for key, value in route["arguments"].items()
+        if key != "operation"
+    ]
+    return [
+        "- **Cause** " + safe_inline(action.get("rationale") or action["reason"]),
+        "- **Scope** " + safe_inline(", ".join(identities)),
+        f"- **Next step** `{tool}` / `{operation}` for one bounded increment.",
+        "- **Known inputs** " + safe_inline(", ".join(known)),
+        "- **Inputs to supply** " + safe_inline(", ".join(route["required_inputs"])),
+        f"- **Operation help** `fow_capabilities` with `view=operation`, "
+        f"`operation_tool={tool}` and `operation_name={operation}`. Proceed within confirmed scope.",
+    ]
+
+
+def _compact_snapshot_markdown(snapshot: Mapping[str, Any], output_budget: int | None) -> str:
+    gate = snapshot["next_gate"]
+    route = gate.get("route")
+    active = snapshot.get("active_work") or {}
+    scope = {**snapshot["project"], "focus": snapshot["focus"]}
+    for kind in ("milestone", "change", "packet", "campaign", "finding"):
+        row = active.get(kind) or {}
+        if identity := row.get(f"{kind}_id"):
+            scope[f"{kind}_id"] = identity
+    current = {"state": gate["state"], "cause": gate["reason"]}
+    if isinstance(route, Mapping):
+        current["next_bounded_increment"] = {
+            "tool": route["tool"], "operation": route["operation"],
+            "known_inputs": route["arguments"], "inputs_to_supply": route["required_inputs"],
+        }
+    if context := snapshot.get("acceptance_context"):
+        current["packet_checkpoint"] = context["packet_checkpoint"]["state"]
+        acceptance = context["milestone_acceptance"]
+        current["milestone_acceptance"] = acceptance["state"]
+        current["acceptance_prerequisites"] = [row["reason"] for row in acceptance["blockers"][:3]]
+    blockers = snapshot["blockers"]
+    return render_markdown(
+        title="Flower Project State", status="success", output_budget=output_budget,
+        document={
+            "scope": scope, "next_gate": current, "blockers": blockers[:3],
+            "completeness": {
+                "coherent_read": snapshot["completeness"]["coherent_read"],
+                "additional_blockers": max(0, len(blockers) - 3) + snapshot["completeness"]["omitted"]["blockers"],
+                "audit_presentation": "Repeat this scope with projection_kind=audit for details and history.",
+            },
+        },
+    )
+
+
+def _acceptance_blocker_lines(
+    blocker: Mapping[str, Any], *, change_id: str = "", milestone_id: str = "",
+) -> list[str]:
+    reason = blocker.get("reason") or blocker.get("kind") or "unknown"
+    references = [str(blocker[key]) for key in ("scope", "change_id", "packet_id", "finding_id", "campaign_id")
+                  if blocker.get(key)]
+    for key in ("requirement_ids", "finding_ids", "campaign_ids"):
+        references.extend(str(identity) for identity in blocker.get(key, ()))
+    label = " · ".join([reason, *(references or [change_id or milestone_id])]).rstrip(" ·")
+    lines = ["- **Prerequisite** " + safe_inline(label)]
+    if reason == "campaign_missing":
+        lines.extend([
+            "  - **Cause** No campaign is linked to this change.",
+            "  - **Next step** Read exact help for `fow_campaign_author` / `start`. "
+            "Use the change above as `scope.change_id` and define the required verification before requesting acceptance.",
+        ])
+    elif reason == "campaign_not_complete":
+        campaign_id = blocker.get("campaign_id")
+        target = f"`campaign_id={safe_inline(campaign_id)}`" if campaign_id else "the affected `campaign_id`"
+        lines.extend([
+            "  - **Cause** The campaign has passing results and its current lifecycle has not completed.",
+            f"  - **Next step** Call `fow_campaign_inspect` with {target} and "
+            "`view=summary` in this project, then follow its current gate.",
+        ])
+    elif reason in {"campaign_not_green", "qualified_campaign_missing", "campaign_happy_path_only"}:
+        if reason == "qualified_campaign_missing":
+            cause = "No linked campaign has current, active qualification."
+        elif reason == "campaign_happy_path_only":
+            cause = "The campaign lacks required failure-oriented coverage and has no recorded exception."
+        else:
+            cause = "The linked campaign has no qualifying passing disposition."
+        lines.extend([
+            "  - **Cause** " + cause,
+            "  - **Next step** Call `fow_campaign_inspect` with the project, the listed `campaign_id` "
+            "and `view=summary` to read the current campaign gate.",
+        ])
+    elif reason in {"finding_unresolved", "finding_resolution_missing_evidence"}:
+        cause = ("A linked finding still needs a disposition." if reason == "finding_unresolved"
+                 else "A resolved finding has no evidence references.")
+        lines.extend([
+            "  - **Cause** " + cause,
+            "  - **Next step** Read each listed `finding_id` with `fow_assurance` / `get_finding` "
+            "in the selected project.",
+        ])
+    elif reason == "packet_missing":
+        lines.extend([
+            "  - **Cause** The linked change has no packet.",
+            "  - **Next step** Read exact help for `fow_packet_author` / `start_packet` "
+            "for the change above and define only the next bounded packet.",
+        ])
+    elif reason == "packet_unresolved":
+        lines.extend([
+            "  - **Cause** The packet still needs a terminal technical disposition.",
+            "  - **Next step** Read `fow_packet_inspect` / `summary` for this packet. When its current "
+            "route is `fow_change` / `transition_packet`, record `packet_status=implemented` with "
+            "the observed criterion evidence. The change and milestone decisions are separate.",
+        ])
+    elif reason == "navigation_audit_blocker":
+        lines.extend([
+            "  - **Cause** The packet's required code targets are not ready.",
+            "  - **Next step** Read `fow_packet_inspect` / `summary` for the listed change and packet, "
+            "then follow its current gate.",
+        ])
+    elif reason == "required_change_unit_missing":
+        lines.extend([
+            "  - **Cause** The listed requirements have no change linked to this milestone.",
+            "  - **Next step** Read exact help for `fow_change` / `create_change` "
+            "and select the requirements for the next bounded result.",
+        ])
+    return lines
+
+
+def _acceptance_gate_lines(
+    gate: Mapping[str, Any], *, project_id: str = "",
+) -> list[str]:
+    change_id = gate.get("change_id", "")
+    milestone_id = gate.get("milestone_id", "")
+    lines = []
+    if project_id:
+        lines.append("- **Project** " + safe_inline(project_id))
+    if change_id or milestone_id:
+        lines.append("- **Scope** " + safe_inline(change_id or milestone_id))
+    if gate.get("prerequisites_satisfied") is True:
+        lines.append("- The current technical prerequisites are satisfied. Acceptance still requires an authorized decision and reference.")
+    if gate.get("effect_state"):
+        lines.append("- **Effect state** " + safe_inline(gate["effect_state"]))
+    if guidance := gate.get("recovery_guidance"):
+        lines.append("- **Before retrying** " + safe_inline(guidance["resolution"]))
+    if call := gate.get("next_tool_call"):
+        fields = ", ".join(f"{key}={value}" for key, value in call["arguments"].items())
+        lines.append("- **Inspect** " + safe_inline(f"{call['tool']} with {fields}"))
+    for blocker in gate["blockers"]:
+        lines.extend(_acceptance_blocker_lines(blocker, change_id=change_id, milestone_id=milestone_id))
+    return lines
+
+
+def _acceptance_markdown(context: Mapping[str, Any]) -> str:
+    scope = context["scope"]
+    milestone = context["milestone_acceptance"]
+    state = milestone["state"]
+    explanations = {
+        "blocked": "The current milestone has outstanding prerequisites. Inspect them before requesting acceptance.",
+        "awaiting_human": "The checked prerequisites are satisfied. The stakeholder decision and its evidence are pending.",
+        "ready": "The checked prerequisites are satisfied. Recorded references do not establish a stakeholder decision.",
+        "accepted": "The selected milestone has a recorded acceptance and evidence.",
+        "unavailable": "Milestone acceptance could not be evaluated for this selection.",
+    }
+    lines = [explanations[state], "", f"- **Acceptance disposition** {safe_inline(state)}"]
+    identities = [str(scope[key]) for key in ("packet_id", "milestone_id") if scope.get(key)]
+    if identities:
+        lines.append("- **Selected scope** " + safe_inline(" · ".join(identities)))
+    if milestone.get("recorded_status"):
+        lines.append("- **Milestone recorded status** " + safe_inline(milestone["recorded_status"]))
+    packet = context.get("packet_checkpoint")
+    if packet:
+        lines.append("- **Packet checkpoint** " + safe_inline(packet["state"]))
+        units = packet.get("reported_units")
+        if units is not None:
+            lines.append(f"- **Host-reported units complete** {units['completed']}/{units['total']}")
+        if review := packet.get("repository_review"):
+            review_detail = [str(review.get("state") or "")]
+            if review.get("latest_audit_id"):
+                review_detail.append(f"audit {review['latest_audit_id']}")
+            if source := review.get("source"):
+                review_detail.extend(str(source[key]) for key in ("provenance", "revision") if source.get(key))
+            lines.append("- **Repository review** " + safe_inline(" · ".join(review_detail)))
+    if milestone.get("reason"):
+        lines.append("- **Scope detail** " + safe_inline(milestone["reason"]))
+    if milestone.get("awaited_inputs"):
+        lines.append("- **Human input** " + safe_inline(", ".join(milestone["awaited_inputs"])))
+    for reference in milestone.get("acceptance_evidence", []):
+        lines.append("- **Recorded acceptance reference** " + safe_inline(reference))
+    for blocker in milestone["blockers"]:
+        lines.extend(_acceptance_blocker_lines(blocker, milestone_id=scope.get("milestone_id", "")))
+    for requirement in context["requirements"]:
+        lines.append("- **Requirement** " + safe_inline(" · ".join((requirement["requirement_id"],
+            requirement["lifecycle_status"], requirement["direct_evidence_state"]))))
+        for proof in requirement["direct_evidence"]:
+            lines.append("  - " + safe_inline(" · ".join((f"evidence {proof['evidence_id']}",
+                proof["verification_kind"], proof["outcome"], proof["currentness"], proof["reference"]))))
+    for goal in context["goal_grounding"]:
+        references = [goal["goal_node_id"], goal["state"], *goal["gaps"]]
+        if goal.get("audit_id"):
+            references.extend([f"audit {goal['audit_id']}", goal["evidence_authority"], goal["source_currentness"]])
+            if goal.get("source_revision"):
+                references.append(goal["source_revision"])
+        lines.append("- **Goal grounding context** " + safe_inline(" · ".join(references)))
+    for deferred in context["deferred_obligations"]:
+        lines.append("- **Deferred verification** " + safe_inline(" · ".join(str(deferred.get(key) or "")
+            for key in ("applicability", "state", "authority_ref", "statement"))))
+    if context["truncated"]:
+        lines.extend(["", "This view is bounded. Use the scoped read and the retained evidence references for details."])
+    return "\n".join(lines)
+
+
+def _architecture_proposal_help(contract: Mapping[str, Any]) -> str:
+    guidance = contract["guidance"]
+    fields = guidance["entity_fields"]
+    kind_path = "payload.definition.interfaces[].kind"
+    lines = [
+        "# Flower Architecture: propose", "", "## Minimum definition shape", "",
+        "Send `project_id`, `operation=propose`, `actor` and a caller-owned `request_id`.",
+        "Set `payload.expected_revision` to the current adopted revision (0 before the first adoption).",
+        "Set `payload.definition` to an object with all three arrays: `components`, `interfaces`, `decisions`.",
+        "An unused array can be `[]`. Include a component before using the design for new plan admission.",
+        "Each included entity must have every field in its row:", "",
+    ]
+    for kind, names in fields.items():
+        lines.append(f"- **{kind.capitalize()}** " + ", ".join(f"`{name}`" for name in names))
+    lines.extend([
+        "",
+        "A one-component example uses `id=Core`, `name=Core`, `responsibility=Own the project state`, "
+        "`boundaries=[]`, `invariants=[]` and `links=[]`, with `interfaces=[]` and `decisions=[]`.",
+        "",
+        "Use `[]` for empty `links`, `boundaries`, `invariants`, `failure_contract`, "
+        "`compatibility`, `component_ids` and `interface_ids`. Interface `clauses` and "
+        "`consumer_component_ids` must be nonempty. Use `supersedes_decision_id` as an empty string for a first decision.",
+        f"`{kind_path}` accepts " + ", ".join(contract["accepted_values"][kind_path]) + ".",
+        "Use existing component IDs for endpoints, and existing component/interface IDs for decision subjects.",
+        "", "## Typed links and narrative", "",
+    ])
+    for link in guidance["links"]:
+        lines.append(f"- **{link['kind']} link** " + ", ".join(f"`{field}`" for field in link))
+    lines.extend(["", guidance["markdown"], guidance["bounds"], "", "## Receipt and next gate", "",
+                  guidance["replay"], guidance["authority"]])
+    return "\n".join(lines) + "\n"
+
+
+def _use_readable_recovery(tool: str, operation: str, payload: Mapping[str, Any]) -> bool:
+    """Keep the new recovery paths readable without changing machine envelopes."""
+    reason = str(payload.get("reason") or "")
+    result = payload.get("result")
+    diagnostics = result.get("diagnostics", []) if isinstance(result, Mapping) else []
+    first = diagnostics[0] if isinstance(diagnostics, (list, tuple)) and diagnostics else {}
+    first = first if isinstance(first, Mapping) else {}
+    if tool == "fow_packet_advance":
+        return reason == "packet_criterion_responsibility_unresolved" or (
+            reason == "packet_decision_not_current"
+            and first.get("expected_operation") == "external_validation"
+        )
+    if tool == "fow_architecture":
+        field = str(first.get("field", ""))
+        return reason == "architecture_input_invalid" and (
+            field == "payload.definition.markdown" or field.startswith("payload.definition.interfaces[")
+            or bool(first.get("missing_entity_fields"))
+        )
+    if tool == "fow_packet_author":
+        if operation == "add_unit":
+            return payload.get("status") != "success"
+        return operation == "set_dependencies" and reason in {
+            "stale_packet_revision", "stale_current_work_plan_revision",
+        }
+    return tool == "fow_external_work" and (
+        operation == "classify_criteria" or reason in CRITERION_RESPONSIBILITY_GAPS
+        or (operation == "select_executor" and first.get("field") == "payload.executor")
+    )
+
+
 def project_markdown(
     tool_name: str,
     payload: Mapping[str, Any],
@@ -340,6 +846,41 @@ def project_markdown(
 
     arguments = arguments or {}
     result = payload.get("result")
+    if (tool_name == "fow_capabilities" and arguments.get("view") == "operation"
+            and payload.get("status") == "success" and isinstance(result, Mapping)):
+        contract = result.get("operation_contract")
+        if isinstance(contract, Mapping) and (contract.get("tool"), contract.get("operation")) == ("fow_architecture", "propose"):
+            rendered = _architecture_proposal_help(contract)
+            if output_budget is not None and len(rendered) > output_budget:
+                return projection_boundary(title="Flower Architecture: propose", status="success",
+                                           required_chars=len(rendered), output_budget=output_budget)
+            return rendered
+    if tool_name in {"fow_campaign_author", "fow_campaign_advance", "fow_campaign_inspect"}:
+        status = str(payload.get("status") or "failed")
+        view = str(arguments.get("view") or "summary")
+        if status == "success":
+            rendered = _campaign_work_markdown(
+                result, project_id=str(arguments.get("project_id") or "selected project"),
+                change_id=str(arguments.get("change_id") or ""), view=view,
+                include_horizon=(tool_name == "fow_campaign_inspect" and view == "summary")
+                or arguments.get("operation") == "start",
+            )
+        else:
+            rendered = campaign_error_markdown(tool_name, payload, arguments)
+        if output_budget is not None and len(rendered) > output_budget:
+            return projection_boundary(title="Campaign work", status=status,
+                                       required_chars=len(rendered), output_budget=output_budget)
+        return rendered
+    if (
+        tool_name == "fow_get_artifacts"
+        and payload.get("status") == "success"
+        and arguments.get("artifact_kind") == ArtifactKind.REQUIREMENTS_CATALOGUE.value
+        and arguments.get("generation_id") is not None
+        and arguments.get("include_content") is True
+    ):
+        return _requirements_export_markdown(
+            result, project_id=arguments["project_id"], generation_id=arguments["generation_id"]
+        )
     if (tool_name == "fow_bootstrap" and payload.get("status") == "success"
             and isinstance(result, Mapping) and "operational_projection" in result):
         return _guided_bootstrap_markdown(payload, str(arguments.get("operation") or ""), output_budget)
@@ -353,6 +894,43 @@ def project_markdown(
     if spec is None:
         raise ModelFacingProjectionError(f"missing_model_facing_projector:{tool_name}")
     operation = str(arguments.get("operation") or "").strip()
+    if tool_name == "fow_bootstrap" and operation == "revise_draft_milestone" and payload.get("status") == "success":
+        milestone = result["milestone"]
+        return render_markdown(
+            title="Draft milestone revision", status="success", output_budget=output_budget,
+            document={"milestone": milestone["milestone_id"], "ordinal": milestone["ordinal"],
+                      "name": milestone["name"], "changed": result["changed"],
+                      "previous_revision": result["previous_revision"], "current_revision": result["current_revision"],
+                      "roadmap_fingerprint": result["roadmap_fingerprint"], "confirmable": result["confirmable"],
+                      "unresolved_obligations": result["gaps"], "next_step": result["next_step"]},
+            json_islands=(MarkdownJsonIsland("Read the current roadmap", result["next_tool_call"]),),
+        )
+    audit_snapshot = (
+        tool_name == "fow_handover" and operation == "project_state_snapshot"
+        and arguments.get("projection_kind") == "audit" and payload.get("status") == "success"
+    )
+    if (tool_name == "fow_handover" and operation == "project_state_snapshot"
+            and payload.get("status") == "success" and not audit_snapshot
+            and isinstance(result, Mapping) and isinstance(result.get("project_state_snapshot"), Mapping)):
+        return _compact_snapshot_markdown(result["project_state_snapshot"], output_budget)
+    if (payload.get("reason") in {"change_acceptance_blocked", "milestone_acceptance_blocked"}
+            and isinstance(result, Mapping) and result.get("blockers")):
+        lines = ["# Acceptance blocked", "", *_acceptance_gate_lines(
+            result, project_id=str(arguments.get("project_id") or ""),
+        )]
+        rendered = "\n".join(lines) + "\n"
+        if output_budget is not None and len(rendered) > output_budget:
+            return projection_boundary(title="Acceptance blocked", status="blocked",
+                                       required_chars=len(rendered), output_budget=output_budget)
+        return rendered
+    if (tool_name == "fow_assurance" and operation == "inspect_change_acceptance"
+            and payload.get("status") == "success"):
+        return "\n".join(["# Change acceptance preflight", "", *_acceptance_gate_lines(
+            result["assurance"], project_id=str(arguments.get("project_id") or ""),
+        )]) + "\n"
+    if (tool_name == "fow_architecture" and operation == "export" and payload.get("status") == "success"
+            and isinstance(result, Mapping) and isinstance(result.get("markdown"), str)):
+        return result["markdown"]
     complete_evidence = tool_name == "fow_traceability" and bool(arguments.get("evidence_id")) and payload.get("status") == "success"
     explicit_review_detail = (
         tool_name == "fow_external_work" and operation == "validation"
@@ -361,7 +939,7 @@ def project_markdown(
     )
     title = spec.title + (f": {operation}" if operation else "")
     full_review = (
-        explicit_review_detail
+        explicit_review_detail or audit_snapshot
     ) or (tool_name == "fow_packet_inspect" and arguments.get("detail_level") == "audit") or (
         tool_name == "fow_handover" and operation == "get_handover"
     )
@@ -375,9 +953,67 @@ def project_markdown(
         presentation_payload,
         result_heading=spec.result_heading,
         artifact_keys=spec.artifact_keys,
-        exact_call_keys=spec.exact_call_keys,
+        exact_call_keys=(frozenset() if _use_readable_recovery(tool_name, operation, payload)
+                         else spec.exact_call_keys),
         preserve_multiline=complete_evidence or payload.get("status") in {"rejected", "blocked", "failed"},
     )
+    if tool_name == "fow_handover" and operation == "project_progress" and payload.get("status") == "success":
+        section = document.pop(spec.result_heading)
+        progress = section["project_progress"]
+        document["recorded_progress_totals"] = _progress_totals(progress)
+        progress.pop("implementation")
+        progress.pop("local_verification")
+        document[spec.result_heading] = section
+    if tool_name == "fow_traceability" and isinstance(result, Mapping) and "pagination" in result:
+        traceability = document.pop(spec.result_heading)
+        pagination = traceability.pop("pagination")
+        pages = [
+            {"view": label, **pagination[key]}
+            for key, label in (("requirements", "Requirements"), ("projection_rows", "Projection rows"))
+        ]
+        offsets = [page["next_offset"] for page in pages if page["has_more"]]
+        projection = result["projection"]
+        scope = f"project_id={projection['project_id']}"
+        if projection["milestone_id"]:
+            scope += f", milestone_id={projection['milestone_id']}"
+        document["traceability_pagination"] = {
+            "next_page": (
+                f"Call fow_traceability with {scope}, detail_level={result['detail_level']}, "
+                f"offset={min(offsets)}, limit={pages[0]['limit']}."
+                if offsets else "End of both views."
+            ),
+            "pages": pages,
+        }
+        document[spec.result_heading] = traceability
+    context_key = {"fow_handover": "project_state_snapshot", "fow_packet_inspect": "packet"}.get(tool_name)
+    if tool_name == "fow_what_next" and isinstance(result, Mapping):
+        shown_result = document[spec.result_heading]
+        if next_lines := _next_work_lines(result.get("primary_action", {})):
+            shown_result.pop("primary_action", None)
+            artifacts.append(("Next bounded increment", "\n".join(next_lines), "markdown"))
+        acceptance = result.get("acceptance_preflight") or result.get("milestone_closure")
+        if acceptance and acceptance.get("blockers"):
+            if "acceptance_preflight" in result:
+                shown_result.pop("acceptance_preflight", None)
+            else:
+                shown_result["milestone_closure"].pop("blockers", None)
+            lines = [
+                "These are acceptance prerequisites. Continue the current work gate above when applicable.",
+                "", *_acceptance_gate_lines(acceptance),
+            ]
+            if change_id := acceptance.get("change_id"):
+                lines.append(
+                    "- **Refresh this preflight** `fow_assurance` / `inspect_change_acceptance` "
+                    f"with `change_id={change_id}`."
+                )
+            artifacts.append(("Acceptance prerequisites", "\n".join(lines), "markdown"))
+    if context_key is not None:
+        section = document.get(spec.result_heading)
+        scoped = section.get(context_key) if isinstance(section, Mapping) else None
+        if isinstance(scoped, dict) and not audit_snapshot and isinstance(scoped.get("acceptance_context"), Mapping):
+            context = scoped.pop("acceptance_context")
+            artifacts.append(("Scoped acceptance and evidence", _acceptance_markdown(context), "markdown"))
+            exact_calls.append(("Read selected acceptance scope", context["detail_reference"]))
     if (
         tool_name == "fow_bootstrap" and operation == "roadmap"
         and payload.get("status") == "success" and isinstance(result, Mapping)
@@ -395,7 +1031,7 @@ def project_markdown(
                 "draft_context": "Presented in the complete roadmap below.",
             },
         }
-    if complete_evidence or (
+    if complete_evidence or audit_snapshot or (
         tool_name == "fow_bootstrap" and operation == "state_details" and payload.get("status") == "success"
     ) or (
         explicit_review_detail and payload.get("status") in {"success", "blocked"}

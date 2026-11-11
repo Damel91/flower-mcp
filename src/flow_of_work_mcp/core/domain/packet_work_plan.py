@@ -15,6 +15,7 @@ from flow_of_work_mcp.core.domain.paths import repo_relative_file_path
 from flow_of_work_mcp.core.domain.provider_surfaces import (
     codingcastle_provider_surface,
 )
+from flow_of_work_mcp.core.errors import InputValidationError
 
 
 _WORK_PLAN_ID_RE = re.compile(r"^WPLAN-[0-9]{6}$")
@@ -92,13 +93,16 @@ class WorkPlanUnit:
             if not file_path:
                 raise ValueError("extract-move unit requires destination file_path")
         else:
+            if file_path:
+                raise InputValidationError(
+                    "file_path is only valid for new-file or extract-move units.",
+                    field="file_path", received_value=file_path,
+                    details={"rule": "Existing-target units describe or bind an existing target.",
+                             "resolution": "Remove file_path. Use target_description for an existing target, or an issued mutation_target_binding_id."},
+                )
             if not mutation_binding and not target_description:
                 raise ValueError(
                     "existing-target unit requires a target binding or readable target description"
-                )
-            if file_path:
-                raise ValueError(
-                    "file_path is only valid for new-file or extract-move units"
                 )
         object.__setattr__(self, "mutation_target_binding_id", mutation_binding)
         object.__setattr__(self, "target_description", target_description)

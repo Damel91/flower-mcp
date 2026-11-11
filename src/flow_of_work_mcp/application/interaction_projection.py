@@ -447,14 +447,16 @@ class InteractionProjectionService:
         )
         next_gate = dict(snapshot.get("next_gate") or {})
         actions: list[Mapping[str, object]] = []
+        route = next_gate.get("route")
+        pair = (str(route.get("tool") or ""), str(route.get("operation") or "call")) if isinstance(route, Mapping) else ("", "")
         engineering_gate = str(next_gate.get("kind") or "") in {
             "repository_reconciliation", "architecture_authority"
+        } or pair in {
+            ("fow_change", "create_change"), ("fow_packet_author", "start_packet"),
         }
         if engineering_gate:
-            route = next_gate.get("route")
             if not isinstance(route, Mapping):
                 raise InteractionProjectionError("engineering_gate_route_missing")
-            pair = (str(route.get("tool") or ""), str(route.get("operation") or "call"))
             membership = lens_operation_membership()
             core = {(item["tool"], item["operation"]) for item in membership["core_operations"]}
             target_areas = {
@@ -482,7 +484,6 @@ class InteractionProjectionService:
         elif str(next_gate.get("kind") or "") != "idle" and lens.selected_area in (
             _GATE_AREAS.get(str(next_gate.get("kind") or ""), frozenset())
         ):
-            route = next_gate.get("route")
             if isinstance(route, Mapping):
                 actions.append(self._action_from_route(route, next_gate))
         if not actions:

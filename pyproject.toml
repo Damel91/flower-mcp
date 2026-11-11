@@ -39,4 +39,4 @@ flower-mcp = "flow_of_work_mcp.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-flow_of_work_mcp = ["resources/*.yaml", "resources/*.md", "resources/dashboard/*.html", "resources/dashboard/*.css", "resources/dashboard/*.js"]
+flow_of_work_mcp = ["resources/*.yaml", "resources/*.md", "resources/dashboard/*.html", "resources/dashboard/*.css", "resources/dashboard/*.js", "resources/opencode/*.js"]

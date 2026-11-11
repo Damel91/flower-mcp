@@ -53,8 +53,8 @@ def dag_fixture(tmp_path, count=8):
         for previous in packets[max(0, index-2):index]:
             changes.link_dependency(*ids, previous, actor='fixture')
         packet = runtime.ledger.change_state(*ids[:2])['packets'][-1]
-        setup.call(*ids, 'upgrade_validation', actor='fixture', request_id=f'upgrade-{index}',
-            payload={'expected_spec_revision': packet['spec_revision'], 'expected_plan_revision': 0})
+        runtime.ledger.upgrade_external_criteria(*ids, packet['completion_criteria'],
+            spec_revision=packet['spec_revision'], actor='fixture')
         check = f'output_{index}() == {index}'
         unit = WorkPlanUnit(client_unit_key=f'output-{index}', operation_kind='new_file', file_path=f'src/output_{index}.py',
             instructions=(f'Implement output_{index}() returning {index}.',), unit_checks=(check,), implements=(1,),

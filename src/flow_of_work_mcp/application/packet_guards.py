@@ -50,6 +50,7 @@ class PacketGuardDecision:
     required_provider_capability: str = ""
     workflow_version: str = PACKET_WORKFLOW_VERSION
     repository_review: Mapping[str, object] | None = None
+    criterion_result_keys: tuple[str, ...] = ()
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, object]) -> "PacketGuardDecision":
@@ -66,6 +67,7 @@ class PacketGuardDecision:
             required_provider_capability=str(payload.get('required_provider_capability') or ''),
             workflow_version=str(payload.get('workflow_version') or PACKET_WORKFLOW_VERSION),
             repository_review=dict(review) if review is not None else None,
+            criterion_result_keys=tuple(payload.get("criterion_result_keys", ())),
         )
 
     def as_payload(self) -> dict[str, object]:
@@ -82,6 +84,8 @@ class PacketGuardDecision:
             "workflow_version": self.workflow_version,
             **({"repository_review": dict(self.repository_review)}
                if self.repository_review is not None else {}),
+            **({"criterion_result_keys": list(self.criterion_result_keys)}
+               if self.criterion_result_keys else {}),
         }
 
 
@@ -471,6 +475,11 @@ class PacketGuardService:
                                            (), (), (), "packet_inactive")
             validation = self._external_work.validation(project_id, change_id, packet_id)
             if not validation.get("plan_executable"):
+                public_gate = _mapping(validation.get("next_gate"))
+                if public_gate.get("lifecycle_operation") == "external_classify_criteria":
+                    return _decision("external_validation_open", (
+                        _blocker(str(public_gate["reason"]), "packet_validation", "external_classify_criteria"),
+                    ), (), (), "external_classify_criteria")
                 structural_gap = _mapping(_mapping(validation.get("validation")).get("next_gap"))
                 reason = str(structural_gap.get("code") or validation.get("reason") or "external_validation_open")
                 if reason == "work_plan_not_accepted" and plan and plan.get("status") == "proposed":
@@ -505,9 +514,14 @@ class PacketGuardService:
                     (), (), "repository_reconciliation",
                     repository_review=dict(repository_review),
                 )
-            return PacketGuardDecision("external_work_complete", True, False, False,
-                                       (), (), (), "external_verification" if frontier.get("deferred_verification")
-                                       else "external_acceptance")
+            if frontier.get("deferred_verification"):
+                return PacketGuardDecision("external_work_complete", True, False, False,
+                                           (), (), (), "external_verification")
+            return PacketGuardDecision(
+                "external_work_complete", True, False, False, (), (), (),
+                "external_packet_disposition",
+                criterion_result_keys=tuple(packet["completion_criteria"]),
+            )
         overlay = self._packet_provider_overlay.projection(
             project_id,
             change_id,

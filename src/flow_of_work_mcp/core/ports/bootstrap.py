@@ -121,4 +121,8 @@ class BootstrapRepository(Protocol):
         operation: str, mutation: Mapping[str, object], guided: Mapping[str, object],
         actor: str, request_id: str, stage: str = "intake",
         handoff: Mapping[str, object] | None = None,
-        completion_reference: str = "") -> Mapping[str, Any]: ...
+        completion_reference: str = "", authority_milestone_ids: list[str] | None = None) -> Mapping[str, Any]: ...
+
+    def record_draft_milestone_outcome(self, project_id: str, bootstrap_id: str, *,
+        mutation: Mapping[str, object], actor: str, request_id: str,
+        outcome: Mapping[str, object]) -> None: ...

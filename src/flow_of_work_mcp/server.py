@@ -12,13 +12,14 @@ from dataclasses import asdict
 from typing import Annotated, Any, Callable, Literal, Mapping
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import WithJsonSchema
 from flow_of_work_mcp.application.bootstrap_input_contracts import bootstrap_input_schema
 from flow_of_work_mcp.application.architecture_input_contracts import architecture_refs_input_schema
 from flow_of_work_mcp.application.guided_bootstrap import validate_roadmap_selection
 
 from flow_of_work_mcp.application.jobs import JobBlockedError
+from flow_of_work_mcp.application.packet_advancement import PacketAdvanceConflictError
 from flow_of_work_mcp.application.operation_contracts import (
     InteractionOperation,
     accepted_values_for_error,
@@ -114,6 +115,7 @@ from flow_of_work_mcp.mcp_runtime import McpRuntime
 from flow_of_work_mcp.model_facing import (
     assert_projector_registry,
     model_facing_tool,
+    project_markdown,
 )
 from flow_of_work_mcp.runtime_factory import RuntimeCompositionCleanupError, build_runtime_from_config
 
@@ -256,6 +258,8 @@ def _standard_gap_view(row: Mapping[str, object]) -> dict[str, object]:
         "requirement_count": len(requirement_ids),
         "sample_requirement_ids": requirement_ids[:5],
         "truncated": len(requirement_ids) > 5,
+        **({key: row[key] for key in ("relation", "scope_kind", "milestone_id")}
+           if "relation" in row else {}),
     }
 
 
@@ -264,8 +268,9 @@ def _guard(
     operation: Callable[[], dict[str, object]],
     *,
     recovery: Callable[[], Mapping[str, object]] | None = None,
+    propagate: tuple[type[Exception], ...] = (),
 ) -> dict[str, object]:
-    response = _guard_operation(tool, operation, recovery=recovery)
+    response = _guard_operation(tool, operation, recovery=recovery, propagate=propagate)
     if response.get("status") == "success":
         return response
     # This guard has no proof-bearing transaction boundary. Neither typed
@@ -296,9 +301,12 @@ def _guard_operation(
     *,
     recovery: Callable[[], Mapping[str, object]] | None = None,
     read_operation: str = "",
+    propagate: tuple[type[Exception], ...] = (),
 ) -> dict[str, object]:
     try:
         return operation()
+    except propagate:
+        raise
     except ProjectNotFoundError:
         return envelope(tool=tool, status="blocked", reason="project_not_found")
     except BootstrapStartConflictError as exc:
@@ -342,7 +350,7 @@ def _guard_operation(
             tool=tool,
             status="blocked",
             reason=exc.reason,
-            result=_recovery_result(recovery),
+            result=_recovery_result(recovery, exc.details),
         )
     except ChangeControlBlockedError as exc:
         return envelope(
@@ -437,6 +445,30 @@ def _guard_operation(
                             "code": "internal_error",
                             "message": "The operation failed without a verified effect receipt.",
                         }))
+
+
+def _guard_read(
+    tool: str, operation: Callable[[], dict[str, object]], *, operation_name: str,
+) -> dict[str, object]:
+    response = _guard_operation(tool, operation, read_operation=operation_name)
+    if response.get("status") == "success":
+        return response
+    result = dict(response.get("result") or {})
+    result["read_only"] = True
+    help_call = {"tool": "fow_capabilities", "arguments": {
+        "view": "operation", "operation_tool": tool, "operation_name": operation_name,
+    }}
+    if not result.get("next_tool_call") and not result.get("next_gate"):
+        result["next_tool_call"] = help_call
+    diagnostics = result.get("diagnostics") or [{
+        "code": str(response.get("reason") or "read_failed"),
+        "message": "The observation did not produce the requested result.",
+    }]
+    result["diagnostics"] = [
+        {"resolution": "Inspect the exact read contract, correct the scope or input, and reread.", **item}
+        for item in diagnostics if isinstance(item, Mapping)
+    ]
+    return {**response, "result": result}
 
 
 def _uncertain_error_result(
@@ -725,8 +757,15 @@ def handle_capabilities(
     if selected_view == "recipe":
         selected_recipe = get_recipe(recipe_name)
         if selected_recipe is None:
-            raise ValueError(
-                "recipe_name must identify one of: " + ", ".join(recipe_names())
+            return envelope(
+                tool="fow_capabilities", status="rejected", reason="recipe_name_invalid",
+                result={"diagnostics": [{
+                    "code": "recipe_name_invalid", "field": "recipe_name",
+                    "received_value": str(recipe_name or "")[:120],
+                    "accepted_values": list(recipe_names()),
+                    "message": "Select a recipe with view=recipe and recipe_name set to a listed name.",
+                    "resolution": "For example, call fow_capabilities with view=recipe and recipe_name=provider-agnostic-engineering-cycle.",
+                }]},
             )
         return envelope(
             tool="fow_capabilities",
@@ -847,11 +886,54 @@ def _packet_start_input(value: object, field: str, validator: Callable[[Any], An
         ) from exc
 
 
+class _DependencyRevisionConflict(ChangeControlBlockedError):
+    """Revision conflict established inside the scoped dependency edit."""
+
+
 def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
     """Keep pure ref proof ahead of repair; late author failures stay unknown."""
     selected = str(arguments.get("operation") or "add_unit").strip().lower()
-    if selected not in {"revise_packet", "revise_unit", "replace_plan", "resolve_questions"}:
+    if selected == "set_dependencies":
+        try:
+            return _execute_packet_command(runtime, **arguments)
+        except _DependencyRevisionConflict as exc:
+            uncertain = _uncertain_error_result("fow_packet_author", exc.details["diagnostics"][0],
+                project_id=arguments.get("project_id", ""), request_id=arguments.get("request_id", ""), operation=selected)
+            return envelope(tool="fow_packet_author", status="blocked", reason=exc.reason,
+                result={**exc.details, **uncertain, "next_tool_call": exc.details["next_tool_call"]},
+                audit_reference=uncertain["original_request"])
+    if selected not in {"add_unit", "revise_packet", "revise_unit", "replace_plan", "resolve_questions"}:
         return _execute_packet_command(runtime, **arguments)
+    if selected == "replace_plan":
+        from flow_of_work_mcp.application.packet_work_plan import prepare_replacement_units
+        try:
+            prepare_replacement_units(arguments.get("work_plan"))
+        except InputValidationError as exc:
+            error = OperationPreEffectError(
+                "packet_replace_plan_input_invalid", str(exc), field=exc.field, received_value=exc.received_value,
+                rule=str(exc.details.get("rule") or "Use the exact replace_plan contract for each declared unit."),
+                resolution=str(exc.details.get("resolution") or "Correct the replacement plan using exact operation help."),
+            )
+            return _pre_effect_rejection(error, tool="fow_packet_author", operation=selected,
+                project_id=arguments.get("project_id", ""), request_id=arguments.get("request_id", ""))
+    if selected == "add_unit" and arguments.get("unit") is not None:
+        from flow_of_work_mcp.application.packet_unit_authoring import prepare_unit_authoring_input
+        unit = arguments["unit"]
+        try:
+            prepare_unit_authoring_input(unit)
+        except (ValueError, TypeError) as exc:
+            typed = isinstance(exc, InputValidationError)
+            error = OperationPreEffectError(
+                "packet_unit_input_invalid", str(exc)[:500],
+                field=exc.field if typed else "unit",
+                received_value=exc.received_value if typed else unit,
+                rule="Use the exact add_unit contract for the selected operation_kind.",
+                resolution="Correct the declared unit and submit the intended input. This call started no mutation.",
+            )
+            return _pre_effect_rejection(
+                error, tool="fow_packet_author", operation=selected,
+                project_id=arguments.get("project_id", ""), request_id=arguments.get("request_id", ""),
+            )
     refs = arguments.get("architecture_refs") if selected == "revise_packet" else None
     if refs is not None:
         from flow_of_work_mcp.core.domain.architecture import normalize_architecture_refs
@@ -878,7 +960,30 @@ def handle_packet_author(runtime: McpRuntime, **arguments) -> dict[str, object]:
                 "project_id": arguments.get("project_id", ""), "change_id": arguments.get("change_id", ""),
                 "packet_id": arguments["packet_id"], "view": "history", "detail_level": "audit", "limit": 10,
             }}
+        if selected == "add_unit" and arguments.get("packet_id"):
+            response["result"]["next_tool_call"] = {"tool": "fow_packet_inspect", "arguments": {
+                "project_id": arguments.get("project_id", ""), "change_id": arguments.get("change_id", ""),
+                "packet_id": arguments["packet_id"], "view": "working_sheet",
+            }}
     return response
+
+
+def _dependency_revision_conflict(
+    project_id: str, change_id: str, packet_id: str, *, kind: str, expected: int, received: int,
+) -> _DependencyRevisionConflict:
+    label = "work-plan" if kind == "plan" else "packet specification"
+    reason = "stale_current_work_plan_revision" if kind == "plan" else "stale_packet_revision"
+    field = f"expected_{kind}_revision"
+    return _DependencyRevisionConflict(reason, details={
+        "revision_kind": kind, field: expected, f"received_{kind}_revision": received,
+        "diagnostics": [{"code": reason, "field": field, "expected_value": expected, "received_value": received,
+            "message": f"The supplied {label} revision is {received}; the current {label} revision is {expected}.",
+            "resolution": "Inspect the current units and both revisions. Review the full dependency list before resubmitting an intended edit."}],
+        "next_tool_call": {"tool": "fow_packet_inspect", "arguments": {
+            "project_id": project_id, "change_id": change_id, "packet_id": packet_id,
+            "view": "working_sheet", "detail_level": "standard", "limit": 10,
+        }},
+    })
 
 
 def _execute_packet_command(
@@ -1607,20 +1712,36 @@ def _execute_packet_command(
                 raise ValueError(
                     "answers are only valid with replace_plan or resolve_questions"
                 )
-            result = runtime.packet_work_plan.mutate_plan(
-                project_id,
-                change_id,
-                packet_id,
-                operation=operation,
-                expected_packet_revision=spec_revision,
-                expected_current_plan_revision=int(expected_plan_revision),
-                actor=actor,
-                request_id=request_id,
-                client_unit_key=client_unit_key,
-                unit=unit,
-                unit_patch=unit_patch,
-                depends_on=depends_on,
-            )
+            if operation == "set_dependencies" and not runtime.ledger.packet_work_plan_request_exists(project_id, request_id):
+                # The legacy writer also accepts current_revision for other
+                # callers. This public input explicitly names spec_revision.
+                current_spec_revision, _ = _current_packet_revisions(runtime, project_id, change_id, packet_id)
+                if expected_spec_revision and spec_revision != current_spec_revision:
+                    raise _dependency_revision_conflict(project_id, change_id, packet_id,
+                        kind="spec", expected=current_spec_revision, received=spec_revision)
+                spec_revision = current_spec_revision
+            try:
+                result = runtime.packet_work_plan.mutate_plan(
+                    project_id,
+                    change_id,
+                    packet_id,
+                    operation=operation,
+                    expected_packet_revision=spec_revision,
+                    expected_current_plan_revision=int(expected_plan_revision),
+                    actor=actor,
+                    request_id=request_id,
+                    client_unit_key=client_unit_key,
+                    unit=unit,
+                    unit_patch=unit_patch,
+                    depends_on=depends_on,
+                )
+            except ChangeControlBlockedError as exc:
+                if (operation != "set_dependencies" or exc.reason != "stale_current_work_plan_revision"
+                        or type(exc.details.get("expected_plan_revision")) is not int
+                        or type(exc.details.get("received_plan_revision")) is not int):
+                    raise
+                raise _dependency_revision_conflict(project_id, change_id, packet_id, kind="plan",
+                    expected=exc.details["expected_plan_revision"], received=exc.details["received_plan_revision"]) from exc
         mutation_metadata = {
             key: result[key]
             for key in ("mutation_operation", "affected_unit_key", "replayed")
@@ -1682,6 +1803,8 @@ def _execute_packet_command(
             "mutation": {
                 "operation": operation,
                 "affected_unit_key": str(result.get("affected_unit_key") or ""),
+                **({"plan_revision": int(result["plan_revision"]), "replayed": bool(result.get("replayed", False))}
+                   if operation == "set_dependencies" else {}),
             },
             "engineering_questions": answer_result or {},
             "provider_queue": dict(provider_queue or {}),
@@ -1801,15 +1924,25 @@ def handle_packet_inspect(
     detail = str(detail_level or "standard").strip().lower()
     if detail not in {"standard", "audit"}:
         raise ValueError("detail_level must be standard or audit")
-    result = runtime.packet_lifecycle.get_packet(
-        project_id,
-        change_id,
-        packet_id,
-        detail_level="verbose" if detail == "audit" else "standard",
-        view=view,
-        offset=offset,
-        limit=limit,
-    )
+    with runtime.ledger.consistent_read():
+        result = dict(runtime.packet_lifecycle.get_packet(
+            project_id,
+            change_id,
+            packet_id,
+            detail_level="verbose" if detail == "audit" else "standard",
+            view=view,
+            offset=offset,
+            limit=limit,
+        ))
+        frontier = result.get("external_work") or {}
+        checkpoint = (frontier.get("next_gate") or {}).get("external_operation")
+        if str(view or "summary").strip().lower() == "summary" and checkpoint in {
+            "record_technical_disposition", "obtain_deferred_verification",
+        }:
+            result["acceptance_context"] = runtime.project_state_snapshot.acceptance_context(
+                project_id, packet_id=packet_id, limit=max(1, min(int(limit), 25)),
+                packet_frontier=frontier,
+            )
     return envelope(
         tool="fow_packet_inspect",
         status="success",
@@ -1874,6 +2007,44 @@ def handle_packet_advance(
     )
 
 
+def _packet_advance_conflict_response(
+    exc: PacketAdvanceConflictError, *, request_id: str,
+) -> dict[str, object]:
+    """Expose the failed comparison without certifying the earlier prelude."""
+    project_id, change_id, packet_id = exc.scope
+    scope = {"project_id": project_id, "change_id": change_id, "packet_id": packet_id}
+    tool = "fow_packet_advance"
+    correlation = {"tool": tool, "operation": "advance", **scope, "request_id": request_id.strip()}
+    diagnostic = {"code": exc.reason, **exc.details}
+    next_tool = {"tool": "fow_packet_inspect", "arguments": {**scope, "view": "gates"}}
+    validation_read = {"tool": "fow_external_work", "arguments": {
+        **scope, "operation": "validation", "payload": {"detail": "standard"},
+    }}
+    if exc.reason == "packet_decision_not_current":
+        diagnostic.update(
+            message="The supplied decision did not match the packet gate at the check.",
+            decision_consumed=False,
+        )
+        if diagnostic.get("expected_operation") == "external_validation":
+            next_tool = validation_read
+    elif exc.reason == "packet_criterion_responsibility_unresolved":
+        gap = dict(exc.details.get("gap") or {})
+        diagnostic.update(gap)
+        diagnostic["code"] = exc.reason
+        diagnostic["message"] = (
+            f"Work-plan acceptance is blocked by criterion responsibility: {gap.get('code', exc.reason)}."
+        )
+        next_tool = validation_read
+    else:
+        diagnostic["message"] = "The supplied packet or plan revision did not match at the check."
+    result = _uncertain_error_result(tool, diagnostic)
+    result.update(
+        original_request=correlation,
+        next_tool_call=next_tool,
+    )
+    return envelope(tool=tool, status="blocked", reason=exc.reason, result=result, audit_reference=correlation)
+
+
 def handle_create_project(
     runtime: McpRuntime, *, project_id: str, name: str, actor: str, request_id: str = ""
 ) -> dict[str, object]:
@@ -1902,6 +2073,7 @@ def handle_bootstrap(
     correspondence: Mapping[str, object] | None = None,
     milestone_ids: list[str] | None = None,
     roadmap_fingerprint: str = "",
+    milestone_revision: Mapping[str, object] | None = None,
     continuation_choice: str = "",
     continuation_reference: str = "",
     progress_revision: str = "",
@@ -1920,6 +2092,34 @@ def handle_bootstrap(
     """Apply one bounded bootstrap transition and return its durable state."""
 
     selected = str(operation or "").strip()
+    if selected == "revise_draft_milestone":
+        try:
+            outcome = runtime.guided_bootstrap.revise_draft_milestone(project_id, bootstrap_id,
+                milestone_ids=[] if milestone_ids is None else milestone_ids,
+                roadmap_fingerprint=roadmap_fingerprint, milestone_revision=milestone_revision,
+                actor=actor, request_id=request_id)
+        except OperationPreEffectError as exc:
+            response = _pre_effect_rejection(exc, project_id=project_id, request_id=request_id,
+                                            tool="fow_bootstrap", operation=selected)
+            if exc.reason in {"milestone_draft_fingerprint_stale", "milestone_draft_revision_stale",
+                              "milestone_draft_request_conflict"}:
+                response["result"]["next_tool_call"] = {"tool": "fow_bootstrap", "arguments": {
+                    "project_id": project_id, "bootstrap_id": bootstrap_id, "operation": "roadmap",
+                    "milestone_ids": milestone_ids, "actor": actor}}
+            elif exc.reason in {"milestone_draft_bootstrap_invalid", "milestone_draft_bootstrap_terminal"}:
+                response["result"]["next_tool_call"] = {"tool": "fow_bootstrap", "arguments": {
+                    "project_id": project_id, "operation": "guidance", "actor": actor}}
+            elif exc.reason == "milestone_draft_linked_work_locked":
+                response["result"]["next_tool_call"] = {"tool": "fow_change", "arguments": {
+                    "project_id": project_id, "operation": "get_change", "change_id": exc.details["change_id"],
+                    "actor": actor}}
+            return response
+        except Exception:
+            return _operation_effect_unknown(project_id=project_id, request_id=request_id,
+                                             tool="fow_bootstrap", operation=selected)
+        return envelope(tool="fow_bootstrap", status="success", result=outcome,
+                        audit_reference={"bootstrap_id": bootstrap_id, "request_id": request_id,
+                                         "milestone_id": outcome["milestone"]["milestone_id"]})
     if selected == "roadmap":
         try:
             validate_roadmap_selection([] if milestone_ids is None else milestone_ids)
@@ -2082,6 +2282,8 @@ def handle_bootstrap(
                 return operation_fn()
         return operation_fn()
 
+    if selected in {"state", "state_details", "guidance", "roadmap"}:
+        return _guard_read("fow_bootstrap", coherent_operation, operation_name=selected)
     return _guard("fow_bootstrap", coherent_operation)
 
 
@@ -2863,6 +3065,9 @@ def handle_assurance(
                 actor=actor,
                 request_id=request_id,
             )
+        elif selected == "inspect_change_acceptance":
+            with runtime.ledger.consistent_read():
+                result = runtime.assurance.inspect_change_acceptance(project_id, change_id)
         elif selected == "request_change_acceptance":
             result = runtime.assurance.request_change_acceptance(
                 project_id,
@@ -2890,6 +3095,15 @@ def handle_assurance(
             },
         )
 
+    if operation.strip() == "inspect_change_acceptance":
+        return _guard_operation("fow_assurance", operation_fn, read_operation="inspect_change_acceptance")
+    if operation.strip() == "request_change_acceptance":
+        return _guard("fow_assurance", operation_fn, recovery=lambda: {
+            "next_tool_call": {"tool": "fow_assurance", "arguments": {
+                "project_id": project_id, "operation": "inspect_change_acceptance",
+                "change_id": change_id, "actor": actor,
+            }},
+        })
     return _guard("fow_assurance", operation_fn)
 
 
@@ -2911,6 +3125,9 @@ def handle_campaign_author(
     scope: Mapping[str, object] | None = None,
     case: Mapping[str, object] | None = None,
     case_order: list[str] | None = None,
+    obligation_batch: Mapping[str, object] | None = None,
+    host_check: Mapping[str, object] | None = None,
+    host_result: Mapping[str, object] | None = None,
     decision: str = "",
     rationale: str = "",
     coverage_intent: str = "",
@@ -2992,6 +3209,20 @@ def handle_campaign_author(
                 actor=actor,
                 request_id=request_id,
                 expected_fingerprint=expected_fingerprint,
+            )
+        elif selected == "author_obligations":
+            result = runtime.campaign_authority.author_obligations(
+                project_id, campaign_id, obligation_batch,
+                expected_fingerprint=expected_fingerprint, actor=actor, request_id=request_id,
+            )
+        elif selected == "issue_host_check":
+            result = runtime.campaign_authority.issue_host_check(
+                project_id, campaign_id, case_id, host_check, actor=actor, request_id=request_id,
+                expected_fingerprint=expected_fingerprint,
+            )
+        elif selected == "report_host_result":
+            result = runtime.campaign_authority.report_host_result(
+                project_id, campaign_id, host_result, actor=actor, request_id=request_id,
             )
         elif selected == "decide_obligation":
             result = runtime.campaign_authority.decide_obligation(
@@ -3125,16 +3356,26 @@ def handle_campaign_author(
         )
 
     recovery_change_id = str((scope or {}).get("change_id") or "")
-    response = _guard(
-        "fow_campaign_author",
-        operation_fn,
-        recovery=lambda: _campaign_recovery_projection(
-            runtime,
-            project_id,
-            campaign_id=campaign_id,
-            change_id=recovery_change_id,
-        ),
-    )
+    try:
+        response = _guard(
+            "fow_campaign_author",
+            operation_fn,
+            recovery=lambda: _campaign_recovery_projection(
+                runtime,
+                project_id,
+                campaign_id=campaign_id,
+                change_id=recovery_change_id,
+            ),
+            propagate=(OperationPreEffectError,) if operation.strip() in {
+                "attest_source", "authorize_materialization", "retry_provider_rejection", "authorize_promotion",
+                "author_obligations", "issue_host_check", "report_host_result", "edit_scope", "edit_case",
+            } else (),
+        )
+    except OperationPreEffectError as exc:
+        response = _pre_effect_rejection(
+            exc, project_id=project_id, request_id=request_id,
+            tool="fow_campaign_author", operation=operation.strip(),
+        )
 
     if response.get("status") != "success":
         body = response["result"]
@@ -3143,7 +3384,8 @@ def handle_campaign_author(
         if isinstance(request_id, str) and len(request_id) > 160:
             body["original_request"]["request_id_length"] = len(request_id)
             body["original_request"]["request_id_truncated"] = True
-        if campaign_id and body.get("next_tool_call", {}).get("tool") == "fow_capabilities":
+        if (campaign_id and body.get("effect_state") != "none"
+                and body.get("next_tool_call", {}).get("tool") == "fow_capabilities"):
             body["next_tool_call"] = {"tool": "fow_campaign_inspect", "arguments": {
                 "project_id": project_id, "campaign_id": campaign_id, "view": "summary"}}
     return response
@@ -3204,6 +3446,7 @@ def handle_campaign_advance(
     campaign_id: str = "",
     change_id: str = "",
     transition_budget: int = 8,
+    source_revision: str = "",
 ) -> dict[str, object]:
     def operation_fn() -> dict[str, object]:
         result = runtime.campaign_authority.advance(
@@ -3213,6 +3456,7 @@ def handle_campaign_advance(
             actor=actor,
             request_id=request_id,
             transition_budget=transition_budget,
+            source_revision=source_revision,
         )
         campaign = result.get("campaign")
         campaign_ref = (
@@ -3252,6 +3496,8 @@ def _campaign_scope_draft(value: Mapping[str, object] | None) -> CampaignScopeDr
             "finding_ids",
             "invariants",
             "environment_assumptions",
+            "execution_lane",
+            "independent_proof_refs",
         },
     )
     return CampaignScopeDraft(
@@ -3274,6 +3520,10 @@ def _campaign_scope_draft(value: Mapping[str, object] | None) -> CampaignScopeDr
             payload.get("environment_assumptions") or [],
             "scope.environment_assumptions",
         ),
+        execution_lane=str(payload.get("execution_lane") or ""),
+        independent_proof_refs=_require_string_list(
+            payload.get("independent_proof_refs") or [], "scope.independent_proof_refs",
+        ),
     )
 
 
@@ -3294,6 +3544,7 @@ def _campaign_case_draft(
             "setup",
             "cleanup",
             "execution_class",
+            "execution_lane",
             "required",
             "obligation_ids",
             "oracle_kind",
@@ -3310,6 +3561,7 @@ def _campaign_case_draft(
         setup=str(payload.get("setup") or ""),
         cleanup=str(payload.get("cleanup") or ""),
         execution_class=str(payload.get("execution_class") or "deterministic"),
+        execution_lane=str(payload.get("execution_lane") or ""),
         required=_require_boolean(payload.get("required", True), "case.required"),
         obligation_ids=_require_string_list(
             payload.get("obligation_ids") or [], "case.obligation_ids"
@@ -3552,6 +3804,9 @@ def handle_handover(
             },
         )
 
+    selected = str(operation or "").strip()
+    if selected in {"get_handover", "resume_context", "ledger_projection", "project_progress", "project_state_snapshot"}:
+        return _guard_read("fow_handover", operation_fn, operation_name=selected)
     return _guard("fow_handover", operation_fn)
 
 
@@ -3834,7 +4089,7 @@ def handle_traceability(
             },
         )
 
-    return _guard("fow_traceability", operation)
+    return _guard_read("fow_traceability", operation, operation_name="call")
 
 
 def handle_goal(
@@ -4427,7 +4682,12 @@ def handle_accept_milestone(
             audit_reference={"milestone_id": milestone["milestone_id"]},
         )
 
-    return _guard("fow_accept_milestone", operation)
+    return _guard("fow_accept_milestone", operation, recovery=lambda: {
+        "next_tool_call": {"tool": "fow_handover", "arguments": {
+            "project_id": project_id, "operation": "project_state_snapshot",
+            "focus_kind": "milestone", "focus_ref": milestone_id,
+        }},
+    })
 
 
 def handle_audit_phase(
@@ -4549,8 +4809,24 @@ def handle_what_next(
             )
         )
         lifecycle_audit_actions = lifecycle_actions + audit_only_actions
+        lifecycle_actions = [action for action in lifecycle_actions if action["state"] != "advisory"]
         packet_actions = _packet_next_actions(runtime, project_id)
-        candidates = packet_actions or lifecycle_actions
+        milestone_closure = None
+        selected_changes = set()
+        if milestone_id:
+            milestone_closure = runtime.lifecycle.milestone_closure_state(project_id, milestone_id)
+            selected_changes.update(milestone_closure["linked_change_ids"])
+            focused_packets = [
+                action for action in packet_actions if action["scope"]["change_id"] in selected_changes
+            ]
+            focused_lifecycle = [
+                action for action in lifecycle_actions
+                if milestone_id in action["milestone_ids"]
+                or selected_changes.intersection(action["change_ids"])
+            ]
+            candidates = focused_packets or focused_lifecycle
+        else:
+            candidates = packet_actions or lifecycle_actions
         primary_action = (
             dict(candidates[0])
             if candidates
@@ -4613,10 +4889,8 @@ def handle_what_next(
                     },
                 }
             )
-        if milestone_id:
-            result["milestone_closure"] = dict(
-                runtime.lifecycle.milestone_closure_state(project_id, milestone_id)
-            )
+        if milestone_closure is not None:
+            result["milestone_closure"] = dict(milestone_closure)
             if detail == "audit":
                 traceability = runtime.milestone_traceability.projection(
                     project_id,
@@ -4642,6 +4916,15 @@ def handle_what_next(
                     for row in traceability.get("rows", [])
                     if isinstance(row, Mapping)
                 ]
+        else:
+            scope = primary_action.get("scope", {})
+            change_ids = ([scope["change_id"]] if scope.get("change_id")
+                          else primary_action.get("change_ids", ()))
+            if len(change_ids) == 1:
+                with runtime.ledger.consistent_read():
+                    result["acceptance_preflight"] = runtime.assurance.inspect_change_acceptance(
+                        project_id, change_ids[0],
+                    )
         return envelope(
             tool="fow_what_next",
             status="success",
@@ -4871,6 +5154,10 @@ def handle_architecture(
     runtime: McpRuntime, *, project_id: str, operation: str,
     payload: Mapping[str, object] | None = None, actor: str = "", request_id: str = "",
 ) -> dict[str, object]:
+    if operation == "export":
+        return _guard_operation("fow_architecture", lambda: _standalone_receipt(
+            "fow_architecture", runtime.architecture.call(project_id, operation, payload=payload),
+        ), read_operation=operation)
     if operation in {"propose", "adopt"}:
         from flow_of_work_mcp.application.architecture import prepare_architecture_mutation
         # The proof belongs to this pure phase, not to an exception class or
@@ -4907,7 +5194,7 @@ def handle_external_work(
     read_operation = operation.strip() if isinstance(operation, str) else ""
     if read_operation not in READ_OPERATIONS:
         return _guard("fow_external_work", execute)
-    response = _guard_operation("fow_external_work", execute, read_operation=read_operation)
+    response = _guard_read("fow_external_work", execute, operation_name=read_operation)
     if response.get("reason") == "guided_roadmap_confirmation_required":
         response = {**response, "result": {**response.get("result", {}),
             "next_tool_call": {"tool": "fow_capabilities", "arguments": {
@@ -4970,6 +5257,50 @@ def handle_semantic(
     return _guard("fow_semantic", run)
 
 
+class _FlowerMcp(FastMCP):
+    """Check exact raw selectors before FastMCP drops unrecognized inputs."""
+
+    _campaign_inspect_contract = operation_contract("fow_campaign_inspect", "summary")
+    _campaign_inspect_fields = frozenset(
+        _campaign_inspect_contract["required_fields"] + _campaign_inspect_contract["optional_fields"]
+    )
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]):
+        diagnostic = None
+        details = {}
+        if name == "fow_campaign_inspect":
+            unknown = sorted(arguments.keys() - self._campaign_inspect_fields)
+            if unknown:
+                details = {"unknown_fields": unknown, "accepted_fields": sorted(self._campaign_inspect_fields)}
+                diagnostic = {
+                    "code": "unknown_arguments", "field": "view",
+                    "accepted_values": list(operation_names(name)),
+                    "message": "Remove unknown arguments. Choose the campaign projection with view, for example view=cases.",
+                }
+        elif name == "fow_handover" and "operation" not in arguments:
+            diagnostic = {
+                "code": "operation_required", "field": "operation",
+                "accepted_values": list(operation_names(name)),
+                "message": "Select an operation. To orient on current project state, use operation=project_state_snapshot with the selected project_id.",
+            }
+        elif name == "fow_packet_author" and arguments.get("operation") == "start_packet":
+            missing = sorted({"actor", "request_id"} - arguments.keys())
+            if missing:
+                diagnostic = {
+                    "code": "packet_identity_inputs_missing", "missing_fields": missing,
+                    "message": "This call was rejected before dispatch. Use your actor identity and an explicit request_id for the intended packet.",
+                    "resolution": "Read fow_capabilities with view=operation, operation_tool=fow_packet_author and operation_name=start_packet for the complete authoring inputs.",
+                }
+        if diagnostic is not None:
+            payload = envelope(tool=name, status="rejected", reason=diagnostic["code"],
+                               result={**details, "diagnostics": [diagnostic]})
+            return CallToolResult(
+                content=[TextContent(type="text", text=project_markdown(name, payload))],
+                structuredContent={"result": payload},
+            )
+        return await super().call_tool(name, arguments)
+
+
 def create_app(
     runtime: McpRuntime,
     *,
@@ -4979,7 +5310,7 @@ def create_app(
 ) -> FastMCP:
     """Build a compact MCP catalog over an already initialized runtime."""
 
-    mcp = FastMCP(
+    mcp = _FlowerMcp(
         name="Flower MCP",
         instructions=SERVER_INSTRUCTIONS,
         host=host,
@@ -5068,6 +5399,7 @@ def create_app(
         correspondence: Annotated[dict[str, object] | None, WithJsonSchema(bootstrap_input_schema("correspondence", nullable=True))] = None,
         milestone_ids: list[str] | None = None,
         roadmap_fingerprint: str = "",
+        milestone_revision: Annotated[dict[str, object] | None, WithJsonSchema(bootstrap_input_schema("milestone_revision", nullable=True))] = None,
         continuation_choice: str = "",
         continuation_reference: str = "",
         progress_revision: str = "",
@@ -5095,6 +5427,7 @@ def create_app(
             correspondence=correspondence,
             milestone_ids=milestone_ids,
             roadmap_fingerprint=roadmap_fingerprint,
+            milestone_revision=milestone_revision,
             continuation_choice=continuation_choice,
             continuation_reference=continuation_reference,
             progress_revision=progress_revision,
@@ -5859,7 +6192,12 @@ def create_app(
                 expected_spec_revision=expected_spec_revision,
                 expected_plan_revision=expected_plan_revision, mode=mode,
             )
-        return _guard("fow_packet_advance", advance) if mode == "sync_only" else advance()
+        if mode == "sync_only":
+            return _guard("fow_packet_advance", advance)
+        try:
+            return advance()
+        except PacketAdvanceConflictError as exc:
+            return _packet_advance_conflict_response(exc, request_id=request_id)
 
     def fow_packet_inspect(
         project_id: str,
@@ -5870,7 +6208,7 @@ def create_app(
         offset: int = 0,
         limit: int = _RECOVERY_DEFAULT_LIMIT,
     ) -> dict[str, object]:
-        return handle_packet_inspect(
+        return _guard_read("fow_packet_inspect", lambda: handle_packet_inspect(
             runtime,
             project_id=project_id,
             change_id=change_id,
@@ -5879,7 +6217,7 @@ def create_app(
             view=view,
             offset=offset,
             limit=limit,
-        )
+        ), operation_name=view if view in operation_names("fow_packet_inspect") else "summary")
 
     def fow_campaign_author(
         project_id: str,
@@ -5897,6 +6235,9 @@ def create_app(
         scope: dict[str, object] | None = None,
         case: dict[str, object] | None = None,
         case_order: list[str] | None = None,
+        obligation_batch: dict[str, object] | None = None,
+        host_check: dict[str, object] | None = None,
+        host_result: dict[str, object] | None = None,
         decision: str = "",
         rationale: str = "",
         coverage_intent: str = "",
@@ -5933,6 +6274,9 @@ def create_app(
             scope=scope,
             case=case,
             case_order=case_order,
+            obligation_batch=obligation_batch,
+            host_check=host_check,
+            host_result=host_result,
             decision=decision,
             rationale=rationale,
             coverage_intent=coverage_intent,
@@ -5960,6 +6304,7 @@ def create_app(
         campaign_id: str = "",
         change_id: str = "",
         transition_budget: int = 8,
+        source_revision: str = "",
     ) -> dict[str, object]:
         return handle_campaign_advance(
             runtime,
@@ -5969,6 +6314,7 @@ def create_app(
             campaign_id=campaign_id,
             change_id=change_id,
             transition_budget=transition_budget,
+            source_revision=source_revision,
         )
 
     def fow_campaign_inspect(
@@ -5990,7 +6336,7 @@ def create_app(
         )
 
     def fow_architecture(
-        project_id: str, operation: Literal["inspect", "propose", "adopt"],
+        project_id: str, operation: Literal["inspect", "propose", "adopt", "export"],
         payload: dict[str, Any] | None = None, actor: str = "", request_id: str = "",
     ) -> dict[str, object]:
         return handle_architecture(runtime, project_id=project_id, operation=operation,
@@ -5998,7 +6344,10 @@ def create_app(
 
     def fow_external_work(
         project_id: str, change_id: str, packet_id: str,
-        operation: Literal["provider_validation", "select_executor", "negotiate_provider", "set_mode", "criteria", "reconcile_criteria", "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation", "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"],
+        operation: Literal["provider_validation", "select_executor", "negotiate_provider",
+                           "set_mode", "criteria", "reconcile_criteria", "classify_criteria",
+                           "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation",
+                           "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"],
         payload: dict[str, Any] | None = None, actor: str = "", request_id: str = "",
     ) -> dict[str, object]:
         return handle_external_work(runtime, project_id=project_id, change_id=change_id, packet_id=packet_id, operation=operation, payload=payload, actor=actor, request_id=request_id)

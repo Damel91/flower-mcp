@@ -1,4 +1,5 @@
 """Cross-case questions, source/IR independence and truthful recovery."""
+import asyncio
 import json
 import sqlite3
 
@@ -11,7 +12,8 @@ from flow_of_work_mcp.core.domain import (
 )
 from flow_of_work_mcp.core.errors import RequirementConflictError
 from flow_of_work_mcp.mcp_runtime import build_runtime
-from flow_of_work_mcp.server import handle_campaign_author, handle_campaign_inspect
+from flow_of_work_mcp.model_facing import project_markdown
+from flow_of_work_mcp.server import create_app, handle_campaign_author, handle_campaign_inspect
 
 
 def fields(execution_class="deterministic"):
@@ -94,6 +96,124 @@ def second_oracle(owned):
     return author(owned, "CASE-000002", request_id="second-oracle")
 
 
+def test_ordered_remaining_source_fields_and_conditional_phases_in_both_channels(owned):
+    runtime, campaign_id, _ = owned
+    author(owned)
+
+    async def run():
+        app = create_app(runtime)
+        scope = {"project_id": "question-test", "campaign_id": campaign_id}
+        inspection = await app.call_tool("fow_campaign_inspect", scope)
+        initial = inspection.structuredContent["result"]["result"]
+        work = initial["lifecycle_gate"]["work_remaining"]
+        questions = work["oracle_questions"]
+        assert work["current_phase"] == "oracle" and work["effort"] == "undetermined"
+        assert [row["phase"] for row in work["conditional_phases"]] == [
+            "attestation", "evidence", "promotion", "coverage",
+        ]
+        assert questions["current_question_id"] == "Q-preconditions"
+        assert questions["oracle_revision"] == 1 and questions["scope"] == "source"
+        expected = [row["question_id"] for row in questions["ordered_missing_fields"]]
+        exact = read(owned, "oracles")["result"]["oracles"][0]
+        assert expected == [row["question_id"] for row in exact["questions"]]
+        markdown = inspection.content[0].text
+        assert "(11 remaining)" in markdown and "Later phases if still applicable" in markdown
+        assert markdown.index("Q-preconditions") < markdown.index("Q-stimulus") < markdown.index("Q-input-domain")
+        assert "answer_question" in markdown and "Optional revision pin" in markdown
+        assert initial["campaign"]["fingerprint"] not in markdown
+
+        answered = await app.call_tool("fow_campaign_author", {
+            **scope, "operation": "answer_question", "oracle_id": questions["oracle_id"],
+            "question_id": questions["current_question_id"], "actor": "test", "request_id": "public-answer",
+            "answer": ["project exists"], "answer_authority": "grounded_fact", "provenance": ["source:owned"],
+        })
+        body = answered.structuredContent["result"]["result"]
+        remaining = body["lifecycle_gate"]["work_remaining"]["oracle_questions"]
+        assert remaining["oracle_revision"] == 2 and remaining["current_question_id"] == "Q-stimulus"
+        assert [row["question_id"] for row in remaining["ordered_missing_fields"]] == expected[1:]
+        assert body["campaign"]["fingerprint"] and body["semantic_delta"]["changed"] is True
+        receipt = answered.content[0].text
+        assert "(10 remaining)" in receipt and "Q-preconditions" not in receipt
+        assert body["campaign"]["fingerprint"] not in receipt and "Semantic Delta" not in receipt
+        assert "Later phases if still applicable" not in receipt
+
+    asyncio.run(run())
+
+
+def test_advancement_stops_at_the_current_question_and_names_its_author_route(owned):
+    runtime, campaign_id, _ = owned
+    author(owned)
+    before = dump(runtime)
+
+    async def run():
+        app = create_app(runtime)
+        result = await app.call_tool("fow_campaign_advance", {
+            "project_id": "question-test", "campaign_id": campaign_id,
+            "actor": "test", "request_id": "advance-at-question",
+        })
+        assert result.structuredContent["result"]["result"]["transitions"] == []
+        markdown = result.content[0].text
+        assert "Q-preconditions" in markdown and "fow_campaign_author" in markdown and "answer_question" in markdown
+        assert "Semantic Delta" not in markdown and "Dependency Fingerprint" not in markdown
+
+    asyncio.run(run())
+    assert dump(runtime) == before
+
+
+@pytest.mark.parametrize(("state", "reason", "next_step"), [
+    ("provider_rejected", "effective_project_cross_domain_collision", "unused provider destination"),
+    ("provider_rejected", "provider_route_unavailable", "retry_provider_rejection"),
+    ("provider_unknown", "test_provider_response_unknown", "same durable command"),
+])
+def test_campaign_markdown_prioritizes_the_provider_delivery_failure(state, reason, next_step):
+    next_action = (
+        {
+            "tool": "fow_campaign_author",
+            "operation": "retry_provider_rejection",
+            "arguments": {"campaign_id": "CAMP-000001", "provider_command_id": "TCMD-000001"},
+            "required_inputs": ["rationale", "request_id"],
+        }
+        if state == "provider_rejected" else "retry this same durable command"
+    )
+    body = {
+        "campaign": {"campaign_id": "CAMP-000001"},
+        "lifecycle_gate": {
+            "state": "provider_boundary", "lifecycle_state": "ready_to_run",
+            "next_action": {"tool": "fow_campaign_advance", "operation": "deliver_test_command"},
+            "work_remaining": {},
+        },
+        "provider_boundary": {
+            "state": state,
+            "next_action": next_action,
+            "deliveries": [{
+                "state": state, "reason": reason, "next_action": next_action,
+                "outbox": {"command_id": "TCMD-000001", "case_id": "CASE-000001"},
+            }],
+        },
+    }
+    markdown = project_markdown("fow_campaign_advance", {"status": "success", "result": body})
+    assert state in markdown and reason in markdown and next_step in markdown
+    assert "CASE-000001" in markdown and "TCMD-000001" in markdown
+    assert "pending technical validation" not in markdown
+    if reason == "effective_project_cross_domain_collision":
+        assert "colliding draft is cleared" in markdown
+        assert "attest_source" in markdown and "retry_provider_rejection" not in markdown
+
+
+def test_ordered_fields_reflect_conditional_source_oracle_schema(owned):
+    runtime, campaign_id, requirement_id = owned
+    runtime.ledger.author_behavioral_oracle("question-test", campaign_id, "CASE-000001",
+        BehavioralOracleDraft(oracle_kind="integration", subject_bindings=(requirement_id,),
+            authority_reference="decision:integration", semantic_fields=fields("integration")),
+        actor="test", request_id="integration-oracle")
+    questions = read(owned)["result"]["lifecycle_gate"]["work_remaining"]["oracle_questions"]
+    assert questions["scope"] == "source"
+    assert questions["ordered_missing_fields"] == [
+        {"field_name": "participants", "question_id": "Q-participants"},
+        {"field_name": "real_mock_boundaries", "question_id": "Q-real-mock-boundaries"},
+    ]
+
+
 @pytest.mark.parametrize("execution_class", ["live", "deterministic"])
 def test_all_source_questions_precede_other_cases_optional_ir(owned, execution_class):
     author(owned, semantic_fields=fields(execution_class))
@@ -104,6 +224,9 @@ def test_all_source_questions_precede_other_cases_optional_ir(owned, execution_c
     assert selected["case_id"] == "CASE-000002"
     assert selected["oracle_revision"] == 1 and selected["scope"] == "source"
     assert gate["next_action"]["arguments"]["question_id"] == "Q-preconditions"
+    questions = gate["work_remaining"]["oracle_questions"]
+    assert questions["oracle_id"] == "ORACLE-000002" and questions["scope"] == "source"
+    assert "Q-operator-profile" not in [row["question_id"] for row in questions["ordered_missing_fields"]]
     ir = read(owned, "oracle_ir")["result"]["oracle_ir"]
     for item in ir:
         action = item["next_action"]
@@ -256,6 +379,7 @@ def test_missing_source_oracle_precedes_optional_ir(owned):
     gate = read(owned)["result"]["lifecycle_gate"]
     assert gate["next_action"] == {"tool": "fow_campaign_author", "operation": "author_oracle",
                                     "arguments": {"case_id": "CASE-000002"}}
+    assert "oracle_questions" not in gate["work_remaining"]
     assert read(owned, "oracle_ir")["result"]["oracle_ir"][0]["next_action"] == gate["next_action"]
     before = dump(runtime)
     assert answer(owned, "ORACLE-000001", "Q-operator-profile")["reason"] == "oracle_question_unavailable"
@@ -269,6 +393,9 @@ def test_two_complete_sources_expose_one_admissible_optional_ir_question(owned):
         actor="test", request_id="second-case")
     author(owned, "CASE-000002", fields(), "second-oracle")
     projections = read(owned, "oracle_ir")["result"]["oracle_ir"]
+    work = read(owned)["result"]["lifecycle_gate"]["work_remaining"]
+    assert work["oracle_questions"]["scope"] == "oracle_ir"
+    assert work["oracle_questions"]["other_pending_questions"] >= 1
     for p in projections:
         arguments = p["next_action"]["arguments"]
         assert arguments["oracle_id"] == "ORACLE-000001"
@@ -276,6 +403,12 @@ def test_two_complete_sources_expose_one_admissible_optional_ir_question(owned):
         assert arguments["expected_fingerprint"]
     assert projections[0]["next_question"]["scope"] == "oracle_ir"
     assert projections[1]["next_question"] is None
+    summary = asyncio.run(create_app(runtime).call_tool("fow_campaign_inspect", {
+        "project_id": "question-test", "campaign_id": campaign_id, "view": "summary",
+    }))
+    markdown = summary.content[0].text
+    assert "Optional deterministic IR" in markdown and "view=oracle_ir" in markdown
+    assert "Current answer slot" not in markdown and "Q-operator-profile" not in markdown
     assert answer(owned, "ORACLE-000002", "Q-operator-profile")["reason"] == "oracle_question_not_current"
     from flow_of_work_mcp.core.domain import ORACLE_IR_OPERATOR_PROFILE
     assert answer(owned, "ORACLE-000001", "Q-operator-profile", answer=ORACLE_IR_OPERATOR_PROFILE)["status"] == "success"
@@ -317,6 +450,29 @@ def test_invalid_view_is_rejected_even_when_project_has_no_campaign(owned):
     assert response["status"] == "rejected" and response["reason"] == "invalid_input"
     assert response["result"]["read_only"] is True
     assert dump(runtime) == before
+
+
+def test_campaign_working_views_preserve_the_gate_and_separate_the_typed_data(owned):
+    runtime, campaign_id, _ = owned
+    author(owned)
+
+    async def inspect():
+        app = create_app(runtime)
+        scope = {"project_id": "question-test", "campaign_id": campaign_id}
+        for view in ("working_sheet", "cases", "obligations", "oracles", "constructibility",
+                     "oracle_ir", "attestation", "evidence", "residuals", "history"):
+            reply = await app.call_tool("fow_campaign_inspect", {**scope, "view": view})
+            body = reply.structuredContent["result"]["result"]
+            markdown = reply.content[0].text
+            assert body["campaign"]["campaign_id"] == campaign_id
+            assert "Current gate" in markdown and "Next step" in markdown and "```json" not in markdown
+            if view in {"oracles", "obligations"}:
+                assert body["campaign"]["fingerprint"] in markdown
+        rejected = await app.call_tool("fow_campaign_inspect", {**scope, "view": "wrong-view"})
+        assert "Cause" in rejected.content[0].text and "Input to correct" in rejected.content[0].text
+        assert "Next step" in rejected.content[0].text and "```json" not in rejected.content[0].text
+
+    asyncio.run(inspect())
 
 
 def test_received_identity_is_bounded_without_changing_admission(owned):

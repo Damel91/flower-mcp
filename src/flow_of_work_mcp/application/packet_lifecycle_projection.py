@@ -728,6 +728,13 @@ def _gate_decision(
     has_units: bool,
     has_reconciliation_scope: bool,
 ) -> tuple[Mapping[str, object] | None, list[object], str]:
+    if operation == "external_packet_disposition":
+        return (
+            {"kind": "packet_technical_disposition",
+             "question": "What current evidence completes each listed packet criterion?"},
+            ["record_technical_disposition"],
+            "Records technical implementation after current evidence and review. Change and milestone acceptance remain separate decisions.",
+        )
     if operation.startswith("external_"):
         return (
             {"kind": "external_agent_obligation", "question": "Inspect the standalone validation or TODO frontier and fulfill its explicit obligation."},

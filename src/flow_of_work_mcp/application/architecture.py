@@ -4,7 +4,8 @@ from __future__ import annotations
 from flow_of_work_mcp.core.domain.architecture import ARCHITECTURE_CONTRACT, ENTITY_LISTS, nonnegative_integer, normalize_definition
 from flow_of_work_mcp.core.domain.external_work import fields, number, text
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
-from flow_of_work_mcp.core.errors import OperationPreEffectError
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError, InputValidationError, OperationPreEffectError
+from flow_of_work_mcp.markdown_adapter import render_structured, safe_inline
 
 
 def prepare_architecture_mutation(project_id, operation, *, payload, actor, request_id):
@@ -42,6 +43,23 @@ def prepare_architecture_mutation(project_id, operation, *, payload, actor, requ
         revision = number(nonnegative_integer(value, field), field)
         field, value = 'payload.rationale', payload.get('rationale')
         return {**result, 'revision': revision, 'rationale': text(value, field)}
+    except InputValidationError as exc:
+        if 'missing_entity_fields' in exc.details:
+            raise OperationPreEffectError(
+                'architecture_input_invalid', str(exc), field=field, received_value=exc.received_value,
+                rule='Provide every required field for each indexed entity.',
+                resolution='Supply all listed fields in one correction. Use [] where an empty list is allowed; interface clauses and consumer_component_ids must be nonempty. Use an empty string for supersedes_decision_id when there is no predecessor. This invocation started no mutation.',
+                details=exc.details,
+            ) from exc
+        is_markdown = exc.field == 'markdown'
+        raise OperationPreEffectError('architecture_input_invalid', str(exc),
+            field=f'{field}.{exc.field}', received_value=exc.received_value,
+            rule=str(exc) if is_markdown else 'Use an accepted interface kind.',
+            resolution=(
+                'Supply bounded UTF-8 Markdown or omit the optional field.' if is_markdown
+                else 'Choose the allowed kind that describes this interface and correct the indexed field.'
+            ) + ' This invocation started no mutation; earlier work under the same ID is unchanged.',
+            details={**exc.details, 'accepted_values': list(exc.accepted_values)}) from exc
     except (ValueError, TypeError) as exc:
         raise OperationPreEffectError('architecture_input_invalid', str(exc),
             field=field, received_value=value,
@@ -63,6 +81,10 @@ class ArchitectureService:
             return self._ledger.adopt_architecture(**prepared)
         if not isinstance(payload, dict):
             raise ValueError('architecture payload must be an object')
+        if operation == 'export':
+            fields(payload, {'revision'}, operation)
+            revision = nonnegative_integer(payload.get('revision', 0), 'revision')
+            return self._export(project_id, revision)
         if operation != 'inspect':
             raise ValueError('unsupported architecture operation')
         fields(payload, {'revision', 'kind', 'offset', 'limit'}, operation)
@@ -89,3 +111,24 @@ class ArchitectureService:
                     'items': page, 'total': total, 'count': len(page), 'offset': offset, 'limit': limit,
                     'complete': not more, 'next_offset': offset + len(page) if more else None,
                     'acceptance': 'not_inferred', 'verification': 'not_inferred'}
+
+    def _export(self, project_id: str, revision: int) -> dict[str, object]:
+        state = self._ledger.architecture_revision(project_id, revision)
+        if state['state'] == 'absent':
+            raise ChangeControlBlockedError('architecture_not_adopted', details={'project_id': project_id})
+        definition = state['definition']
+        entity_sections = {name: definition[name] for name in ENTITY_LISTS.values()}
+        markdown = '\n'.join([
+            '# Project architecture',
+            '',
+            f"- **Project:** {safe_inline(project_id)}",
+            f"- **Architecture revision:** {state['revision']}",
+            f"- **State:** {state['state']}",
+            f"- **Definition fingerprint:** {state['definition_fingerprint']}",
+            '',
+            render_structured(entity_sections),
+        ])
+        if definition.get('markdown'):
+            markdown += '\n## Architecture narrative\n\n' + definition['markdown']
+        return {'contract': ARCHITECTURE_CONTRACT, **state, 'markdown': markdown,
+                'acceptance': 'not_inferred', 'verification': 'not_inferred'}

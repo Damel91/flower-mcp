@@ -6,16 +6,27 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 
-from flow_of_work_mcp.application.milestone_traceability import REQUIREMENT_LEDGER_VERSION_NAMESPACE
 from flow_of_work_mcp.application.dashboard_markdown import limited_reader, markdown_reader
-from flow_of_work_mcp.core.domain.change_control import validate_packet_id
+from flow_of_work_mcp.application.milestone_traceability import REQUIREMENT_LEDGER_VERSION_NAMESPACE
+from flow_of_work_mcp.application.roadmap_markdown import render_requirement
+from flow_of_work_mcp.core.domain.change_control import validate_milestone_id, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id, validate_requirement_id
+from flow_of_work_mcp.core.errors import ChangeControlBlockedError
+from flow_of_work_mcp.markdown_adapter import render_structured
 
 
 SECTIONS = frozenset({"overview", "roadmap", "packets", "verification", "architecture", "evidence"})
 VERIFICATION_CHANNELS = frozenset({"campaign", "verification", "external_report", "repository_review"})
 _EVIDENCE_CONTENT_KEYS = {"verification": "metadata", "external_report": "report", "repository_review": "repository_review"}
 MAXIMUM_EVIDENCE_BYTES = 2 * 1024 * 1024
+
+
+class DashboardDocumentNotFound(LookupError):
+    """A valid selector does not resolve in the selected project."""
+
+
+class DashboardDocumentTooLarge(ValueError):
+    """The complete document cannot fit the dashboard response."""
 
 
 def _pagination(offset: int, limit: int) -> None:
@@ -56,6 +67,18 @@ def _evidence_response_bytes(result: Mapping[str, object]) -> int:
                           separators=(",", ":")).encode("utf-8"))
 
 
+def _bounded_document(result: dict[str, object], *, size_error: ValueError) -> dict[str, object]:
+    if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
+        raise size_error
+    if result["content_type"] == "text/markdown":
+        result["reader"] = markdown_reader(result["content"])
+        if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
+            result["reader"] = limited_reader("reader_response_limit")
+            if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
+                del result["reader"]
+    return result
+
+
 class DashboardProjectionService:
     """Derive read-only sections without selecting a chat project or capability lens."""
 
@@ -83,13 +106,22 @@ class DashboardProjectionService:
             raise ValueError("unsupported dashboard section")
         if not isinstance(channel, str) or channel not in VERIFICATION_CHANNELS or not isinstance(scope_id, str):
             raise ValueError("unsupported dashboard verification channel or scope")
-        if (channel != "campaign" or scope_id) and section != "verification":
-            raise ValueError("verification channel and scope require the verification section")
+        if channel != "campaign" and section != "verification":
+            raise ValueError("verification channel requires the verification section")
         if scope_id:
-            if channel == "campaign":
-                raise ValueError("campaign listing does not accept a requirement or packet scope")
-            scope_id = (validate_requirement_id(scope_id) if channel == "verification"
-                        else validate_packet_id(scope_id))
+            if section == "verification":
+                if channel == "campaign":
+                    raise ValueError("campaign listing does not accept a requirement or packet scope")
+                scope_id = (validate_requirement_id(scope_id) if channel == "verification"
+                            else validate_packet_id(scope_id))
+            elif section == "packets":
+                scope_id = validate_packet_id(scope_id)
+            elif section == "roadmap":
+                scope_id = validate_milestone_id(scope_id)
+            else:
+                raise ValueError("scope requires the verification, packets or roadmap section")
+            if section != "verification" and offset:
+                raise ValueError("focused acceptance context does not accept a page offset")
         with self._ledger.consistent_read():
             project = self._ledger.dashboard_project(project_id)
             if section == "architecture":
@@ -105,6 +137,12 @@ class DashboardProjectionService:
                 summary = {"evidence_channels": page["counts"], "channel": channel, "scope_id": scope_id}
                 if channel == "campaign":
                     items = [self._campaign(project_id, row, limit) for row in items]
+            elif scope_id:
+                selected = {"packet_id" if section == "packets" else "milestone_id": scope_id}
+                context = self._runtime.project_state_snapshot.acceptance_context(
+                    project_id, **selected, limit=limit)
+                items, total = [], 0
+                summary = {"acceptance_context": context}
             else:
                 page = self._ledger.dashboard_items(project_id, section, offset=offset, limit=limit)
                 items, total = page["items"], page["total"]
@@ -177,6 +215,104 @@ class DashboardProjectionService:
                 "evidence": evidence.get("evidence", []), "evidence_bounds": evidence.get("page", {}),
                 "acceptance": "not_inferred"}
 
+    def requirement_document(self, project_id: str, scope: str, scope_id: str = "") -> dict[str, object]:
+        project_id = validate_project_id(project_id)
+        if scope == "requirement":
+            scope_id = validate_requirement_id(scope_id)
+        elif scope == "milestone":
+            scope_id = validate_milestone_id(scope_id)
+        elif scope != "project" or scope_id:
+            raise ValueError("unsupported dashboard requirement scope")
+
+        with self._ledger.consistent_read():
+            project = self._ledger.dashboard_project(project_id)
+            ledger_version = self._ledger.ledger_version(project_id)
+            requirement_ids = None
+            provenance = {"project_id": project_id, "scope": scope, "source_ledger_version": ledger_version,
+                          "source_ledger_version_namespace": REQUIREMENT_LEDGER_VERSION_NAMESPACE}
+            if scope == "requirement":
+                requirement_ids = (scope_id,)
+                title = f"Requirement {scope_id}"
+                provenance["requirement_id"] = scope_id
+            elif scope == "milestone":
+                requirement_ids = self._ledger.dashboard_milestone_requirements(project_id, scope_id)
+                if requirement_ids is None:
+                    raise DashboardDocumentNotFound
+                title = f"Requirements realized by {scope_id}"
+                provenance.update(milestone_id=scope_id, membership_source="milestone.requirement_ids",
+                                  body_basis="Current requirement revisions observed in this read")
+            else:
+                title = "Project requirements catalogue"
+
+            parts = [f"# {title}", render_structured(provenance)]
+            pins = []
+            body_bytes = sum(len(part.encode("utf-8")) for part in parts)
+            for row in self._ledger.dashboard_requirement_rows(project_id, requirement_ids):
+                body = render_requirement(row, level=2).rstrip()
+                body_bytes += len(body.encode("utf-8")) + 2
+                if body_bytes > MAXIMUM_EVIDENCE_BYTES:
+                    raise DashboardDocumentTooLarge
+                parts.append(body)
+                pins.append({"requirement_id": row["requirement_id"], "revision": row["current_revision"]})
+            if requirement_ids is not None and len(pins) != len(requirement_ids):
+                raise DashboardDocumentNotFound
+            if not pins:
+                parts.append("No requirements recorded for this scope (0 requirements).")
+            if scope == "requirement":
+                filename = f"flower-{project_id}-{scope_id}-r{pins[0]['revision']}.md"
+            elif scope == "milestone":
+                filename = f"flower-{project_id}-{scope_id}-requirements-ledger-{ledger_version}.md"
+            else:
+                filename = f"flower-{project_id}-requirements-ledger-{ledger_version}.md"
+            return self._document(project, kind="requirements", title=title, filename=filename,
+                                  content="\n\n".join(parts) + "\n", **provenance,
+                                  scope_id=scope_id, requirements=pins)
+
+    @staticmethod
+    def _document(project: Mapping[str, object], *, kind: str, title: str, filename: str,
+                  content: str, **metadata) -> dict[str, object]:
+        return _bounded_document({"project": project, "kind": kind, "title": title, "filename": filename,
+                                  "content": content, "content_type": "text/markdown", **metadata},
+                                 size_error=DashboardDocumentTooLarge())
+
+    def architecture_history(self, project_id: str, *, offset: int, limit: int) -> dict[str, object]:
+        _pagination(offset, limit)
+        project_id = validate_project_id(project_id)
+        with self._ledger.consistent_read():
+            history = self._runtime.architecture.call(project_id, "inspect", payload={
+                "kind": "history", "offset": offset, "limit": limit,
+            })
+            items = [{"revision": row["revision"], "state": row["state"]} for row in history["items"]]
+            return {"current_adopted_revision": history["current_adopted_revision"],
+                    "items": items, "bounds": _bounds(history["total"], offset, len(items), limit)}
+
+    def architecture_document(self, project_id: str, revision: str | None) -> dict[str, object]:
+        project_id = validate_project_id(project_id)
+        selected = 0
+        if revision is not None:
+            if not revision.isascii() or not revision.isdecimal() or len(revision) > 19:
+                raise ValueError("dashboard architecture revision must be a positive SQLite integer")
+            selected = int(revision)
+            if not 1 <= selected < 2**63:
+                raise ValueError("dashboard architecture revision must be a positive SQLite integer")
+        with self._ledger.consistent_read():
+            project = self._ledger.dashboard_project(project_id)
+            try:
+                exported = self._runtime.architecture.call(project_id, "export", payload={"revision": selected})
+            except ChangeControlBlockedError as exc:
+                if exc.reason in {"architecture_not_adopted", "architecture_revision_not_found"}:
+                    raise DashboardDocumentNotFound from exc
+                raise
+            exact = exported["revision"]
+            return self._document(
+                project, kind="architecture", title=f"Architettura · revisione {exact}",
+                filename=f"flower-{project_id}-architecture-r{exact}.md",
+                content=exported["markdown"], revision=exact, state=exported["state"],
+                current_adopted_revision=exported["current_adopted_revision"],
+                definition_fingerprint=exported["definition_fingerprint"],
+                source_ledger_version=self._ledger.ledger_version(project_id),
+            )
+
     def evidence(self, project_id: str, kind: str, identity: str) -> dict[str, object]:
         project_id = validate_project_id(project_id)
         if kind not in {"artifact", "handover", *_EVIDENCE_CONTENT_KEYS}:
@@ -204,12 +340,4 @@ class DashboardProjectionService:
                       "source_ledger_version": self._ledger.ledger_version(project_id),
                       "observed_at": _observed_at(), "content": content,
                       "content_type": content_type, **retained}
-            if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
-                raise ValueError("dashboard evidence exceeds the 2 MiB read limit")
-            if content_type == "text/markdown":
-                result["reader"] = markdown_reader(content)
-                if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
-                    result["reader"] = limited_reader("reader_response_limit")
-                if _evidence_response_bytes(result) > MAXIMUM_EVIDENCE_BYTES:
-                    del result["reader"]
-            return result
+            return _bounded_document(result, size_error=ValueError("dashboard evidence exceeds the 2 MiB read limit"))

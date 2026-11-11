@@ -1,13 +1,15 @@
 """Persistence port for revisioned packet work plans."""
 from __future__ import annotations
 
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from flow_of_work_mcp.core.domain.packet_work_plan import PacketWorkPlanDraft
 from flow_of_work_mcp.core.domain.packet_construction import PacketQuestionResolutionDraft
 
 
 class PacketWorkPlanRepository(Protocol):
+    def packet_consumption_mode(self, project_id: str, change_id: str, packet_id: str) -> str: ...
+
     def packet_work_plan_authoring_history(
         self, project_id: str, change_id: str, packet_id: str,
     ) -> list[Mapping[str, object]]: ...
@@ -136,4 +138,5 @@ class PacketWorkPlanRepository(Protocol):
         rationale: str,
         actor: str,
         request_id: str = "",
+        acceptance_check: Callable[[str, str, str, int], None] | None = None,
     ) -> Mapping[str, object]: ...

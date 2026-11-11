@@ -20,7 +20,7 @@ from flow_of_work_mcp.model_facing import (
 def test_architecture_is_discoverable_as_ordinary_project_authority():
     descriptor = next(item for item in public_tool_catalog() if item["name"] == "fow_architecture")
     assert descriptor["area"] == "project_bootstrap"
-    assert operation_names("fow_architecture") == ("inspect", "propose", "adopt")
+    assert operation_names("fow_architecture") == ("inspect", "propose", "adopt", "export")
     assert_projector_registry(public_tool_names())
 
     inspect = operation_contract("fow_architecture", "inspect")
@@ -30,6 +30,10 @@ def test_architecture_is_discoverable_as_ordinary_project_authority():
     assert "actor" not in inspect["required_fields"]
     assert inspect["example"]["payload"] == {"revision": 0, "kind": "all", "offset": 0, "limit": 20}
     assert inspect["accepted_values"]["payload.kind"] == ["all", "component", "interface", "decision", "history"]
+    export = operation_contract("fow_architecture", "export")
+    assert export["risk"] == "read" and export["effect_class"] == "none"
+    assert export["required_fields"] == ["project_id", "operation"]
+    assert export["example"]["payload"] == {"revision": 0}
 
 
 def test_architecture_mutation_help_closes_revision_replay_and_definition_shape():
@@ -42,6 +46,7 @@ def test_architecture_mutation_help_closes_revision_replay_and_definition_shape(
         assert "historical receipt" in contract["guidance"]["replay"]
         assert "not product acceptance" in contract["guidance"]["authority"]
     assert proposal["example"]["payload"]["expected_revision"] == 0
+    assert "payload.definition.markdown" in proposal["optional_fields"]
     definition = proposal["example"]["payload"]["definition"]
     normalized = normalize_definition(definition)
     assert len(normalized["interfaces"]) == len(normalized["decisions"]) == 1
@@ -186,7 +191,7 @@ def test_recipes_keep_standalone_and_negotiated_provider_boundaries_explicit():
     standalone = get_recipe("standalone-external-plan")
     assert architecture and provider and standalone
     assert "not implementation evidence" in architecture["authority"]["boundary"]
-    assert any("Pi owns the agent loop" in item for item in architecture["safety_notes"])
+    assert any("connected coding host owns the agent loop" in item for item in architecture["safety_notes"])
     assert "does not transfer an admitted run" in provider["authority"]["boundary"]
     assert any("provider_validation is a pure read" in item for item in provider["safety_notes"])
     assert any("deferred and never current coding tasks" in item for item in provider["safety_notes"])

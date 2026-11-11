@@ -12,6 +12,7 @@ from flow_of_work_mcp.core.domain.provider_validation import (
 )
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError, ImplementationProviderError, ImplementationProviderUnavailableError,
+    InputValidationError,
 )
 
 
@@ -154,8 +155,9 @@ class PacketExecutorService:
     def _select(self, project_id, change_id, packet_id, payload, actor):
         packet, plan = self._expect(project_id, change_id, packet_id, payload)
         executor = payload.get('executor')
-        if executor not in {'external_agent', 'provider'}:
-            raise ValueError('executor must explicitly be external_agent or provider')
+        if not isinstance(executor, str) or executor not in {'external_agent', 'provider'}:
+            raise InputValidationError('executor must be the string external_agent or provider',
+                field='payload.executor', received_value=executor, accepted_values=('external_agent', 'provider'))
         provider_kind = str(payload.get('provider_kind') or '')
         if executor == 'external_agent' and provider_kind:
             raise ValueError('external_agent selection must not specify provider_kind')

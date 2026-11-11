@@ -27,12 +27,15 @@ _ROUTES: Mapping[str, tuple[str, str, str, tuple[str, ...]]] = {
     "provider_validation": ("fow_external_work", "provider_validation", "semantic", ()),
     "external_select_mode": ("fow_external_work", "set_mode", "semantic", ("actor", "request_id")),
     "external_validation": ("fow_external_work", "validation", "semantic", ()),
+    "external_classify_criteria": ("fow_external_work", "classify_criteria", "semantic",
+                                   ("payload.dispositions", "actor", "request_id")),
     "external_todo": ("fow_external_work", "todo", "semantic", ()),
     "external_reconcile": ("fow_external_work", "reconcile_outcome", "semantic",
                            ("payload.report_key", "payload.rationale", "actor", "request_id")),
     "external_verification": ("fow_campaign_author", "start", "semantic",
                               ("title", "scope.change_id", "actor", "request_id")),
-    "external_acceptance": ("fow_packet_inspect", "summary", "semantic", ()),
+    "external_packet_disposition": ("fow_change", "transition_packet", "semantic",
+                                    ("criterion_results", "actor", "request_id")),
     "packet_inactive": (
         "fow_packet_inspect",
         "summary",
@@ -288,31 +291,58 @@ class PacketNextActionProjectionService:
         )
         if decision.next_operation == "observe_provider_packet":
             continuation_policy = "host_observe"
+        if decision.next_operation == "external_packet_disposition":
+            route = packet_technical_disposition_route(
+                project_id, change_id, packet_id, decision.criterion_result_keys,
+            )
+        else:
+            route = {
+                "tool": tool,
+                "operation": operation,
+                "arguments": dict(review_gate["arguments"]) if review_gate is not None else _fixed_arguments(
+                    tool,
+                    operation,
+                    project_id=project_id,
+                    change_id=change_id,
+                    packet_id=packet_id,
+                    spec_revision=spec_revision,
+                    plan_revision=plan_revision,
+                    decision_class=decision_class,
+                ),
+                "required_inputs": list(required_inputs),
+            }
         return {
             "state": decision.state,
             "lifecycle_operation": decision.next_operation,
-            "tool": tool,
-            "operation": operation,
             "decision_class": decision_class,
             "continuation_policy": continuation_policy,
             "reason": reason,
-            "arguments": dict(review_gate["arguments"]) if review_gate is not None else _fixed_arguments(
-                tool,
-                operation,
-                project_id=project_id,
-                change_id=change_id,
-                packet_id=packet_id,
-                spec_revision=spec_revision,
-                plan_revision=plan_revision,
-                decision_class=decision_class,
-            ),
-            "required_inputs": list(required_inputs),
+            **route,
             **({"repository_review_template": dict(review_gate["repository_review_template"])}
                if review_gate is not None and "repository_review_template" in review_gate else {}),
             **({"engineering_recipe": "project-architecture-v1"}
                if decision.next_operation == "architecture_required" else {}),
             "alternatives": [],
         }
+
+
+def packet_technical_disposition_route(
+    project_id: str, change_id: str, packet_id: str, criterion_result_keys: tuple[str, ...],
+) -> dict[str, object]:
+    tool, operation, _, required_inputs = _ROUTES["external_packet_disposition"]
+    return {
+        "tool": tool,
+        "operation": operation,
+        "arguments": {
+            "project_id": project_id,
+            "change_id": change_id,
+            "packet_id": packet_id,
+            "operation": operation,
+            "packet_status": "implemented",
+        },
+        "required_inputs": list(required_inputs),
+        "criterion_result_keys": list(criterion_result_keys),
+    }
 
 
 def _registered_operation(tool: str, operation: str) -> str:
@@ -378,7 +408,7 @@ def _fixed_arguments(
     if tool == "fow_external_work":
         arguments = {"project_id": project_id, "change_id": change_id,
                      "packet_id": packet_id, "operation": operation}
-        if operation in {"reconcile_outcome", "select_executor", "negotiate_provider"}:
+        if operation in {"reconcile_outcome", "select_executor", "negotiate_provider", "classify_criteria"}:
             arguments["payload"] = {"expected_spec_revision": spec_revision,
                                     "expected_plan_revision": plan_revision}
         elif operation == "set_mode":

@@ -79,7 +79,7 @@ def test_initial_upgrade_and_exact_replay_create_one_stable_criterion_history(tm
     service = ExternalWorkService(ledger)
     revisions = {"expected_spec_revision": packet["spec_revision"], "expected_plan_revision": 0}
     first = service.call(*ids, "upgrade_validation", actor="host", request_id="initial", payload=revisions)
-    assert first["validation_version"] == 1
+    assert first["validation_version"] == 2
     assert [item["number"] for item in first["criteria"]] == [1, 2]
     assert len(ledger.external_work_state(*ids)["criterion_history"]) == 2
     before = _rows(path)

@@ -10,7 +10,9 @@ from flow_of_work_mcp.application.lifecycle_recipes import get_recipe
 from flow_of_work_mcp.application.operation_contracts import operation_contract
 from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
+from flow_of_work_mcp.mcp_runtime import build_runtime
 from flow_of_work_mcp.model_facing import project_markdown
+from flow_of_work_mcp.server import handle_handover, handle_packet_author
 from tests.test_external_work import fixture
 
 
@@ -195,3 +197,43 @@ def test_revise_unit_failure_preserves_prior_effect_and_unknown_correlation(tmp_
     assert 'effect_receipt' not in result['result']
     assert result['result']['original_request'] == {'tool': 'fow_packet_author', 'operation': 'revise_unit',
         'project_id': 'owned', 'request_id': 'retained-original'}
+
+
+def test_replace_plan_proves_pre_effect_for_invalid_existing_target_and_accepts_correction(tmp_path):
+    ledger, _service, ids, _ = fixture(tmp_path)
+    runtime = build_runtime(database_path=ledger.database_path, import_root=tmp_path, ledger=ledger)
+    try:
+        units = deepcopy(ledger.packet_work_plan_state(*ids)['units'])
+        units[0]['operation_kind'] = 'modify_existing'
+        args = dict(zip(('project_id', 'change_id', 'packet_id'), ids))
+        args.update(operation='replace_plan', actor='engineer', request_id='replace-test', work_plan={'units': units})
+        prior = dump(ledger)
+        rejected = handle_packet_author(runtime, **args)
+        assert rejected['status'] == 'rejected'
+        diagnostic = rejected['result']['diagnostics'][0]
+        assert diagnostic['field'] == 'work_plan.units[0].file_path'
+        assert diagnostic['received_value'] == 'src/increment.py'
+        assert 'target_description' in diagnostic['resolution']
+        assert rejected['result']['effect_state'] == 'none'
+        assert rejected['result']['effect_receipt']['mutation_started'] is False
+        assert dump(ledger) == prior
+        units[0].pop('file_path')
+        units[0]['target_description'] = 'Existing increment producer in src/increment.py.'
+        corrected = handle_packet_author(runtime, **args)
+        assert corrected['status'] == 'success', corrected
+        assert dump(ledger) != prior
+    finally:
+        runtime.close()
+
+
+def test_rejected_snapshot_offers_read_correction_without_write_reconciliation(tmp_path):
+    runtime = build_runtime(database_path=tmp_path / 'ledger.sqlite3', import_root=tmp_path)
+    try:
+        response = handle_handover(runtime, project_id='alpha', operation='project_state_snapshot', limit=0)
+        assert response['status'] == 'rejected'
+        result = response['result']
+        assert result['read_only'] and 'effect_state' not in result
+        assert result['next_tool_call']['arguments']['operation_name'] == 'project_state_snapshot'
+        assert 'limit must be between 1 and 25' in result['diagnostics'][0]['message']
+    finally:
+        runtime.close()

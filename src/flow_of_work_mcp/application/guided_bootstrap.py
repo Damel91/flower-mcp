@@ -12,10 +12,15 @@ from hashlib import sha256
 import json
 from typing import Mapping
 
-from flow_of_work_mcp.core.errors import BootstrapBlockedError, ChangeControlBlockedError, OperationPreEffectError
-from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
+from flow_of_work_mcp.core.errors import (
+    BootstrapBlockedError, ChangeControlBlockedError, MilestonePreEffectError,
+    OperationPreEffectError, ProjectNotFoundError, RequirementConflictError,
+)
+from flow_of_work_mcp.core.domain.change_control import validate_milestone_id
+from flow_of_work_mcp.core.domain.identifiers import validate_requirement_id
+from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps, roadmap_correspondence
 from flow_of_work_mcp.application.bootstrap_input_contracts import (
-    ANSWER_SCHEMA, CORRESPONDENCE_SCHEMA, REFERENCES_SCHEMA,
+    ANSWER_SCHEMA, CORRESPONDENCE_SCHEMA, MILESTONE_REVISION_FIELDS, REFERENCES_SCHEMA,
 )
 from flow_of_work_mcp.application.roadmap_markdown import render_roadmap
 
@@ -161,15 +166,22 @@ class GuidedBootstrapService:
     def _guided(state):
         return deepcopy(state['intake'].get('_guided', {}))
 
-    def _entities(self, project_id):
+    def _entities(self, project_id, *, revised=None):
         requirements = {r['requirement_id']: {'retired': r.get('lifecycle_status') == 'removed', **{k: r.get(k) for k in (
             'requirement_id', 'title', 'statement', 'category', 'current_revision', 'source_anchor')}}
                         for r in self._ledger.traceability_matrix(project_id)}
-        milestones = {m['milestone_id']: {k: m.get(k) for k in (
-            'milestone_id', 'name', 'requirement_ids', 'prerequisite_requirement_ids',
-            'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
-            'entry_policy', 'exit_policy', 'risk_disposition')}
-                      for m in self._ledger.milestones(project_id)}
+        milestones = {}
+        for milestone in self._ledger.milestones(project_id):
+            identity = milestone['milestone_id']
+            if revised is not None and identity == revised['milestone_id']:
+                milestone = revised
+            projected = {k: milestone.get(k) for k in (
+                'milestone_id', 'name', 'requirement_ids', 'prerequisite_requirement_ids',
+                'prerequisite_producers', 'prerequisite_mapping_gaps', 'prerequisite_authority_gaps',
+                'entry_policy', 'exit_policy', 'risk_disposition')}
+            if milestone.get('revision', 1) > 1:
+                projected['revision'] = milestone['revision']
+            milestones[identity] = projected
         graph = self._ledger.goal_graph(project_id)
         goals = {g['goal_node_id']: {k: _plain(g.get(k)) for k in (
             'goal_node_id', 'node_type', 'title', 'payload', 'source_anchor')}
@@ -284,10 +296,10 @@ class GuidedBootstrapService:
         with self._ledger.consistent_read():
             return self._roadmap(project_id, bootstrap_id, selected)
 
-    def _roadmap(self, project_id, bootstrap_id, selected):
+    def _roadmap(self, project_id, bootstrap_id, selected, *, revised=None):
         state = self._state(project_id, bootstrap_id)
         guided = self._guided(state)
-        entities, graph = self._entities(project_id)
+        entities, graph = self._entities(project_id, revised=revised)
         unknown = set(selected) - set(entities['milestone_ids'])
         if unknown:
             raise ValueError('unknown project milestones: ' + ', '.join(sorted(unknown)))
@@ -297,8 +309,10 @@ class GuidedBootstrapService:
         gaps = []
         for m in milestones:
             gaps.extend({'reason': gap['code'], **gap} for gap in milestone_prerequisite_gaps(m))
-            if not m['requirement_ids'] or not m['entry_policy'] or not m['exit_policy']:
-                gaps.append({'reason':'milestone_definition_incomplete', 'milestone_id':m['milestone_id']})
+            missing = [field for field in ('requirement_ids', 'entry_policy', 'exit_policy') if not m[field]]
+            if missing:
+                gaps.append({'reason':'milestone_definition_incomplete', 'milestone_id':m['milestone_id'],
+                             'missing_fields': missing})
         if not requirement_ids:
             gaps.append({'reason':'roadmap_requirements_missing'})
         requirements = [entities['requirement_ids'][r] for r in sorted(requirement_ids) if r in entities['requirement_ids']]
@@ -307,7 +321,6 @@ class GuidedBootstrapService:
         if len(requirements) != len(requirement_ids):
             gaps.append({'reason':'roadmap_requirement_missing'})
         relevant_goals = set()
-        relevant_mappings = {}
         for change in self._ledger.list_changes(project_id):
             for packet in change.get('packets', []):
                 if change.get('milestone_id') in selected and packet.get('status') not in {'cancelled', 'superseded'}:
@@ -327,21 +340,8 @@ class GuidedBootstrapService:
         # Correspondence links intake to canonical scope. Resolve related Goal
         # context and Goal-only mappings together; disconnected intake remains
         # draft context, including new answers with no correspondence yet.
-        while True:
-            previous_goals = set(relevant_goals)
-            previous_keys = set(relevant_mappings)
-            for key, mapping in guided.get('correspondence', {}).items():
-                refs = mapping['canonical_references']
-                if (set(refs['requirement_ids']) & requirement_ids
-                        or set(refs['milestone_ids']) & set(selected)
-                        or set(refs['goal_node_ids']) & relevant_goals):
-                    relevant_goals.update(refs['goal_node_ids'])
-                    relevant_mappings[key] = mapping
-            added = {e['target_goal_id'] for e in graph['edges'] if e['source_goal_id'] in relevant_goals}
-            added.update(e['source_goal_id'] for e in graph['edges'] if e['target_goal_id'] in relevant_goals)
-            relevant_goals.update(added)
-            if previous_goals == relevant_goals and previous_keys == set(relevant_mappings):
-                break
+        relevant_mappings, relevant_goals = roadmap_correspondence(guided.get('correspondence', {}),
+            requirement_ids, selected, relevant_goals, graph['edges'])
         relevant_answers = {key: answer for key, answer in guided.get('answers', {}).items()
                             if key in relevant_mappings}
         gaps[:0] = self._correspondence_gaps(guided, entities, answer_keys=relevant_mappings)
@@ -360,15 +360,134 @@ class GuidedBootstrapService:
                  'answers':relevant_answers, 'correspondence':relevant_mappings}
         revision = _hash(basis)
         confirmation = guided.get('roadmap_confirmation', {})
+        incomplete = [gap for gap in gaps if gap['reason'] == 'milestone_definition_incomplete']
+        current_milestones = ({m['milestone_id']: m for m in self._ledger.milestones(project_id)}
+                              if incomplete else {})
+        for gap in incomplete:
+            milestone = current_milestones[gap['milestone_id']]
+            if (state['status'] in {'in_progress', 'blocked'}
+                    and milestone['status'] == 'planned'
+                    and gap['milestone_id'] not in confirmation.get('milestone_ids', [])):
+                gap['resolution'] = 'Revise the same draft milestone with the missing fields, then reread the roadmap.'
+                gap['correction'] = {
+                    'tool': 'fow_bootstrap', 'operation': 'revise_draft_milestone',
+                    'arguments': {'project_id': project_id, 'bootstrap_id': bootstrap_id,
+                        'operation': 'revise_draft_milestone', 'milestone_ids': list(selected),
+                        'roadmap_fingerprint': revision, 'milestone_revision': {
+                            'milestone_id': gap['milestone_id'], 'expected_revision': milestone.get('revision', 1)}},
+                    'required_inputs': ['actor', 'request_id',
+                        *(f'milestone_revision.{field}' for field in gap['missing_fields'])],
+                }
         confirmed = (confirmation.get('roadmap_fingerprint') == revision and
                      confirmation.get('milestone_ids') == list(selected) and not gaps)
         markdown = render_roadmap(basis, fingerprint=revision, draft_context=draft_context, gaps=gaps)
         return {'contract_version':'flow.guided_roadmap.v1', 'project_id':project_id, 'bootstrap_id':bootstrap_id,
                 'milestone_ids':list(selected), 'roadmap_fingerprint':revision, 'confirmable':not gaps,
                 'confirmed':confirmed, 'gaps':gaps, 'canonical_scope':_plain(basis),
+                'milestone_revisions':{m['milestone_id']: m.get('revision', 1) for m in milestones},
                 'draft_context':_plain(draft_context),
                 'markdown':markdown, 'semantic_completeness':'host_judgment_and_human_confirmation',
                 'human_acceptance':False}
+
+    def revise_draft_milestone(self, project_id, bootstrap_id, *, milestone_ids,
+                               roadmap_fingerprint, milestone_revision, actor, request_id):
+        """Apply one revision against a specific unconfirmed guided draft."""
+
+        def reject(code, field, value, rule, resolution, **details):
+            raise MilestonePreEffectError(code, rule, field=field, received_value=value,
+                                          rule=rule, resolution=resolution, details=details)
+
+        selected = validate_roadmap_selection(milestone_ids)
+        required = {'milestone_id', 'expected_revision'}
+        if (not isinstance(milestone_revision, Mapping) or not required <= set(milestone_revision)
+                or not (set(milestone_revision) - required)
+                or set(milestone_revision) - required - set(MILESTONE_REVISION_FIELDS)):
+            reject('milestone_draft_revision_input_invalid', 'milestone_revision', milestone_revision,
+                   'Supply the milestone ID, expected revision and at least one supported replacement.',
+                   'Read exact help for revise_draft_milestone and copy IDs and revisions from roadmap.')
+        expected_revision = milestone_revision['expected_revision']
+        if type(expected_revision) is not int or expected_revision < 1:
+            reject('milestone_draft_revision_input_invalid', 'expected_revision', expected_revision,
+                   'The expected milestone revision must be a positive integer.', 'Read its revision in the roadmap.')
+        try:
+            milestone_id = validate_milestone_id(milestone_revision['milestone_id'])
+            actor = _text(actor, 'actor')
+            request_id = _text(request_id, 'request_id', 512)
+            bootstrap_id = _text(bootstrap_id, 'bootstrap_id', 128)
+            roadmap_fingerprint = _text(roadmap_fingerprint, 'roadmap_fingerprint', 128)
+        except (TypeError, ValueError) as exc:
+            reject('milestone_draft_revision_input_invalid', 'revision_context', None, str(exc),
+                   'Copy the active bootstrap ID and fingerprint from roadmap and supply an actor and request ID.')
+        if milestone_id not in selected:
+            reject('milestone_draft_target_outside_scope', 'milestone_id', milestone_id,
+                   'The target must be part of the explicitly selected draft.',
+                   'Read roadmap with the intended selection before revising it.')
+        replacements = {}
+        for field in MILESTONE_REVISION_FIELDS:
+            if field not in milestone_revision:
+                continue
+            value = milestone_revision[field]
+            try:
+                if field in {'requirement_ids', 'prerequisite_requirement_ids'}:
+                    value = [validate_requirement_id(identity) for identity in
+                             _ids(value, field, required=field == 'requirement_ids')]
+                elif field in {'entry_policy', 'exit_policy'}:
+                    if not isinstance(value, Mapping):
+                        raise ValueError(f'{field} must be an object')
+                    value = json.loads(json.dumps(dict(value), allow_nan=False, sort_keys=True))
+                elif not isinstance(value, str) or not value.strip():
+                    raise ValueError(f'{field} must be nonempty text')
+                else:
+                    value = value.strip()
+            except (TypeError, ValueError) as exc:
+                reject('milestone_draft_revision_input_invalid', field, value, str(exc),
+                       'Correct the replacement using the exact operation schema and canonical IDs.')
+            replacements[field] = value
+        mutation = {'milestone_ids': list(selected), 'roadmap_fingerprint': roadmap_fingerprint,
+                    'milestone_revision': {'milestone_id': milestone_id,
+                                           'expected_revision': expected_revision, **replacements}}
+        with self._ledger.atomic():
+            try:
+                state = self._state(project_id, bootstrap_id)
+            except (ValueError, BootstrapBlockedError, ProjectNotFoundError, RequirementConflictError) as exc:
+                reject('milestone_draft_bootstrap_invalid', 'bootstrap_id', bootstrap_id, str(exc),
+                       'Use guidance to find the current guided bootstrap in this project.')
+            try:
+                replay = self._replay(project_id, bootstrap_id, 'revise_draft_milestone', mutation, actor, request_id)
+                if replay is not None:
+                    return replay
+            except RequirementConflictError:
+                reject('milestone_draft_request_conflict', 'request_id', request_id,
+                       'This request identity already has a different recorded input.',
+                       'Replay the original input or inspect the current roadmap before a new edit.')
+            if state['status'] not in {'in_progress', 'blocked'}:
+                reject('milestone_draft_bootstrap_terminal', 'bootstrap_id', bootstrap_id,
+                       'The guided bootstrap has ended.', 'Use guidance to recover the active draft or authorized new scope.')
+            try:
+                draft = self._roadmap(project_id, bootstrap_id, selected)
+            except ValueError as exc:
+                reject('milestone_draft_selection_invalid', 'milestone_ids', selected, str(exc),
+                       'Select existing milestone IDs from this project, then read roadmap.')
+            if draft['roadmap_fingerprint'] != roadmap_fingerprint:
+                reject('milestone_draft_fingerprint_stale', 'roadmap_fingerprint', roadmap_fingerprint,
+                       'The selected draft fingerprint has changed.', 'Read the same roadmap selection before making another edit.',
+                       current_roadmap_fingerprint=draft['roadmap_fingerprint'])
+            previous, milestone = self._ledger.revise_milestone_definition(project_id, milestone_id,
+                expected_revision=expected_revision, replacements=replacements)
+            changed = previous['revision'] != milestone['revision']
+            if changed:
+                draft = self._roadmap(project_id, bootstrap_id, selected, revised=milestone)
+            outcome = {'project_id': project_id, 'bootstrap_id': bootstrap_id, 'changed': changed,
+                       'milestone': milestone, 'previous_revision': previous['revision'],
+                       'previous_milestone': previous if changed else None,
+                       'current_revision': milestone['revision'], 'roadmap_fingerprint': draft['roadmap_fingerprint'],
+                       'confirmable': draft['confirmable'], 'gaps': draft['gaps'],
+                       'next_tool_call': {'tool': 'fow_bootstrap', 'arguments': {'project_id': project_id,
+                           'bootstrap_id': bootstrap_id, 'operation': 'roadmap', 'milestone_ids': list(selected), 'actor': actor}},
+                       'next_step': 'Read the revised roadmap. Refresh affected correspondence if required, then present the current scope for explicit confirmation.'}
+            self._ledger.record_draft_milestone_outcome(project_id, bootstrap_id, mutation=mutation,
+                actor=actor, request_id=request_id, outcome=outcome)
+            return outcome
 
     def confirm_roadmap(self, project_id, bootstrap_id, *, milestone_ids,
                         roadmap_fingerprint, confirmation_reference, actor, request_id):
@@ -381,14 +500,23 @@ class GuidedBootstrapService:
                 return replay
             roadmap = self._roadmap(project_id, bootstrap_id, selected)
             if not roadmap['confirmable']:
-                raise BootstrapBlockedError('guided_roadmap_not_confirmable')
+                raise BootstrapBlockedError('guided_roadmap_not_confirmable', details={
+                    'diagnostics': roadmap['gaps'],
+                    'next_tool_call': {'tool': 'fow_bootstrap', 'arguments': {
+                        'project_id': project_id, 'bootstrap_id': bootstrap_id,
+                        'operation': 'roadmap', 'milestone_ids': list(selected)}},
+                })
             if roadmap['roadmap_fingerprint'] != mutation['roadmap_fingerprint']:
                 raise BootstrapBlockedError('guided_roadmap_fingerprint_stale')
             guided = self._guided(self._state(project_id, bootstrap_id))
             guided['roadmap_confirmation'] = mutation
+            authority_milestones = set(selected)
+            for mapping in roadmap['canonical_scope']['correspondence'].values():
+                authority_milestones.update(mapping['canonical_references']['milestone_ids'])
             return self._ledger.record_guided_bootstrap(project_id, bootstrap_id,
                 operation='confirm_roadmap', mutation=mutation, guided=guided,
-                actor=actor, request_id=request_id, stage='ready_for_completion')
+                actor=actor, request_id=request_id, stage='ready_for_completion',
+                authority_milestone_ids=sorted(authority_milestones))
 
     def execution_guard(self, project_id, packet_id):
         with self._ledger.consistent_read():

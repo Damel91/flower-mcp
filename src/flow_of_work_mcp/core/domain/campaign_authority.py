@@ -106,6 +106,53 @@ class CampaignEvidenceDisposition(StrEnum):
     PASSED = "passed"
 
 
+SOURCE_ATTESTATION_TRANSIENT_STATES = frozenset(
+    {"unavailable", "environment_failed", "profile_unavailable",
+     "graph_refresh_unavailable", "graph_refresh_failed"}
+)
+
+
+def source_attestation_retry_eligible(attestation: Mapping[str, object] | None) -> bool:
+    """Recognize a technical invalidation without changed source authority."""
+    if not isinstance(attestation, Mapping):
+        return False
+    basis = attestation.get("basis")
+    return bool(
+        attestation.get("materialization_mode")
+        == TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value
+        and attestation.get("state") == MaterializationAttestationState.INVALIDATED.value
+        and isinstance(basis, Mapping)
+        and basis.get("authority_current") is True
+        and basis.get("exact_authority_binding") is True
+        and basis.get("provider_technical_state") in SOURCE_ATTESTATION_TRANSIENT_STATES
+        and "invalidation" not in basis
+        and "effective_invalidation" not in basis
+    )
+
+
+def source_materialization_failure_receipt(
+    receipt: Mapping[str, object], *, reconciled_attestation_state: str,
+) -> bool:
+    return bool(
+        receipt.get("materialization_mode")
+        == TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value
+        and reconciled_attestation_state == MaterializationAttestationState.INVALIDATED.value
+        and receipt.get("technical_state") in SOURCE_ATTESTATION_TRANSIENT_STATES
+        and receipt.get("evidence_disposition") in {"diagnostic_only", "environment_failed"}
+    )
+
+
+def source_provider_attempt_ref(attestation: Mapping[str, object]) -> str:
+    """Scope the provider's materialization binding to the current source attempt."""
+    if attestation.get("materialization_mode") != TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value:
+        return ""
+    basis = attestation.get("basis")
+    retry = basis.get("technical_retry") if isinstance(basis, Mapping) else None
+    if not isinstance(retry, Mapping):
+        return ""
+    return f"{attestation['attestation_id']}/retry/{retry['predecessor_command_id']}"
+
+
 def deterministic_materialization_retry_eligible(
     attestation: Mapping[str, object] | None,
 ) -> bool:
@@ -169,6 +216,8 @@ class CampaignScopeDraft:
     finding_ids: tuple[str, ...] = ()
     invariants: tuple[str, ...] = ()
     environment_assumptions: tuple[str, ...] = ()
+    execution_lane: str = ""
+    independent_proof_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "change_id", validate_change_id(self.change_id))
@@ -201,6 +250,11 @@ class CampaignScopeDraft:
             "environment_assumptions",
             _unique_texts(self.environment_assumptions, "environment_assumptions"),
         )
+        object.__setattr__(self, "execution_lane", validate_campaign_execution_lane(self.execution_lane))
+        refs = _unique_texts(self.independent_proof_refs, "independent_proof_refs")
+        if any(ref not in (*self.requirement_ids, *self.goal_ids, *self.packet_ids, *self.finding_ids) for ref in refs):
+            raise ValueError("independent_proof_refs must name sources in this campaign scope")
+        object.__setattr__(self, "independent_proof_refs", refs)
 
     def as_payload(self) -> dict[str, object]:
         return {
@@ -212,7 +266,16 @@ class CampaignScopeDraft:
             "finding_ids": list(self.finding_ids),
             "invariants": list(self.invariants),
             "environment_assumptions": list(self.environment_assumptions),
+            **({"execution_lane": self.execution_lane} if self.execution_lane else {}),
+            **({"independent_proof_refs": list(self.independent_proof_refs)} if self.independent_proof_refs else {}),
         }
+
+
+def validate_campaign_execution_lane(value: str) -> str:
+    lane = str(value or "").strip()
+    if lane not in {"", "host", "provider"}:
+        raise ValueError("execution_lane must be host or provider")
+    return lane
 
 
 @dataclass(frozen=True)
@@ -230,8 +293,10 @@ class CampaignCaseSemanticDraft:
     execution_class: str = "deterministic"
     obligation_ids: tuple[str, ...] = ()
     oracle_kind: str = "behavior"
+    execution_lane: str = ""
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "execution_lane", validate_campaign_execution_lane(self.execution_lane))
         if not isinstance(self.required, bool):
             raise ValueError("required must be boolean")
         for field_name in (
@@ -278,6 +343,7 @@ class CampaignCaseSemanticDraft:
             "required": self.required,
             "obligation_ids": list(self.obligation_ids),
             "oracle_kind": self.oracle_kind,
+            **({"execution_lane": self.execution_lane} if self.execution_lane else {}),
         }
 
 

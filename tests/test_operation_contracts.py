@@ -18,12 +18,12 @@ from flow_of_work_mcp.server import (
 
 
 EXPECTED_OPERATIONS = {
-    "fow_architecture": {"inspect", "propose", "adopt"},
-    "fow_external_work": {"provider_validation", "select_executor", "negotiate_provider", "set_mode", "criteria", "reconcile_criteria", "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation", "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"},
+    "fow_architecture": {"inspect", "propose", "adopt", "export"},
+    "fow_external_work": {"provider_validation", "select_executor", "negotiate_provider", "set_mode", "criteria", "reconcile_criteria", "add_criterion", "edit_criterion", "remove_criterion", "upgrade_validation", "classify_criteria", "validation", "export_plan", "todo", "report_outcome", "reconcile_outcome"},
     "fow_bindings": {"inspect", "export", "import"},
     "fow_semantic": {"inventory", "prepare", "inspect", "submit", "adopt", "execute_internal"},
     "fow_bootstrap": {
-        "guidance", "record_answer", "record_correspondence", "roadmap", "confirm_roadmap", "record_continuation",
+        "guidance", "record_answer", "record_correspondence", "roadmap", "revise_draft_milestone", "confirm_roadmap", "record_continuation",
         "bind_implementation_provider",
         "provider_binding_state",
         "list_provider_bindings",
@@ -45,6 +45,7 @@ EXPECTED_OPERATIONS = {
         "set_finding_disposition",
         "link_fixing_packet",
         "request_change_acceptance",
+        "inspect_change_acceptance",
     },
     "fow_run": {
         "create_run",

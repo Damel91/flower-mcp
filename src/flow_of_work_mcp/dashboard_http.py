@@ -24,6 +24,9 @@ from starlette.responses import JSONResponse, RedirectResponse, Response, Stream
 from starlette.routing import Route
 
 from flow_of_work_mcp import managed_service_security as secure
+from flow_of_work_mcp.application.dashboard import (
+    DashboardDocumentNotFound, DashboardDocumentTooLarge, DashboardProjectionService,
+)
 from flow_of_work_mcp.dashboard_maintenance import DashboardMaintenance, MaintenanceUnavailable
 from flow_of_work_mcp.core.errors import ProjectNotFoundError, RequirementConflictError
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
@@ -178,7 +181,6 @@ class DashboardHTTP:
     def __init__(self, runtime, config_path: Path, *, port: int, host: str = '127.0.0.1',
                  loaded_config_revision: str | None = None, network_active: dict | None = None,
                  network_urls=None):
-        from flow_of_work_mcp.application.dashboard import DashboardProjectionService
         from flow_of_work_mcp.managed_upgrade import UpgradeController
         self.projection = DashboardProjectionService(runtime)
         self.requirements = runtime.requirements
@@ -548,7 +550,12 @@ class DashboardHTTP:
                     httponly=True, samesite='strict', secure=request.url.scheme == 'https')
                 return response
             network_route = path == ['network']
-            read_route = (path in (['status'], ['projects'], ['settings'], ['backups'], ['upgrade']) or network_route
+            architecture_document_route = len(path) == 4 and path[0] == 'projects' and path[2:] == ['documents', 'architecture']
+            architecture_history_route = len(path) == 5 and path[0] == 'projects' and path[2:] == ['documents', 'architecture', 'history']
+            requirement_document_route = len(path) == 4 and path[0] == 'projects' and path[2:] == ['documents', 'requirements']
+            read_route = (path in (['status'], ['projects'], ['settings'], ['backups'], ['upgrade'])
+                or network_route or requirement_document_route
+                or architecture_document_route or architecture_history_route
                 or len(path) == 4 and path[0] == 'projects' and path[2] == 'sections'
                 or len(path) == 5 and path[0] == 'projects' and path[2] == 'evidence')
             admin_route = len(path) == 4 and path[0] == 'projects' and path[2:] == ['deletion', 'delete']
@@ -628,6 +635,26 @@ class DashboardHTTP:
                 return self._json(await run_in_threadpool(self._upgrade_status, cookie, csrf))
             if backups_route:
                 return self._json(await run_in_threadpool(self._backup_operation, 'list', cookie, csrf))
+            if requirement_document_route:
+                query = request.query_params
+                scope = query.get('scope', '')
+                expected = {'scope'} if scope == 'project' else {'scope', 'scope_id'}
+                if set(query) != expected or len(query.multi_items()) != len(expected):
+                    raise ValueError('invalid requirement document selector')
+                return self._json(await run_in_threadpool(self.maintenance.read,
+                    self.projection.requirement_document, path[1], scope, query.get('scope_id', '')))
+            if architecture_document_route or architecture_history_route:
+                query = request.query_params
+                allowed = {'offset', 'limit'} if architecture_history_route else {'revision'}
+                if set(query) - allowed or len(query.multi_items()) != len(query):
+                    raise ValueError('invalid architecture document query')
+                if architecture_history_route:
+                    result = await run_in_threadpool(self.maintenance.read, self.projection.architecture_history,
+                        path[1], offset=int(query.get('offset', '0')), limit=int(query.get('limit', '25')))
+                else:
+                    result = await run_in_threadpool(self.maintenance.read, self.projection.architecture_document,
+                        path[1], query.get('revision'))
+                return self._json(result)
             offset = int(request.query_params.get('offset', '0'))
             limit = int(request.query_params.get('limit', '25'))
             if path == ['projects']:
@@ -655,6 +682,10 @@ class DashboardHTTP:
             return self._maintenance_error(exc)
         except ProjectNotFoundError:
             return self._json(status=404, reason='dashboard_project_not_found', message='The selected project is no longer available. Return to the project list and refresh it.')
+        except DashboardDocumentNotFound:
+            return self._json(status=404, reason='dashboard_document_not_found', message='The selected document is unavailable in this project. Refresh the project view and select it again.')
+        except DashboardDocumentTooLarge:
+            return self._json(status=413, reason='dashboard_document_too_large', message='The complete document exceeds the 2 MiB browser limit. Select a smaller document scope if available.')
         except ValueError as exc:
             # Render only the fixed adapter/application size rejection, never arbitrary exception text.
             if exc.args == ('dashboard evidence exceeds the 2 MiB read limit',):

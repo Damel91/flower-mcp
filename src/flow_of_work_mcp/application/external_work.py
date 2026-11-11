@@ -7,20 +7,23 @@ from typing import Callable, Mapping
 
 from flow_of_work_mcp.application.change_control import ChangeControlService
 from flow_of_work_mcp.application.external_plan_markdown import render_plan
-from flow_of_work_mcp.application.engineering_cycle import repository_review_projection, engineering_cycle_version
+from flow_of_work_mcp.application.engineering_cycle import (
+    engineering_cycle_version, normalize_observed_repository_source, repository_review_projection,
+)
+from flow_of_work_mcp.application.packet_next_action import packet_technical_disposition_route
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
 from flow_of_work_mcp.core.domain.architecture import architecture_authority_context
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
 from flow_of_work_mcp.core.domain.external_work import (fields, fingerprint, number, objects, strings, text)
-from flow_of_work_mcp.core.domain.packet_validation_projection import derive_packet_validation
+from flow_of_work_mcp.core.domain.packet_validation_projection import CRITERION_RESPONSIBILITY_GAPS, derive_packet_validation
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError, ChangeNotFoundError, InputValidationError, PacketValidationAlreadyUpgradedError, RequirementConflictError,
 )
 
 READ_OPERATIONS = frozenset({'criteria', 'validation', 'provider_validation', 'todo'})
-MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
+MUTATION_OPERATIONS = frozenset({'set_mode', 'upgrade_validation', 'classify_criteria', 'add_criterion', 'edit_criterion', 'remove_criterion', 'reconcile_criteria', 'export_plan', 'report_outcome', 'reconcile_outcome'})
 _RECOVERY_REQUIRED = 'historical_outcome_recovery_required'
 
 
@@ -68,12 +71,14 @@ def _verification_error(snapshot, unit, *, field, received, expected, message, c
 
 
 class ExternalWorkService:
-    def __init__(self, ledger, *, execution_guard: Callable[[str, str], None] | None = None, engineer_projection=None, packet_executor=None) -> None:
+    def __init__(self, ledger, *, execution_guard: Callable[[str, str], None] | None = None,
+                 engineer_projection=None, packet_executor=None, non_external_guard=None) -> None:
         self._ledger = ledger
         self._changes = ChangeControlService(ledger)
         self._execution_guard = execution_guard
         self._engineer_projection = engineer_projection
         self._packet_executor = packet_executor
+        self._non_external_guard = non_external_guard
 
     def _assert_execution_allowed(self, snapshot) -> None:
         gaps = milestone_prerequisite_gaps(snapshot.get('milestone'))
@@ -110,6 +115,22 @@ class ExternalWorkService:
         if self._packet_executor is None:
             return {'allowed': False, 'reason': 'packet_executor_unavailable', 'next_operation': 'executor_select'}
         return self._packet_executor.admission(project_id, change_id, packet_id)
+
+    def assert_plan_criterion_responsibility(self, project_id: str, change_id: str, packet_id: str, plan_revision: int) -> None:
+        if self._ledger.external_work_validation_policy(project_id, change_id, packet_id) != (2, 'external_agent'):
+            return
+        snapshot = self._snapshot(project_id, change_id, packet_id)
+        plan = snapshot['plan'] or {}
+        if plan.get('plan_revision') != plan_revision or plan.get('status') != 'proposed':
+            gaps = [{'code': 'criterion_responsibility_plan_not_current'}]
+        else:
+            projection = derive_packet_validation(snapshot, require_accepted_plan=False)
+            gaps = [gap for gap in projection['gaps'] if gap['code'] in CRITERION_RESPONSIBILITY_GAPS]
+        if gaps:
+            raise ChangeControlBlockedError('packet_criterion_responsibility_unresolved', details={
+                'project_id': project_id, 'change_id': change_id, 'packet_id': packet_id,
+                'plan_revision': plan_revision, 'gap': gaps[0], 'gap_count': len(gaps),
+            })
 
     def call(self, project_id: str, change_id: str, packet_id: str, operation: str,
              *, actor: str = '', request_id: str = '', payload: Mapping[str, object] | None = None) -> Mapping[str, object]:
@@ -149,11 +170,14 @@ class ExternalWorkService:
                 with self._ledger.consistent_read():
                     state = self._ledger.external_work_state(project_id, change_id, packet_id)
                     return {'status': 'success', 'criteria': state['criteria'], 'history': state['criterion_history'],
-                            'validation_version': state['validation_version']}
+                            'validation_version': state['validation_version'],
+                            **({'criterion_dispositions': state['criterion_dispositions']}
+                               if 'criterion_dispositions' in state else {})}
             if operation == 'validation':
-                fields(payload, {'detail', 'history_offset'}, operation)
+                fields(payload, {'detail', 'history_offset', 'observed_source'}, operation)
                 return self.validation(project_id, change_id, packet_id, detail=str(payload.get('detail', 'standard')),
-                                       history_offset=payload.get('history_offset', 0))
+                                       history_offset=payload.get('history_offset', 0),
+                                       observed_source=payload.get('observed_source'))
             fields(payload, {'unit_key'}, operation)
             return self.todo(project_id, change_id, packet_id, unit_key=str(payload.get('unit_key', '')))
         if operation not in MUTATION_OPERATIONS:
@@ -219,11 +243,15 @@ class ExternalWorkService:
                         }},
                         'recovery_calls': recovery_calls,
                     })
+                version = 2 if snapshot['packet']['purpose'] == 'implementation' else 1
                 self._ledger.upgrade_external_criteria(project_id, change_id, packet_id,
                                                       list(snapshot['packet']['completion_criteria']),
-                                                      spec_revision=snapshot['packet']['spec_revision'], actor=actor)
-                result = {'status': 'success', 'validation_version': 1,
+                                                      spec_revision=snapshot['packet']['spec_revision'], actor=actor,
+                                                      validation_version=version)
+                result = {'status': 'success', 'validation_version': version,
                           'criteria': self._ledger.external_work_state(project_id, change_id, packet_id)['criteria']}
+            elif operation == 'classify_criteria':
+                result = self._classify_criteria(snapshot, payload)
             elif operation == 'reconcile_criteria':
                 result = self._reconcile_criteria(snapshot, payload, actor, request_id)
             else:
@@ -234,7 +262,8 @@ class ExternalWorkService:
                 return self._outcome_replay_view(snapshot, self._projection(snapshot), result, payload)
             return result
 
-    def _snapshot(self, project_id: str, change_id: str, packet_id: str, *, _cache=None, _path=(), _change=None) -> dict[str, object]:
+    def _snapshot(self, project_id: str, change_id: str, packet_id: str, *, _cache=None, _path=(), _change=None,
+                  observed_source: Mapping[str, str] | None = None) -> dict[str, object]:
         if packet_id in _path:
             raise ChangeControlBlockedError('packet_dependency_cycle', details={'packet_ids': [*_path, packet_id]})
         cache = {} if _cache is None else _cache
@@ -332,6 +361,8 @@ class ExternalWorkService:
                            'goals': goals, 'goal_edges': goal_edges, 'accepted_answers': answers, 'accepted_risk_context': pressure_context, 'referenced_authority': resolved,
                            'predecessor_authority': [{'packet_id': predecessor['packet_id'], 'authority_fingerprint': fingerprint(predecessor['authority_basis'])}
                                                      for predecessor in predecessors]}
+        if 'criterion_dispositions' in external:
+            authority_basis['criterion_dispositions'] = external['criterion_dispositions']
         architecture = self._ledger.resolve_architecture_refs(project_id, packet.get('architecture_refs', []))
         if architecture is not None:
             basis_packet['architecture_refs'] = packet['architecture_refs']
@@ -364,16 +395,29 @@ class ExternalWorkService:
             snapshot['contextual_predecessor'] = self._snapshot(project_id, change_id, identity,
                 _cache=cache, _path=(*_path, packet_id), _change=change)
             authority_basis['contextual_predecessor_authority'] = fingerprint(snapshot['contextual_predecessor']['authority_basis'])
+        contextual = snapshot.get('contextual_predecessor') or {}
+        if ('criterion_dispositions' in authority_basis or 'provider_authority_basis' in contextual
+                or any('provider_authority_basis' in predecessor for predecessor in predecessors)):
+            provider_basis = {key: value for key, value in authority_basis.items() if key != 'criterion_dispositions'}
+            provider_basis['predecessor_authority'] = [
+                {'packet_id': predecessor['packet_id'], 'authority_fingerprint': fingerprint(
+                    predecessor.get('provider_authority_basis', predecessor['authority_basis']))}
+                for predecessor in predecessors]
+            if 'provider_authority_basis' in contextual:
+                provider_basis['contextual_predecessor_authority'] = fingerprint(contextual['provider_authority_basis'])
+            snapshot['provider_authority_basis'] = provider_basis
         audit_key = ('repository_review_audits', project_id)
         if audit_key not in cache:
             cache[audit_key] = self._ledger.read_projection('engineering_cycle_audits', (project_id,),
                 lambda: self._ledger.all_phase_audits(project_id))
         snapshot['engineering_cycle_version'] = (plan or {}).get('engineering_cycle_version')
-        snapshot['repository_review'] = repository_review_projection(snapshot, cache[audit_key])
+        snapshot['repository_review'] = repository_review_projection(snapshot, cache[audit_key],
+                                                                     observed_source=observed_source)
         cache[packet_id] = snapshot
         return snapshot
 
-    def validation(self, project_id: str, change_id: str, packet_id: str, *, detail: str = 'standard', history_offset=0) -> Mapping[str, object]:
+    def validation(self, project_id: str, change_id: str, packet_id: str, *, detail: str = 'standard',
+                   history_offset=0, observed_source=None) -> Mapping[str, object]:
         if detail not in {'standard', 'full'}:
             raise ValueError('detail must be standard or full')
         if isinstance(history_offset, bool) or not isinstance(history_offset, int) or history_offset < 0:
@@ -382,12 +426,14 @@ class ExternalWorkService:
         if history_offset and detail != 'full':
             raise InputValidationError('history_offset requires detail=full', field='payload.history_offset',
                                        received_value=history_offset)
+        source_observation = normalize_observed_repository_source(observed_source)
         with self._ledger.consistent_read():
             # Original reports remain readable even when current authority cannot
             # be resolved. This path never supplies executable admission.
             raw = self._ledger.external_work_state(project_id, change_id, packet_id) if detail == 'full' else None
             try:
-                snapshot = self._snapshot(project_id, change_id, packet_id)
+                observation = {'observed_source': source_observation} if source_observation is not None else {}
+                snapshot = self._snapshot(project_id, change_id, packet_id, **observation)
             except (ChangeControlBlockedError, ValueError) as exc:
                 if detail != 'full':
                     raise
@@ -402,6 +448,7 @@ class ExternalWorkService:
                                               'required': version == 1 and raw['consumption_mode'] == 'external_agent',
                                               'complete': False, 'scope_id': '', 'requirement_ids': [],
                                               'basis_fingerprint': None, 'latest_audit_id': None, 'source': None,
+                                              'source_applicability': {'state': 'not_evaluated'},
                                               'coverage': [], 'retrospective_recorded': False,
                                               'semantic_truth_verified': False, 'human_acceptance': False,
                                               'next_gate': self._history_route(project_id, change_id, packet_id)},
@@ -411,6 +458,7 @@ class ExternalWorkService:
             pvp_gate = self._validation_gate(projection, snapshot)
             gate = pvp_gate
             inactive = snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES
+            current_plan_gate = None if inactive else self._current_plan_gate(snapshot, projection, pvp_gate)
             if projection['status'] == 'closed' and snapshot['external']['consumption_mode'] != 'external_agent':
                 gate = {'tool': 'fow_external_work', 'operation': 'set_mode', 'reason': 'external_mode_not_selected'}
             plan_executable = not inactive and projection['status'] == 'closed' and snapshot['external']['consumption_mode'] == 'external_agent'
@@ -426,8 +474,13 @@ class ExternalWorkService:
             if recovery is not None:
                 execution_allowed = False
                 admission = {'reason': _RECOVERY_REQUIRED, 'details': {}, 'next_gate': recovery}
-            return {'status': 'success' if projection['status'] == 'closed' and not inactive and admission is None else 'blocked',
-                    'reason': 'external_packet_inactive' if inactive else (admission['reason'] if admission else (projection['next_gap'] or {}).get('code', '')),
+            if current_plan_gate is not None:
+                gate = current_plan_gate
+            displayed_reason = (gate.get('reason') if current_plan_gate is not None
+                                else (projection['next_gap'] or {}).get('code', ''))
+            return {'status': 'success' if (projection['status'] == 'closed' and not inactive
+                                           and admission is None and current_plan_gate is None) else 'blocked',
+                    'reason': 'external_packet_inactive' if inactive else (admission['reason'] if admission else displayed_reason),
                     'validation': projection if detail == 'full' else {k: projection[k] for k in ('contract_version', 'consumer_scope', 'status', 'authority_fingerprint', 'spec_revision', 'plan_revision', 'next_gap')},
                     'next_gate': self._inactive_gate(snapshot) if inactive else ((admission.get('next_gate') or {'tool': 'fow_handover', 'operation': 'project_state_snapshot', 'reason': admission['reason']}) if admission else gate), 'consumption_mode': snapshot['external']['consumption_mode'],
                     'plan_executable': plan_executable, 'execution_allowed': execution_allowed, 'execution_admission': admission,
@@ -437,6 +490,43 @@ class ExternalWorkService:
                     'packet_dependencies': dependencies, 'repository_review': snapshot['repository_review'],
                     **(self._report_history(raw['reports'], snapshot=snapshot, projection=projection, history_offset=history_offset)
                        if detail == 'full' else {})}
+
+    def _current_plan_gate(self, snapshot, projection, pvp_gate):
+        from flow_of_work_mcp.application.packet_guards import PacketGuardBlocker, PacketGuardDecision
+        from flow_of_work_mcp.application.packet_next_action import PacketNextActionProjectionService
+
+        plan = snapshot.get('plan') or {}
+        if snapshot['external']['consumption_mode'] != 'external_agent':
+            if self._non_external_guard is None:
+                return None
+            # The non-external guard uses provider admission, which reads the
+            # semantic projection directly. The external branch calls validation.
+            decision = self._non_external_guard(snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'])
+            if decision.next_operation not in {'executor_select', 'architecture_required', 'external_select_mode'}:
+                return None
+        elif plan.get('status') == 'proposed':
+            repair = pvp_gate.get('repair') or {}
+            if (repair.get('operation') or {}).get('operation') == 'classify_criteria':
+                gap = repair['obligation']['code']
+                decision = PacketGuardDecision(
+                    'external_validation_open', False, False, False,
+                    (PacketGuardBlocker(gap, 'packet_validation', 'external_classify_criteria'),),
+                    (), (), 'external_classify_criteria',
+                )
+            elif not repair and (projection.get('next_gap') or {}).get('code') == 'work_plan_not_accepted':
+                decision = PacketGuardDecision(
+                    'needs_instructions', False, False, False, (),
+                    ('accept_work_plan',), (), 'accept_work_plan',
+                )
+            else:
+                return None
+        else:
+            return None
+        return PacketNextActionProjectionService().project(
+            decision, project_id=snapshot['project_id'], change_id=snapshot['change_id'],
+            packet_id=snapshot['packet_id'], spec_revision=projection['spec_revision'],
+            plan_revision=projection['plan_revision'],
+        )
 
     @staticmethod
     def _gate_context(snapshot, projection, *, execution_allowed=False,
@@ -584,7 +674,10 @@ class ExternalWorkService:
         identity = (id(snapshot), consumer_scope)
         if identity in cache:
             return deepcopy(cache[identity])
-        projection = derive_packet_validation(snapshot, consumer_scope=consumer_scope)
+        projection_input = snapshot
+        if consumer_scope == 'provider' and 'provider_authority_basis' in snapshot:
+            projection_input = {**snapshot, 'authority_basis': snapshot['provider_authority_basis']}
+        projection = derive_packet_validation(projection_input, consumer_scope=consumer_scope)
         architecture = snapshot.get('architecture')
         if architecture:
             projection['gaps'].extend(architecture.get('gaps', []))
@@ -621,7 +714,8 @@ class ExternalWorkService:
         with self._ledger.consistent_read():
             snapshot = self._snapshot(project_id, change_id, packet_id)
             projection = self._projection(snapshot, consumer_scope='provider')
-            projection['authority_context'] = {key: value for key, value in snapshot['authority_basis'].items()
+            basis = snapshot.get('provider_authority_basis', snapshot['authority_basis'])
+            projection['authority_context'] = {key: value for key, value in basis.items()
                                                if key not in {'plan', 'criteria'}}
             admission = None
             try:
@@ -734,13 +828,29 @@ class ExternalWorkService:
             'verification_intent_missing', 'planned_contract_missing',
             'contract_not_in_dependency_closure',
         }
+        strict = 'criterion_dispositions' in snapshot['external']
+        if strict:
+            repair_codes.update(CRITERION_RESPONSIBILITY_GAPS)
         if not gap or snapshot['packet']['status'] in PACKET_INACTIVE_STATUS_VALUES:
+            return gate
+        plan = snapshot.get('plan')
+        if (gap['code'] == 'packet_validation_upgrade_required'
+                and snapshot['external']['consumption_mode'] == 'external_agent'
+                and (not plan or plan['status'] == 'proposed')):
+            gate['repair'] = ExternalWorkService._criterion_authoring_repair(snapshot, projection, gap)
             return gate
         # Acceptance is ordered before declaration gaps in the projection. Help
         # repair those facts without changing that order or accepting the plan.
         selected = (next((item for item in projection['gaps'] if item['code'] in repair_codes), None)
                     if gap['code'] == 'work_plan_not_accepted' else gap)
+        if strict and gap['code'] in {'work_plan_missing', 'verification_intent_missing'}:
+            selected = next((item for item in projection['gaps'] if item['code'] in {
+                'criterion_statement_id_only', 'criterion_disposition_missing', 'criterion_disposition_invalid',
+            }), selected)
         if not selected or selected['code'] not in repair_codes:
+            return gate
+        if strict and selected['code'] in CRITERION_RESPONSIBILITY_GAPS:
+            gate['repair'] = ExternalWorkService._criterion_authoring_repair(snapshot, projection, selected)
             return gate
         arguments = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
         arguments.update(operation='revise_unit', expected_spec_revision=projection['spec_revision'],
@@ -773,6 +883,65 @@ class ExternalWorkService:
         return gate
 
     @staticmethod
+    def _criterion_authoring_repair(snapshot, projection, gap):
+        address = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
+        revisions = {'expected_spec_revision': projection['spec_revision'], 'expected_plan_revision': projection['plan_revision']}
+        code = gap['code']
+        tool = 'fow_external_work'
+        payload = {'expected_spec_revision': projection['spec_revision']}
+        required = ['actor', 'request_id']
+        if code == 'packet_validation_upgrade_required':
+            operation = 'upgrade_validation'
+            payload = revisions
+            guidance = ('Initialize stable criterion numbers from the current packet completion criteria. '
+                        'Plan revision 0 means no plan exists. Read the returned criteria before drafting or correcting units, '
+                        'then classify their responsibilities against the proposed plan.')
+        elif code == 'criterion_statement_id_only':
+            operation = 'edit_criterion'
+            payload['number'] = gap['criterion']
+            required.append('payload.statement')
+            guidance = 'Replace the bare requirement ID with an observable completion criterion grounded in that requirement. Read the new specification revision and classify all current criteria again.'
+        elif code == 'criterion_authority_stale':
+            operation = 'reconcile_criteria'
+            required.extend(['payload.criteria', 'payload.rationale'])
+            guidance = 'Compare stable criterion identities with current packet completion criteria. Reconcile actual drift, then classify the resulting current specification.'
+        elif code in {'criterion_disposition_missing', 'criterion_disposition_invalid',
+                      'criterion_verification_target_invalid', 'criterion_external_authority_unaccepted'}:
+            operation = 'classify_criteria'
+            payload = revisions
+            required.append('payload.dispositions')
+            guidance = 'Investigate the intended responsibility and record one disposition per active criterion. A verification target needs an exact recorded baseline or a producing criterion. An external-authority target needs an existing accepted scoped engineering answer. Revise an already accepted plan before changing the classification.'
+        else:
+            tool = 'fow_packet_author'
+            operation = 'set_dependencies' if code == 'criterion_verification_target_dependency_missing' else 'revise_unit'
+            arguments = {**address, **revisions, 'operation': operation}
+            if gap.get('unit_key'):
+                arguments['client_unit_key'] = gap['unit_key']
+            else:
+                required.append('client_unit_key')
+            required.append('depends_on' if operation == 'set_dependencies' else 'unit_patch')
+            guidance = {
+                'criterion_owner_missing': 'Assign a unit that actually implements this criterion and preserve its verification obligations.',
+                'criterion_implementation_owner_unexpected': 'Inspect the disposition and the implementation assignment. Correct the actual mismatch and retain valid verification obligations.',
+                'criterion_unknown_or_retired': 'Inspect the unit declarations and active criterion identities. Correct the invalid reference without guessing its replacement.',
+                'verification_intent_missing': 'Declare a responsible verifier and the bounded check that verifies this criterion.',
+                'criterion_verification_target_dependency_missing': 'Make the verifier depend on its intended producing unit, preserving its other dependency edges, or correct the declared target if it was wrong.',
+                'criterion_external_authority_verification_missing': 'Declare explicit_authority verification for the same accepted authority reference as the criterion target.',
+                'external_authority_missing': 'Inspect the referenced verification authority. Select a supported current reference or correct the declaration while preserving the criterion verification obligation.',
+            }[code]
+        if tool == 'fow_external_work':
+            arguments = {**address, 'operation': operation, 'payload': payload}
+        inspect_operation = 'validation' if code == 'packet_validation_upgrade_required' else 'criteria'
+        return {'contract_version': 'flow.plan-authoring-repair.v1', 'ready_to_call': False,
+                'execution_allowed': False, 'authoring_scope': 'confirmed_intent_only', 'obligation': deepcopy(gap),
+                'operation': {'tool': tool, 'operation': operation, 'arguments': arguments}, 'required_input': required,
+                'help_route': {'tool': 'fow_capabilities', 'arguments': {'view': 'operation',
+                    'operation_tool': tool, 'operation_name': operation}},
+                'inspection_route': {'tool': 'fow_external_work', 'operation': inspect_operation,
+                    'arguments': {**address, 'operation': inspect_operation}},
+                'guidance': guidance + ' Keep repository execution held until review, ordinary plan acceptance and revalidation.'}
+
+    @staticmethod
     def _expect(snapshot, payload, *, plan_required: bool = False) -> None:
         expected = number(payload.get('expected_spec_revision'), 'expected_spec_revision')
         if expected != int(snapshot['packet']['spec_revision']):
@@ -783,6 +952,62 @@ class ExternalWorkService:
                 raise ValueError('expected_plan_revision must be a nonnegative integer')
             if value != int((snapshot['plan'] or {}).get('plan_revision') or 0):
                 raise ChangeControlBlockedError('stale_work_plan_revision')
+
+    def _classify_criteria(self, snapshot, payload):
+        operation = 'classify_criteria'
+        fields(payload, {'expected_spec_revision', 'expected_plan_revision', 'dispositions'}, operation)
+        self._expect(snapshot, payload, plan_required=True)
+        state = snapshot['external']
+        if 'criterion_dispositions' not in state:
+            raise ChangeControlBlockedError('criterion_responsibility_policy_not_active')
+        packet = snapshot['packet']
+        if packet['status'] in PACKET_INACTIVE_STATUS_VALUES:
+            raise ChangeControlBlockedError('external_packet_inactive', details={'packet_status': packet['status']})
+        plan = snapshot['plan'] or {}
+        if plan.get('status') == 'accepted' and plan.get('packet_revision') == packet['spec_revision']:
+            raise ChangeControlBlockedError('criterion_responsibility_plan_already_accepted')
+        if state['criterion_statement_fingerprint'] != fingerprint(packet['completion_criteria']):
+            raise ChangeControlBlockedError('criterion_authority_stale')
+        active = {criterion['number'] for criterion in state['criteria'] if criterion['active']}
+        declarations = {}
+        for entry in objects(payload.get('dispositions'), 'dispositions', max_items=len(active)):
+            fields(entry, {'number', 'disposition', 'target'}, 'disposition')
+            identity = number(entry.get('number'), 'number')
+            if identity not in active or identity in declarations:
+                raise InputValidationError('Use each active criterion number exactly once.', field='payload.dispositions',
+                                           received_value=identity)
+            disposition = text(entry.get('disposition'), 'disposition')
+            declaration = {'number': identity, 'disposition': disposition}
+            if disposition == 'implementation':
+                if 'target' in entry:
+                    raise ValueError('implementation disposition must omit target')
+            elif disposition in {'verification_only', 'external_authority'}:
+                declaration['target'] = self._criterion_target(entry.get('target'), disposition)
+            else:
+                raise ValueError('disposition must be implementation, verification_only, or external_authority')
+            declarations[identity] = declaration
+        if missing := sorted(active - declarations.keys()):
+            raise InputValidationError('Classify every active criterion in this specification.', field='payload.dispositions',
+                                       received_value=len(declarations),
+                                       details={'missing_criteria': missing[:10], 'missing_count': len(missing)})
+        return {'status': 'success', 'change_id': snapshot['change_id'], 'packet_id': snapshot['packet_id'],
+                'spec_revision': packet['spec_revision'], 'dispositions': [declarations[key] for key in sorted(declarations)]}
+
+    @staticmethod
+    def _criterion_target(target, disposition):
+        if not isinstance(target, Mapping):
+            raise ValueError('criterion disposition requires a target object')
+        kind = text(target.get('kind'), 'target.kind')
+        if (disposition, kind) in {('verification_only', 'baseline'), ('external_authority', 'authority')}:
+            fields(target, {'kind', 'ref'}, 'target')
+            return {'kind': kind, 'ref': text(target.get('ref'), 'target.ref')}
+        if disposition == 'verification_only' and kind == 'criterion':
+            fields(target, {'kind', 'criterion', 'packet_id'}, 'target')
+            result = {'kind': kind, 'criterion': number(target.get('criterion'), 'target.criterion')}
+            if 'packet_id' in target:
+                result['packet_id'] = validate_packet_id(text(target['packet_id'], 'target.packet_id'))
+            return result
+        raise ValueError('verification_only targets baseline or criterion; external_authority targets authority')
 
     def _criterion(self, snapshot, operation, payload, actor, request_id):
         allowed = {'expected_spec_revision'} | ({'statement'} if operation == 'add_criterion' else
@@ -904,6 +1129,7 @@ class ExternalWorkService:
                         'report_outcome': report['payload']['outcome']})
             criteria = []
             deferred = []
+            strict = 'criterion_dispositions' in snapshot['external']
             for criterion in projection['criteria']:
                 owners = criterion['implementation_units']
                 local = [intent for intent in criterion['verification'] if intent['kind'] == 'unit_check']
@@ -924,9 +1150,11 @@ class ExternalWorkService:
                         'spec_revision': projection['spec_revision'], 'plan_revision': projection['plan_revision']}
                     obligations.append(obligation)
                     deferred.append(obligation)
+                implementation_expected = owners or (strict and criterion.get('disposition') not in
+                                                       {'verification_only', 'external_authority'})
                 criteria.append({**criterion, 'packet_id': packet_id,
                     'implementation_state': 'complete' if closed and owners and set(owners).issubset(done)
-                                            else 'pending' if owners else 'not_applicable',
+                                            else 'pending' if implementation_expected else 'not_applicable',
                     'local_verification_state': 'passed' if local_passed else 'pending' if local else 'not_applicable',
                     'current_evidence': evidence, 'current_reports': [
                         {'unit_key': key, 'report_key': effective[key]['report_key'], 'outcome': effective[key]['payload']['outcome'],
@@ -1019,11 +1247,22 @@ class ExternalWorkService:
             gate = {'action_kind': 'external_obligation', 'external_operation': 'complete_predecessors', 'reason': 'dependencies_pending',
                     'inspect_route': {'tool': 'fow_external_work', 'operation': 'todo'}}
         else:
-            gate = {'action_kind': 'verification_or_acceptance', 'external_operation': 'obtain_deferred_verification' if deferred else 'request_human_acceptance',
-                    'reason': 'agent_work_complete_acceptance_pending'}
             review = snapshot['repository_review']
             if review['required'] and not review['complete']:
                 gate = {**review['next_gate'], 'reason': 'repository_review_required'}
+            elif deferred:
+                gate = {'action_kind': 'verification_or_acceptance', 'external_operation': 'obtain_deferred_verification',
+                        'reason': 'agent_work_complete_acceptance_pending'}
+            else:
+                gate = {
+                    'action_kind': 'external_packet_disposition',
+                    'external_operation': 'record_technical_disposition',
+                    'reason': 'external_work_complete',
+                    **packet_technical_disposition_route(
+                        snapshot['project_id'], snapshot['change_id'], snapshot['packet_id'],
+                        tuple(snapshot['packet']['completion_criteria']),
+                    ),
+                }
         criterion_traceability = []
         for criterion in projection['criteria']:
             evidence = [dict(v, unit_key=key, report_key=r['report_key'], source_revision=r['payload']['source_revision'], evidence_authority='host_reported')
@@ -1186,6 +1425,10 @@ class ExternalWorkService:
             raise ValueError('allow_draft must be boolean')
         projection = self._projection(snapshot)
         try:
+            if (snapshot['external']['validation_version'] == 2
+                    and snapshot['external']['consumption_mode'] != 'external_agent'):
+                raise ChangeControlBlockedError('external_mode_not_selected', details={'next_gate': {
+                    'tool': 'fow_external_work', 'operation': 'set_mode'}})
             self._assert_execution_allowed(snapshot)
             if projection['status'] == 'closed' and snapshot['external']['consumption_mode'] == 'external_agent':
                 dependencies = self._packet_dependencies(snapshot)
@@ -1198,7 +1441,14 @@ class ExternalWorkService:
                 raise
             projection = {**projection, 'status': 'open', 'gaps': [*projection['gaps'], {'code': exc.reason, **exc.details}]}
         if not allow_draft and projection['status'] != 'closed':
-            raise ChangeControlBlockedError(projection['next_gap']['code'])
+            responsibility = (next((gap for gap in projection['gaps'] if gap['code'] in CRITERION_RESPONSIBILITY_GAPS), None)
+                              if 'criterion_dispositions' in snapshot['external'] else None)
+            details = None
+            if responsibility:
+                address = {key: snapshot[key] for key in ('project_id', 'change_id', 'packet_id')}
+                details = {'diagnostics': [responsibility], 'next_tool_call': {'tool': 'fow_external_work',
+                    'arguments': {**address, 'operation': 'validation', 'payload': {'detail': 'full'}}}}
+            raise ChangeControlBlockedError(projection['next_gap']['code'], details=details)
         content = render_plan(snapshot, projection, project_predecessor=self._projection)
         mappings = (ArtifactMapping('packet', snapshot['packet_id']),
                     *(ArtifactMapping('requirement', r['requirement_id']) for r in snapshot['requirements']),

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import ContextManager, Mapping, Protocol, Sequence
 
+from flow_of_work_mcp.core.domain.campaign_authoring import ObligationAuthoringBatch
+from flow_of_work_mcp.core.domain.campaign_host import HostCampaignCheck, HostCampaignResult
 from flow_of_work_mcp.core.domain.campaign_authority import (
     BehavioralOracleDraft,
     CampaignCaseSemanticDraft,
@@ -105,6 +107,7 @@ class CampaignAuthorityRepository(Protocol):
         propagation: Mapping[str, object],
         actor: str,
         request_id: str = "",
+        observed_source_revision: str = "",
     ) -> Mapping[str, object]: ...
 
     def edit_campaign_authority_case(
@@ -149,6 +152,27 @@ class CampaignAuthorityRepository(Protocol):
         *,
         actor: str,
         request_id: str = "",
+    ) -> Mapping[str, object]: ...
+
+    def author_campaign_obligations(
+        self,
+        project_id: str,
+        campaign_id: str,
+        batch: ObligationAuthoringBatch,
+        *,
+        expected_fingerprint: str,
+        actor: str,
+        request_id: str,
+    ) -> Mapping[str, object]: ...
+
+    def issue_campaign_host_check(
+        self, project_id: str, campaign_id: str, case_id: str, check: HostCampaignCheck,
+        *, actor: str, request_id: str, expected_fingerprint: str = "",
+    ) -> Mapping[str, object]: ...
+
+    def report_campaign_host_result(
+        self, project_id: str, campaign_id: str, result: HostCampaignResult,
+        *, actor: str, request_id: str,
     ) -> Mapping[str, object]: ...
 
     def decide_campaign_obligation(
@@ -212,6 +236,7 @@ class CampaignAuthorityRepository(Protocol):
         source_files: Mapping[str, str],
         harness: Mapping[str, object] | None,
         requested_capability: Mapping[str, object] | None = None,
+        allow_pending_dispatch: bool = False,
         authority_reference: str,
         actor: str,
         request_id: str = "",

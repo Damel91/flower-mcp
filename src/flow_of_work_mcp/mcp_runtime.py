@@ -7,6 +7,7 @@ from pathlib import Path
 
 from flow_of_work_mcp.adapters.documents import MarkdownSrsParser
 from flow_of_work_mcp.adapters.sqlite import SQLiteRequirementLedger
+from flow_of_work_mcp.application.acceptance_context import AcceptanceContextService
 from flow_of_work_mcp.application import (
     ArtifactGenerationService,
     AssuranceService,
@@ -174,7 +175,8 @@ def build_runtime(
             external_work.provider_validation(project_id, change_id, packet_id))
     external_work = ExternalWorkService(ledger, execution_guard=external_execution_guard,
                                        engineer_projection=engineer_gate.projection,
-                                       packet_executor=packet_executor)
+                                       packet_executor=packet_executor,
+                                       non_external_guard=lambda *identity: packet_guards.evaluate(*identity))
     architecture = ArchitectureService(ledger)
     provider_bindings = provider_bindings or ProviderBindingService(ledger)
     association_receipts = AssociationReceiptService(ledger, provider_bindings)
@@ -189,7 +191,6 @@ def build_runtime(
         ),
     )
     requirements = RequirementService(ledger)
-    assurance = AssuranceService(assurance=ledger, changes=ledger, engineer_gate=engineer_gate)
     test_provider_socket = TestProviderSocketService(
         ledger, mode=test_provider_mode, provider=test_provider
     )
@@ -202,6 +203,12 @@ def build_runtime(
         ledger,
         test_provider_socket=test_provider_socket,
         coverage_propagation=coverage_propagation,
+    )
+    assurance = AssuranceService(
+        assurance=ledger,
+        changes=ledger,
+        engineer_gate=engineer_gate,
+        campaign_authority=campaign_authority,
     )
     execution_runs = ExecutionRunService(ledger)
     goals = GoalGraphService(ledger)
@@ -253,6 +260,7 @@ def build_runtime(
         ledger,
         changes=ledger,
         navigation=ledger,
+        acceptance_check=external_work.assert_plan_criterion_responsibility,
     )
     packet_unit_authoring = PacketUnitAuthoringService(
         ledger=ledger,
@@ -326,6 +334,7 @@ def build_runtime(
         construction=ledger,
         pressure=ledger,
         external_work=external_work,
+        campaign_authority=campaign_authority,
     )
     project_state_snapshot = ProjectStateSnapshotService(
         consistent_reads=ledger,
@@ -341,6 +350,10 @@ def build_runtime(
         packet_guards=packet_guards,
         packet_next_actions=packet_next_action,
         packet_lifecycle=packet_lifecycle,
+        acceptance=AcceptanceContextService(
+            reads=ledger, changes=ledger, lifecycle=lifecycle, external_work=external_work,
+            requirements=ledger, ledger_versions=ledger, goals=ledger, grounding_audits=ledger,
+        ),
         provider_enabled=packet_provider is not None,
     )
     from flow_of_work_mcp.application.handover import ExternalRecoveryProjection

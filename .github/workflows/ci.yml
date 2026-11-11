@@ -39,6 +39,9 @@ jobs:
         run: |
           python -m pip install markdown-it-py==4.0.0
           python -m unittest discover -s docs/presentation/tests -p test_reader.py -v
+      - name: Check OpenCode compaction recovery
+        if: matrix.python == '3.11'
+        run: node --test tests/opencode_compaction.test.mjs
       - name: Build packages and release assets
         run: |
           python -m pip install build
@@ -82,6 +85,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP"
           env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_native_project_purge.py"
+      - name: Check the installed Flower engineering cycle
+        if: matrix.python == '3.11'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -c 'from importlib.resources import files; assert files("flow_of_work_mcp").joinpath("resources/opencode/flower-compaction.js").is_file()'
+          env -u PYTHONPATH "$RUNNER_TEMP/flower-wheel/bin/python" -m pytest -c /dev/null --rootdir "$RUNNER_TEMP" -p no:cacheprovider --noconftest "$GITHUB_WORKSPACE/tests/test_acceptance_context.py" "$GITHUB_WORKSPACE/tests/test_project_state_snapshot.py" "$GITHUB_WORKSPACE/tests/test_milestone_traceability_projection.py" "$GITHUB_WORKSPACE/tests/test_draft_milestone_revision.py" "$GITHUB_WORKSPACE/tests/test_criterion_responsibility.py" "$GITHUB_WORKSPACE/tests/test_campaign_host_execution.py" "$GITHUB_WORKSPACE/tests/test_campaign_proof_applicability.py" "$GITHUB_WORKSPACE/tests/test_dashboard_architecture_export.py"
       - name: Check installed local dashboard, Markdown reader and semantic currentness / Linux POSIX only
         if: matrix.python == '3.11'
         shell: bash

@@ -4,6 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Mapping
 
+from flow_of_work_mcp.application.campaign_authority import CampaignAuthorityService, qualified_campaign_is_accepted
 from flow_of_work_mcp.core.ports import (
     AssuranceRepository,
     ChangeControlRepository,
@@ -25,6 +26,13 @@ from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisit
 
 
 REQUIREMENT_LEDGER_VERSION_NAMESPACE = "requirement_events.max_event_id.v1"
+_HISTORICAL_PACKET_STATUSES = {PacketStatus.SUPERSEDED.value, PacketStatus.CANCELLED.value}
+
+
+def _packet_requirement_ids(
+    packet: Mapping[str, object], change: Mapping[str, object]
+) -> set[str]:
+    return {str(item) for item in (packet.get("requirement_ids") or change.get("requirement_ids", []))}
 
 
 class MilestoneTraceabilityProjectionService:
@@ -44,6 +52,7 @@ class MilestoneTraceabilityProjectionService:
         construction: PacketConstructionRepository | None = None,
         pressure: PacketPressureRepository | None = None,
         external_work=None,
+        campaign_authority: CampaignAuthorityService | None = None,
     ) -> None:
         self._requirements = requirements
         self._lifecycle = lifecycle
@@ -56,6 +65,7 @@ class MilestoneTraceabilityProjectionService:
         self._construction = construction
         self._pressure = pressure
         self._external_work = external_work
+        self._campaign_authority = campaign_authority
 
     def progress(self, project_id: str, *, milestone_ids: tuple[str, ...]) -> Mapping[str, object]:
         """Count declared criterion scope; host reports never grant acceptance."""
@@ -110,10 +120,10 @@ class MilestoneTraceabilityProjectionService:
             covered = set()
             for change in linked_changes:
                 for packet in change.get('packets', []):
-                    if packet['status'] in {'superseded', 'cancelled'}:
+                    if packet['status'] in _HISTORICAL_PACKET_STATUSES:
                         continue
                     packet_id = str(packet['packet_id'])
-                    covered.update(packet.get('requirement_ids') or change.get('requirement_ids', []))
+                    covered.update(_packet_requirement_ids(packet, change))
                     if self._external_work is None:
                         gaps.append({'code': 'external_work_unavailable', 'packet_id': packet_id})
                         continue
@@ -188,6 +198,7 @@ class MilestoneTraceabilityProjectionService:
         navigation_blocks = self._navigation.list_navigation_audits(project_id)
         rows: list[Mapping[str, object]] = []
         packet_summaries: dict[tuple[str, str], Mapping[str, object]] = {}
+        campaign_cache: dict[str, list[Mapping[str, object]]] = {}
         scoped_requirement_ids: set[str] = set()
         for milestone in milestones:
             for requirement_id in milestone.get("requirement_ids", []):
@@ -202,6 +213,7 @@ class MilestoneTraceabilityProjectionService:
                         navigation_blocks=navigation_blocks,
                         grounding_audits=grounding_audits,
                         packet_summaries=packet_summaries,
+                        campaign_cache=campaign_cache,
                     )
                 )
 
@@ -219,6 +231,7 @@ class MilestoneTraceabilityProjectionService:
                         navigation_blocks=navigation_blocks,
                         grounding_audits=grounding_audits,
                         packet_summaries=packet_summaries,
+                        campaign_cache=campaign_cache,
                     )
                 )
 
@@ -259,22 +272,25 @@ class MilestoneTraceabilityProjectionService:
         navigation_blocks: list[Mapping[str, object]],
         grounding_audits: list[Mapping[str, object]],
         packet_summaries: dict[tuple[str, str], Mapping[str, object]],
+        campaign_cache: dict[str, list[Mapping[str, object]]],
     ) -> Mapping[str, object]:
         requirement_id = str(requirement["requirement_id"])
         milestone_id = "" if milestone is None else str(milestone["milestone_id"])
-        linked_changes = [
-            change
-            for change in changes
-            if requirement_id in {str(item) for item in change.get("requirement_ids", [])}
-            and (not milestone_id or str(change.get("milestone_id") or "") == milestone_id)
+        linked_changes, packets = [], []
+        for change in changes:
+            if milestone_id and str(change.get("milestone_id") or "") != milestone_id:
+                continue
+            matching = [
+                packet for packet in change.get("packets", [])
+                if isinstance(packet, Mapping) and requirement_id in _packet_requirement_ids(packet, change)
+            ]
+            if matching or requirement_id in change.get("requirement_ids", []):
+                linked_changes.append(change)
+                packets.extend(matching)
+        current_packets = [
+            packet for packet in packets if packet.get("status") not in _HISTORICAL_PACKET_STATUSES
         ]
-        packets = [
-            packet
-            for change in linked_changes
-            for packet in change.get("packets", [])
-            if isinstance(packet, Mapping)
-        ]
-        packet_ids = [str(packet["packet_id"]) for packet in packets]
+        packet_ids = [str(packet["packet_id"]) for packet in current_packets]
         packet_runs = [
             run
             for change in linked_changes
@@ -286,11 +302,12 @@ class MilestoneTraceabilityProjectionService:
             for change in linked_changes
             for finding in self._assurance.findings_for_change(project_id, str(change["change_id"]))
         ]
-        campaigns = [
-            campaign
-            for change in linked_changes
-            for campaign in self._assurance.campaigns_for_change(project_id, str(change["change_id"]))
-        ]
+        campaigns = []
+        for change in linked_changes:
+            change_id = str(change["change_id"])
+            if change_id not in campaign_cache:
+                campaign_cache[change_id] = self._campaigns_for_change(project_id, change_id)
+            campaigns.extend(campaign_cache[change_id])
         coverage = _coverage_projection(
             requirement_id,
             requirement,
@@ -312,7 +329,7 @@ class MilestoneTraceabilityProjectionService:
         gaps = self._gaps(
             milestone=milestone,
             changes=linked_changes,
-            packets=packets,
+            packets=current_packets,
             navigation_blocks=navs,
             runs=packet_runs,
             findings=findings,
@@ -344,6 +361,26 @@ class MilestoneTraceabilityProjectionService:
             "readiness_projection": _readiness_projection(summaries, gaps),
             "evidence": _evidence_refs(requirement, findings, campaigns),
         }
+
+    def _campaigns_for_change(self, project_id: str, change_id: str) -> list[Mapping[str, object]]:
+        campaigns = self._assurance.campaigns_for_change(project_id, change_id)
+        if self._campaign_authority is None:
+            return campaigns
+        result = []
+        for campaign in campaigns:
+            if _campaign_status_accepted(campaign):
+                projection = self._campaign_authority.inspect(
+                    project_id, campaign_id=str(campaign["campaign_id"]), view="summary",
+                )
+                summary = projection.get("campaign") or {}
+                qualification = summary.get("qualification")
+                if qualification == "historical_on_original_basis":
+                    campaign = {**campaign, "acceptance_applicability": "historical_on_original_basis"}
+                elif qualification == "current":
+                    campaign = {**campaign, "acceptance_applicability":
+                                "current" if qualified_campaign_is_accepted(projection) else "not_current"}
+            result.append(campaign)
+        return result
 
     @staticmethod
     def _gaps(
@@ -391,9 +428,11 @@ class MilestoneTraceabilityProjectionService:
             for finding in findings
         ):
             gaps.append("finding_unresolved")
-        if changes and not campaigns:
+        current_campaigns = [campaign for campaign in campaigns
+                             if campaign.get("acceptance_applicability") != "historical_on_original_basis"]
+        if changes and not current_campaigns:
             gaps.append("campaign_missing")
-        if any(str(campaign.get("status") or "") not in {"passed", "accepted_exception"} for campaign in campaigns):
+        if any(not _campaign_status_accepted(campaign) for campaign in current_campaigns):
             gaps.append("campaign_not_accepted")
         if milestone is not None and not milestone.get("acceptance_evidence"):
             gaps.append("acceptance_evidence_missing")
@@ -504,6 +543,8 @@ def _campaign_summary(campaign: Mapping[str, object]) -> Mapping[str, object]:
     return {
         "campaign_id": str(campaign["campaign_id"]),
         "status": str(campaign.get("status") or ""),
+        **({"acceptance_applicability": campaign["acceptance_applicability"]}
+           if "acceptance_applicability" in campaign else {}),
         "cases": [
             {
                 "case_id": str(case.get("case_id") or ""),
@@ -524,6 +565,11 @@ def _campaign_summary(campaign: Mapping[str, object]) -> Mapping[str, object]:
             if isinstance(case, Mapping)
         ],
     }
+
+
+def _campaign_status_accepted(campaign: Mapping[str, object]) -> bool:
+    return (campaign.get("status") in {"passed", "accepted_exception"}
+            and campaign.get("acceptance_applicability", "current") == "current")
 
 
 def _milestone_acceptance_projection(
@@ -569,7 +615,7 @@ def _coverage_projection(
     covering_cases = []
     for campaign in campaigns:
         campaign_id = str(campaign.get("campaign_id") or "")
-        accepted = str(campaign.get("status") or "") in {"passed", "accepted_exception"}
+        accepted = _campaign_status_accepted(campaign)
         for event in campaign.get("events", []):
             if not isinstance(event, Mapping):
                 continue
@@ -577,6 +623,8 @@ def _coverage_projection(
                 payload = event.get("payload")
                 if isinstance(payload, Mapping):
                     diagnostics.append(dict(payload))
+        if campaign.get("acceptance_applicability") == "historical_on_original_basis":
+            continue
         for case in campaign.get("cases", []):
             if not isinstance(case, Mapping):
                 continue
@@ -732,13 +780,21 @@ def _readiness_projection(
 
 
 def _dedupe_gaps(rows: object) -> list[Mapping[str, object]]:
-    gaps: dict[str, set[str]] = {}
+    gaps: dict[tuple[str, str], set[str]] = {}
     for row in rows:
         if not isinstance(row, Mapping):
             continue
         for gap in row.get("acceptance_blockers", []):
-            gaps.setdefault(str(gap), set()).add(str(row["requirement_id"]))
+            scope = str(row["milestone_id"]) if gap == "no_packet_for_requirement" else ""
+            gaps.setdefault((str(gap), scope), set()).add(str(row["requirement_id"]))
     return [
-        {"reason": reason, "requirement_ids": sorted(requirement_ids)}
-        for reason, requirement_ids in sorted(gaps.items())
+        {
+            "reason": reason,
+            "requirement_ids": sorted(requirement_ids),
+            **({"relation": "current_packet_requirement_scope",
+                "scope_kind": "milestone" if scope else "project",
+                "milestone_id": scope}
+               if reason == "no_packet_for_requirement" else {}),
+        }
+        for (reason, scope), requirement_ids in sorted(gaps.items())
     ]

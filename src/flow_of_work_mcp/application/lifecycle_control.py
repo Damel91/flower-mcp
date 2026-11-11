@@ -7,6 +7,7 @@ from itertools import islice
 from math import isfinite
 from typing import Callable, Any, Mapping, Protocol
 
+from flow_of_work_mcp.application.campaign_authority import qualified_campaign_is_accepted
 from flow_of_work_mcp.core.domain import (
     ActionExecutionClass,
     FindingDisposition,
@@ -50,6 +51,7 @@ _PHASE_CHANGE_ORDER = (
     PhaseChangeType.BLOCKED,
 )
 _VERIFICATION_DETAIL_TEXT_LIMIT = 2_048
+_ACCEPTANCE_EVIDENCE_MISSING = "required_acceptance_evidence_missing"
 
 
 class _CampaignAuthority(Protocol):
@@ -124,28 +126,17 @@ class LifecycleControlService:
     def _accept_milestone(self, project_id: str, milestone_id: str, *,
                           acceptance_evidence: Iterable[str], actor: str,
                           request_id: str = "") -> Mapping[str, object]:
-        progress = (self._external_milestone_progress(project_id, milestone_id)
-                    if self._external_milestone_progress is not None else None)
-        if progress is not None and not all(progress.get(key) for key in
-            ("scope_complete", "implementation_complete", "local_verification_complete")):
-            raise ChangeControlBlockedError("external_milestone_scope_incomplete",
-                                            details={"milestone_id":milestone_id, "progress":dict(progress)})
-        if progress is not None and any(obligation.get('state') != 'verified' for obligation in progress.get('deferred_obligations', [])):
-            raise ChangeControlBlockedError('external_milestone_verification_pending',
-                details={'milestone_id':milestone_id, 'deferred_obligations':progress['deferred_obligations']})
+        _, external_blocker = self._external_acceptance_check(project_id, milestone_id)
+        if external_blocker is not None:
+            reason, details = external_blocker
+            raise ChangeControlBlockedError(reason, details=details)
         evidence = tuple(
             required_text(item, "acceptance_evidence") for item in acceptance_evidence
         )
         if not evidence:
             raise ValueError("accept_milestone requires acceptance evidence")
         closure = self.milestone_closure_state(project_id, milestone_id)
-        remaining_blockers = [
-            blocker
-            for blocker in closure.get("blockers", [])
-            if isinstance(blocker, Mapping)
-            and str(blocker.get("reason") or "")
-            != "required_acceptance_evidence_missing"
-        ]
+        remaining_blockers = _acceptance_prerequisites(closure)
         if remaining_blockers:
             raise ChangeControlBlockedError(
                 "milestone_acceptance_blocked",
@@ -158,6 +149,51 @@ class LifecycleControlService:
             actor=required_text(actor, "actor"),
             request_id=str(request_id or ""),
         )
+
+    def _external_acceptance_check(
+        self, project_id: str, milestone_id: str,
+    ) -> tuple[Mapping[str, object] | None, tuple[str, Mapping[str, object]] | None]:
+        progress = (self._external_milestone_progress(project_id, milestone_id)
+                    if self._external_milestone_progress is not None else None)
+        if progress is None:
+            return None, None
+        if not all(progress.get(key) for key in (
+            "scope_complete", "implementation_complete", "local_verification_complete"
+        )):
+            return progress, ("external_milestone_scope_incomplete", {
+                "milestone_id": milestone_id, "progress": dict(progress),
+            })
+        if any(item.get("state") != "verified" for item in progress.get("deferred_obligations", [])):
+            return progress, ("external_milestone_verification_pending", {
+                "milestone_id": milestone_id, "deferred_obligations": progress["deferred_obligations"],
+            })
+        return progress, None
+
+    def milestone_acceptance_context(self, project_id: str, milestone_id: str) -> Mapping[str, object]:
+        """Read the existing acceptance checks and the separately supplied human input."""
+        milestone = self._milestone_for_closure(project_id, milestone_id)
+        progress, external_blocker = self._external_acceptance_check(project_id, milestone_id)
+        closure = self._milestone_closure_state(project_id, milestone)
+        blockers = _acceptance_prerequisites(closure)
+        if external_blocker is not None:
+            blockers.insert(0, {"reason": external_blocker[0], "scope": milestone_id})
+        recorded_status = str(milestone.get("status") or "")
+        evidence = list(milestone.get("acceptance_evidence", []))
+        recorded_acceptance = recorded_status == "accepted" and bool(evidence)
+        return {
+            "state": ("accepted" if recorded_acceptance else "blocked" if blockers else
+                      "ready" if evidence else "awaiting_human"),
+            "recorded_status": recorded_status,
+            "recorded_acceptance": recorded_acceptance,
+            "prerequisites_satisfied": not blockers,
+            "blockers": blockers,
+            "awaited_inputs": ["acceptance_evidence"] if not recorded_acceptance and not blockers else [],
+            "acceptance_evidence": evidence,
+            "requirement_ids": list(milestone.get("requirement_ids", [])),
+            "linked_change_ids": closure["linked_change_ids"],
+            "external_progress_applies": progress is not None,
+            "external_progress": progress,
+        }
 
     def record_validation(
         self,
@@ -183,6 +219,9 @@ class LifecycleControlService:
     ) -> Mapping[str, object]:
         """Return evidence-derived milestone closure blockers without mutating state."""
 
+        return self._milestone_closure_state(project_id, self._milestone_for_closure(project_id, milestone_id))
+
+    def _milestone_for_closure(self, project_id: str, milestone_id: str) -> Mapping[str, object]:
         milestones = {
             str(item["milestone_id"]): item
             for item in self._control.milestones(project_id)
@@ -191,7 +230,10 @@ class LifecycleControlService:
             raise ValueError(
                 f"unknown milestone in project {project_id}: {milestone_id}"
             )
-        milestone = milestones[milestone_id]
+        return milestones[milestone_id]
+
+    def _milestone_closure_state(self, project_id: str, milestone: Mapping[str, object]) -> Mapping[str, object]:
+        milestone_id = str(milestone["milestone_id"])
         requirement_ids = tuple(
             str(item) for item in milestone.get("requirement_ids", [])
         )
@@ -318,13 +360,14 @@ class LifecycleControlService:
                             {
                                 "reason": "qualified_campaign_missing",
                                 "change_id": change_id,
+                                "campaign_ids": [str(item["campaign_id"]) for item in campaigns],
                             }
                         )
                     else:
                         not_green = [
                             str(item["campaign"].get("campaign_id") or "")
                             for item in authoritative
-                            if not _qualified_campaign_is_accepted(item)
+                            if not qualified_campaign_is_accepted(item)
                         ]
                         if not_green:
                             blockers.append(
@@ -352,7 +395,7 @@ class LifecycleControlService:
         if not milestone.get("acceptance_evidence"):
             blockers.append(
                 {
-                    "reason": "required_acceptance_evidence_missing",
+                    "reason": _ACCEPTANCE_EVIDENCE_MISSING,
                     "scope": milestone_id,
                 }
             )
@@ -625,6 +668,14 @@ class LifecycleControlService:
                         rationale="milestone has requirements not covered by a linked change unit",
                         requirement_ids=uncovered,
                         milestone_ids=(milestone_id,),
+                        tool="fow_change",
+                        operation="create_change",
+                        arguments={
+                            "project_id": project_id,
+                            "operation": "create_change",
+                            "milestone_id": milestone_id,
+                        },
+                        required_inputs=("title", "rationale", "requirement_ids", "actor", "request_id"),
                     )
                 )
         return actions
@@ -716,6 +767,14 @@ class LifecycleControlService:
                             str(item) for item in change.get("requirement_ids", [])
                         ),
                         change_ids=(change_id,),
+                        tool="fow_packet_author",
+                        operation="start_packet",
+                        arguments={
+                            "project_id": project_id,
+                            "operation": "start_packet",
+                            "change_id": change_id,
+                        },
+                        required_inputs=("title", "intent", "completion_criteria", "purpose", "actor", "request_id"),
                     )
                 )
                 continue
@@ -886,6 +945,8 @@ class LifecycleControlService:
                         execution_class=ActionExecutionClass.DETERMINISTIC,
                         priority=60,
                         rationale="accepted change can be summarized through a ledger projection",
+                        state="advisory",
+                        decision_class="informational",
                         requirement_ids=tuple(
                             str(item) for item in change.get("requirement_ids", [])
                         ),
@@ -1066,7 +1127,7 @@ class LifecycleControlService:
                     )
                 ) or (
                     qualified
-                    and all(_qualified_campaign_is_accepted(item) for item in qualified)
+                    and all(qualified_campaign_is_accepted(item) for item in qualified)
                 ):
                     actions.append(
                         self._action(
@@ -1382,15 +1443,6 @@ def _finding_priority(severity: str, disposition: str) -> int:
     return severity_base + disposition_offset
 
 
-def _qualified_campaign_is_accepted(
-    projection: Mapping[str, object],
-) -> bool:
-    campaign = projection.get("campaign")
-    gate = projection.get("lifecycle_gate")
-    if not isinstance(campaign, Mapping) or not isinstance(gate, Mapping):
-        return False
-    status = str(campaign.get("status") or "")
-    gate_state = str(gate.get("state") or "")
-    return gate_state == "accepted" or (
-        status == "accepted_exception" and gate_state == "inactive"
-    )
+def _acceptance_prerequisites(closure: Mapping[str, object]) -> list[Mapping[str, object]]:
+    return [blocker for blocker in closure.get("blockers", [])
+            if isinstance(blocker, Mapping) and str(blocker.get("reason") or "") != _ACCEPTANCE_EVIDENCE_MISSING]

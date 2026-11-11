@@ -6,7 +6,10 @@ import pytest
 from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.application.operation_contracts import operation_contract
 from flow_of_work_mcp.model_facing import project_markdown
+from flow_of_work_mcp.mcp_runtime import build_runtime
+from flow_of_work_mcp.server import handle_external_work, handle_packet_advance, handle_packet_inspect
 from tests.test_external_work import fixture
+from tests.test_packet_executor import fixture as unselected_executor_fixture
 from tests.test_guided_bootstrap import prepared, confirm
 from tests.test_plan_authoring_repair import dump, revise
 
@@ -72,6 +75,51 @@ def test_proposed_plan_diagnostic_selects_repair_without_reordering_next_gap(tmp
     assert ctx['next_gap']['code'] == 'work_plan_not_accepted'
     assert ctx['diagnostic']['code'] == 'unit_check_verification_missing'
     assert ctx['diagnostic']['received'] == CHECK and not view['execution_allowed']
+
+
+def test_validation_inspect_and_advance_share_current_executor_gate(tmp_path):
+    ledger, _, _, _, ids, _ = unselected_executor_fixture(tmp_path, bind=False)
+    runtime = build_runtime(database_path=ledger.database_path, import_root=tmp_path, ledger=ledger)
+    try:
+        units = deepcopy(ledger.packet_work_plan_state(*ids)['units'])
+        proposed = revise(ledger, ids, units, accept=False)
+        address = dict(zip(('project_id', 'change_id', 'packet_id'), ids))
+        validation = handle_external_work(runtime, **address, operation='validation')['result']
+        inspected = handle_packet_inspect(runtime, **address)['result']['packet']['next_action']
+        advanced = handle_packet_advance(runtime, **address, actor='engineer',
+            request_id='read-current-gate', mode='sync_only')['result']['next_action']
+        assert validation['validation']['next_gap']['code'] == 'work_plan_not_accepted'
+        assert not validation['execution_allowed']
+        for gate in (validation['next_gate'], inspected, advanced):
+            assert (gate['tool'], gate['operation']) == ('fow_external_work', 'select_executor')
+            assert gate['arguments'] == inspected['arguments']
+            assert 'payload.executor' in gate['required_inputs']
+        selected = handle_external_work(runtime, **address, operation='select_executor',
+            actor='engineer', request_id='choose-standalone', payload={'executor': 'external_agent',
+                'expected_spec_revision': proposed['packet_revision'],
+                'expected_plan_revision': proposed['plan_revision']})
+        assert selected['status'] == 'success'
+        validation = handle_external_work(runtime, **address, operation='validation')['result']
+        inspected = handle_packet_inspect(runtime, **address)['result']['packet']['next_action']
+        advanced = handle_packet_advance(runtime, **address, actor='engineer',
+            request_id='read-classification-gate', mode='sync_only')['result']['next_action']
+        for gate in (validation['next_gate'], inspected, advanced):
+            assert (gate['tool'], gate['operation']) == ('fow_external_work', 'classify_criteria')
+            assert gate['arguments'] == inspected['arguments']
+            assert 'payload.dispositions' in gate['required_inputs']
+        classifications = handle_external_work(runtime, **address, operation='classify_criteria',
+            actor='engineer', request_id='classify-two-criteria',
+            payload={**inspected['arguments']['payload'], 'dispositions': [
+                {'number': 1, 'disposition': 'implementation'},
+                {'number': 2, 'disposition': 'implementation'},
+            ]})
+        assert classifications['status'] == 'success'
+        validation = handle_external_work(runtime, **address, operation='validation')['result']
+        inspected = handle_packet_inspect(runtime, **address)['result']['packet']['next_action']
+        for gate in (validation['next_gate'], inspected):
+            assert (gate['tool'], gate['lifecycle_operation']) == ('fow_packet_advance', 'accept_work_plan')
+    finally:
+        runtime.close()
 
 
 def test_todo_early_blocks_do_not_evaluate_admission_or_dependencies(tmp_path, monkeypatch):

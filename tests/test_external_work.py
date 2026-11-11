@@ -9,9 +9,43 @@ from flow_of_work_mcp import (ChangeControlService, GovernedChangeDraft, Impleme
                              SQLiteRequirementLedger, WorkPlanUnit)
 from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
+from flow_of_work_mcp.core.domain.external_work import fingerprint
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError, RequirementConflictError
 from tests.engineering_cycle_support import record_test_repository_review
 from tests.engineering_cycle_support import adopt_minimal_architecture
+
+
+@pytest.mark.parametrize("plan_revision", [0, 2])
+def test_unenrolled_external_packet_offers_exact_authoring_repair(plan_revision):
+    snapshot = {
+        "project_id": "alpha", "change_id": "CHANGE-000001", "packet_id": "PACKET-000001",
+        "packet": {"status": "planned"}, "external": {"consumption_mode": "external_agent"},
+        "plan": {"status": "proposed"} if plan_revision else None,
+    }
+    projection = {"next_gap": {"code": "packet_validation_upgrade_required"},
+                  "authority_fingerprint": "fixture", "spec_revision": 3, "plan_revision": plan_revision}
+    gate = ExternalWorkService._validation_gate(projection, snapshot)
+    assert gate["operation"] == "validation"
+    repair = gate["repair"]
+    assert repair["execution_allowed"] is False and repair["ready_to_call"] is False
+    assert repair["operation"]["arguments"] == {
+        "project_id": "alpha", "change_id": "CHANGE-000001", "packet_id": "PACKET-000001",
+        "operation": "upgrade_validation",
+        "payload": {"expected_spec_revision": 3, "expected_plan_revision": plan_revision},
+    }
+    assert repair["required_input"] == ["actor", "request_id"]
+    snapshot["plan"] = {"status": "accepted"}
+    assert "repair" not in ExternalWorkService._validation_gate(projection, snapshot)
+
+
+def historical_criterion_enrollment(ledger, ids, packet, *, request_id='upgrade'):
+    """Seed version-one authority and the receipt produced before strict enrollment."""
+    payload = {'expected_spec_revision': packet['spec_revision'], 'expected_plan_revision': 0}
+    with ledger.atomic():
+        ledger.upgrade_external_criteria(*ids, packet['completion_criteria'], spec_revision=packet['spec_revision'], actor='human')
+        result = {'status': 'success', 'validation_version': 1, 'criteria': ledger.external_work_state(*ids)['criteria']}
+        ledger.record_external_work_request(ids[0], request_id, fingerprint({'change_id': ids[1], 'packet_id': ids[2],
+            'operation': 'upgrade_validation', 'actor': 'human', 'payload': payload}), result, actor='human', operation='upgrade_validation')
 
 
 def fixture(tmp_path):
@@ -33,8 +67,7 @@ def fixture(tmp_path):
         architecture_refs=architecture_refs), actor='human')['packets'][0]
     service = ExternalWorkService(ledger)
     ids = ('alpha', change['change_id'], packet['packet_id'])
-    service.call(*ids, 'upgrade_validation', actor='human', request_id='upgrade',
-                 payload={'expected_spec_revision': packet['spec_revision'], 'expected_plan_revision': 0})
+    historical_criterion_enrollment(ledger, ids, packet)
     producer = WorkPlanUnit(client_unit_key='producer', operation_kind='new_file', file_path='src/increment.py',
         instructions=('Create src/increment.py exposing increment(value: int) -> int.', 'Return value + 1 and keep zero/negative inputs valid.'),
         unit_checks=('increment(0) == 1 and increment(-1) == 0',), implements=(1,),

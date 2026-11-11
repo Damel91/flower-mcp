@@ -5,14 +5,18 @@ from __future__ import annotations
 import json
 import sqlite3
 from hashlib import sha256
+from posixpath import normpath
 from typing import Any, Mapping, Sequence
 
+from flow_of_work_mcp.adapters.sqlite.campaign_host import CampaignHostStoreMixin
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
 from flow_of_work_mcp.core.domain.assurance import (
     CampaignStatus,
     validate_campaign_id,
     validate_case_id,
 )
+from flow_of_work_mcp.core.domain.campaign_authoring import ObligationAuthoringBatch, batch_rejection
+from flow_of_work_mcp.core.domain.campaign_host import campaign_case_lane, host_rejection, required_host_cases
 from flow_of_work_mcp.core.domain.campaign_authority import (
     CAMPAIGN_PLAN_CONTRACT_VERSION,
     ORACLE_SNAPSHOT_CONTRACT_VERSION,
@@ -31,7 +35,9 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
     deterministic_materialization_failure_receipt,
     deterministic_materialization_retry_eligible,
     semantic_fingerprint,
+    source_attestation_retry_eligible,
     source_manifest_digest,
+    source_materialization_failure_receipt,
     validate_obligation_id,
     validate_oracle_id,
 )
@@ -42,7 +48,10 @@ from flow_of_work_mcp.core.domain.change_control import (
 )
 from flow_of_work_mcp.core.domain.oracle_ir_projection import compile_oracle_ir
 from flow_of_work_mcp.core.domain.oracle_questions import current_oracle_question, oracle_ir_refinement_applicable
-from flow_of_work_mcp.core.errors import AssuranceBlockedError, RequirementConflictError, OracleQuestionConflictError
+from flow_of_work_mcp.core.errors import (
+    AssuranceBlockedError, CampaignSourcePathPreEffectError, OracleQuestionConflictError,
+    RequirementConflictError,
+)
 
 
 _ORACLE_REQUIRED_FIELDS = (
@@ -78,7 +87,7 @@ _ORACLE_EXPLICIT_EMPTY_FIELDS = frozenset(
 )
 
 
-class CampaignAuthorityStoreMixin:
+class CampaignAuthorityStoreMixin(CampaignHostStoreMixin):
     """Owns the qualified campaign aggregate without rewriting legacy history."""
 
     def start_campaign_authority(
@@ -232,6 +241,12 @@ class CampaignAuthorityStoreMixin:
                         AND e.campaign_id = c.campaign_id
                         AND e.event_type = 'campaign_completion_recorded'
                         AND e.semantic_revision = h.current_revision
+                        AND NOT EXISTS (
+                            SELECT 1 FROM campaign_authority_events pending
+                            WHERE pending.project_id = e.project_id AND pending.campaign_id = e.campaign_id
+                              AND pending.event_type = 'campaign_host_check_issued'
+                              AND pending.event_id > e.event_id
+                        )
                   )
                 ORDER BY c.ordinal DESC LIMIT 1
                 """,
@@ -279,9 +294,11 @@ class CampaignAuthorityStoreMixin:
                     row["target_packet_ids_json"]
                 ):
                     continue
-                return self._campaign_authority_value(
+                state = self._campaign_authority_value(
                     connection, project_id, str(row["campaign_id"])
                 )
+                if (state.get("completion") or {}).get("current"):
+                    return state
             return None
 
     def add_campaign_authority_case(
@@ -364,6 +381,21 @@ class CampaignAuthorityStoreMixin:
             campaign = self._campaign_row(connection, project_id, campaign_id)
             if str(campaign["change_id"]) != scope.change_id:
                 raise AssuranceBlockedError("campaign_change_is_immutable")
+            old_payload = self._current_campaign_plan_payload(connection, project_id, campaign_id)
+            old_scope = old_payload["scope"]
+            new_scope = scope.as_payload()
+            if "execution_lane" in old_scope:
+                new_scope.setdefault("execution_lane", old_scope["execution_lane"])
+            retained_refs = set((*scope.requirement_ids, *scope.goal_ids, *scope.packet_ids, *scope.finding_ids))
+            retained_independent = set(old_scope.get("independent_proof_refs", ())) & retained_refs
+            independent = retained_independent | set(scope.independent_proof_refs)
+            if independent:
+                new_scope["independent_proof_refs"] = sorted(independent)
+            for case in old_payload["cases"]:
+                self._guard_campaign_execution_lane_change(
+                    connection, project_id, campaign_id, case["case_id"],
+                    campaign_case_lane(old_scope, case), campaign_case_lane(new_scope, case),
+                )
             self._validate_campaign_scope(connection, project_id, scope)
             occurred_at = _utc_now()
             connection.execute(
@@ -385,15 +417,12 @@ class CampaignAuthorityStoreMixin:
                     campaign_id,
                 ),
             )
-            old_payload = self._current_campaign_plan_payload(
-                connection, project_id, campaign_id
-            )
             payload = self._campaign_plan_payload(
                 connection,
                 project_id,
                 campaign_id,
                 title=title,
-                scope=scope.as_payload(),
+                scope=new_scope,
                 case_order=list(old_payload.get("case_order", [])),
             )
             revision = self._append_campaign_plan_revision(
@@ -534,6 +563,8 @@ class CampaignAuthorityStoreMixin:
             state = self._campaign_authority_value(
                 connection, project_id, campaign_id
             )
+            if not state["obligation_applicability"]["current"]:
+                raise AssuranceBlockedError("campaign_obligation_basis_changed")
             unresolved = _unresolved_campaign_obligation_ids(state)
             received = set(obligations)
             if received != unresolved:
@@ -565,7 +596,7 @@ class CampaignAuthorityStoreMixin:
                 campaign_id=campaign_id,
                 event_type="campaign_exception_accepted",
                 semantic_revision=int(head["current_revision"]),
-                payload=input_payload
+                payload=input_payload | {"basis_fingerprint": str(head["semantic_fingerprint"])}
                 | {"input_fingerprint": semantic_fingerprint(input_payload)},
                 actor=actor,
                 request_id=request_id,
@@ -611,6 +642,7 @@ class CampaignAuthorityStoreMixin:
             if replay is not None:
                 return replay
             head = self._qualified_campaign_head(connection, project_id, campaign_id)
+            self._require_provider_campaign_case(connection, project_id, campaign_id, case_id)
             self._active_case_revision(connection, project_id, campaign_id, case_id)
             evidence_values = self._campaign_execution_evidence_values(
                 connection,
@@ -691,6 +723,7 @@ class CampaignAuthorityStoreMixin:
         propagation: Mapping[str, object],
         actor: str,
         request_id: str = "",
+        observed_source_revision: str = "",
     ) -> Mapping[str, Any]:
         project_id = validate_project_id(project_id)
         campaign_id = validate_campaign_id(campaign_id)
@@ -701,6 +734,8 @@ class CampaignAuthorityStoreMixin:
             "propagated_count": len(propagation.get("propagated", [])),
             "diagnostic_count": len(propagation.get("diagnostics", [])),
         }
+        if observed_source_revision:
+            input_payload["observed_source_revision"] = observed_source_revision
         with self._transaction() as connection:
             replay = self._mutation_replay(
                 connection,
@@ -717,10 +752,37 @@ class CampaignAuthorityStoreMixin:
             if str(campaign["status"]) != "passed":
                 raise AssuranceBlockedError("campaign_completion_requires_passed_cases")
             state = self._campaign_authority_value(connection, project_id, campaign_id)
+            if not state["obligation_applicability"]["current"]:
+                raise AssuranceBlockedError("campaign_obligation_basis_changed")
+            host_case_ids = {str(case["case_id"]) for case in required_host_cases(state)}
+            host_proofs = {}
+            if host_case_ids:
+                execution = state["host_execution"]
+                host_proofs = {
+                    case_id: receipt["receipt_id"]
+                    for case_id, receipt in execution["current_receipts"].items()
+                    if receipt["outcome"] == "passed"
+                }
+                if (not observed_source_revision
+                        or observed_source_revision != execution["declared_source_revision"]
+                        or host_case_ids.difference(host_proofs)):
+                    raise AssuranceBlockedError(
+                        "campaign_completion_requires_current_host_evidence",
+                        details={"case_ids": sorted(host_case_ids.difference(host_proofs))},
+                    )
+                live_blockers = [
+                    item for item in propagation.get("diagnostics", [])
+                    if item.get("case_id") in host_case_ids
+                    and str(item.get("reason", "")).startswith(("live_grounding_", "live_coverage_"))
+                ]
+                if live_blockers:
+                    raise AssuranceBlockedError(
+                        "campaign_host_live_coverage_blocked", details={"diagnostics": live_blockers},
+                    )
             required_case_ids = {
                 str(item.get("case_id") or "")
                 for item in state.get("cases", [])
-                if bool(item.get("required"))
+                if bool(item.get("required")) and campaign_case_lane(state["scope"], item) == "provider"
             }
             latest_runs: dict[str, Mapping[str, object]] = {}
             latest_promotions: dict[str, Mapping[str, object]] = {}
@@ -761,6 +823,8 @@ class CampaignAuthorityStoreMixin:
                 "promotion_evidence_ids": promotion_evidence_ids,
                 "propagation": propagation,
             }
+            if host_proofs:
+                payload["host_receipt_ids"] = sorted(host_proofs.values())
             self._append_campaign_authority_event(
                 connection,
                 project_id=project_id,
@@ -804,12 +868,20 @@ class CampaignAuthorityStoreMixin:
                 return replay
             current = self._qualified_campaign_head(connection, project_id, campaign_id)
             self._guard_campaign_fingerprint(current, expected_fingerprint)
-            self._active_case_revision(connection, project_id, campaign_id, case_id)
+            previous = self._active_case_revision(connection, project_id, campaign_id, case_id)
+            previous_payload = json.loads(previous["payload_json"])
+            payload = draft.as_payload()
+            if "execution_lane" in previous_payload:
+                payload.setdefault("execution_lane", previous_payload["execution_lane"])
+            scope = self._current_scope(connection, project_id, campaign_id)
+            self._guard_campaign_execution_lane_change(
+                connection, project_id, campaign_id, case_id,
+                campaign_case_lane(scope, previous_payload), campaign_case_lane(scope, payload),
+            )
             revision = self._next_case_revision(
                 connection, project_id, campaign_id, case_id
             )
             occurred_at = _utc_now()
-            payload = draft.as_payload()
             connection.execute(
                 """
                 INSERT INTO campaign_case_revisions(
@@ -1018,41 +1090,32 @@ class CampaignAuthorityStoreMixin:
                 return self._campaign_authority_value(
                     connection, project_id, campaign_id
                 ) | {"replayed": True}
-            head = self._qualified_campaign_head(connection, project_id, campaign_id)
+            self._qualified_campaign_head(connection, project_id, campaign_id)
             scope = self._current_scope(connection, project_id, campaign_id)
-            candidates = self._obligation_candidates(
-                connection,
-                project_id,
-                campaign_id,
-                scope,
-                int(head["current_revision"]),
-            )
-            active_fingerprints: set[str] = set()
+            candidates = self._obligation_candidates(connection, project_id, campaign_id, scope)
+            existing_rows = self._campaign_obligation_rows(connection, project_id, campaign_id)
+            existing_by_basis: dict[str, sqlite3.Row] = {}
+            for row in existing_rows:
+                basis = _obligation_material_basis(row)
+                if basis not in existing_by_basis or (row["active"] and not existing_by_basis[basis]["active"]):
+                    existing_by_basis[basis] = row
+            current_ids: set[str] = set()
             created: list[str] = []
             occurred_at = _utc_now()
             for candidate in candidates:
-                fingerprint = semantic_fingerprint(candidate)
-                active_fingerprints.add(fingerprint)
-                existing = connection.execute(
-                    """
-                    SELECT obligation_id FROM campaign_obligations
-                    WHERE project_id = ? AND campaign_id = ? AND dependency_fingerprint = ?
-                    """,
-                    (project_id, campaign_id, fingerprint),
-                ).fetchone()
+                fingerprint = _obligation_material_basis(candidate)
+                existing = existing_by_basis.get(fingerprint)
                 if existing is not None:
-                    connection.execute(
-                        """
-                        UPDATE campaign_obligations SET active = 1, updated_at = ?
-                        WHERE project_id = ? AND campaign_id = ? AND obligation_id = ?
-                        """,
-                        (
-                            occurred_at,
-                            project_id,
-                            campaign_id,
-                            str(existing["obligation_id"]),
-                        ),
-                    )
+                    obligation_id = str(existing["obligation_id"])
+                    current_ids.add(obligation_id)
+                    if not existing["active"]:
+                        connection.execute(
+                            """
+                            UPDATE campaign_obligations SET active = 1, updated_at = ?
+                            WHERE project_id = ? AND campaign_id = ? AND obligation_id = ?
+                            """,
+                            (occurred_at, project_id, campaign_id, obligation_id),
+                        )
                     continue
                 ordinal = self._next_campaign_authority_ordinal(
                     connection, project_id, "obligation"
@@ -1090,16 +1153,8 @@ class CampaignAuthorityStoreMixin:
                     ),
                 )
                 created.append(obligation_id)
-            existing_rows = connection.execute(
-                """
-                SELECT obligation_id, dependency_fingerprint
-                FROM campaign_obligations
-                WHERE project_id = ? AND campaign_id = ? AND active = 1
-                """,
-                (project_id, campaign_id),
-            ).fetchall()
             for row in existing_rows:
-                if str(row["dependency_fingerprint"]) not in active_fingerprints:
+                if row["active"] and str(row["obligation_id"]) not in current_ids:
                     connection.execute(
                         """
                         UPDATE campaign_obligations SET active = 0, updated_at = ?
@@ -1112,6 +1167,17 @@ class CampaignAuthorityStoreMixin:
                             str(row["obligation_id"]),
                         ),
                     )
+            if created or any(bool(row["active"]) != (str(row["obligation_id"]) in current_ids)
+                              for row in existing_rows):
+                for row in connection.execute(
+                    """
+                    SELECT DISTINCT case_id FROM campaign_case_obligation_bindings
+                    WHERE project_id = ? AND campaign_id = ?
+                    """, (project_id, campaign_id),
+                ).fetchall():
+                    self._sync_case_coverage_from_obligations(
+                        connection, project_id, campaign_id, str(row["case_id"]),
+                    )
             return self._refresh_campaign_plan(
                 connection,
                 project_id,
@@ -1122,6 +1188,163 @@ class CampaignAuthorityStoreMixin:
                 actor=actor,
                 request_id=request_id,
             )
+
+    def author_campaign_obligations(
+        self,
+        project_id: str,
+        campaign_id: str,
+        batch: ObligationAuthoringBatch,
+        *,
+        expected_fingerprint: str,
+        actor: str,
+        request_id: str,
+    ) -> Mapping[str, Any]:
+        project_id = validate_project_id(project_id)
+        campaign_id = validate_campaign_id(campaign_id)
+        actor = required_text(actor, "actor")
+        request_id = required_text(request_id, "request_id")
+        expected_fingerprint = str(expected_fingerprint or "").strip()
+        if not expected_fingerprint:
+            raise batch_rejection("expected_fingerprint", "", "A current campaign fingerprint is required.")
+        input_fingerprint = sha256(self._json({
+            "basis": expected_fingerprint, "decisions": batch.decisions, "bindings": batch.bindings,
+        }).encode("utf-8")).hexdigest()
+        event_type = "campaign_obligation_batch_authored"
+        with self._transaction() as connection:
+            replay = self._campaign_authority_request_event(
+                connection, project_id, event_type, request_id,
+            )
+            if replay is not None:
+                stored = json.loads(str(replay["payload_json"]))
+                if (str(replay["campaign_id"]) != campaign_id or str(replay["actor"]) != actor
+                        or stored["input_fingerprint"] != input_fingerprint):
+                    raise batch_rejection(
+                        "request_id", request_id, "This request ID already identifies a different authoring group."
+                    )
+                return self._campaign_authority_value(connection, project_id, campaign_id) | {
+                    "authoring_receipt": stored["receipt"], "replayed": True,
+                }
+            head = self._qualified_campaign_head(connection, project_id, campaign_id)
+            revision = int(head["current_revision"])
+            if expected_fingerprint != str(head["semantic_fingerprint"]):
+                raise batch_rejection("expected_fingerprint", expected_fingerprint, "The campaign basis has changed.")
+            current_plan = self._current_campaign_plan_payload(connection, project_id, campaign_id)
+            current_obligation_ids = self._current_obligation_ids(connection, project_id, campaign_id)
+            obligations = {
+                item["obligation_id"]: item for item in current_plan["obligations"]
+                if item["obligation_id"] in current_obligation_ids
+            }
+            cases = {item["case_id"] for item in current_plan["cases"]}
+            existing_links = {
+                (item["case_id"], item["obligation_id"]): item["coverage_intent"]
+                for item in current_plan["obligation_bindings"]
+            }
+            items = [
+                (f"obligation_batch.{group}[{index}]", item)
+                for group, entries in (("decisions", batch.decisions), ("bindings", batch.bindings))
+                for index, item in enumerate(entries)
+            ]
+            for path, item in items:
+                if item["obligation_id"] not in obligations:
+                    raise batch_rejection(
+                        f"{path}.obligation_id", item["obligation_id"], "The obligation is not active in this campaign."
+                    )
+                if "case_id" in item and item["case_id"] not in cases:
+                    raise batch_rejection(
+                        f"{path}.case_id", item["case_id"], "The case is not active in this campaign."
+                    )
+            touched_cases: set[str] = set()
+            outcomes = []
+            occurred_at = _utc_now()
+            for path, item in items:
+                obligation_id = item["obligation_id"]
+                case_id = item.get("case_id")
+                if case_id is None:
+                    before = obligations[obligation_id]
+                    changed = any(before[key] != item[key] for key in ("decision", "rationale"))
+                    if changed:
+                        self._write_obligation_decision(
+                            connection, project_id, campaign_id, item, actor, request_id, occurred_at,
+                        )
+                else:
+                    changed = existing_links.get((case_id, obligation_id)) != item["coverage_intent"]
+                    if changed:
+                        self._write_obligation_binding(
+                            connection, project_id, campaign_id, item, revision, actor, occurred_at,
+                        )
+                        touched_cases.add(case_id)
+                outcomes.append({"input": path, **item, "outcome": "applied" if changed else "already_current"})
+            for case_id in sorted(touched_cases):
+                self._sync_case_coverage_from_obligations(connection, project_id, campaign_id, case_id)
+                self._invalidate_case_execution_authority(
+                    connection, project_id, campaign_id, case_id, actor=actor, request_id=request_id,
+                )
+            payload = self._campaign_plan_payload(
+                connection, project_id, campaign_id, title=str(current_plan["title"]),
+                scope=current_plan["scope"], case_order=current_plan["case_order"],
+            )
+            resulting_revision = self._append_campaign_plan_revision(
+                connection, project_id, campaign_id, payload, reason="obligations_authored",
+                actor=actor, request_id=request_id, occurred_at=occurred_at,
+            )
+            for outcome in outcomes:
+                outcome["event_id"] = self._append_campaign_authority_event(
+                    connection, project_id=project_id, campaign_id=campaign_id,
+                    case_id=outcome.get("case_id", ""),
+                    event_type="campaign_obligation_batch_item",
+                    semantic_revision=resulting_revision, payload=outcome, actor=actor,
+                    request_id=request_id, occurred_at=occurred_at,
+                )
+            receipt = {
+                "contract": "flow.campaign-obligation-authoring.v1",
+                "campaign_id": campaign_id, "actor": actor, "request_id": request_id,
+                "basis": {"revision": revision, "fingerprint": expected_fingerprint},
+                "result": {"revision": resulting_revision, "fingerprint": semantic_fingerprint(payload)},
+                "items": outcomes,
+            }
+            self._append_campaign_authority_event(
+                connection, project_id=project_id, campaign_id=campaign_id,
+                event_type=event_type, semantic_revision=resulting_revision,
+                payload={"receipt": receipt, "input_fingerprint": input_fingerprint},
+                actor=actor, request_id=request_id, occurred_at=occurred_at,
+            )
+            return self._campaign_authority_value(connection, project_id, campaign_id) | {
+                "authoring_receipt": receipt,
+            }
+
+    @staticmethod
+    def _write_obligation_decision(
+        connection, project_id, campaign_id, item, actor, request_id, occurred_at,
+    ) -> None:
+        connection.execute(
+            """
+            UPDATE campaign_obligations
+            SET decision = ?, rationale = ?, updated_at = ?, actor = ?, request_id = ?
+            WHERE project_id = ? AND campaign_id = ? AND obligation_id = ?
+            """,
+            (item["decision"], item["rationale"], occurred_at, actor, request_id,
+             project_id, campaign_id, item["obligation_id"]),
+        )
+
+    @staticmethod
+    def _write_obligation_binding(
+        connection, project_id, campaign_id, item, revision, actor, occurred_at,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO campaign_case_obligation_bindings(
+                project_id, campaign_id, case_id, obligation_id,
+                coverage_intent, campaign_revision, created_at, actor
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, campaign_id, case_id, obligation_id)
+            DO UPDATE SET coverage_intent = excluded.coverage_intent,
+                          campaign_revision = excluded.campaign_revision,
+                          created_at = excluded.created_at,
+                          actor = excluded.actor
+            """,
+            (project_id, campaign_id, item["case_id"], item["obligation_id"],
+             item["coverage_intent"], revision, occurred_at, actor),
+        )
 
     def decide_campaign_obligation(
         self,
@@ -1156,27 +1379,11 @@ class CampaignAuthorityStoreMixin:
             )
             if replay is not None:
                 return replay
-            row = self._obligation_row(
-                connection, project_id, campaign_id, obligation_id
-            )
-            if not bool(row["active"]):
+            self._obligation_row(connection, project_id, campaign_id, obligation_id)
+            if obligation_id not in self._current_obligation_ids(connection, project_id, campaign_id):
                 raise AssuranceBlockedError("campaign_obligation_stale")
-            connection.execute(
-                """
-                UPDATE campaign_obligations
-                SET decision = ?, rationale = ?, updated_at = ?, actor = ?, request_id = ?
-                WHERE project_id = ? AND campaign_id = ? AND obligation_id = ?
-                """,
-                (
-                    decision.value,
-                    rationale,
-                    _utc_now(),
-                    actor,
-                    str(request_id or ""),
-                    project_id,
-                    campaign_id,
-                    obligation_id,
-                ),
+            self._write_obligation_decision(
+                connection, project_id, campaign_id, input_payload, actor, str(request_id or ""), _utc_now(),
             )
             return self._refresh_campaign_plan(
                 connection,
@@ -1223,34 +1430,12 @@ class CampaignAuthorityStoreMixin:
             if replay is not None:
                 return replay
             self._active_case_revision(connection, project_id, campaign_id, case_id)
-            obligation = self._obligation_row(
-                connection, project_id, campaign_id, obligation_id
-            )
-            if not bool(obligation["active"]):
+            self._obligation_row(connection, project_id, campaign_id, obligation_id)
+            if obligation_id not in self._current_obligation_ids(connection, project_id, campaign_id):
                 raise AssuranceBlockedError("campaign_obligation_stale")
             head = self._qualified_campaign_head(connection, project_id, campaign_id)
-            connection.execute(
-                """
-                INSERT INTO campaign_case_obligation_bindings(
-                    project_id, campaign_id, case_id, obligation_id,
-                    coverage_intent, campaign_revision, created_at, actor
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(project_id, campaign_id, case_id, obligation_id)
-                DO UPDATE SET coverage_intent = excluded.coverage_intent,
-                              campaign_revision = excluded.campaign_revision,
-                              created_at = excluded.created_at,
-                              actor = excluded.actor
-                """,
-                (
-                    project_id,
-                    campaign_id,
-                    case_id,
-                    obligation_id,
-                    coverage_intent,
-                    int(head["current_revision"]),
-                    _utc_now(),
-                    actor,
-                ),
+            self._write_obligation_binding(
+                connection, project_id, campaign_id, input_payload, int(head["current_revision"]), actor, _utc_now(),
             )
             self._sync_case_coverage_from_obligations(
                 connection, project_id, campaign_id, case_id
@@ -1683,6 +1868,7 @@ class CampaignAuthorityStoreMixin:
         request_id: str = "",
         harness: Mapping[str, object] | None = None,
         requested_capability: Mapping[str, object] | None = None,
+        allow_pending_dispatch: bool = False,
     ) -> Mapping[str, Any]:
         project_id = validate_project_id(project_id)
         campaign_id = validate_campaign_id(campaign_id)
@@ -1716,16 +1902,27 @@ class CampaignAuthorityStoreMixin:
             "authority_reference": authority_reference,
         }
         with self._transaction() as connection:
-            replay = self._mutation_replay(
-                connection,
-                project_id,
-                campaign_id,
-                "attestation_intent_created",
-                request_id,
-                input_payload,
-            )
-            if replay is not None:
-                return replay
+            for event_type in (
+                "attestation_intent_created", "source_attestation_retry_authorized",
+                "source_attestation_dispatch_authorized",
+            ):
+                replay_event = self._campaign_authority_request_event(
+                    connection, project_id, event_type, request_id,
+                )
+                if replay_event is None:
+                    continue
+                replay = self._mutation_replay(
+                    connection, project_id, campaign_id, event_type, request_id,
+                    input_payload,
+                )
+                return {
+                    **replay,
+                    "source_attestation_id": str(replay_event["attestation_id"]),
+                }
+            self._qualified_campaign_head(connection, project_id, campaign_id)
+            self._require_provider_campaign_case(connection, project_id, campaign_id, case_id)
+            if harness_value["disposition"] == "repository":
+                self._check_campaign_source_paths(connection, project_id, campaign_id, source_files)
             binding = self._current_case_oracle_binding(
                 connection, project_id, campaign_id, case_id
             )
@@ -1737,64 +1934,93 @@ class CampaignAuthorityStoreMixin:
             )
             if str(oracle_revision["status"]) != "constructible":
                 raise AssuranceBlockedError("attestation_requires_constructible_oracle")
-            ordinal = self._next_campaign_authority_ordinal(
-                connection, project_id, "attestation"
-            )
-            attestation_id = f"ATTEST-{ordinal:06d}"
-            occurred_at = _utc_now()
-            connection.execute(
+            existing = connection.execute(
                 """
-                UPDATE campaign_attestation_intents
-                SET state = 'invalidated', updated_at = ?, actor = ?
+                SELECT * FROM campaign_attestation_intents
                 WHERE project_id = ? AND campaign_id = ? AND case_id = ?
-                  AND state IN ('pending_technical_validation', 'attested_current')
-                """,
-                (occurred_at, actor, project_id, campaign_id, case_id),
-            )
-            connection.execute(
-                """
-                INSERT INTO campaign_attestation_intents(
-                    project_id, campaign_id, case_id, attestation_id, ordinal,
-                    oracle_id, oracle_revision, oracle_fingerprint,
-                    materialization_mode, authority_input_fingerprint,
-                    source_manifest_digest, source_manifest_json,
-                    oracle_ir_contract_version, oracle_ir_operator_profile,
-                    oracle_ir_fingerprint, oracle_ir_json,
-                    requested_capability_json, requested_capability_fingerprint,
-                    harness_json, harness_fingerprint, authority_reference,
-                    state, created_at, updated_at, actor, request_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                          ?, ?, ?, ?, ?, ?, ?, ?)
+                  AND oracle_id = ? AND oracle_revision = ?
+                  AND materialization_mode = 'orchestrator_source'
+                  AND authority_input_fingerprint = ?
+                  AND requested_capability_fingerprint = ?
                 """,
                 (
-                    project_id,
-                    campaign_id,
-                    case_id,
-                    attestation_id,
-                    ordinal,
-                    str(binding["oracle_id"]),
-                    int(binding["oracle_revision"]),
-                    str(binding["oracle_fingerprint"]),
-                    TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value,
-                    digest,
-                    digest,
-                    self._json(manifest),
-                    "",
-                    "",
-                    "",
-                    "{}",
-                    self._json(capability),
-                    capability_fingerprint,
-                    self._json(harness_value),
-                    harness_fingerprint,
-                    authority_reference,
-                    MaterializationAttestationState.PENDING_TECHNICAL_VALIDATION.value,
-                    occurred_at,
-                    occurred_at,
-                    actor,
-                    str(request_id or ""),
+                    project_id, campaign_id, case_id, str(binding["oracle_id"]),
+                    int(binding["oracle_revision"]), digest, capability_fingerprint,
                 ),
-            )
+            ).fetchone()
+            occurred_at = _utc_now()
+            event_type = "attestation_intent_created"
+            event_extra = {}
+            if existing is not None:
+                attestation_id = str(existing["attestation_id"])
+                predecessor_id = self._rearm_source_attestation(
+                    connection, existing, harness_fingerprint=harness_fingerprint,
+                    actor=actor, occurred_at=occurred_at,
+                    allow_pending_dispatch=allow_pending_dispatch,
+                )
+                if predecessor_id:
+                    event_type = "source_attestation_retry_authorized"
+                    event_extra = {"predecessor_command_id": predecessor_id}
+                else:
+                    event_type = "source_attestation_dispatch_authorized"
+            else:
+                ordinal = self._next_campaign_authority_ordinal(
+                    connection, project_id, "attestation"
+                )
+                attestation_id = f"ATTEST-{ordinal:06d}"
+                connection.execute(
+                    """
+                    UPDATE campaign_attestation_intents
+                    SET state = 'invalidated', updated_at = ?, actor = ?
+                    WHERE project_id = ? AND campaign_id = ? AND case_id = ?
+                      AND state IN ('pending_technical_validation', 'attested_current')
+                    """,
+                    (occurred_at, actor, project_id, campaign_id, case_id),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO campaign_attestation_intents(
+                        project_id, campaign_id, case_id, attestation_id, ordinal,
+                        oracle_id, oracle_revision, oracle_fingerprint,
+                        materialization_mode, authority_input_fingerprint,
+                        source_manifest_digest, source_manifest_json,
+                        oracle_ir_contract_version, oracle_ir_operator_profile,
+                        oracle_ir_fingerprint, oracle_ir_json,
+                        requested_capability_json, requested_capability_fingerprint,
+                        harness_json, harness_fingerprint, authority_reference,
+                        state, created_at, updated_at, actor, request_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                              ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        project_id,
+                        campaign_id,
+                        case_id,
+                        attestation_id,
+                        ordinal,
+                        str(binding["oracle_id"]),
+                        int(binding["oracle_revision"]),
+                        str(binding["oracle_fingerprint"]),
+                        TestProviderMaterializationMode.ORCHESTRATOR_SOURCE.value,
+                        digest,
+                        digest,
+                        self._json(manifest),
+                        "",
+                        "",
+                        "",
+                        "{}",
+                        self._json(capability),
+                        capability_fingerprint,
+                        self._json(harness_value),
+                        harness_fingerprint,
+                        authority_reference,
+                        MaterializationAttestationState.PENDING_TECHNICAL_VALIDATION.value,
+                        occurred_at,
+                        occurred_at,
+                        actor,
+                        str(request_id or ""),
+                    ),
+                )
             connection.execute(
                 """
                 UPDATE campaign_cases
@@ -1811,13 +2037,13 @@ class CampaignAuthorityStoreMixin:
                     case_id,
                 ),
             )
-            return self._refresh_campaign_plan(
+            state = self._refresh_campaign_plan(
                 connection,
                 project_id,
                 campaign_id,
-                reason="attestation_intent_created",
-                event_type="attestation_intent_created",
-                event_payload=input_payload | {"attestation_id": attestation_id},
+                reason=event_type,
+                event_type=event_type,
+                event_payload=input_payload | {"attestation_id": attestation_id} | event_extra,
                 actor=actor,
                 request_id=request_id,
                 request_input_payload=input_payload,
@@ -1825,6 +2051,144 @@ class CampaignAuthorityStoreMixin:
                 oracle_id=str(binding["oracle_id"]),
                 attestation_id=attestation_id,
             )
+            return state | {"source_attestation_id": attestation_id}
+
+    def _check_campaign_source_paths(
+        self,
+        connection: sqlite3.Connection,
+        project_id: str,
+        campaign_id: str,
+        source_files: Mapping[str, str],
+    ) -> None:
+        campaign = self._campaign_row(connection, project_id, campaign_id)
+        rows = connection.execute(
+            """
+            SELECT r.report_key, json_extract(artifact.value, '$.reference') AS path
+            FROM external_work_reports r
+            JOIN implementation_packets p USING (project_id, change_id, packet_id)
+            JOIN packet_work_plans w USING (project_id, change_id, packet_id)
+            JOIN packet_work_plan_revisions plan USING (project_id, work_plan_id, plan_revision)
+            LEFT JOIN external_work_report_selections selected
+              USING (project_id, change_id, packet_id, unit_key, authority_fingerprint)
+            JOIN json_each(r.payload_json, '$.artifacts') artifact ON artifact.type = 'object'
+            WHERE r.project_id = ? AND r.change_id = ?
+              AND r.spec_revision = p.spec_revision
+              AND p.status NOT IN ('cancelled', 'superseded')
+              AND plan.status = 'accepted' AND r.disposition = 'current'
+              AND (selected.report_key IS NULL OR selected.report_key = r.report_key)
+              AND json_extract(r.payload_json, '$.outcome') = 'complete'
+              AND (json_array_length(?) = 0 OR r.packet_id IN (SELECT value FROM json_each(?)))
+            """,
+            (
+                project_id, campaign["change_id"], campaign["target_packet_ids_json"],
+                campaign["target_packet_ids_json"],
+            ),
+        )
+        requested = {normpath(path.strip().replace("\\", "/")) for path in source_files}
+        for row in rows:
+            if isinstance(row["path"], str) and normpath(row["path"].strip().replace("\\", "/")) in requested:
+                raise CampaignSourcePathPreEffectError(
+                    "campaign_source_overlaps_product_artifact",
+                    "This destination is already recorded as a product artifact.",
+                    field="source_files", received_value=row["path"],
+                    rule="A provider-managed test destination must be separate from product files.",
+                    resolution="Choose an unused provider destination for this case. Send the full "
+                               "source inline in source_files and leave the product checkout unchanged.",
+                    details={"report_key": str(row["report_key"])},
+                )
+
+    def _rearm_source_attestation(
+        self,
+        connection: sqlite3.Connection,
+        attestation: sqlite3.Row,
+        *,
+        harness_fingerprint: str,
+        actor: str,
+        occurred_at: str,
+        allow_pending_dispatch: bool,
+    ) -> str | None:
+        scope = (attestation["project_id"], attestation["campaign_id"], attestation["case_id"])
+        attestation_id = str(attestation["attestation_id"])
+        details = {
+            "case_id": str(attestation["case_id"]),
+            "attestation_id": attestation_id,
+            "attestation_state": str(attestation["state"]),
+        }
+        latest = connection.execute(
+            """
+            SELECT attestation_id FROM campaign_attestation_intents
+            WHERE project_id = ? AND campaign_id = ? AND case_id = ?
+            ORDER BY ordinal DESC LIMIT 1
+            """,
+            scope,
+        ).fetchone()
+        if str(latest["attestation_id"]) != attestation_id:
+            raise AssuranceBlockedError("source_attestation_retry_not_available", details=details)
+        existing_harness = str(attestation["harness_fingerprint"]) or semantic_fingerprint(
+            canonical_test_harness(json.loads(str(attestation["harness_json"])))
+        )
+        if existing_harness != harness_fingerprint:
+            raise AssuranceBlockedError("source_attestation_retry_harness_mismatch", details=details)
+
+        if allow_pending_dispatch and attestation["state"] == "pending_technical_validation":
+            pending_command = connection.execute(
+                """
+                SELECT 1 FROM test_provider_outbox
+                WHERE project_id = ? AND campaign_id = ? AND case_id = ?
+                  AND json_extract(command_json, '$.attestation_intent_ref') = ?
+                LIMIT 1
+                """,
+                (*scope, attestation_id),
+            ).fetchone()
+            if pending_command is None:
+                return None
+        if not source_attestation_retry_eligible(self._attestation_value(connection, attestation)):
+            raise AssuranceBlockedError("source_attestation_retry_not_available", details=details)
+
+        predecessor = connection.execute(
+            """
+            SELECT o.command_id, o.operation, o.state, o.command_json,
+                   r.receipt_json, r.attestation_state
+            FROM test_provider_outbox o
+            LEFT JOIN test_provider_receipts r
+              ON r.project_id = o.project_id AND r.receipt_id = o.receipt_id
+            WHERE o.project_id = ? AND o.campaign_id = ? AND o.case_id = ?
+            ORDER BY o.ordinal DESC LIMIT 1
+            """,
+            scope,
+        ).fetchone()
+        if (
+            predecessor is None
+            or predecessor["state"] != "delivered"
+            or predecessor["operation"] not in {"materialize", "edit"}
+            or json.loads(str(predecessor["command_json"])).get("attestation_intent_ref")
+            != attestation_id
+            or not source_materialization_failure_receipt(
+                json.loads(predecessor["receipt_json"] or "{}"),
+                reconciled_attestation_state=str(predecessor["attestation_state"] or ""),
+            )
+        ):
+            raise AssuranceBlockedError("source_attestation_failed_attempt_missing", details=details)
+        predecessor_id = str(predecessor["command_id"])
+        receipt = json.loads(str(predecessor["receipt_json"]))
+        retry_basis = {
+            "technical_retry": {
+                "predecessor_command_id": predecessor_id,
+                "reason": "provider_attestation_invalidated",
+                "technical_state": str(receipt["technical_state"]),
+            }
+        }
+        connection.execute(
+            """
+            UPDATE campaign_attestation_intents
+            SET state = 'pending_technical_validation',
+                provider_materialization_ref = '', representation_fingerprint = '',
+                basis_json = ?, updated_at = ?, actor = ?
+            WHERE project_id = ? AND attestation_id = ?
+            """,
+            (self._json(retry_basis), occurred_at, actor, scope[0], attestation_id),
+        )
+        return predecessor_id
 
     def create_campaign_materialization_intent(
         self,
@@ -1847,6 +2211,7 @@ class CampaignAuthorityStoreMixin:
         harness_value = canonical_test_harness(None)
         harness_fingerprint = semantic_fingerprint(harness_value)
         with self._transaction() as connection:
+            self._require_provider_campaign_case(connection, project_id, campaign_id, case_id)
             binding = self._current_case_oracle_binding(
                 connection, project_id, campaign_id, case_id
             )
@@ -2162,6 +2527,8 @@ class CampaignAuthorityStoreMixin:
         )
         if case is None:
             raise RequirementConflictError(f"unknown active campaign case: {case_id}")
+        if campaign_case_lane(state["scope"], case) == "host":
+            raise host_rejection("case_id", case_id, "This case uses host execution. Follow its current campaign action.")
         binding = self._current_case_oracle_binding(
             connection, project_id, campaign_id, case_id
         )
@@ -2498,11 +2865,19 @@ class CampaignAuthorityStoreMixin:
         project_id: str,
         campaign_id: str,
         scope: Mapping[str, object],
-        campaign_revision: int,
+        *,
+        unavailable: list[str] | None = None,
     ) -> list[dict[str, str]]:
         candidates: list[dict[str, str]] = []
+        change_id = str(scope["change_id"])
+        change = self._change_row(connection, project_id, change_id)
+        change_requirements = set(self._json_string_list(change["requirement_ids_json"]))
         for requirement_id in scope.get("requirement_ids", []):
+            if requirement_id not in change_requirements:
+                continue
             row = self._requirement_row(connection, project_id, str(requirement_id))
+            if str(row["lifecycle_status"]) == "removed":
+                continue
             candidates.append(
                 _obligation_candidate(
                     CampaignObligationKind.PRIMARY_BEHAVIOR,
@@ -2522,6 +2897,9 @@ class CampaignAuthorityStoreMixin:
                 (project_id, str(goal_id)),
             ).fetchone()
             if row is None:
+                if unavailable is not None:
+                    unavailable.append(str(goal_id))
+                    continue
                 raise RequirementConflictError(f"unknown campaign goal: {goal_id}")
             payload = json.loads(str(row["payload_json"]))
             node_type = str(row["node_type"])
@@ -2546,7 +2924,6 @@ class CampaignAuthorityStoreMixin:
                     expected_behavior=expected,
                 )
             )
-        change_id = str(scope["change_id"])
         for packet_id in scope.get("packet_ids", []):
             row = self._packet_row(connection, project_id, change_id, str(packet_id))
             standalone = connection.execute(
@@ -2556,7 +2933,10 @@ class CampaignAuthorityStoreMixin:
             if standalone and standalone["validation_version"] and standalone["consumption_mode"] == "external_agent":
                 from flow_of_work_mcp.core.domain.external_work import fingerprint
                 if standalone["criterion_statement_fingerprint"] != fingerprint(self._json_string_list(row["completion_criteria_json"])):
-                    raise AssuranceBlockedError("criterion_authority_stale")
+                    if unavailable is None:
+                        raise AssuranceBlockedError("criterion_authority_stale")
+                    unavailable.append(str(packet_id))
+                    continue
                 criteria = connection.execute(
                     "SELECT number,statement FROM packet_criteria WHERE project_id=? AND change_id=? AND packet_id=? AND active=1 ORDER BY number",
                     (project_id, change_id, str(packet_id)),
@@ -2603,7 +2983,7 @@ class CampaignAuthorityStoreMixin:
                     subject_ref=f"{campaign_id}:invariant:{index}",
                     source_kind="campaign_invariant",
                     source_ref=campaign_id,
-                    source_revision=str(campaign_revision),
+                    source_revision=semantic_fingerprint({"invariant": invariant}),
                     statement=str(invariant),
                     expected_behavior=str(invariant),
                     prohibited_behavior=f"violate: {invariant}",
@@ -2611,7 +2991,7 @@ class CampaignAuthorityStoreMixin:
             )
         unique: dict[str, dict[str, str]] = {}
         for item in candidates:
-            unique.setdefault(semantic_fingerprint(item), item)
+            unique.setdefault(_obligation_material_basis(item), item)
         return list(unique.values())
 
     def _validate_campaign_scope(
@@ -2868,6 +3248,28 @@ class CampaignAuthorityStoreMixin:
                 "campaign plan head references missing revision"
             )
         plan_payload = dict(json.loads(str(revision["payload_json"])))
+        obligation_rows, pending_obligations = self._campaign_obligation_applicability(
+            connection, project_id, campaign_id, plan_payload["scope"],
+        )
+        current_obligations = [_obligation_value(row, True) for row, current in obligation_rows if current]
+        historical_obligations = [_obligation_value(row, False) for row, current in obligation_rows if not current]
+        current_obligation_ids = {str(item["obligation_id"]) for item in current_obligations}
+        stale_active = sum(bool(row["active"]) and not current for row, current in obligation_rows)
+        applicability = {
+            "current": not (pending_obligations or stale_active),
+            "candidates_pending": pending_obligations,
+            "stale_active": stale_active,
+        }
+        plan_payload["obligations"] = current_obligations
+        plan_payload["obligation_bindings"] = [
+            binding for binding in plan_payload["obligation_bindings"]
+            if binding["obligation_id"] in current_obligation_ids
+        ]
+        if not applicability["current"]:
+            plan_payload["constructibility"] = CampaignConstructibility.NEEDS_OBLIGATIONS.value
+            plan_payload["residuals"] = [_residual(
+                "obligation_basis_changed", "refresh proof obligations for the current scope", "derive_obligations",
+            )]
         plan_payload["cases"] = self._campaign_case_runtime_values(
             connection,
             project_id,
@@ -2915,10 +3317,11 @@ class CampaignAuthorityStoreMixin:
             project_id,
             campaign_id,
             limit=None,
+            current_obligation_ids=current_obligation_ids,
         )
         exception_row = connection.execute(
             """
-            SELECT payload_json, occurred_at, actor
+            SELECT event_id, semantic_revision, payload_json, occurred_at, actor, request_id
             FROM campaign_authority_events
             WHERE project_id = ? AND campaign_id = ?
               AND event_type = 'campaign_exception_accepted'
@@ -2928,8 +3331,19 @@ class CampaignAuthorityStoreMixin:
         ).fetchone()
         exception = None
         if exception_row is not None:
+            exception_payload = json.loads(str(exception_row["payload_json"]))
+            covered = set(exception_payload["obligation_ids"])
+            unresolved = _unresolved_campaign_obligation_ids({**plan_payload, "evidence": evidence})
+            same_basis = (int(exception_row["semantic_revision"]) == int(head["current_revision"])
+                          and applicability["current"] and covered <= current_obligation_ids
+                          and unresolved <= covered)
             exception = {
-                **json.loads(str(exception_row["payload_json"])),
+                **exception_payload,
+                "event_id": int(exception_row["event_id"]),
+                "semantic_revision": int(exception_row["semantic_revision"]),
+                "request_id": str(exception_row["request_id"]),
+                "current": same_basis,
+                "applicability": "current" if same_basis else "historical_on_original_basis",
                 "occurred_at": str(exception_row["occurred_at"]),
                 "actor": str(exception_row["actor"]),
             }
@@ -2976,13 +3390,13 @@ class CampaignAuthorityStoreMixin:
                 **json.loads(str(completion_row["payload_json"])),
                 "event_id": int(completion_row["event_id"]),
                 "semantic_revision": int(completion_row["semantic_revision"]),
-                "current": int(completion_row["semantic_revision"])
-                == int(head["current_revision"]),
+                "current": (int(completion_row["semantic_revision"]) == int(head["current_revision"])
+                            and applicability["current"]),
                 "occurred_at": str(completion_row["occurred_at"]),
                 "actor": str(completion_row["actor"]),
                 "request_id": str(completion_row["request_id"]),
             }
-        return {
+        value = {
             "project_id": project_id,
             "campaign_id": campaign_id,
             "change_id": str(campaign["change_id"]),
@@ -2992,6 +3406,8 @@ class CampaignAuthorityStoreMixin:
             "revision": int(head["current_revision"]),
             "fingerprint": str(head["semantic_fingerprint"]),
             **plan_payload,
+            "obligation_applicability": applicability,
+            "obligation_history": historical_obligations,
             "oracles": oracles,
             "attestations": attestations,
             "evidence": evidence,
@@ -3000,6 +3416,21 @@ class CampaignAuthorityStoreMixin:
             "completion": completion,
             "history": history,
         }
+        host = self._campaign_host_execution(connection, project_id, campaign_id, value)
+        if required_host_cases(value) or host["source_generation"]:
+            value["host_execution"] = host
+            value["evidence"] = [*host["evidence"], *evidence]
+            if completion is not None and required_host_cases(value):
+                current_host_ids = sorted(
+                    receipt["receipt_id"] for receipt in host["current_receipts"].values()
+                    if receipt["outcome"] == "passed"
+                )
+                completion["current"] = (
+                    completion["current"]
+                    and current_host_ids == completion.get("host_receipt_ids")
+                    and len(current_host_ids) == len(required_host_cases(value))
+                )
+        return value
 
     def _campaign_case_runtime_values(
         self,
@@ -3052,9 +3483,10 @@ class CampaignAuthorityStoreMixin:
         campaign_id: str,
         case_id: str,
     ) -> None:
+        current_obligation_ids = self._current_obligation_ids(connection, project_id, campaign_id)
         rows = connection.execute(
             """
-            SELECT o.source_kind, o.source_ref, b.coverage_intent
+            SELECT o.obligation_id, o.source_kind, o.source_ref, b.coverage_intent
             FROM campaign_case_obligation_bindings b
             JOIN campaign_obligations o
               ON o.project_id = b.project_id
@@ -3066,6 +3498,7 @@ class CampaignAuthorityStoreMixin:
             """,
             (project_id, campaign_id, case_id),
         ).fetchall()
+        rows = [row for row in rows if str(row["obligation_id"]) in current_obligation_ids]
         requirements = sorted(
             {
                 str(row["source_ref"])
@@ -3537,6 +3970,51 @@ class CampaignAuthorityStoreMixin:
             for row in rows
         ]
 
+    def _campaign_obligation_rows(
+        self, connection: sqlite3.Connection, project_id: str, campaign_id: str,
+    ) -> list[sqlite3.Row]:
+        return connection.execute(
+            """
+            SELECT * FROM campaign_obligations
+            WHERE project_id = ? AND campaign_id = ? ORDER BY ordinal
+            """, (project_id, campaign_id),
+        ).fetchall()
+
+    def _campaign_obligation_applicability(
+        self, connection: sqlite3.Connection, project_id: str, campaign_id: str,
+        scope: Mapping[str, object] | None = None,
+    ) -> tuple[list[tuple[sqlite3.Row, bool]], int]:
+        if scope is None:
+            revision = connection.execute(
+                """
+                SELECT r.payload_json FROM campaign_plan_heads h
+                JOIN campaign_plan_revisions r ON r.project_id = h.project_id
+                  AND r.campaign_id = h.campaign_id AND r.revision = h.current_revision
+                WHERE h.project_id = ? AND h.campaign_id = ?
+                """, (project_id, campaign_id),
+            ).fetchone()
+            if revision is None:
+                return [], 0
+            scope = json.loads(str(revision["payload_json"]))["scope"]
+        unavailable: list[str] = []
+        pending = {_obligation_material_basis(candidate) for candidate in self._obligation_candidates(
+            connection, project_id, campaign_id, scope, unavailable=unavailable,
+        )}
+        rows = []
+        for row in self._campaign_obligation_rows(connection, project_id, campaign_id):
+            basis = _obligation_material_basis(row)
+            applicable = bool(row["active"]) and basis in pending
+            if applicable:
+                pending.remove(basis)
+            rows.append((row, applicable))
+        return rows, len(pending) + len(unavailable)
+
+    def _current_obligation_ids(
+        self, connection: sqlite3.Connection, project_id: str, campaign_id: str,
+    ) -> set[str]:
+        rows, _ = self._campaign_obligation_applicability(connection, project_id, campaign_id)
+        return {str(row["obligation_id"]) for row, current in rows if current}
+
     def _campaign_obligation_values(
         self,
         connection: sqlite3.Connection,
@@ -3545,30 +4023,10 @@ class CampaignAuthorityStoreMixin:
         *,
         active_only: bool,
     ) -> list[dict[str, object]]:
-        suffix = "AND active = 1" if active_only else ""
         return [
-            {
-                "obligation_id": str(row["obligation_id"]),
-                "kind": str(row["kind"]),
-                "subject_ref": str(row["subject_ref"]),
-                "source_kind": str(row["source_kind"]),
-                "source_ref": str(row["source_ref"]),
-                "source_revision": str(row["source_revision"]),
-                "statement": str(row["statement"]),
-                "expected_behavior": str(row["expected_behavior"]),
-                "prohibited_behavior": str(row["prohibited_behavior"]),
-                "decision": str(row["decision"]),
-                "rationale": str(row["rationale"]),
-                "fresh": bool(row["active"]),
-            }
-            for row in connection.execute(
-                f"""
-                SELECT * FROM campaign_obligations
-                WHERE project_id = ? AND campaign_id = ? {suffix}
-                ORDER BY ordinal
-                """,
-                (project_id, campaign_id),
-            ).fetchall()
+            _obligation_value(row, bool(row["active"]))
+            for row in self._campaign_obligation_rows(connection, project_id, campaign_id)
+            if not active_only or row["active"]
         ]
 
     def _current_campaign_plan_payload(
@@ -3601,7 +4059,8 @@ class CampaignAuthorityStoreMixin:
         return scope
 
     def _qualified_campaign_head(
-        self, connection: sqlite3.Connection, project_id: str, campaign_id: str
+        self, connection: sqlite3.Connection, project_id: str, campaign_id: str,
+        *, allow_host_completed: bool = False,
     ) -> sqlite3.Row:
         campaign = self._campaign_row(connection, project_id, campaign_id)
         row = connection.execute(
@@ -3617,15 +4076,23 @@ class CampaignAuthorityStoreMixin:
             raise AssuranceBlockedError("campaign_inactive")
         completion = connection.execute(
             """
-            SELECT 1 FROM campaign_authority_events
-            WHERE project_id = ? AND campaign_id = ?
-              AND event_type = 'campaign_completion_recorded'
-              AND semantic_revision = ?
-            LIMIT 1
+            SELECT e.payload_json FROM campaign_authority_events e
+            WHERE e.project_id = ? AND e.campaign_id = ?
+              AND e.event_type = 'campaign_completion_recorded'
+              AND e.semantic_revision = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM campaign_authority_events pending
+                  WHERE pending.project_id = e.project_id AND pending.campaign_id = e.campaign_id
+                    AND pending.event_type = 'campaign_host_check_issued'
+                    AND pending.event_id > e.event_id
+              )
+            ORDER BY e.event_id DESC LIMIT 1
             """,
             (project_id, campaign_id, int(row["current_revision"])),
         ).fetchone()
-        if completion is not None:
+        if completion is not None and not (
+            allow_host_completed and json.loads(completion["payload_json"]).get("host_receipt_ids")
+        ):
             raise AssuranceBlockedError("campaign_inactive")
         return row
 
@@ -3937,6 +4404,30 @@ class CampaignAuthorityStoreMixin:
                 },
             }
         return value
+
+
+_OBLIGATION_FIELDS = (
+    "kind", "subject_ref", "source_kind", "source_ref", "source_revision",
+    "statement", "expected_behavior", "prohibited_behavior",
+)
+
+
+def _obligation_material_basis(value: Mapping[str, object] | sqlite3.Row) -> str:
+    basis = {key: value[key] for key in _OBLIGATION_FIELDS}
+    if basis["source_kind"] in {"campaign_invariant", "finding"}:
+        # Legacy invariant revisions were campaign counters and finding revisions
+        # are timestamps. Their material content is already in the remaining fields.
+        basis.pop("source_revision")
+    if basis["source_kind"] == "campaign_invariant":
+        # Inserting or reordering another invariant does not revise this clause.
+        basis.pop("subject_ref")
+    return semantic_fingerprint(basis)
+
+
+def _obligation_value(row: sqlite3.Row, current: bool) -> dict[str, object]:
+    return {key: str(row[key]) for key in (*_OBLIGATION_FIELDS, "obligation_id", "decision", "rationale")} | {
+        "fresh": current,
+    }
 
 
 def _obligation_candidate(

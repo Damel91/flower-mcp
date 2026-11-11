@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from typing import Mapping
 
+from flow_of_work_mcp.application.campaign_authority import (
+    CampaignAuthorityService,
+    qualified_campaign_is_accepted,
+)
 from flow_of_work_mcp.core.domain.assurance import (
     CampaignCaseDraft,
     CampaignCaseKind,
@@ -39,10 +43,12 @@ class AssuranceService:
         assurance: AssuranceRepository,
         changes: ChangeControlRepository,
         engineer_gate=None,
+        campaign_authority: CampaignAuthorityService | None = None,
     ) -> None:
         self._assurance = assurance
         self._changes = changes
         self._engineer_gate = engineer_gate
+        self._campaign_authority = campaign_authority
 
     def record_finding(
         self,
@@ -207,19 +213,28 @@ class AssuranceService:
         request_id: str = "",
     ) -> Mapping[str, object]:
         required_text(acceptance_reference, "acceptance_reference")
-        blockers = self._acceptance_blockers(project_id, change_id)
-        if blockers:
-            raise AssuranceBlockedError(
-                "change_acceptance_blocked",
-                details={"change_id": change_id, "blockers": blockers},
+        with self._changes.atomic():
+            blockers = self._acceptance_blockers(project_id, change_id)
+            if blockers:
+                raise AssuranceBlockedError(
+                    "change_acceptance_blocked",
+                    details={"change_id": change_id, "blockers": blockers},
+                )
+            return self._assurance.accept_change(
+                project_id,
+                change_id,
+                acceptance_reference=acceptance_reference,
+                actor=required_text(actor, "actor"),
+                request_id=str(request_id or ""),
             )
-        return self._assurance.accept_change(
-            project_id,
-            change_id,
-            acceptance_reference=acceptance_reference,
-            actor=required_text(actor, "actor"),
-            request_id=str(request_id or ""),
-        )
+
+    def inspect_change_acceptance(self, project_id: str, change_id: str) -> Mapping[str, object]:
+        blockers = self._acceptance_blockers(project_id, change_id)
+        return {
+            "change_id": change_id,
+            "prerequisites_satisfied": not blockers,
+            "blockers": blockers,
+        }
 
     def _acceptance_blockers(self, project_id: str, change_id: str) -> list[Mapping[str, object]]:
         blockers: list[Mapping[str, object]] = []
@@ -263,24 +278,52 @@ class AssuranceService:
         campaigns = self._assurance.campaigns_for_change(project_id, change_id)
         if not campaigns:
             blockers.append({"kind": "campaign_missing", "change_id": change_id})
+        historical_exceptions = []
         for campaign in campaigns:
+            campaign_id = str(campaign["campaign_id"])
             status = str(campaign["status"])
+            if status == CampaignStatus.ACCEPTED_EXCEPTION.value and self._campaign_authority is not None:
+                projection = self._campaign_authority.inspect(project_id, campaign_id=campaign_id, view="summary")
+                summary = projection.get("campaign")
+                if isinstance(summary, Mapping) and summary.get("qualification") == "historical_on_original_basis":
+                    historical_exceptions.append(campaign_id)
+                    continue
             if _happy_path_only(campaign) and not campaign.get("exception_reference"):
                 blockers.append(
                     {
                         "kind": "campaign_happy_path_only",
-                        "campaign_id": str(campaign["campaign_id"]),
+                        "campaign_id": campaign_id,
                     }
                 )
+            if status == CampaignStatus.PASSED.value and self._campaign_authority is not None:
+                projection = self._campaign_authority.inspect(
+                    project_id, campaign_id=campaign_id, view="summary",
+                )
+                summary = projection.get("campaign")
+                if (
+                    isinstance(summary, Mapping)
+                    and summary.get("qualification") == "current"
+                    and not qualified_campaign_is_accepted(projection)
+                ):
+                    blockers.append(
+                        {
+                            "kind": "campaign_not_complete",
+                            "campaign_id": campaign_id,
+                            "status": status,
+                        }
+                    )
             if status in {CampaignStatus.PASSED.value, CampaignStatus.ACCEPTED_EXCEPTION.value}:
                 continue
             blockers.append(
                 {
                     "kind": "campaign_not_green",
-                    "campaign_id": str(campaign["campaign_id"]),
+                    "campaign_id": campaign_id,
                     "status": status,
                 }
             )
+        if historical_exceptions and len(historical_exceptions) == len(campaigns):
+            blockers.append({"kind": "qualified_campaign_missing", "change_id": change_id,
+                             "historical_campaign_ids": historical_exceptions})
         return blockers
 
 

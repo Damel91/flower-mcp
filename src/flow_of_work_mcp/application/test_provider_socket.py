@@ -13,6 +13,7 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
     TestProviderReceipt,
     canonical_materializer_capability,
     semantic_fingerprint,
+    source_provider_attempt_ref,
 )
 from flow_of_work_mcp.core.errors import (
     AssuranceBlockedError,
@@ -44,6 +45,10 @@ class TestProviderSocketRepository(Protocol):
     def test_provider_outbox_entry(
         self, project_id: str, command_id: str
     ) -> Mapping[str, object]: ...
+
+    def test_provider_outbox_for_request(
+        self, project_id: str, request_id: str
+    ) -> Mapping[str, object] | None: ...
 
     def test_provider_recoverable_commands(
         self, project_id: str, *, campaign_id: str = "", limit: int = 64
@@ -194,6 +199,36 @@ class TestProviderSocketService:
             context=context,
         )
 
+    def replay_source_materialization(
+        self,
+        project_id: str,
+        campaign_id: str,
+        case_id: str,
+        *,
+        attestation_id: str,
+        request_id: str,
+    ) -> Mapping[str, object] | None:
+        entry = self._repository.test_provider_outbox_for_request(project_id, request_id)
+        if entry is None:
+            return None
+        payload = entry.get("command")
+        if not isinstance(payload, Mapping):
+            raise AssuranceBlockedError("test_provider_source_replay_binding_mismatch")
+        command = TestProviderCommand.from_payload(payload)
+        if (
+            command.flow_session_ref != project_id
+            or command.campaign_id != campaign_id
+            or command.case_id != case_id
+            or command.attestation_intent_ref != attestation_id
+            or command.materialization_mode != TestProviderMaterializationMode.ORCHESTRATOR_SOURCE
+            or command.operation not in {TestProviderOperation.MATERIALIZE, TestProviderOperation.EDIT}
+        ):
+            raise AssuranceBlockedError("test_provider_source_replay_binding_mismatch")
+        return {
+            "state": str(entry["state"]),
+            "outbox": entry | {"replayed": True},
+        }
+
     def queue_deterministic_materialization(
         self,
         project_id: str,
@@ -343,6 +378,8 @@ class TestProviderSocketService:
             "oracle_snapshot": dict(oracle["payload"]),
             "harness": dict(attestation.get("harness") or {}),
         }
+        if attempt_ref := source_provider_attempt_ref(attestation):
+            semantic_input["source_provider_attempt_ref"] = attempt_ref
         if source_files is not None:
             semantic_input.update(
                 {
@@ -412,15 +449,18 @@ class TestProviderSocketService:
             }
             else ""
         )
-        if (
-            operation == TestProviderOperation.MATERIALIZE
-            and isinstance(technical_retry, Mapping)
+        if operation in {TestProviderOperation.MATERIALIZE, TestProviderOperation.EDIT} and isinstance(
+            technical_retry, Mapping
         ):
             retry_of_command_id = required_text(
                 str(technical_retry.get("predecessor_command_id") or ""),
                 "predecessor_command_id",
             )
-            retry_rationale = "explicit deterministic materialization successor"
+            retry_rationale = (
+                "explicit source materialization successor"
+                if mode == TestProviderMaterializationMode.ORCHESTRATOR_SOURCE
+                else "explicit deterministic materialization successor"
+            )
             replay_boundary = f"technical-retry:{retry_of_command_id}"
         command = TestProviderCommand(
             flow_session_ref=project_id,

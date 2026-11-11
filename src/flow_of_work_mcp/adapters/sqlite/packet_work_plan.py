@@ -5,7 +5,7 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import replace
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from flow_of_work_mcp.adapters.sqlite.common import _utc_now
 from flow_of_work_mcp.core.domain.architecture import applicability, selected_closure
@@ -56,6 +56,17 @@ def _draft_fingerprint(draft: PacketWorkPlanDraft) -> str:
 
 
 class PacketWorkPlanStoreMixin:
+    def packet_consumption_mode(self, project_id: str, change_id: str, packet_id: str) -> str:
+        """Read the selected packet mode without hydrating its evidence history."""
+        with self._read_connection() as connection:
+            self._packet_row(connection, project_id, change_id, packet_id)
+            row = connection.execute(
+                """SELECT consumption_mode FROM external_packet_authority
+                   WHERE project_id = ? AND change_id = ? AND packet_id = ?""",
+                (project_id, change_id, packet_id),
+            ).fetchone()
+            return str(row["consumption_mode"]) if row is not None else "provider"
+
     def packet_work_plan_authoring_history(
         self, project_id: str, change_id: str, packet_id: str,
     ) -> list[Mapping[str, object]]:
@@ -1062,6 +1073,7 @@ class PacketWorkPlanStoreMixin:
         rationale: str,
         actor: str,
         request_id: str = "",
+        acceptance_check: Callable[[str, str, str, int], None] | None = None,
     ) -> Mapping[str, Any]:
         project_id = validate_project_id(project_id)
         work_plan_id = validate_packet_work_plan_id(work_plan_id)
@@ -1160,6 +1172,8 @@ class PacketWorkPlanStoreMixin:
 
             if next_status == PacketWorkPlanStatus.ACCEPTED:
                 self._assert_work_plan_architecture(connection, project_id, packet)
+                if acceptance_check is not None:
+                    acceptance_check(project_id, str(plan["change_id"]), str(plan["packet_id"]), plan_revision)
                 self._revalidate_persisted_bindings(
                     connection, project_id, work_plan_id, plan_revision
                 )

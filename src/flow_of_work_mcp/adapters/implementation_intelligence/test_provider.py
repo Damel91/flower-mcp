@@ -298,6 +298,9 @@ def _provider_metadata(command: TestProviderCommand) -> dict[str, object]:
 def _flow_provider_metadata(command: TestProviderCommand) -> dict[str, object]:
     payload = command.as_payload()
     semantic_input = dict(_mapping(payload.get("semantic_input"), "semantic_input"))
+    attempt_ref = semantic_input.pop("source_provider_attempt_ref", None)
+    if attempt_ref is not None:
+        payload["attestation_intent_ref"] = _required_text(attempt_ref, "source_provider_attempt_ref")
     semantic_input["harness"] = _harness_input(command.semantic_input)
     payload["semantic_input"] = semantic_input
     return payload
@@ -515,6 +518,10 @@ def _canonical_oracle_kind(
         "boundary": "probe_limit",
     }
     selected = aliases.get(normalized)
+    case = semantic.get("case")
+    if selected is None and normalized and isinstance(case, Mapping):
+        case_kind = str(case.get("oracle_kind") or "").strip().lower()
+        selected = aliases.get(case_kind)
     if selected is None:
         raise ImplementationProviderContractError("test_provider_oracle_kind_invalid")
     harness = _harness_input(semantic)

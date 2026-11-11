@@ -118,7 +118,22 @@ def _review_basis(snapshot):
                         "report_scopes": [report_scopes[key] for key in sorted(report_scopes)]})
 
 
-def repository_review_projection(snapshot: Mapping[str, object], audits) -> dict[str, object]:
+def normalize_observed_repository_source(value: object) -> dict[str, str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {"identity", "revision"}:
+        raise InputValidationError(
+            "Supply the observed repository identity and revision together.",
+            field="payload.observed_source", received_value=None,
+        )
+    try:
+        return {key: _bounded_text(value[key], key, 512) for key in ("identity", "revision")}
+    except ValueError as exc:
+        raise InputValidationError(str(exc), field="payload.observed_source", received_value=None) from exc
+
+
+def repository_review_projection(snapshot: Mapping[str, object], audits, *,
+                                 observed_source: Mapping[str, str] | None = None) -> dict[str, object]:
     version = engineering_cycle_version(snapshot.get("plan"))
     required = version == 1 and (snapshot.get("external") or {}).get("consumption_mode") == "external_agent"
     requirement_ids = sorted(str(row["requirement_id"]) for row in snapshot.get("requirements", []))
@@ -130,9 +145,22 @@ def repository_review_projection(snapshot: Mapping[str, object], audits) -> dict
     latest = max(relevant, key=lambda audit: int(audit["phase_audit_id"]), default=None)
     review = (latest or {}).get("repository_review")
     current = bool(review and review["expected_basis_fingerprint"] == basis)
+    source = {"identity": review["source_identity"], "revision": review["source_revision"],
+              "provenance": "host_declared"} if review else None
+    if observed_source is None:
+        source_status = "not_observed"
+    elif source is None:
+        source_status = "no_review"
+    elif observed_source["identity"] != source["identity"]:
+        source_status = "different_repository"
+    elif observed_source["revision"] != source["revision"]:
+        source_status = "changed_revision"
+    else:
+        source_status = "matching_revision"
+    source_changed = source_status in {"changed_revision", "different_repository"}
     absence = _absence(snapshot)
     coverage = deepcopy(review["coverage"]) if review else []
-    complete = current and all(row["state"] in _CURRENT_STATES or
+    complete = current and not source_changed and all(row["state"] in _CURRENT_STATES or
                                (row["state"] == "not_applicable" and absence[row["dimension"]])
                                for row in coverage)
     retrospective = current and all(row["state"] in _RETROSPECTIVE_STATES
@@ -143,7 +171,7 @@ def repository_review_projection(snapshot: Mapping[str, object], audits) -> dict
     if gaps or architecture_gaps:
         state = "authority_blocked"
         complete = retrospective = False
-    elif review and not current:
+    elif review and (not current or source_changed):
         state = "stale"
     elif review:
         state = "current" if complete else "open"
@@ -164,8 +192,10 @@ def repository_review_projection(snapshot: Mapping[str, object], audits) -> dict
               "required": required, "state": state, "scope_id": scope_id,
               "requirement_ids": requirement_ids, "basis_fingerprint": basis,
               "latest_audit_id": int(latest["phase_audit_id"]) if latest else None,
-              "source": {"identity": review["source_identity"], "revision": review["source_revision"],
-                         "provenance": "host_declared"} if review else None,
+              "source": source,
+              "source_applicability": {"state": source_status,
+                                       **({"observation": {**observed_source, "provenance": "host_declared"}}
+                                          if observed_source is not None else {})},
               "coverage": coverage, "complete": bool(complete), "retrospective_recorded": bool(retrospective),
               "semantic_truth_verified": False, "human_acceptance": False, "next_gate": route}
     if state == "authority_blocked":

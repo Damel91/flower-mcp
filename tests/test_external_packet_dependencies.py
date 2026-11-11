@@ -6,7 +6,7 @@ import pytest
 from flow_of_work_mcp import ChangeControlService, ImplementationPacketDraft, PacketWorkPlanDraft, WorkPlanUnit
 from flow_of_work_mcp.application.external_work import ExternalWorkService
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
-from tests.test_external_work import fixture, report
+from tests.test_external_work import fixture, historical_criterion_enrollment, report
 from tests.engineering_cycle_support import record_test_repository_review
 
 
@@ -20,8 +20,7 @@ def dependent_fixture(tmp_path):
         invariants=('Use the predecessor increment contract without changing arithmetic',),
         architecture_refs=architecture_refs), actor='human')['packets'][-1]
     ids = (first_ids[0], first_ids[1], packet['packet_id'])
-    external.call(*ids, 'upgrade_validation', actor='human', request_id='facade-upgrade',
-        payload={'expected_spec_revision': packet['spec_revision'], 'expected_plan_revision': 0})
+    historical_criterion_enrollment(ledger, ids, packet, request_id='facade-upgrade')
     changes.link_dependency(*ids, first_ids[2], actor='human')
     packet = ledger.change_state(*ids[:2])['packets'][-1]
     unit = WorkPlanUnit(client_unit_key='facade', operation_kind='new_file', file_path='src/facade.py',

@@ -4,6 +4,16 @@ from __future__ import annotations
 
 from typing import Mapping, Protocol, Sequence
 
+from flow_of_work_mcp.core.domain.campaign_authoring import ObligationAuthoringBatch
+from flow_of_work_mcp.core.domain.campaign_host import (
+    HostCampaignCheck,
+    HostCampaignResult,
+    campaign_case_lane,
+    host_case_supported,
+    independent_host_obligations,
+    next_host_case,
+    required_host_cases,
+)
 from flow_of_work_mcp.core.domain.campaign_authority import (
     BehavioralOracleDraft,
     CampaignCaseSemanticDraft,
@@ -14,11 +24,12 @@ from flow_of_work_mcp.core.domain.campaign_authority import (
     TestProviderOperation,
     deterministic_materialization_retry_eligible,
     semantic_fingerprint,
+    source_attestation_retry_eligible,
 )
 from flow_of_work_mcp.core.domain.identifiers import required_text
 from flow_of_work_mcp.core.domain.oracle_ir_projection import compile_oracle_ir
 from flow_of_work_mcp.core.domain.oracle_questions import (
-    current_oracle_question, oracle_ir_refinement_applicable, oracle_source_repair,
+    applicable_oracle_questions, current_oracle_question, oracle_ir_refinement_applicable, oracle_source_repair,
 )
 from flow_of_work_mcp.core.errors import AssuranceBlockedError, InputValidationError
 from flow_of_work_mcp.core.ports.campaign_authority import CampaignAuthorityRepository
@@ -181,6 +192,56 @@ class CampaignAuthorityService:
         )
         return self._mutation_projection("reorder_cases", before, state)
 
+    def author_obligations(
+        self,
+        project_id: str,
+        campaign_id: str,
+        batch: object,
+        *,
+        expected_fingerprint: str,
+        actor: str,
+        request_id: str,
+    ) -> Mapping[str, object]:
+        state = self._repository.author_campaign_obligations(
+            project_id, campaign_id, ObligationAuthoringBatch.parse(batch),
+            expected_fingerprint=expected_fingerprint, actor=actor, request_id=request_id,
+        )
+        return {
+            "campaign": _summary(state),
+            "authoring_receipt": state["authoring_receipt"],
+            "replayed": bool(state.get("replayed")),
+            "lifecycle_gate": _campaign_gate(state),
+        }
+
+    def issue_host_check(
+        self, project_id: str, campaign_id: str, case_id: str, check: object,
+        *, actor: str, request_id: str, expected_fingerprint: str = "",
+    ) -> Mapping[str, object]:
+        state = self._repository.issue_campaign_host_check(
+            project_id, campaign_id, case_id, HostCampaignCheck.parse(check),
+            actor=actor, request_id=request_id, expected_fingerprint=expected_fingerprint,
+        )
+        return self._host_action_projection(state, "host_attempt")
+
+    def report_host_result(
+        self, project_id: str, campaign_id: str, result: object,
+        *, actor: str, request_id: str,
+    ) -> Mapping[str, object]:
+        state = self._repository.report_campaign_host_result(
+            project_id, campaign_id, HostCampaignResult.parse(result),
+            actor=actor, request_id=request_id,
+        )
+        return self._host_action_projection(state, "host_receipt")
+
+    @staticmethod
+    def _host_action_projection(state: Mapping[str, object], field: str) -> Mapping[str, object]:
+        return {
+            "campaign": _summary(state),
+            field: state[field],
+            "replayed": bool(state.get("replayed")),
+            "lifecycle_gate": _campaign_gate(state),
+        }
+
     def decide_obligation(
         self,
         project_id: str,
@@ -294,31 +355,41 @@ class CampaignAuthorityService:
         harness: Mapping[str, object] | None = None,
         requested_capability: Mapping[str, object] | None = None,
     ) -> Mapping[str, object]:
-        before = self._repository.campaign_authority_state(project_id, campaign_id)
-        state = self._repository.create_campaign_attestation_intent(
-            project_id,
-            campaign_id,
-            case_id,
-            source_files=source_files,
-            harness=harness,
-            requested_capability=requested_capability,
-            authority_reference=authority_reference,
-            actor=required_text(actor, "actor"),
-            request_id=required_text(request_id, "request_id"),
-        )
-        projection = dict(self._mutation_projection("attest_source", before, state))
-        if self._test_provider_socket is not None:
-            projection["provider"] = _provider_projection(
-                self._test_provider_socket.queue_materialization(
-                    project_id,
-                    campaign_id,
-                    case_id,
-                    source_files=source_files,
-                    actor=actor,
-                    request_id=f"{request_id}:provider",
-                    deliver=False,
-                )
+        actor = required_text(actor, "actor")
+        request_id = required_text(request_id, "request_id")
+        provider = None
+        with self._repository.atomic():
+            before = self._repository.campaign_authority_state(project_id, campaign_id)
+            state = self._repository.create_campaign_attestation_intent(
+                project_id,
+                campaign_id,
+                case_id,
+                source_files=source_files,
+                harness=harness,
+                requested_capability=requested_capability,
+                allow_pending_dispatch=bool(
+                    self._test_provider_socket and self._test_provider_socket.configured
+                ),
+                authority_reference=authority_reference,
+                actor=actor,
+                request_id=request_id,
             )
+            attestation_id = str(state["source_attestation_id"])
+            if self._test_provider_socket is not None:
+                if state.get("replayed"):
+                    provider = self._test_provider_socket.replay_source_materialization(
+                        project_id, campaign_id, case_id, attestation_id=attestation_id,
+                        request_id=f"{request_id}:provider",
+                    )
+                else:
+                    provider = self._test_provider_socket.queue_materialization(
+                        project_id, campaign_id, case_id, source_files=source_files,
+                        actor=actor, request_id=f"{request_id}:provider", deliver=False,
+                    )
+        projection = dict(self._mutation_projection("attest_source", before, state))
+        projection["attestation_id"] = attestation_id
+        if provider is not None:
+            projection["provider"] = _provider_projection(provider)
         return projection
 
     def authorize_materialization(
@@ -504,6 +575,7 @@ class CampaignAuthorityService:
             "constructibility",
             "oracle_ir",
             "attestation",
+            "host_attempts",
             "evidence",
             "residuals",
             "history",
@@ -511,7 +583,7 @@ class CampaignAuthorityService:
             raise InputValidationError("campaign inspect view is invalid", field="view",
                 received_value=selected_view, accepted_values=("summary", "working_sheet", "cases",
                     "obligations", "oracles", "constructibility", "oracle_ir", "attestation",
-                    "evidence", "residuals", "history"))
+                    "host_attempts", "evidence", "residuals", "history"))
         if not campaign_id:
             active = self._repository.active_campaign_authority(
                 project_id, change_id=change_id
@@ -555,11 +627,16 @@ class CampaignAuthorityService:
             "obligations": "obligations",
             "oracles": "oracles",
             "attestation": "attestations",
+            "host_attempts": "host_attempts",
             "evidence": "evidence",
             "residuals": "residuals",
             "history": "history",
         }[selected_view]
-        values = list(state.get(key, []))
+        values = list(
+            state.get("host_execution", {}).get("attempts", []) if key == "host_attempts" else state.get(key, [])
+        )
+        if key == "obligations":
+            values.extend(state.get("obligation_history", []))
         if key == "attestations":
             values = [
                 _public_attestation_projection(item)
@@ -584,6 +661,7 @@ class CampaignAuthorityService:
         actor: str,
         request_id: str,
         transition_budget: int = 8,
+        source_revision: str = "",
     ) -> Mapping[str, object]:
         if isinstance(transition_budget, bool) or not 1 <= transition_budget <= 32:
             raise ValueError("transition_budget must be between 1 and 32")
@@ -603,7 +681,7 @@ class CampaignAuthorityService:
             state = self._repository.campaign_authority_state(project_id, campaign_id)
         transitions: list[Mapping[str, object]] = []
         for index in range(transition_budget):
-            gate = _campaign_gate(state)
+            gate = _campaign_gate(state, source_revision)
             action = gate["next_action"]
             if (
                 gate["state"] == "mechanical_progress"
@@ -679,23 +757,28 @@ class CampaignAuthorityService:
                 and action.get("operation") == "propagate_coverage"
                 and self._coverage_propagation is not None
             ):
-                propagation = self._coverage_propagation.propagate_campaign(
-                    project_id,
-                    campaign_id,
-                    actor=required_text(actor, "actor"),
-                    request_id=(f"{required_text(request_id, 'request_id')}:coverage"),
-                )
+                host_cases = required_host_cases(state)
+                with self._repository.atomic():
+                    if host_cases:
+                        state = self._repository.campaign_authority_state(project_id, campaign_id)
+                        current_gate = _campaign_gate(state, source_revision)
+                        if current_gate["next_action"].get("operation") != "propagate_coverage":
+                            return {
+                                "campaign": _summary(state), "transitions": transitions,
+                                "lifecycle_gate": current_gate,
+                            }
+                    propagation = self._coverage_propagation.propagate_campaign(
+                        project_id, campaign_id, actor=required_text(actor, "actor"),
+                        request_id=f"{required_text(request_id, 'request_id')}:coverage",
+                    )
+                    state = self._repository.record_campaign_completion(
+                        project_id, campaign_id, propagation=propagation,
+                        actor=required_text(actor, "actor"),
+                        request_id=f"{required_text(request_id, 'request_id')}:completion",
+                        observed_source_revision=source_revision if host_cases else "",
+                    )
                 transitions.append(
                     {"operation": "propagate_coverage", "result": propagation}
-                )
-                state = self._repository.record_campaign_completion(
-                    project_id,
-                    campaign_id,
-                    propagation=propagation,
-                    actor=required_text(actor, "actor"),
-                    request_id=(
-                        f"{required_text(request_id, 'request_id')}:completion"
-                    ),
                 )
                 return {
                     "campaign": _summary(state),
@@ -794,12 +877,14 @@ class CampaignAuthorityService:
 
 
 def _summary(state: Mapping[str, object]) -> dict[str, object]:
+    exception = state.get("exception")
+    historical_exception = isinstance(exception, Mapping) and exception.get("current") is False
     return {
         "campaign_id": str(state.get("campaign_id") or ""),
         "change_id": str(state.get("change_id") or ""),
         "title": str(state.get("title") or ""),
         "status": str(state.get("status") or ""),
-        "qualification": str(state.get("qualification") or ""),
+        "qualification": "historical_on_original_basis" if historical_exception else str(state.get("qualification") or ""),
         "constructibility": str(state.get("constructibility") or ""),
         "revision": int(state.get("revision") or 0),
         "fingerprint": str(state.get("fingerprint") or ""),
@@ -808,15 +893,17 @@ def _summary(state: Mapping[str, object]) -> dict[str, object]:
         "oracle_count": len(state.get("oracles", [])),
         "attestation_count": len(state.get("attestations", [])),
         "evidence_count": len(state.get("evidence", [])),
+        **({"execution_lane": state["scope"]["execution_lane"]}
+           if state.get("scope", {}).get("execution_lane") else {}),
+        **({"host_source_revision": state["host_execution"]["declared_source_revision"]}
+           if state.get("host_execution") else {}),
         "promotion_authorization_count": len(state.get("promotion_authorizations", [])),
         "completed": bool(
             isinstance(state.get("completion"), Mapping)
             and state["completion"].get("current")
         ),
         "residual_count": len(state.get("residuals", [])),
-        "exception": dict(state["exception"])
-        if isinstance(state.get("exception"), Mapping)
-        else None,
+        "exception": dict(exception) if isinstance(exception, Mapping) else None,
     }
 
 
@@ -884,7 +971,70 @@ def _oracle_ir_projections(state: Mapping[str, object]) -> list[dict[str, object
     return result[:20]
 
 
-def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
+_CAMPAIGN_WORK_PHASES = (
+    ("scope", "Select a current governed change and scope.", {"start", "edit_scope"}),
+    ("obligations", "Derive and classify proof obligations for the selected scope.",
+     {"derive_obligations", "decide_obligation"}),
+    ("cases", "Author required cases and bind applicable obligations.", {"add_case", "bind_obligation"}),
+    ("oracle", "Author and complete current source Oracles for the required cases.",
+     {"author_oracle", "answer_question", "oracles"}),
+    ("attestation", "Bind and validate exact test source or authorized materialization.",
+     {"attest_source", "authorize_materialization", "deliver_test_command", "issue_host_check"}),
+    ("evidence", "Run current attested cases and inspect their observed outcomes.",
+     {"run_test_case", "rerun_test_case", "report_host_result"}),
+    ("promotion", "Authorize and deliver promotion for current passed evidence.",
+     {"authorize_promotion", "deliver_promotion"}),
+    ("coverage", "Reconcile accepted coverage and record campaign completion.", {"propagate_coverage"}),
+)
+
+
+def _campaign_remaining_work(
+    gate: Mapping[str, object], questions: Sequence[Mapping[str, object]] = (),
+) -> dict[str, object]:
+    action = gate["next_action"]
+    phase = next((index for index, (_, _, operations) in enumerate(_CAMPAIGN_WORK_PHASES)
+                  if action["operation"] in operations), None)
+    remaining: dict[str, object] = {"conditional_phases": []}
+    if gate["state"] in {"accepted", "inactive"}:
+        return remaining
+    remaining["effort"] = "undetermined"
+    if action["tool"] == "fow_packet_author":
+        remaining["current_phase"] = "product_correction"
+    elif phase is not None:
+        name, description, _ = _CAMPAIGN_WORK_PHASES[phase]
+        remaining["current_phase"] = name
+        remaining["current_phase_requirement"] = description
+        remaining["conditional_phases"] = [
+            {"phase": later_name, "requirement": later_description}
+            for later_name, later_description, _ in _CAMPAIGN_WORK_PHASES[phase + 1:]
+        ]
+    if questions:
+        selected = questions[0]
+        same_oracle = [question for question in questions
+                       if question["oracle_id"] == selected["oracle_id"]
+                       and question["oracle_revision"] == selected["oracle_revision"]]
+        remaining["oracle_questions"] = {
+            **{key: selected[key] for key in ("case_id", "oracle_id", "oracle_revision", "scope")},
+            "current_question_id": selected["question_id"],
+            "ordered_missing_fields": [
+                {key: question[key] for key in ("question_id", "field_name")} for question in same_oracle
+            ],
+            "other_pending_questions": len(questions) - len(same_oracle),
+        }
+    return remaining
+
+
+def _campaign_gate(state: Mapping[str, object], source_revision: str = "") -> dict[str, object]:
+    active = state.get("qualification") == "current" and state.get("status") not in {"cancelled", "accepted_exception"}
+    questions = applicable_oracle_questions(state) if active else []
+    gate = _campaign_lifecycle_gate(state, questions[0] if questions else None, source_revision)
+    return {**gate, "work_remaining": _campaign_remaining_work(gate, questions)}
+
+
+def _campaign_lifecycle_gate(
+    state: Mapping[str, object], current_question: Mapping[str, object] | None,
+    source_revision: str = "",
+) -> dict[str, object]:
     campaign_id = str(state.get("campaign_id") or "")
     qualification = str(state.get("qualification") or "")
     if qualification != "current":
@@ -892,7 +1042,6 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
     constructibility = str(state.get("constructibility") or "draft")
     obligations = list(state.get("obligations", []))
     cases = list(state.get("cases", []))
-    oracles = list(state.get("oracles", []))
     attestations = list(state.get("attestations", []))
     decision_required: dict[str, object] | None = None
     allowed: list[Mapping[str, object]] = []
@@ -900,23 +1049,28 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
     gate_state = "semantic_decision"
     next_action: dict[str, object]
     status = str(state.get("status") or "")
+    applicability = state.get("obligation_applicability") or {}
     source_repair = oracle_source_repair(state)
     if status in {"cancelled", "accepted_exception"}:
         gate_state = "inactive"
         next_action = {"tool": "fow_campaign_inspect", "operation": "summary"}
+        exception = state.get("exception")
+        if isinstance(exception, Mapping) and exception.get("current") is False:
+            effect = "The exception belongs to its original scope. Assess current scope through an ordinary campaign."
     elif constructibility == CampaignConstructibility.NEEDS_OBLIGATIONS.value:
         undecided = [
             item
             for item in obligations
             if item.get("decision") in {"unclassified", "investigate"}
         ]
-        if not obligations:
+        if not obligations or applicability.get("current") is False:
             gate_state = "mechanical_progress"
             next_action = {
                 "tool": "fow_campaign_advance",
                 "operation": "derive_obligations",
             }
-            effect = "derive current proof-obligation candidates without accepting them"
+            effect = ("refresh proof obligations for changed scope or sources"
+                      if obligations else "derive current proof-obligation candidates without accepting them")
         else:
             item = undecided[0]
             decision_required = {
@@ -962,7 +1116,6 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
         operation = str(
             (residual.get("next_action") or {}).get("operation") or "author_oracle"
         )
-        current_question = current_oracle_question(state)
         decision_required = (
             {"kind": "oracle_answer", **dict(current_question)}
             if current_question is not None
@@ -992,8 +1145,15 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
         else:
             next_action = {"tool": "fow_campaign_inspect", "operation": "oracles",
                 "arguments": {"campaign_id": campaign_id, "view": "oracles"}}
+    elif (host_case := next_host_case(state, source_revision)) is not None:
+        gate_state, next_action, decision_required, effect = _host_execution_boundary(
+            state, host_case, source_revision,
+        )
     else:
-        required_cases = [item for item in cases if bool(item.get("required"))]
+        required_cases = [
+            item for item in cases if bool(item.get("required"))
+            and campaign_case_lane(state.get("scope", {}), item) == "provider"
+        ]
         oracle_by_case = {
             str(binding.get("case_id") or ""): binding
             for binding in state.get("oracle_bindings", [])
@@ -1177,7 +1337,15 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
                     ),
                     None,
                 )
-                if unpromoted_case is None:
+                if unpromoted_case is None and required_host_cases(state) and not source_revision:
+                    gate_state = "source_boundary"
+                    next_action = {
+                        "tool": "fow_campaign_advance", "operation": "advance",
+                        "arguments": {"campaign_id": campaign_id},
+                    }
+                    decision_required = {"kind": "observe_host_source", "required_inputs": ["source_revision"]}
+                    effect = "supply the repository source revision observed for coverage reconciliation"
+                elif unpromoted_case is None:
                     gate_state = "mechanical_progress"
                     next_action = {
                         "tool": "fow_campaign_advance",
@@ -1264,6 +1432,71 @@ def _campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def _host_execution_boundary(state, case, observed_source_revision):
+    case_id = case["case_id"]
+    campaign_id = state["campaign_id"]
+    execution = state.get("host_execution", {})
+    declared_source = execution.get("declared_source_revision", "")
+    source_changed = bool(observed_source_revision and declared_source and observed_source_revision != declared_source)
+    attempt = execution.get("current_attempts", {}).get(case_id)
+    receipt = execution.get("current_receipts", {}).get(case_id)
+    blockers = independent_host_obligations(state, case_id)
+    if blockers or not host_case_supported(case):
+        cause = "independent_proof_required" if blockers else "case_not_host_eligible"
+        return (
+            "independent_proof_boundary",
+            {"tool": "fow_campaign_author", "operation": "edit_case",
+             "arguments": {"campaign_id": campaign_id, "case_id": case_id}},
+            {"kind": cause, "case_id": case_id, "obligation_ids": blockers,
+             "required_inputs": ["case"]},
+            "supply an eligible case and select its required proof lane before execution",
+        )
+    if receipt and not source_changed and receipt["outcome"] == "product_failed":
+        return (
+            "product_failure_boundary",
+            {"tool": "fow_assurance", "operation": "record_finding",
+             "arguments": {"change_id": state["change_id"]}},
+            {"kind": "product_failure_route", "case_id": case_id,
+             "evidence_id": receipt["receipt_id"], "observation": receipt["observation"]},
+            "record and route the observed product failure, then verify the corrected source",
+        )
+    if attempt and not source_changed and not receipt:
+        return (
+            "host_execution_boundary",
+            {"tool": "fow_campaign_author", "operation": "report_host_result",
+             "arguments": {"campaign_id": campaign_id, "host_result": {
+                 "attempt_id": attempt["attempt_id"], "source_revision": attempt["source_revision"],
+             }}},
+            {"kind": "run_host_check", "case_id": case_id, "attempt_id": attempt["attempt_id"],
+             "check_reference": attempt["check_reference"], "execution_profile": attempt["execution_profile"],
+             "source_revision": attempt["source_revision"], "check": attempt["check"],
+             "required_inputs": ["outcome", "evidence_reference", "observation"]},
+            "run the issued check using authorized host tools and report its actual result",
+        )
+    last_outcome = receipt.get("outcome") if receipt and not source_changed else ""
+    cause = {
+        "test_invalid": "correct the invalid check, then issue its replacement",
+        "environment_failed": "restore the declared execution environment before issuing a retry",
+    }.get(last_outcome, "issue the current case check using the observed source and execution profile")
+    decision = {
+        "kind": "issue_host_check", "case_id": case_id,
+        "required_inputs": ["source_revision", "execution_profile", "check_reference"],
+    }
+    if source_changed:
+        decision |= {"declared_source_revision": declared_source, "observed_source_revision": observed_source_revision}
+        cause = "source changed since the previous attempts; issue a check for the observed revision"
+    if receipt:
+        decision |= {"evidence_id": receipt["receipt_id"], "last_outcome": receipt["outcome"],
+                     "observation": receipt["observation"]}
+    return (
+        "host_check_boundary",
+        {"tool": "fow_campaign_author", "operation": "issue_host_check",
+         "arguments": {"campaign_id": campaign_id, "case_id": case_id,
+                       "expected_fingerprint": state["fingerprint"]}},
+        decision, cause,
+    )
+
+
 def _attestation_successor_gate(
     case_id: str,
     attestation: Mapping[str, object] | None,
@@ -1271,6 +1504,22 @@ def _attestation_successor_gate(
     known_case_choices: Sequence[str],
     evidence_id: str = "",
 ) -> tuple[dict[str, object], dict[str, object], str]:
+    if not evidence_id and attestation is not None and source_attestation_retry_eligible(attestation):
+        attestation_id = str(attestation["attestation_id"])
+        capability = attestation.get("requested_capability") or {}
+        arguments = {"case_id": case_id, "requested_capability": capability}
+        return (
+            {"tool": "fow_campaign_author", "operation": "attest_source", "arguments": arguments},
+            {
+                "kind": "source_attestation_technical_retry",
+                "case_id": case_id,
+                "attestation_id": attestation_id,
+                "reason": f"A finished technical attempt invalidated {attestation_id}. The source authority is unchanged.",
+                "known_case_choices": list(known_case_choices),
+            },
+            "submit one new request now with the exact same source_files, harness and capability. "
+            "The new provider attempt checks readiness. Inspect its result before any further retry",
+        )
     if deterministic_materialization_retry_eligible(attestation):
         raw_capability = attestation.get("requested_capability")
         capability = (
@@ -1324,9 +1573,9 @@ def _attestation_successor_gate(
             "arguments": {"case_id": case_id},
         },
         decision,
-        "author a corrected source revision without changing the oracle"
+        "send corrected test source inline for the same Oracle and leave the product checkout unchanged"
         if evidence_id
-        else "bind exact orchestrator-authored test source to the current oracle",
+        else "send test source inline to a distinct provider-managed destination and leave the product checkout unchanged",
     )
 
 
@@ -1389,7 +1638,10 @@ def _accepted_campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
         "known_facts": [
             {
                 "label": "campaign evidence",
-                "fact": "all required cases have current attested passed evidence",
+                "fact": (
+                    "all required cases have eligible passed evidence; host receipts retain declared provenance"
+                    if required_host_cases(state) else "all required cases have current attested passed evidence"
+                ),
                 "source": "Flow campaign ledger",
                 "freshness": "current",
             }
@@ -1398,11 +1650,12 @@ def _accepted_campaign_gate(state: Mapping[str, object]) -> dict[str, object]:
         "allowed_responses": [],
         "semantic_effect": "campaign evidence is accepted and coverage was reconciled",
         "next_action": {"tool": "fow_campaign_inspect", "operation": "summary"},
+        "work_remaining": {"conditional_phases": []},
     }
 
 
 def _empty_gate(project_id: str, change_id: str) -> dict[str, object]:
-    return {
+    gate = {
         "contract": "flow.lifecycle_gate.v1",
         "subject": "campaign",
         "state": "semantic_decision",
@@ -1416,6 +1669,7 @@ def _empty_gate(project_id: str, change_id: str) -> dict[str, object]:
         "semantic_effect": "create one qualified campaign from current scope",
         "next_action": {"tool": "fow_campaign_author", "operation": "start"},
     }
+    return {**gate, "work_remaining": _campaign_remaining_work(gate)}
 
 
 def _page(values: Sequence[object], *, offset: int, limit: int) -> dict[str, object]:
@@ -1525,4 +1779,17 @@ def _public_attestation_projection(
     }
 
 
-__all__ = ["CampaignAuthorityService"]
+def qualified_campaign_is_accepted(projection: Mapping[str, object]) -> bool:
+    campaign = projection.get("campaign")
+    gate = projection.get("lifecycle_gate")
+    if not isinstance(campaign, Mapping) or not isinstance(gate, Mapping):
+        return False
+    status = str(campaign.get("status") or "")
+    gate_state = str(gate.get("state") or "")
+    return gate_state == "accepted" or (
+        status == "accepted_exception" and gate_state == "inactive"
+        and campaign.get("qualification") != "historical_on_original_basis"
+    )
+
+
+__all__ = ["CampaignAuthorityService", "qualified_campaign_is_accepted"]

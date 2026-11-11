@@ -8,6 +8,7 @@ from flow_of_work_mcp import dashboard_maintenance
 from flow_of_work_mcp.dashboard_http import DashboardHTTP
 from flow_of_work_mcp.dashboard_auth import DashboardAuth
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind
+from flow_of_work_mcp.core.domain.lifecycle_control import MilestoneDraft
 from flow_of_work_mcp.mcp_runtime import build_runtime
 from flow_of_work_mcp.runtime_ownership import acquire_runtime_ownership
 from flow_of_work_mcp.server import create_app
@@ -295,5 +296,94 @@ def test_oversized_evidence_read_returns_specific_limit_rejection(tmp_path):
             assert response.json()['reason'] == 'dashboard_evidence_too_large'
             assert '2 MiB' in response.json()['message']
             assert 'content' not in response.json()
+    finally:
+        runtime.close()
+
+
+def test_requirement_documents_read_exact_scopes_beyond_dashboard_pagination(tmp_path):
+    runtime, dashboard, mcp = fixture(tmp_path)
+    ledger = runtime.ledger
+    try:
+        ids = [ledger.add_requirement('project-a', title=f'Owned requirement {index}',
+            statement=f'Owned behavior {index}.', category='functional', actor='test')['requirement_id']
+            for index in range(27)]
+        ledger.revise_requirement('project-a', ids[-1], title='Revised requirement',
+            statement='Use the current content.\n\n![External image](https://example.invalid/a)',
+            category='functional', actor='test', rationale='Owned revision fixture')
+        ledger.promote_milestone('project-a', MilestoneDraft(name='Earlier delivery',
+            requirement_ids=(ids[0],), prerequisite_requirement_ids=(), entry_policy={}, exit_policy={},
+            risk_disposition='bounded'), actor='test')
+        milestone = ledger.promote_milestone('project-a', MilestoneDraft(name='Selected delivery',
+            requirement_ids=(ids[-1], ids[2]), prerequisite_requirement_ids=(ids[0],), entry_policy={},
+            exit_policy={}, risk_disposition='bounded'), actor='test')['milestone_id']
+        before = _rows(ledger.database_path)
+        expected_ledger = ledger.ledger_version('project-a')
+        endpoint = '/dashboard/api/projects/project-a/documents/requirements'
+        with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+            assert client.get(endpoint, params={'scope': 'project'}).status_code == 401
+            request_csrf(client)
+            assert len(dashboard.projection.project('project-a')['items']) == 25
+            for scope, identity, expected_ids in (
+                ('requirement', ids[-1], [ids[-1]]),
+                ('milestone', milestone, [ids[2], ids[-1]]),
+                ('project', None, ids),
+            ):
+                params = {'scope': scope, **({'scope_id': identity} if identity else {})}
+                response = client.get(endpoint, params=params)
+                assert response.status_code == 200, response.text
+                assert response.headers['cache-control'] == 'no-store'
+                result = response.json()['result']
+                assert result['scope'] == scope and result['source_ledger_version'] == expected_ledger
+                assert result['filename'].startswith('flower-project-a-') and result['filename'].endswith('.md')
+                assert result['content_type'] == 'text/markdown'
+                assert result['requirements'] == [
+                    {'requirement_id': requirement_id, 'revision': 2 if requirement_id == ids[-1] else 1}
+                    for requirement_id in expected_ids
+                ]
+                assert 'Use the current content.' in result['content']
+                assert 'https://example.invalid/a' in result['content']
+                assert 'https://example.invalid/a' not in str(result['reader'])
+                assert result['content'] == client.get(endpoint, params=params).json()['result']['content']
+                if scope == 'milestone':
+                    assert ids[0] not in result['content']
+                    assert 'milestone.requirement_ids' in result['content']
+                    assert 'Current requirement revisions observed in this read' in result['content']
+                if scope == 'requirement':
+                    assert result['filename'] == f'flower-project-a-{ids[-1]}-r2.md'
+            foreign_endpoint = endpoint.replace('project-a', 'project-b')
+            for scope, identity in [('requirement', ids[-1]), ('milestone', milestone)]:
+                foreign = client.get(foreign_endpoint, params={'scope': scope, 'scope_id': identity})
+                assert foreign.status_code == 404
+                assert foreign.json()['reason'] == 'dashboard_document_not_found'
+                assert 'Revised requirement' not in foreign.text
+            empty = client.get(foreign_endpoint, params={'scope': 'project'}).json()['result']
+            assert not empty['requirements'] and '0 requirements' in empty['content']
+        assert _rows(ledger.database_path) == before
+    finally:
+        runtime.close()
+
+
+def test_requirement_document_rejects_malformed_selectors_maintenance_and_oversize(tmp_path, monkeypatch):
+    runtime, dashboard, mcp = fixture(tmp_path)
+    ledger = runtime.ledger
+    try:
+        ledger.add_requirement('project-a', title='Oversized requirement', statement='x' * (2 * 1024 * 1024 + 1),
+                               category='functional', actor='test')
+        before = _rows(ledger.database_path)
+        endpoint = '/dashboard/api/projects/project-a/documents/requirements'
+        with TestClient(mcp.streamable_http_app(), base_url='http://127.0.0.1:18760', client=('127.0.0.1', 12345)) as client:
+            request_csrf(client)
+            for query in ('', '?scope=milestone', '?scope=requirement&scope_id=bad',
+                          '?scope=project&scope=project', '?scope=project&scope_id=', '?scope=project&limit=1'):
+                response = client.get(endpoint + query)
+                assert response.status_code == 400 and response.json()['reason'] == 'dashboard_input_invalid'
+            with monkeypatch.context() as patch:
+                patch.setattr(dashboard.maintenance, '_state', 'draining')
+                response = client.get(endpoint + '?scope=project')
+                assert response.status_code == 503 and response.json()['reason'] == 'server_maintenance'
+            response = client.get(endpoint + '?scope=project')
+            assert response.status_code == 413 and response.json()['reason'] == 'dashboard_document_too_large'
+            assert '2 MiB' in response.json()['message'] and 'content' not in response.json()
+        assert _rows(ledger.database_path) == before
     finally:
         runtime.close()

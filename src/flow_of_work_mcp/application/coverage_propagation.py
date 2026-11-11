@@ -61,6 +61,13 @@ class CoveragePropagationService:
         for case in campaign.get("cases", []):
             if not isinstance(case, Mapping):
                 continue
+            case_evidence = case.get("metadata") or {}
+            host_provenance = (
+                {key: case_evidence[key] for key in (
+                    "campaign_evidence_id", "provenance", "source_revision", "execution_profile",
+                )}
+                if case_evidence.get("provenance") == "host_reported" else {}
+            )
             case_result = str(case.get("result") or "")
             if case_result != "passed":
                 diagnostics.append(
@@ -149,6 +156,17 @@ class CoveragePropagationService:
                         )
                     )
                     continue
+                if host_provenance and grounding_projection.get("source_revision") != host_provenance["source_revision"]:
+                    diagnostics.append(
+                        self._diagnostic(
+                            project_id, change_id=change_id, campaign_id=campaign_id, case=case,
+                            reason="live_grounding_source_mismatch", actor=actor,
+                            request_id=f"{base_request_id}:{case['case_id']}:live-grounding-source",
+                            extra={"grounding": grounding_projection,
+                                   "required_source_revision": host_provenance["source_revision"]},
+                        )
+                    )
+                    continue
             for requirement_id in covered_requirements:
                 evidence = self._requirements.record_verification(
                     project_id,
@@ -168,6 +186,7 @@ class CoveragePropagationService:
                             str(item) for item in case.get("covered_sequence_goal_node_ids", [])
                         ],
                         "grounding": dict(grounding_projection or {}),
+                        **host_provenance,
                     },
                     request_id=(
                         f"{base_request_id}:{case['case_id']}:{requirement_id}:{effect.value}"

@@ -96,7 +96,7 @@ class ExternalWorkStoreMixin:
 
     def external_work_state(self, project_id: str, change_id: str, packet_id: str) -> Mapping[str, object]:
         with self._read_connection() as connection:
-            self._packet_row(connection, project_id, change_id, packet_id)
+            packet = self._packet_row(connection, project_id, change_id, packet_id)
             row = connection.execute('''SELECT * FROM external_packet_authority
                 WHERE project_id=? AND change_id=? AND packet_id=?''', (project_id, change_id, packet_id)).fetchone()
             criteria = [dict(item) for item in connection.execute('''SELECT number,statement,active
@@ -115,10 +115,26 @@ class ExternalWorkStoreMixin:
                 reports.append(item)
             selections = [dict(item) for item in connection.execute('''SELECT * FROM external_work_report_selections
                 WHERE project_id=? AND change_id=? AND packet_id=?''', (project_id, change_id, packet_id)).fetchall()]
-            return {'validation_version': int(row['validation_version']) if row else 0,
+            state = {'validation_version': int(row['validation_version']) if row else 0,
                     'consumption_mode': str(row['consumption_mode']) if row else 'provider',
                     'criterion_statement_fingerprint': str(row['criterion_statement_fingerprint']) if row else '',
                     'criteria': criteria, 'criterion_history': history, 'reports': reports, 'selections': selections}
+            if state['validation_version'] == 2 and state['consumption_mode'] == 'external_agent':
+                event = connection.execute('''SELECT json_extract(payload_json, '$.result.dispositions') AS dispositions
+                    FROM requirement_events WHERE project_id=? AND event_type='external_work_classify_criteria'
+                        AND json_extract(payload_json, '$.result.change_id')=?
+                        AND json_extract(payload_json, '$.result.packet_id')=?
+                        AND json_extract(payload_json, '$.result.spec_revision')=?
+                    ORDER BY event_id DESC LIMIT 1''',
+                    (project_id, change_id, packet_id, packet['spec_revision'])).fetchone()
+                state['criterion_dispositions'] = json.loads(event['dispositions']) if event else []
+            return state
+
+    def external_work_validation_policy(self, project_id: str, change_id: str, packet_id: str) -> tuple[int, str]:
+        with self._read_connection() as connection:
+            row = connection.execute('''SELECT validation_version,consumption_mode FROM external_packet_authority
+                WHERE project_id=? AND change_id=? AND packet_id=?''', (project_id, change_id, packet_id)).fetchone()
+            return (int(row['validation_version']), str(row['consumption_mode'])) if row else (0, 'provider')
 
     def external_work_request_replay(self, project_id: str, request_id: str, request_fingerprint: str):
         with self._read_connection() as connection:
@@ -143,7 +159,8 @@ class ExternalWorkStoreMixin:
                                payload={'request_fingerprint': request_fingerprint, 'result': dict(result)}, occurred_at=_utc_now())
 
     def upgrade_external_criteria(self, project_id: str, change_id: str, packet_id: str,
-                                 statements: list[str], *, spec_revision: int, actor: str) -> None:
+                                 statements: list[str], *, spec_revision: int, actor: str,
+                                 validation_version: int = 1) -> None:
         with self._transaction() as connection:
             self._packet_row(connection, project_id, change_id, packet_id)
             row = connection.execute('''SELECT validation_version FROM external_packet_authority
@@ -151,8 +168,9 @@ class ExternalWorkStoreMixin:
             if row and row['validation_version']:
                 raise RequirementConflictError('packet_validation_already_upgraded')
             connection.execute('''INSERT INTO external_packet_authority(project_id,change_id,packet_id,validation_version,criterion_statement_fingerprint)
-                VALUES(?,?,?,1,?) ON CONFLICT(project_id,change_id,packet_id) DO UPDATE SET validation_version=1,criterion_statement_fingerprint=excluded.criterion_statement_fingerprint''',
-                (project_id, change_id, packet_id, fingerprint(statements)))
+                VALUES(?,?,?,?,?) ON CONFLICT(project_id,change_id,packet_id) DO UPDATE SET
+                validation_version=excluded.validation_version,criterion_statement_fingerprint=excluded.criterion_statement_fingerprint''',
+                (project_id, change_id, packet_id, validation_version, fingerprint(statements)))
             for num, statement in enumerate(statements, start=1):
                 cursor = connection.execute('''INSERT INTO packet_criteria(project_id,change_id,packet_id,number,statement,active)
                     VALUES(?,?,?,?,?,1)''', (project_id, change_id, packet_id, num, statement))

@@ -44,7 +44,7 @@ def oracle_source_repair(state: Mapping[str, object]) -> dict[str, object] | Non
     return None
 
 
-def current_oracle_question(state: Mapping[str, object]) -> dict[str, object] | None:
+def applicable_oracle_questions(state: Mapping[str, object]) -> list[dict[str, object]]:
     """Source questions globally precede optional IR; only exact bound heads qualify.
 
     Consume the full authority snapshot, never a paginated presentation. Retained
@@ -72,8 +72,13 @@ def current_oracle_question(state: Mapping[str, object]) -> dict[str, object] | 
         if not source_questions and oracle_ir_refinement_applicable(oracle):
             ir.extend({**question, **identity} for question in oracle.get("oracle_ir_questions", []))
     if source:
-        return source[0]
+        return source
     if source_incomplete or any(c.get("required") and c["case_id"] not in bound_cases
                                 for c in state.get("cases", [])):
-        return None
-    return ir[0] if ir else None
+        return []
+    return ir
+
+
+def current_oracle_question(state: Mapping[str, object]) -> dict[str, object] | None:
+    questions = applicable_oracle_questions(state)
+    return questions[0] if questions else None

@@ -60,6 +60,27 @@ def milestone_prerequisite_gaps(milestone: Mapping[str, object] | None) -> list[
             *milestone.get("prerequisite_authority_gaps", [])]
 
 
+def roadmap_correspondence(mappings, requirement_ids, milestone_ids, goals, edges):
+    """Resolve selected correspondence and its connected Goal context together."""
+    goals = set(goals)
+    selected = set(milestone_ids)
+    relevant = {}
+    while True:
+        previous = (set(goals), set(relevant))
+        for key, mapping in mappings.items():
+            refs = mapping["canonical_references"]
+            if (requirement_ids.intersection(refs["requirement_ids"])
+                    or selected.intersection(refs["milestone_ids"])
+                    or goals.intersection(refs["goal_node_ids"])):
+                goals.update(refs["goal_node_ids"])
+                relevant[key] = mapping
+        connected = {edge["target_goal_id"] for edge in edges if edge["source_goal_id"] in goals}
+        connected.update(edge["source_goal_id"] for edge in edges if edge["target_goal_id"] in goals)
+        goals.update(connected)
+        if (goals, set(relevant)) == previous:
+            return relevant, goals
+
+
 @dataclass(frozen=True)
 class MilestoneDraft:
     name: str

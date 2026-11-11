@@ -7,7 +7,9 @@ from typing import Mapping
 
 from flow_of_work_mcp.core.domain.external_work import has_only_deferred_verification, normalize_declarations
 from flow_of_work_mcp.application.navigation_audit import NavigationAuditService
-from flow_of_work_mcp.application.packet_work_plan import PacketWorkPlanService
+from flow_of_work_mcp.application.packet_work_plan import (
+    COMPACT_LOCAL_CHECKS, PacketWorkPlanService, materialize_compact_unit_checks,
+)
 from flow_of_work_mcp.core.domain.packet_operations import PacketTaskOperationKind
 from flow_of_work_mcp.core.domain.paths import repo_relative_file_path
 from flow_of_work_mcp.core.domain.provider_targets import candidate_can_be_deleted
@@ -16,6 +18,7 @@ from flow_of_work_mcp.core.domain.provider_surfaces import (
 )
 from flow_of_work_mcp.core.errors import (
     ChangeControlBlockedError,
+    InputValidationError,
     RequirementConflictError,
 )
 from flow_of_work_mcp.core.ports.change_control import ChangeControlRepository
@@ -90,8 +93,9 @@ class PacketUnitAuthoringService:
             int(current_plan.get("plan_revision") or 0) if current_plan else 0
         )
         key = str(client_unit_key or "").strip()
+        compact = unit is not None and COMPACT_LOCAL_CHECKS in unit
         if unit is not None:
-            normalized_unit = _normalize_unit_intent(unit)
+            normalized_unit = prepare_unit_authoring_input(unit)
             if key and key != normalized_unit["client_unit_key"]:
                 raise ValueError(
                     "client_unit_key does not match the unit being resumed"
@@ -155,6 +159,8 @@ class PacketUnitAuthoringService:
                     "received_plan_revision": int(expected_plan_revision),
                 },
             )
+        if compact:
+            self._work_plans.require_external_agent_mode(project_id, change_id, packet_id)
         if intent is None:
             intent = self._repository.save_packet_unit_authoring_intent(
                 project_id,
@@ -580,6 +586,11 @@ def _public_authoring_unit(unit: object) -> Mapping[str, object]:
     }
 
 
+def prepare_unit_authoring_input(unit: Mapping[str, object]) -> Mapping[str, object]:
+    """Validate an explicit unit without ledger, provider or repair effects."""
+    return _normalize_unit_intent(materialize_compact_unit_checks(unit))
+
+
 def _normalize_unit_intent(unit: Mapping[str, object]) -> Mapping[str, object]:
     value = dict(unit)
     forbidden = {
@@ -612,7 +623,10 @@ def _normalize_unit_intent(unit: Mapping[str, object]) -> Mapping[str, object]:
     if operation == PacketTaskOperationKind.NEW_FILE and not file_path:
         raise ValueError("new_file unit requires file_path")
     if operation == PacketTaskOperationKind.NEW_FILE and target_description:
-        raise ValueError("new_file unit cannot declare target_description")
+        raise InputValidationError(
+            "new_file unit cannot declare target_description. Omit it and use file_path for the destination.",
+            field="unit.target_description", received_value=target_description,
+        )
     if operation == PacketTaskOperationKind.EXTRACT_MOVE and not file_path:
         raise ValueError("extract_move unit requires destination file_path")
     if operation not in {
@@ -648,7 +662,10 @@ def _string_list(value: object, field: str) -> list[str]:
     if value is None:
         return []
     if not isinstance(value, (list, tuple)):
-        raise ValueError(f"{field} must be a list")
+        raise InputValidationError(
+            f"{field} must be a list. Put each statement in a separate array item.",
+            field=f"unit.{field}", received_value=value,
+        )
     result = [str(item or "").strip() for item in value]
     if any(not item for item in result):
         raise ValueError(f"{field} cannot contain empty values")

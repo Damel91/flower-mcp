@@ -94,10 +94,12 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             ),
             safety_notes=(
                 "Compose engineering-bootstrap, project-architecture-v1 and standalone-external-plan; current frames and exact help provide executable arguments. The host owns the agent loop. No provider or internal model is required.",
+                "From the confirmed roadmap, pick one bounded result in the eligible milestone. Reuse or open its change and packet, then report each admitted unit's outcome before selecting the next TODO. Record governing decisions when they arise.",
                 "Flower is canonical for project components, interfaces and governing decisions. Investigate and use fow_architecture inspect/propose/adopt before newly accepting the affected work plan; ordinary packet architecture_refs select its governing entities. Repository Markdown may explain or export a named Flower revision; its presence is not adopted architecture.",
                 "At packet or increment completion, reconcile only the affected scope through the current fow_audit_phase repository_review contract. A recovered context requires another comparison when its relevant declared source or semantic basis changed, not after every tool or unit.",
                 "A planned requirement or missing current outcome does not prove absent code. Inspect historical reports through fow_external_work validation with detail=full. Preserve original source pins, revisions, fingerprints and provenance; never relabel old tests as evidence for new authority or rewrite completed features from the initial backlog.",
                 "Update canonical architecture, grounding, evidence and findings only for demonstrated differences. Resolve technical choices as the engineer; a behavior mismatch uses canonical rereading and finding-linked corrective work rather than changing intent to justify code.",
+                "For intention grounding without an internal model, discover fow_semantic and use its existing prepare, submit and adopt operations with execution_mode=host for preparation. Supply real evidence and the issued source pin; the adopted result is a grounding audit for that scope.",
                 "Current admitted unit execution and outcome collection remain available while repository review is open. The review condition applies at final closure or affected dependent admission, not before the packet's own unit work. Historical issued plans remain historical authority; they are not silently enrolled or upgraded.",
                 "The phase audit retains traceability and a separate host-declared repository comparison. A no-change result still needs actual coverage and evidence references. historical_on_pin bookkeeping does not satisfy applicable current obligations, and unknown or truncated input is not complete.",
                 "Continue across confirmed milestones when actual scoped entry/admission predicates permit. Secondary actions are ordered options/context, not cumulative prerequisites. Recorded technical risk treatment does not create a new human approval. A review human_acceptance=false is non-attestation, not a per-milestone approval gate; explicit requires_milestone and real governed decisions remain authoritative.",
@@ -120,8 +122,9 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             stop_conditions=("hold affected repository execution while ownership, verification intent or predecessor contracts are incomplete; continue engineering authoring within confirmed intent", "hold affected effects while intent is unresolved or authority is stale", "conflicting reports need explicit reconciliation", "provider/agent execution mode change lacks explicit authority"),
             escalation_conditions=("intended behavior or scope remains unresolved after canonical reread and engineer investigation", "stakeholder explicitly requests architecture participation", "a concrete capability/evidence limit prevents further autonomous work"),
             safety_notes=(
-                "Request fow_external_work exact operation help on demand: upgrade_validation, validation, select_executor (external_agent), set_mode, export_plan, todo, report_outcome, reconcile_outcome.",
-                "Author units through fow_packet_author with declarations in the same unit payload. Consumer requires references producer_unit_key/contract_name/use, never copies producer clauses.",
+                "Request fow_external_work exact operation help on demand: upgrade_validation, criteria, classify_criteria, validation, select_executor (external_agent), export_plan, todo, report_outcome, reconcile_outcome.",
+                "Select the external_agent executor before compact unit authoring. Author units through fow_packet_author with ownership, dependencies and verification declarations together. Consumer requires references producer_unit_key/contract_name/use and does not copy producer clauses.",
+                "For validation version 2, save the exact current criterion dispositions through classify_criteria after drafting the plan. A change in behavior needs implements and verifies. Verification-only work needs an exact baseline or producing criterion and a verifier. Preserve deferred proof as its own obligation.",
                 "Complete the plan through investigation and ordinary authoring while PVP holds repository execution. Use validation detail=full and next_gate.repair for concrete help; revise_unit repairs one investigated unit, while replace_plan replaces the whole plan. Missing technical declarations are engineering work within confirmed intent. Clarify genuinely missing product behavior/scope; never invent mappings, waive obligations or claim completion to advance.",
                 "Each unit_checks statement needs the exact same-unit verifies statement with kind=unit_check after canonical text normalization. It need not equal criterion prose; implements does not determine which criterion the check verifies. Choose the active criterion through investigation. Preserve whole arrays when patching, use returned current revisions, review/accept the proposed plan and revalidate before execution. Deferred verification remains deferred.",
                 "A newly discovered gap offline holds affected repository effects. Continue investigation and retain proposed declarations for ordinary accepted Flower mutations after reconnection; editing the exported Markdown never changes canonical authority. A draft remains NOT EXECUTABLE. Closed issued plans retain their offline execution route while their included authority remains applicable.",
@@ -149,6 +152,7 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             evidence=(
                 "bounded fow_architecture inspection with explicit revision/paging completeness",
                 "complete immutable proposal and explicit adoption receipt with rationale",
+                "complete Markdown from fow_architecture export, pinned to the selected revision and state",
                 "same-project canonical requirement/Goal/packet/evidence links and original provenance",
                 "ordinary packet architecture_refs and coherent selected authority fingerprint",
             ),
@@ -163,10 +167,11 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             ),
             safety_notes=(
                 "Request exact fow_architecture inspect/propose/adopt help. Propose a complete bounded definition against current adopted revision (0 initially); adopt through actor/request identity and rationale. Exact replay preserves history; stale/conflicting writes reject atomically.",
+                "Put governing prose or fenced Mermaid in optional payload.definition.markdown with the structured entities. Use fow_architecture export with payload.revision=0 for the adopted head or a positive revision for exact readback. The complete Markdown is returned directly and proposals remain labelled as proposals.",
                 "Use ordinary fow_packet_author start_packet/revise_packet architecture_refs to select component/interface/decision entities from one adopted revision. Omission preserves refs; [] clears them through a spec revision. Governing decisions must be selected explicitly; no reverse graph is inferred.",
                 "A changed adopted decision uses a new ID and retains explicit supersession lineage. Relevant changed/removed/superseded selected authority blocks work; unrelated adoption or unadopted proposals leave its fingerprint stable.",
                 "Complete Markdown and frozen HAND carry selected definitions, linked intent and provenance without chat history. Keep future symbols/contracts planned until evidence establishes implementation.",
-                "Pi owns the agent loop; Noxi owns UI/correlations/process observation/transport. Flower owns architecture/lifecycle semantics and does not launch a new coding harness.",
+                "The connected coding host owns the agent loop. Flower owns architecture and lifecycle authority; its public routes do not launch the coding host.",
                 "For projects managed by Flower, adopted architecture is canonical; repository Markdown is explanatory or an export tied to a named Flower revision. A new accepted work plan requires adopted components and current nonempty architecture_refs. Existing software is investigated and recorded as observed, without restarting historical packets or retrodating acceptance.",
             ),
         ),
@@ -538,30 +543,30 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             "Build and close a qualified campaign",
             area="campaigns",
             intent=(
-                "Define behavioral obligations and oracles, materialize tests through an "
-                "authorized provider, and close only from current attested evidence."
+                "Define behavioral obligations and Oracles, observe the current cases in "
+                "their authorized execution lanes, and close from current qualifying evidence."
             ),
-            authority_owner="Flower campaign lifecycle and orchestrator oracle authority",
+            authority_owner="Flower campaign lifecycle and orchestrator Oracle authority",
             authority_boundary=(
-                "Flower owns behavioral meaning and acceptance; the provider owns technical "
-                "materialization and execution."
+                "Flower governs campaign scope, proof and closure. The host records observed checks in "
+                "the host lane. Independently required proof stays with its authorized provider."
             ),
             semantic_decisions=(
                 "Which governed change, behavior, and obligation does the campaign cover?",
                 "Is the oracle complete and who attests its meaning?",
-                "Should source-authored or typed-oracle materialization be used?",
+                "Does the case admit host observations or require independently produced evidence?",
                 "Does current evidence authorize promotion or require remediation?",
             ),
             evidence=(
                 "closed campaign scope, cases, obligations, and oracle answers",
-                "current materialization attestation",
-                "authoritative deterministic and live run evidence",
+                "an issued host check and result bound to the tested source revision, or current provider attestation",
+                "current deterministic or live observations for the covered obligations",
             ),
             stop_conditions=(
                 "scope, obligation, binding, or oracle meaning is unresolved",
                 "evidence is stale, incomplete, flaky, or environment-blocked",
                 "authoritative product failure requires packet remediation",
-                "the test provider is unavailable or rejects the command",
+                "an independently required provider is unavailable or rejects the command",
             ),
             escalation_conditions=(
                 "oracle meaning or acceptance authority cannot be established deterministically",
@@ -569,7 +574,8 @@ _RECIPES: Mapping[str, dict[str, Any]] = MappingProxyType(
             safety_notes=(
                 "A compiling but unattested test cannot establish authoritative product failure.",
                 "Provider identities and raw internal representations remain behind the provider boundary.",
-                "Campaign provider evidence is accepted only from the structured channel; readable Markdown is not a transport contract.",
+                "Follow the current gate in campaign summary. Use operation help for exact inputs and use a scoped view for details.",
+                "Host observations keep their host provenance and cannot satisfy independently required proof.",
             ),
         ),
     }

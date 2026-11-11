@@ -122,6 +122,36 @@ def test_roadmap_progress_names_visible_scope_and_never_infers_acceptance(tmp_pa
         runtime.close()
 
 
+def test_focused_acceptance_uses_shared_scope_without_hydrating_list(tmp_path, monkeypatch):
+    runtime, ids, _, _, _ = prepared(tmp_path)
+    try:
+        milestone = runtime.ledger.promote_milestone(ids[0], MilestoneDraft(
+            name='Current scope', requirement_ids=('REQ-000001',), prerequisite_requirement_ids=(),
+            entry_policy={}, exit_policy={}, risk_disposition='bounded'), actor='human')
+        milestone_id = milestone['milestone_id']
+        runtime.changes.link_change_milestone(ids[0], ids[1], milestone_id, actor='engineer')
+        service = DashboardProjectionService(runtime)
+        before = dump(runtime)
+        monkeypatch.setattr(runtime.ledger, 'dashboard_items',
+                            lambda *args, **kwargs: pytest.fail('Focused read hydrated the dashboard list'))
+        for section, identity in [('packets', ids[2]), ('roadmap', milestone_id)]:
+            result = service.project(ids[0], section, scope_id=identity, limit=10)
+            context = result['summary']['acceptance_context']
+            assert result['items'] == [] and result['coherent_read']
+            assert context['scope']['milestone_id'] == milestone_id
+            if section == 'packets':
+                assert context['scope']['packet_id'] == ids[2]
+            assert context['milestone_acceptance']['state'] == 'blocked'
+            assert any(item['reason'] == 'packet_unresolved' for item in context['milestone_acceptance']['blockers'])
+        with pytest.raises(ValueError, match='page offset'):
+            service.project(ids[0], 'packets', scope_id=ids[2], offset=1)
+        with pytest.raises(ValueError, match='scope requires'):
+            service.project(ids[0], 'overview', scope_id=ids[2])
+        assert dump(runtime) == before
+    finally:
+        runtime.close()
+
+
 def test_oracle_source_ir_and_evidence_are_observed_without_execution(tmp_path):
     runtime, ids, _, _, _ = prepared(tmp_path)
     try:

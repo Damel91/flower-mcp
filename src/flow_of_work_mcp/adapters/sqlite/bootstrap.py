@@ -248,13 +248,32 @@ class BootstrapStoreMixin:
             recorded = self._json_object(row["payload_json"])
             if recorded.get("input") != expected:
                 raise RequirementConflictError("guided_bootstrap_request_conflict")
+            if operation == "revise_draft_milestone":
+                return recorded["outcome"]
             return self._bootstrap_value(connection, project_id, bootstrap_id)
+
+    def record_draft_milestone_outcome(self, project_id, bootstrap_id, *, mutation,
+                                       actor, request_id, outcome):
+        with self._transaction() as connection:
+            occurred_at = _utc_now()
+            self._append_bootstrap_event(connection, project_id=project_id, bootstrap_id=bootstrap_id,
+                event_type="guided_revise_draft_milestone", actor=actor, request_id=request_id,
+                payload={"input": {"operation": "revise_draft_milestone", "mutation": mutation, "actor": actor},
+                         "outcome": outcome}, occurred_at=occurred_at)
+            if outcome["changed"]:
+                self._append_event(connection, project_id=project_id, requirement_id=None,
+                    event_type="milestone_draft_revised", actor=actor, request_id=request_id,
+                    payload={"bootstrap_id": bootstrap_id, "milestone_id": outcome["milestone"]["milestone_id"],
+                             "previous_revision": outcome["previous_revision"],
+                             "current_revision": outcome["current_revision"],
+                             "roadmap_fingerprint": outcome["roadmap_fingerprint"]}, occurred_at=occurred_at)
 
     def record_guided_bootstrap(self, project_id: str, bootstrap_id: str, *,
                                 operation: str, mutation: Mapping[str, object],
                                 guided: Mapping[str, object], actor: str, request_id: str,
                                 stage: str = "intake", handoff: Mapping[str, object] | None = None,
-                                completion_reference: str = "") -> Mapping[str, Any]:
+                                completion_reference: str = "",
+                                authority_milestone_ids: list[str] | None = None) -> Mapping[str, Any]:
         actor = required_text(actor, "actor")
         request_id = required_text(request_id, "request_id")
         with self._transaction() as connection:
@@ -280,10 +299,13 @@ class BootstrapStoreMixin:
                  self._json(dict(handoff)) if handoff is not None else row["completion_handoff_json"],
                  project_id, bootstrap_id),
             )
+            payload = {"input": {"operation": operation, "mutation": dict(mutation), "actor": actor},
+                       "guided_state": dict(guided), "handoff": dict(handoff or {})}
+            if authority_milestone_ids is not None:
+                payload["authority_milestone_ids"] = authority_milestone_ids
             self._append_bootstrap_event(connection, project_id=project_id, bootstrap_id=bootstrap_id,
                 event_type="guided_" + operation, actor=actor, request_id=request_id,
-                payload={"input": {"operation": operation, "mutation": dict(mutation), "actor": actor},
-                         "guided_state": dict(guided), "handoff": dict(handoff or {})}, occurred_at=_utc_now())
+                payload=payload, occurred_at=_utc_now())
             return self._bootstrap_value(connection, project_id, bootstrap_id)
 
     def record_bootstrap_intake(

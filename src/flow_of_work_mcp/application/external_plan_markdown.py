@@ -34,7 +34,7 @@ def repository_review_summary(review: Mapping[str, Any]) -> dict[str, Any]:
     summary = {key: review[key] for key in (
         'contract_version', 'engineering_cycle_version', 'required', 'state',
         'scope_id', 'requirement_ids', 'basis_fingerprint', 'latest_audit_id',
-        'source', 'complete', 'retrospective_recorded', 'semantic_truth_verified',
+        'source', 'source_applicability', 'complete', 'retrospective_recorded', 'semantic_truth_verified',
         'human_acceptance', 'diagnostic', 'next_gate', 'change_id', 'packet_id',
         'expected_basis_fingerprint', 'source_identity', 'source_revision',
     ) if key in review}
@@ -205,6 +205,27 @@ def _ordered_units(units: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]
     return ordered
 
 
+def _criterion_responsibility(criterion: Mapping[str, Any], *, strict: bool, legacy_label: str) -> list[str]:
+    owners = ', '.join(map(str, criterion.get('implementation_units', [])))
+    if not strict:
+        coverage = 'verification-only' if criterion.get('verification') else 'unresolved'
+        return [legacy_label + (owners or coverage)]
+    disposition = criterion.get('disposition')
+    lines = ['Disposition: ' + str(disposition or 'unclassified')]
+    if disposition == 'implementation' or owners:
+        lines.append('Implementation units: ' + (owners or 'unresolved'))
+    target = criterion.get('target')
+    if isinstance(target, Mapping):
+        if target.get('kind') == 'criterion':
+            address = 'criterion ' + str(target.get('criterion', 'unresolved'))
+            if target.get('packet_id'):
+                address = str(target['packet_id']) + ' / ' + address
+        else:
+            address = str(target.get('ref', ''))
+        lines.append('Target: ' + _text(address))
+    return lines
+
+
 def render_plan(
     snapshot: Mapping[str, Any], projection: Mapping[str, Any], *,
     project_predecessor: Callable[[Mapping[str, Any]], Mapping[str, Any]],
@@ -285,8 +306,10 @@ def render_plan(
     _section(lines, 'Stable completion criteria')
     for criterion in projection.get('criteria', []):
         lines.append(f"- Criterion {criterion['number']}: {_text(criterion['statement'])}")
-        owners = criterion.get('implementation_units', [])
-        lines.append('  - Implementation ownership: ' + (', '.join(map(str, owners)) or ('verification-only' if criterion.get('verification') else 'unresolved')))
+        lines.extend('  - ' + line for line in _criterion_responsibility(
+            criterion, strict=projection.get('validation_version') == 2,
+            legacy_label='Implementation ownership: ',
+        ))
     predecessors = snapshot.get('predecessor_packets', [])
     if predecessors:
         _section(lines, 'Canonical predecessor packet boundary')
@@ -479,8 +502,10 @@ def render_external_result(result: Mapping[str, Any], *, inspection: bool = Fals
             for criterion in validation['criteria']:
                 _section(lines, f"Criterion {criterion['number']}", 3)
                 lines.extend([_text(criterion['statement']), ''])
-                owners = criterion.get('implementation_units', [])
-                lines.append('Implementation units: ' + (', '.join(map(str, owners)) or ('verification-only' if criterion.get('verification') else 'unresolved')))
+                lines.extend(_criterion_responsibility(
+                    criterion, strict=validation.get('validation_version') == 2,
+                    legacy_label='Implementation units: ',
+                ))
                 _section(lines, 'Declared verification', 4)
                 _record(lines, criterion.get('verification', []), level=5)
         for unit in _ordered_units(validation.get('units', [])):
