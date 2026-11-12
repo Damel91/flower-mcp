@@ -29,7 +29,7 @@ def adopt_minimal_architecture(ledger, project_id="alpha"):
     return ({"revision": adopted["revision"], "kind": "component", "entity_id": "Application"},)
 
 
-def record_test_repository_review(ledger, ids, *, state="aligned"):
+def record_test_repository_review(ledger, ids, *, state="aligned", source_revision="test-reviewed-source"):
     """Record explicitly synthetic host inspection for a test's current scope."""
     from flow_of_work_mcp.application.engineering_cycle import DIMENSIONS, RepositoryReviewService
     from flow_of_work_mcp.application.external_work import ExternalWorkService
@@ -44,7 +44,7 @@ def record_test_repository_review(ledger, ids, *, state="aligned"):
               "outcomes": not (snapshot["plan"] or {}).get("units") and not snapshot["external"]["reports"]}
     review = {"contract_version": "flow.repository-review.v1", "change_id": ids[1], "packet_id": ids[2],
               "expected_basis_fingerprint": context["basis_fingerprint"], "source_identity": "synthetic:test-repository",
-              "source_revision": "test-reviewed-source", "coverage": [
+              "source_revision": source_revision, "coverage": [
                   {"dimension": dimension, "state": "not_applicable" if absent[dimension] else state,
                    "rationale": "Synthetic scoped inspection retains original reports and deferred verification obligations.",
                    "evidence_refs": [] if absent[dimension] else ["synthetic:inspection-and-original-report-log"]}

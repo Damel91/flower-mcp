@@ -6,6 +6,9 @@ from copy import deepcopy
 from typing import Callable, Mapping
 
 from flow_of_work_mcp.application.change_control import ChangeControlService
+from flow_of_work_mcp.application.deferred_campaign_verification import (
+    CAMPAIGN_VERIFICATION_KINDS, campaign_plan_basis, deferred_campaign_proof,
+)
 from flow_of_work_mcp.application.external_plan_markdown import render_plan
 from flow_of_work_mcp.application.engineering_cycle import (
     engineering_cycle_version, normalize_observed_repository_source, repository_review_projection,
@@ -13,6 +16,7 @@ from flow_of_work_mcp.application.engineering_cycle import (
 from flow_of_work_mcp.application.packet_next_action import packet_technical_disposition_route
 from flow_of_work_mcp.core.domain.artifacts import ArtifactDraft, ArtifactGeneration, ArtifactKind, ArtifactMapping
 from flow_of_work_mcp.core.domain.architecture import architecture_authority_context
+from flow_of_work_mcp.core.domain.campaign_host import required_host_cases
 from flow_of_work_mcp.core.domain.change_control import PACKET_INACTIVE_STATUS_VALUES, validate_packet_id
 from flow_of_work_mcp.core.domain.identifiers import validate_project_id
 from flow_of_work_mcp.core.domain.lifecycle_control import milestone_prerequisite_gaps
@@ -332,8 +336,12 @@ class ExternalWorkService:
             for ref in [*answer.get('evidence_refs', []), answer.get('policy_ref')]:
                 if ref and answer.get('answer_summary'):
                     resolved[str(ref)] = {'kind': 'accepted_engineering_answer', 'content': answer['answer_summary'], 'provenance': answer.get('answer_source')}
-        refs = {v.get('authority_ref') for u in (plan or {}).get('units', []) for v in u.get('verifies', []) if v.get('authority_ref')}
-        refs.update('campaign:' + str(c) for c in packet.get('required_campaign_ids', []))
+        intents = [v for u in (plan or {}).get('units', []) for v in u.get('verifies', []) if v.get('authority_ref')]
+        required_refs = {'campaign:' + str(c) for c in packet.get('required_campaign_ids', [])}
+        refs = {v['authority_ref'] for v in intents} | required_refs
+        deferred_refs = {v['authority_ref'] for v in intents if v['kind'] in CAMPAIGN_VERIFICATION_KINDS}
+        other_refs = {v['authority_ref'] for v in intents if v['kind'] not in CAMPAIGN_VERIFICATION_KINDS} | required_refs
+        deferred_campaigns = {}
         campaigns = []
         # Only explicit campaign/oracle references enter authority fingerprint.
         for campaign in self._ledger.campaigns_for_change(project_id, change_id):
@@ -344,8 +352,12 @@ class ExternalWorkService:
                 semantic = {k: state.get(k) for k in ('campaign_id', 'revision', 'fingerprint', 'status', 'qualification', 'constructibility',
                     'scope', 'cases', 'obligations', 'obligation_bindings', 'oracles', 'oracle_bindings')}
                 if 'campaign:' + campaign_id in refs:
-                    resolved['campaign:' + campaign_id] = semantic
+                    ref = 'campaign:' + campaign_id
+                    resolved[ref] = semantic
                     campaigns.append(semantic)
+                    if (external['consumption_mode'] == 'external_agent' and ref in deferred_refs
+                            and required_host_cases(state)):
+                        deferred_campaigns[ref] = state
                 for oracle in state.get('oracles', []):
                     ref = 'oracle:' + str(oracle['oracle_id'])
                     if ref in refs:
@@ -356,9 +368,13 @@ class ExternalWorkService:
         basis_change = {k: change.get(k) for k in ('change_id', 'title', 'rationale', 'requirement_ids', 'goal_ids', 'source_refs', 'baseline_refs', 'milestone_id')}
         semantic_requirements = [{**{k: r.get(k) for k in ('requirement_id', 'current_revision', 'title', 'statement', 'category', 'rationale', 'source_anchor')},
                                   'retired': r['lifecycle_status'] == 'removed'} for r in requirements]
+        referenced_basis = {
+            ref: campaign_plan_basis(value) if ref in deferred_campaigns and ref not in other_refs else value
+            for ref, value in resolved.items()
+        }
         authority_basis = {'project_id': project_id, 'change_id': change_id, 'change': basis_change, 'packet': basis_packet,
                            'plan': basis_plan, 'criteria': external['criteria'], 'requirements': semantic_requirements,
-                           'goals': goals, 'goal_edges': goal_edges, 'accepted_answers': answers, 'accepted_risk_context': pressure_context, 'referenced_authority': resolved,
+                           'goals': goals, 'goal_edges': goal_edges, 'accepted_answers': answers, 'accepted_risk_context': pressure_context, 'referenced_authority': referenced_basis,
                            'predecessor_authority': [{'packet_id': predecessor['packet_id'], 'authority_fingerprint': fingerprint(predecessor['authority_basis'])}
                                                      for predecessor in predecessors]}
         if 'criterion_dispositions' in external:
@@ -373,6 +389,7 @@ class ExternalWorkService:
                 'plan': plan, 'external': external, 'requirements': requirements, 'goals': goals, 'milestone': milestone,
                 'predecessor_packets': predecessors,
                 'construction': construction, 'answers': answers, 'resolved_authorities': resolved,
+                'deferred_campaigns': deferred_campaigns,
                 'goal_edges': goal_edges, 'pressure_context': pressure_context, 'pressure_stale': pressure_stale,
                 'campaigns': campaigns, 'authority_basis': authority_basis,
                 'architecture': architecture,
@@ -396,9 +413,11 @@ class ExternalWorkService:
                 _cache=cache, _path=(*_path, packet_id), _change=change)
             authority_basis['contextual_predecessor_authority'] = fingerprint(snapshot['contextual_predecessor']['authority_basis'])
         contextual = snapshot.get('contextual_predecessor') or {}
-        if ('criterion_dispositions' in authority_basis or 'provider_authority_basis' in contextual
+        if ('criterion_dispositions' in authority_basis or referenced_basis != resolved
+                or 'provider_authority_basis' in contextual
                 or any('provider_authority_basis' in predecessor for predecessor in predecessors)):
             provider_basis = {key: value for key, value in authority_basis.items() if key != 'criterion_dispositions'}
+            provider_basis['referenced_authority'] = resolved
             provider_basis['predecessor_authority'] = [
                 {'packet_id': predecessor['packet_id'], 'authority_fingerprint': fingerprint(
                     predecessor.get('provider_authority_basis', predecessor['authority_basis']))}
@@ -1148,6 +1167,10 @@ class ExternalWorkService:
                         'state': 'verification_pending', 'host_result': claimed,
                         'linked_authority': authority, 'attestation': 'not_inferred',
                         'spec_revision': projection['spec_revision'], 'plan_revision': projection['plan_revision']}
+                    if closed and intent['unit_key'] in done:
+                        obligation.update(deferred_campaign_proof(
+                            snapshot, criterion, intent, effective[intent['unit_key']], self._ledger.grounding_audits,
+                        ))
                     obligations.append(obligation)
                     deferred.append(obligation)
                 implementation_expected = owners or (strict and criterion.get('disposition') not in
@@ -1221,6 +1244,7 @@ class ExternalWorkService:
             selected = _recovery_frontier(candidates) or next((row for row in candidates
                 if row['status'] in {'actionable', 'blocked', 'failed', 'conflict', 'stale'} and not row['dependencies_pending']), None)
         deferred = []
+        criteria = {criterion['number']: criterion for criterion in projection['criteria']}
         for u in projection['units']:
             current_report = effective.get(u['client_unit_key']) if u['client_unit_key'] in done else None
             for intent in u['verifies']:
@@ -1228,8 +1252,14 @@ class ExternalWorkService:
                     continue
                 evidence = next((v for v in (current_report or {}).get('payload', {}).get('verification', [])
                                  if (v['criterion'], v['kind'], v['statement']) == (intent['criterion'], intent['kind'], intent['statement'])), None)
-                deferred.append({'unit_key': u['client_unit_key'], **intent, 'state': 'host_reported_' + evidence['status'] if evidence else 'verification_pending',
-                                 'evidence': evidence, 'attestation': 'not_inferred'})
+                obligation = {'unit_key': u['client_unit_key'], **intent,
+                              'state': 'host_reported_' + evidence['status'] if evidence else 'verification_pending',
+                              'evidence': evidence, 'attestation': 'not_inferred'}
+                if current_report is not None:
+                    obligation.update(deferred_campaign_proof(
+                        snapshot, criteria[intent['criterion']], intent, current_report, self._ledger.grounding_audits,
+                    ))
+                deferred.append(obligation)
         recovery = bool(selected and selected['status'] == 'recovery_required' and not selected['dependencies_pending'])
         execution = {}
         if recovery:
@@ -1250,7 +1280,7 @@ class ExternalWorkService:
             review = snapshot['repository_review']
             if review['required'] and not review['complete']:
                 gate = {**review['next_gate'], 'reason': 'repository_review_required'}
-            elif deferred:
+            elif any(obligation['state'] != 'verified' for obligation in deferred):
                 gate = {'action_kind': 'verification_or_acceptance', 'external_operation': 'obtain_deferred_verification',
                         'reason': 'agent_work_complete_acceptance_pending'}
             else:

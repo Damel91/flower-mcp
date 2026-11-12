@@ -26,7 +26,7 @@ al commit `73cb74497e4ae65c509eb4ac8acf1026cbb0fd30` corregge il costo del recup
 [guida avanzata corrente](https://github.com/Damel91/flower-mcp/tree/main/docs/ADVANCED-CONFIGURATION.md)
 segue il ramo mutabile e non pretende di esistere già al pin congelato.
 I vecchi download di questo checkpoint puntavano alla release `0.5.2`.
-I comandi operativi in [Ora prova Flower](try-flower.md) selezionano la 1.1.0. La storica
+I comandi operativi in [Ora prova Flower](try-flower.md) selezionano la 1.1.1. La storica
 `0.4.1` conserva runtime `0.4.0`; questa fotografia editoriale non qualifica i
 binari. Le release pubblicate `0.3.1`, `0.4.0`, `0.4.1`, `0.5.0` e `0.5.1` rimangono immutabili.
 Il reader si rigenera dai Markdown; i riferimenti di
@@ -42,7 +42,7 @@ per gli esiti storici e le evidenze introdotte nella 0.13.0 restano disponibili.
 I link seguono il ramo corrente `main`.
 
 - [Guida della dashboard](https://github.com/Damel91/flower-mcp/tree/main/docs/DASHBOARD.md): avvio, accesso del proprietario, temi, lettura e manutenzione.
-- [Release notes 1.1.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-1.1.0.md): perimetro della release, installazione e aggiornamento.
+- [Release notes 1.1.1](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-1.1.1.md): perimetro della release, installazione e aggiornamento.
 - Le [note di rilascio 0.14.0](https://github.com/Damel91/flower-mcp/tree/main/docs/RELEASE-NOTES-0.14.0.md) descrivono le modifiche precedenti a eliminazione e ripristino.
 - [Recupero della currentness](https://github.com/Damel91/flower-mcp/tree/main/docs/CONTINUOUS-RECOVERY.md): fingerprint e valutazione degli snapshot precedenti.
 

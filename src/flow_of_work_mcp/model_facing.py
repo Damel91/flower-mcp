@@ -768,6 +768,13 @@ def _acceptance_markdown(context: Mapping[str, Any]) -> str:
     for deferred in context["deferred_obligations"]:
         lines.append("- **Deferred verification** " + safe_inline(" · ".join(str(deferred.get(key) or "")
             for key in ("applicability", "state", "authority_ref", "statement"))))
+        if deferred.get("proof_reason"):
+            lines.append("  - " + safe_inline(deferred["proof_reason"]))
+        if route := deferred.get("proof_route"):
+            arguments = route["arguments"]
+            lines.append("  - Inspect " + safe_inline(
+                f"{route['tool']} · {arguments['campaign_id']} · {arguments['view']}"
+            ))
     if context["truncated"]:
         lines.extend(["", "This view is bounded. Use the scoped read and the retained evidence references for details."])
     return "\n".join(lines)

@@ -1,5 +1,20 @@
 # Upgrade Flower without losing project data
 
+<a id="preparing-a-111-upgrade"></a>
+
+## Preparing a 1.1.1 upgrade
+
+Choose the [1.1.1 release assets](https://github.com/Damel91/flower-mcp/releases/tag/v1.1.1)
+and verify the installer against that release's `SHA256SUMS`. Stop Flower and
+preview the upgrade with `--upgrade --dry-run` or PowerShell
+`-Upgrade -DryRun`. Use the same environment, profile and profile root. Check
+the SQLite and YAML paths, then apply without the dry-run option.
+
+The installer backs up SQLite and the profile YAML before pip. Upgrading from
+1.1.0 uses schema 56 and retains the selected client configuration. Restart
+with your usual launcher and resume the existing project. Keep the backup and
+upgrade receipt. [1.1.1 release notes](RELEASE-NOTES-1.1.1.md)
+
 ## Preparing a 1.1.0 upgrade
 
 Choose the [1.1.0 release assets](https://github.com/Damel91/flower-mcp/releases/tag/v1.1.0)

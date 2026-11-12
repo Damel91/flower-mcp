@@ -212,6 +212,7 @@ def _acceptance_summary(acceptance: Mapping[str, object], limit: int) -> dict:
 
 def _deferred_summary(obligation: Mapping[str, object], *, applies: bool) -> dict:
     statement = str(obligation.get("statement") or "")
-    return {**{key: obligation[key] for key in ("packet_id", "unit_key", "criterion", "kind", "state", "authority_ref", "attestation")
+    return {**{key: obligation[key] for key in ("packet_id", "unit_key", "criterion", "kind", "state", "authority_ref",
+                                               "attestation", "proof_reason", "proof_route", "campaign_proof")
                if key in obligation}, "statement": statement[:512], "statement_truncated": len(statement) > 512,
             "applicability": "acceptance_prerequisite" if applies else "packet_context"}

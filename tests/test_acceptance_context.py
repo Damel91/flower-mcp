@@ -1,13 +1,16 @@
 """Scoped acceptance readback preserves report, proof and decision boundaries."""
 import asyncio
+from dataclasses import replace
 
 import pytest
 
 from flow_of_work_mcp import (
-    GoalGraphService, GovernedChangeDraft, ImplementationPacketDraft, LifecycleControlService,
-    LifecycleStatus, MilestoneDraft, PacketWorkPlanDraft, RequirementDraft, RequirementService,
+    GoalGraphService, GovernedChangeDraft, GroundingAudit, GroundingDisposition, GroundingDivergence,
+    GroundingItem, ImplementationAnchor, ImplementationPacketDraft, LifecycleControlService,
+    LifecycleStatus, MilestoneDraft, PacketWorkPlanDraft, RequirementDraft, RequirementService, SequenceDraft,
     UseCaseDraft, VerificationDraft, VerificationKind, VerificationOutcome, WorkPlanUnit,
 )
+from flow_of_work_mcp.core.domain.campaign_authority import CampaignScopeDraft
 from flow_of_work_mcp.core.domain.change_control import PacketStatus, PacketTransition
 from flow_of_work_mcp.core.errors import ChangeControlBlockedError
 from flow_of_work_mcp.mcp_runtime import build_runtime
@@ -17,6 +20,8 @@ from flow_of_work_mcp.server import (
     handle_handover, handle_packet_advance, handle_packet_inspect, handle_traceability,
 )
 from tests.engineering_cycle_support import adopt_minimal_architecture, record_test_repository_review
+from tests.test_campaign_authority import _case, _complete_fields
+from tests.test_campaign_host_execution import _advance, _author, _issue, _report
 from tests.test_external_work import report
 
 
@@ -58,7 +63,7 @@ def scoped_work(tmp_path):
         runtime.close()
 
 
-def _complete_external(runtime, ids, *, deferred=False, record_review=True):
+def _prepare_external(runtime, ids, *, deferred=False, authority_ref="", deferred_kind="live_campaign"):
     packet = runtime.ledger.change_state(*ids[:2])["packets"][0]
     spec_revision = packet["spec_revision"]
     external = runtime.external_work
@@ -66,7 +71,10 @@ def _complete_external(runtime, ids, *, deferred=False, record_review=True):
     check = "Compare the public artifact checksum to the verified local build."
     verifies = [{"criterion": 1, "kind": "unit_check", "statement": check}]
     if deferred:
-        verifies.append({"criterion": 1, "kind": "live_campaign", "statement": "Exercise the installed release. " * 20})
+        verification = {"criterion": 1, "kind": deferred_kind, "statement": "Exercise the installed release. " * 20}
+        if authority_ref:
+            verification["authority_ref"] = authority_ref
+        verifies.append(verification)
     plan = runtime.ledger.create_packet_work_plan(ids[0], PacketWorkPlanDraft(ids[1], ids[2], spec_revision, (
         WorkPlanUnit(client_unit_key="publish", operation_kind="new_file", file_path="release.txt",
                      instructions=("Publish the pinned artifact.",), unit_checks=(check,), implements=(1,),
@@ -77,8 +85,13 @@ def _complete_external(runtime, ids, *, deferred=False, record_review=True):
         rationale="Bounded test plan.", actor="agent", request_id="accept-plan")
     revisions = {"expected_spec_revision": plan["packet_revision"], "expected_plan_revision": plan["plan_revision"]}
     external.call(*ids, "set_mode", actor="agent", request_id="mode", payload={"mode": "external_agent", **revisions})
-    external.call(*ids, "report_outcome", actor="agent", request_id="report",
-                  payload=report(external, ids, revisions, "publish", report_key="release-report"))
+    return revisions
+
+
+def _complete_external(runtime, ids, *, deferred=False, record_review=True):
+    revisions = _prepare_external(runtime, ids, deferred=deferred)
+    runtime.external_work.call(*ids, "report_outcome", actor="agent", request_id="report",
+                               payload=report(runtime.external_work, ids, revisions, "publish", report_key="release-report"))
     return record_test_repository_review(runtime.ledger, ids).audit_id if record_review else None
 
 
@@ -292,6 +305,163 @@ def test_external_deferred_requirement_uses_same_check_and_mixed_mode_preserves_
     assert mixed["deferred_obligations"][0]["applicability"] == "packet_context"
     with pytest.raises(ChangeControlBlockedError, match="milestone_acceptance_blocked"):
         runtime.lifecycle.accept_milestone(ids[0], milestone_id, acceptance_evidence=("operator:decision",), actor="operator")
+
+
+@pytest.mark.parametrize("scenario", [
+    "deterministic", "live", "integration", "wrong_class", "wrong_source", "no_link", "wrong_scope",
+    "independent_exception", "stale_after_pass",
+])
+def test_linked_current_campaign_proof_reconciles_deferred_milestone(scoped_work, scenario):
+    runtime, _requirements, ids, milestone_id, identities = scoped_work
+    project_id, change_id, packet_id = ids
+    requirement_id, _, goal_id, _ = identities
+    ledger = runtime.ledger
+    external = runtime.external_work
+    report_source = "host-revision-1"
+    independent = scenario == "independent_exception"
+    case_source = "host-revision-other" if scenario == "wrong_source" else report_source
+    case_class = scenario if scenario in {"live", "integration"} else "deterministic"
+    deferred_kind = "live_campaign" if scenario in {"live", "integration", "wrong_class"} else "deterministic_campaign"
+    goals = ()
+    if case_class in {"live", "integration"}:
+        graph = GoalGraphService(ledger)
+        sequence = graph.add_sequence(project_id, SequenceDraft(
+            title="Install artifact", participants=("operator", "runtime"),
+            normal_steps=("Install the pinned artifact.", "Observe the running release."),
+            expected_effects=("The verified release starts.",),
+        ), actor="engineer")
+        goals = (goal_id, sequence["goal_node_id"])
+        graph.link(project_id, source_goal_id=goals[0], target_goal_id=goals[1],
+                   relation="realized_by", actor="engineer")
+        ledger.record_grounding_audit(GroundingAudit(
+            project_id=project_id, provider_id="", source_revision=case_source,
+            selected_goal_ids=goals, disposition=GroundingDisposition.COMPLETED,
+            evidence_authority="host_declared",
+            anchors=(ImplementationAnchor("fixture", "symbol", "installed release", "owned fixture"),),
+            items=tuple(GroundingItem(GroundingDivergence.CONVERGED, goal, ("fixture",)) for goal in goals),
+        ), actor="engineer")
+    case = replace(_case("Verify the released artifact"), execution_class=case_class,
+                   case_kind="live_sequence" if goals else "deterministic_regression")
+    campaign = ledger.start_campaign_authority(
+        project_id, title="Deferred milestone proof",
+        scope=CampaignScopeDraft(
+            change_id=change_id, milestone_id=milestone_id, requirement_ids=(requirement_id,),
+            goal_ids=goals, packet_ids=() if scenario == "wrong_scope" else (packet_id,),
+            execution_lane="host", independent_proof_refs=(packet_id,) if independent else (),
+        ), first_case=case, actor="engineer",
+    )["campaign_id"]
+    if independent:
+        ledger.add_campaign_authority_case(
+            project_id, campaign, replace(case, title="Independent criterion proof", execution_lane="provider"),
+            actor="engineer",
+        )
+    revisions = _prepare_external(
+        runtime, ids, deferred=True, deferred_kind=deferred_kind,
+        authority_ref="" if scenario == "no_link" else f"campaign:{campaign}",
+    )
+    state = ledger.derive_campaign_obligations(project_id, campaign, actor="engineer")
+    case_id = state["cases"][0]["case_id"]
+    criterion_obligation = next(
+        (row for row in state["obligations"]
+         if row["source_kind"] == "packet_criterion" and row["source_ref"] == f"{packet_id}:criterion:1"),
+        None,
+    )
+    assert (criterion_obligation is not None) is (scenario != "wrong_scope")
+    provider_case_id = state["cases"][1]["case_id"] if independent else ""
+    _author(runtime, campaign, "author_obligations", "deferred-obligations", expected_fingerprint=state["fingerprint"],
+            obligation_batch={
+                "decisions": [{"obligation_id": row["obligation_id"], "decision": "required",
+                               "rationale": "The declared obligation is in scope."} for row in state["obligations"]],
+                "bindings": [{"obligation_id": row["obligation_id"],
+                              "case_id": provider_case_id if independent and row == criterion_obligation else case_id,
+                              "coverage_intent": row["statement"]} for row in state["obligations"]],
+            })
+    for current_case in state["cases"]:
+        current_case_id = current_case["case_id"]
+        _author(runtime, campaign, "author_oracle", f"deferred-oracle-{current_case_id}", case_id=current_case_id,
+                oracle={"oracle_kind": "behavior", "subject_bindings": [requirement_id], "goal_bindings": list(goals),
+                        "authority_reference": "confirmed campaign scope",
+                        "semantic_fields": _complete_fields() | {"execution_class": case_class}})
+    payload = report(external, ids, revisions, "publish", report_key="release-report")
+    issued_receipt = external.call(*ids, "report_outcome", actor="agent", request_id="report", payload=payload)
+    record_test_repository_review(ledger, ids, source_revision=payload["source_revision"])
+    before = runtime.project_state_snapshot.acceptance_context(project_id, milestone_id=milestone_id)
+    assert before["deferred_obligations"][0]["state"] == "verification_pending"
+    assert "external_milestone_verification_pending" in {
+        blocker["reason"] for blocker in before["milestone_acceptance"]["blockers"]
+    }
+
+    attempt = _issue(runtime, campaign, case_id, "deferred-issue", source=case_source)["host_attempt"]
+    _report(runtime, campaign, attempt, "deferred-result", source=case_source)
+    if independent:
+        exception = _author(
+            runtime, campaign, "accept_exception", "deferred-exception",
+            exception_obligation_ids=[criterion_obligation["obligation_id"]],
+            evidence_gaps=["Independent proof is unavailable in the fixture."],
+            risk_authority="fixture:stakeholder-review", disposition_reference="fixture:independent-gap",
+        )
+        assert exception["campaign"]["status"] == "accepted_exception"
+    else:
+        advanced = _advance(runtime, campaign, "deferred-propagate", source=case_source)
+        assert advanced["status"] == "success", advanced
+        assert advanced["result"]["lifecycle_gate"]["state"] == "accepted"
+        assert advanced["result"]["transitions"][0]["result"]["propagated"]
+    after = runtime.project_state_snapshot.acceptance_context(project_id, milestone_id=milestone_id)
+    obligation = after["deferred_obligations"][0]
+    acceptance = after["milestone_acceptance"]
+    expected_verified = scenario in {"deterministic", "live", "integration", "stale_after_pass"}
+    expected_state = "verified" if expected_verified else "verification_pending"
+    assert obligation["state"] == expected_state
+    assert acceptance["recorded_acceptance"] is False
+    assert acceptance["external_progress"]["implementation_complete"] is True
+    assert acceptance["external_progress"]["local_verification_complete"] is True
+    assert ("external_milestone_verification_pending" in {row["reason"] for row in acceptance["blockers"]}) is not expected_verified
+    todo = external.todo(*ids)
+    assert todo["authority_fingerprint"] == payload["authority_fingerprint"]
+    assert todo["deferred_verification"][0]["state"] == expected_state
+    assert todo["next_gate"]["external_operation"] == (
+        "record_technical_disposition" if expected_verified else "obtain_deferred_verification"
+    )
+    replay = external.call(*ids, "report_outcome", actor="agent", request_id="report", payload=payload)
+    assert replay.get("recorded_receipt", replay) == issued_receipt
+    if scenario == "stale_after_pass":
+        replacement = _issue(runtime, campaign, case_id, "deferred-source-changed", source="host-revision-new")
+        assert replacement["host_attempt"]["attempt_id"] != attempt["attempt_id"]
+        stale = runtime.project_state_snapshot.acceptance_context(project_id, milestone_id=milestone_id)
+        stale_obligation = stale["deferred_obligations"][0]
+        assert stale_obligation["state"] == "verification_pending"
+        assert "campaign_proof" not in stale_obligation
+        assert stale["milestone_acceptance"]["recorded_acceptance"] is False
+        assert "external_milestone_verification_pending" in {
+            row["reason"] for row in stale["milestone_acceptance"]["blockers"]
+        }
+        stale_todo = external.todo(*ids)
+        assert stale_todo["authority_fingerprint"] == payload["authority_fingerprint"]
+        assert stale_todo["next_gate"]["external_operation"] == "obtain_deferred_verification"
+        replay = external.call(*ids, "report_outcome", actor="agent", request_id="report", payload=payload)
+        assert replay.get("recorded_receipt", replay) == issued_receipt
+    elif expected_verified:
+        criterion = ledger.change_state(project_id, change_id)["packets"][0]["completion_criteria"][0]
+        implemented = handle_change(
+            runtime, project_id=project_id, change_id=change_id, packet_id=packet_id, operation="transition_packet",
+            packet_status="implemented", actor="engineer", request_id="deferred-disposition",
+            criterion_results={criterion: "Current report and linked campaign proof."},
+        )
+        assert implemented["status"] == "success", implemented
+        human_gate = runtime.lifecycle.milestone_acceptance_context(project_id, milestone_id)
+        assert human_gate["state"] == "awaiting_human"
+        assert human_gate["awaited_inputs"] == ["acceptance_evidence"]
+        if scenario != "deterministic":
+            runtime.lifecycle.accept_milestone(project_id, milestone_id, acceptance_evidence=("operator:fixture",),
+                                               actor="operator", request_id="deferred-human-decision")
+            assert runtime.lifecycle.milestone_acceptance_context(project_id, milestone_id)["state"] == "accepted"
+    elif scenario == "wrong_source":
+        envelope = handle_packet_inspect(runtime, project_id=project_id, change_id=change_id, packet_id=packet_id,
+                                         view="summary")
+        structured = envelope["result"]["packet"]["acceptance_context"]["deferred_obligations"][0]
+        assert structured["proof_reason"] == "Use campaign proof from the exact source of the current packet work."
+        markdown = project_markdown("fow_packet_inspect", envelope, arguments={"view": "summary"})
+        assert structured["proof_reason"] in markdown
 
 
 def test_existing_closure_distinguishes_missing_human_input_from_a_prerequisite(scoped_work):
